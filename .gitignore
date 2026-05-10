@@ -1,0 +1,32 @@
+# Python runtime artifacts
+__pycache__/
+*.py[cod]
+*.pyo
+.pytest_cache/
+
+# Local environments
+.venv/
+venv/
+env/
+.conda/
+
+# SecretBase local configuration and data
+backend/.env
+backend/data/
+backend/logs/
+backend/settings.json
+
+# Local planning/session notes
+task_plan.md
+findings.md
+progress.md
+
+# OS/editor artifacts
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Node tooling cache if used for local static serving
+node_modules/
+npm-debug.log*

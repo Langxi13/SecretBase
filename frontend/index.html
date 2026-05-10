@@ -1,0 +1,1172 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SecretBase - 密码管理工具</title>
+    
+    <!-- Vue 3 CDN (Production) -->
+    <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+    
+    <!-- 基础样式 -->
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/components.css">
+    
+    <!-- 主题样式 -->
+    <link rel="stylesheet" href="css/themes/variables.css">
+    <link rel="stylesheet" href="css/themes/dark.css">
+    <link rel="stylesheet" href="css/themes/light.css">
+    <link rel="stylesheet" href="css/themes/system.css">
+    
+    <!-- Favicon -->
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🔐</text></svg>">
+</head>
+<body>
+    <div id="app">
+        <!-- 加载中 -->
+        <div v-if="loading" class="loading-screen">
+            <div class="loading-spinner"></div>
+            <p>加载中...</p>
+        </div>
+        
+        <!-- 未初始化 - 设置主密码 -->
+        <div v-else-if="!initialized" class="auth-screen">
+            <div class="auth-card">
+                <h1>🔐 SecretBase</h1>
+                <h2>设置主密码</h2>
+                <p class="auth-hint">这是唯一密码，请牢记</p>
+                
+                <form @submit.prevent="initPassword">
+                    <div class="form-group">
+                        <label>主密码</label>
+                        <input 
+                            type="password" 
+                            v-model="password" 
+                            placeholder="请输入主密码（至少 8 位）"
+                            minlength="8"
+                            required
+                        >
+                    </div>
+                    <div class="form-group">
+                        <label>确认密码</label>
+                        <input 
+                            type="password" 
+                            v-model="confirmPassword" 
+                            placeholder="请再次输入密码"
+                            required
+                        >
+                    </div>
+                    <p v-if="passwordError" class="error-message">{{ passwordError }}</p>
+                    <button type="submit" class="btn-primary" :disabled="submitting">
+                        {{ submitting ? '设置中...' : '设置主密码' }}
+                    </button>
+                </form>
+            </div>
+        </div>
+        
+        <!-- 已锁定 - 解锁界面 -->
+        <div v-else-if="locked" class="auth-screen">
+            <div class="auth-card">
+                <h1>🔐 SecretBase</h1>
+                <h2>解锁</h2>
+                
+                <form @submit.prevent="unlock">
+                    <div class="form-group">
+                        <label>主密码</label>
+                        <input 
+                            type="password" 
+                            v-model="password" 
+                            placeholder="请输入主密码"
+                            autofocus
+                            required
+                        >
+                    </div>
+                    <p v-if="unlockError" class="error-message">{{ unlockError }}</p>
+                    <button type="submit" class="btn-primary" :disabled="submitting">
+                        {{ submitting ? '解锁中...' : '解锁' }}
+                    </button>
+                </form>
+            </div>
+        </div>
+        
+        <!-- 已解锁 - 主界面 -->
+        <div v-else class="app-container">
+            <aside class="desktop-sidebar" aria-label="桌面侧边栏导航">
+                <div class="sidebar-brand">
+                    <div class="sidebar-logo">🔐</div>
+                    <div>
+                        <h1>SecretBase</h1>
+                        <p>本地加密密码库</p>
+                    </div>
+                </div>
+                <button class="btn-primary sidebar-create" @click="openCreateModal">
+                    + 新建条目
+                </button>
+                <nav class="sidebar-section" aria-label="条目视图">
+                    <span class="sidebar-label">视图</span>
+                    <button class="sidebar-nav-item" :class="{ active: filter === 'all' && !activeTagName }" @click="showAllEntries">
+                        <span>全部条目</span>
+                        <strong>{{ totalEntries }}</strong>
+                    </button>
+                    <button class="sidebar-nav-item" :class="{ active: filter === 'starred' }" @click="showStarredEntries">
+                        <span>星标条目</span>
+                        <strong>★</strong>
+                    </button>
+                </nav>
+                <nav class="sidebar-section sidebar-tags" aria-label="标签筛选">
+                    <span class="sidebar-label">标签</span>
+                    <button
+                        class="sidebar-nav-item sidebar-more-tags"
+                        @click="openTagBrowser"
+                    >
+                        <span>更多标签</span>
+                        <strong>{{ hiddenSidebarTagCount > 0 ? '+' + hiddenSidebarTagCount : tags.length }}</strong>
+                    </button>
+                    <button
+                        v-for="tag in visibleSidebarTags"
+                        :key="tag.name"
+                        class="sidebar-nav-item tag-nav-item"
+                        :class="{ active: activeTagName === tag.name }"
+                        @click="filterByTag(tag.name)"
+                        :title="tag.name"
+                    >
+                        <span><i class="tag-dot" :style="{ backgroundColor: tag.color }"></i>{{ tag.name }}</span>
+                        <strong>{{ tag.count }}</strong>
+                    </button>
+                </nav>
+                <nav class="sidebar-section sidebar-tools" aria-label="管理工具">
+                    <span class="sidebar-label">管理</span>
+                    <button class="sidebar-nav-item" @click="openAiParse"><span>AI 智能录入</span><strong>🤖</strong></button>
+                    <button class="sidebar-nav-item" @click="showTagManager = true"><span>标签管理</span><strong>🏷️</strong></button>
+                    <button class="sidebar-nav-item" @click="showTrash = true"><span>回收站</span><strong>🗑️</strong></button>
+                    <button class="sidebar-nav-item" @click="openToolsModal"><span>工具</span><strong>🧰</strong></button>
+                    <button class="sidebar-nav-item" @click="showSettings = true"><span>设置</span><strong>⚙️</strong></button>
+                </nav>
+            </aside>
+            <div class="workspace-shell">
+            <!-- 顶部导航 -->
+            <header class="app-header">
+                <div class="header-left">
+                    <h1 class="logo">🔐 SecretBase</h1>
+                </div>
+                <div class="header-right">
+                    <button class="btn-icon" @click="openAiParse" title="AI 智能录入">
+                        🤖
+                    </button>
+                    <button class="btn-icon" @click="toggleTheme" title="切换主题">
+                        {{ themeIcon }}
+                    </button>
+                    <button class="btn-icon" @click="showSettings = true" title="设置">
+                        ⚙️
+                    </button>
+                    <button class="btn-icon" @click="lock" title="锁定">
+                        🔒
+                    </button>
+                </div>
+            </header>
+            
+            <!-- 搜索和筛选栏 -->
+            <div class="search-bar">
+                <input 
+                    type="text" 
+                    v-model="searchQuery" 
+                    placeholder="搜索条目..."
+                    class="search-input"
+                    @input="debounceSearch"
+                >
+                <div class="search-scope-selector" aria-label="搜索范围">
+                    <span class="search-scope-label">搜索范围</span>
+                    <button
+                        v-for="scope in searchScopeOptions"
+                        :key="scope.key"
+                        type="button"
+                        class="search-scope-chip"
+                        :class="{ active: selectedSearchScopes.includes(scope.key) }"
+                        :aria-pressed="selectedSearchScopes.includes(scope.key)"
+                        @click="toggleSearchScope(scope.key)"
+                    >
+                        {{ scope.label }}
+                    </button>
+                </div>
+                <p class="search-scope-hint">只在已选范围内搜索；全部取消时，输入搜索词不会返回结果。</p>
+                <div class="sort-controls">
+                    <label>
+                        排序
+                        <select v-model="sortBy" @change="applySort">
+                            <option value="updated_at">更新时间</option>
+                            <option value="created_at">创建时间</option>
+                            <option value="title">标题</option>
+                        </select>
+                    </label>
+                    <label>
+                        方向
+                        <select v-model="sortOrder" @change="applySort">
+                            <option value="desc">降序</option>
+                            <option value="asc">升序</option>
+                        </select>
+                    </label>
+                </div>
+                <div class="advanced-filters">
+                    <button class="btn-small" @click="showAdvancedFilters = !showAdvancedFilters">
+                        高级筛选 {{ showAdvancedFilters ? '▲' : '▼' }}
+                    </button>
+                    <div v-if="activeAdvancedFilterChips.length > 0" class="active-filter-chips">
+                        <span v-for="chip in activeAdvancedFilterChips" :key="chip.key" class="tag filter-chip">
+                            {{ chip.label }}
+                            <button @click="removeAdvancedFilterChip(chip)">✕</button>
+                        </span>
+                    </div>
+                    <div v-if="showAdvancedFilters" class="advanced-filter-panel">
+                        <div class="advanced-filter-row full-width">
+                            <span class="filter-label">多标签</span>
+                            <div class="filter-tags-input">
+                                <span v-for="tag in advancedTagList" :key="tag" class="tag filter-chip">
+                                    {{ tag }}
+                                    <button @click="removeAdvancedTag(tag)">✕</button>
+                                </span>
+                                <input
+                                    type="text"
+                                    v-model="advancedTagDraft"
+                                    placeholder="输入标签后回车，也支持逗号分隔"
+                                    @keydown.enter.prevent="commitAndApplyAdvancedTags"
+                                    @keydown.tab.prevent="commitAndApplyAdvancedTags"
+                                    @keydown="handleAdvancedTagKey"
+                                    @input="handleAdvancedTagInput"
+                                    @blur="commitAdvancedTags"
+                                >
+                            </div>
+                        </div>
+                        <div class="advanced-filter-card advanced-filter-dates">
+                            <span class="filter-label">创建时间</span>
+                            <span class="filter-help">留空表示不限，默认 {{ defaultTimeRange.from }} 至 {{ defaultTimeRange.to }}</span>
+                            <div class="advanced-filter-inline">
+                                <label>起始 <input type="date" v-model="advancedFilters.createdFrom" @change="applyAdvancedFilters"></label>
+                                <label>结束 <input type="date" v-model="advancedFilters.createdTo" @change="applyAdvancedFilters"></label>
+                            </div>
+                        </div>
+                        <div class="advanced-filter-card advanced-filter-state">
+                            <span class="filter-label">状态</span>
+                            <label class="checkbox-label compact-checkbox">
+                                <input type="checkbox" v-model="advancedFilters.untagged" @change="applyAdvancedFilters">
+                                只看无标签
+                            </label>
+                            <div class="advanced-filter-inline">
+                                <label>网址
+                                    <select v-model="advancedFilters.hasUrl" @change="applyAdvancedFilters">
+                                        <option value="">不限</option>
+                                        <option value="yes">有网址</option>
+                                        <option value="no">无网址</option>
+                                    </select>
+                                </label>
+                                <label>备注
+                                    <select v-model="advancedFilters.hasRemarks" @change="applyAdvancedFilters">
+                                        <option value="">不限</option>
+                                        <option value="yes">有备注</option>
+                                        <option value="no">无备注</option>
+                                    </select>
+                                </label>
+                            </div>
+                        </div>
+                        <div class="advanced-filter-card advanced-filter-actions">
+                            <span class="filter-label">操作</span>
+                            <button class="btn-small" @click="applyAdvancedFilters">应用</button>
+                            <button class="btn-small" @click="clearAdvancedFilters">清空</button>
+                            <button class="btn-small" @click="saveCurrentAdvancedFilter">保存</button>
+                        </div>
+                        <div v-if="savedAdvancedFilters.length > 0" class="saved-filter-list full-width">
+                            <span class="filter-label">常用筛选</span>
+                            <span v-for="item in savedAdvancedFilters" :key="item.id" class="saved-filter-chip">
+                                <button @click="applySavedAdvancedFilter(item)">{{ item.name }}</button>
+                                <button class="saved-filter-remove" @click="deleteSavedAdvancedFilter(item)">✕</button>
+                            </span>
+                        </div>
+                    </div>
+                </div>
+                <div class="filter-tabs">
+                    <button 
+                        class="tab-btn" 
+                        :class="{ active: filter === 'all' }"
+                        @click="showAllEntries"
+                    >
+                        全部
+                    </button>
+                    <button 
+                        class="tab-btn" 
+                        :class="{ active: filter === 'starred' }"
+                        @click="showStarredEntries"
+                    >
+                        ⭐ 星标
+                    </button>
+                    <div class="tag-filter" v-if="tags.length > 0">
+                        <button class="tab-btn" @click="openTagBrowser">
+                            🏷️ 标签
+                        </button>
+                    </div>
+                </div>
+                <div v-if="hasActiveListState" class="list-state-banner">
+                    <div>
+                        <strong>当前列表状态</strong>
+                        <span v-for="item in activeListStateItems" :key="item" class="state-pill">{{ item }}</span>
+                    </div>
+                    <button class="btn-small" @click="clearListState">清除定位/筛选</button>
+                </div>
+            </div>
+            
+            <!-- 主内容区 -->
+            <main class="main-content">
+                <!-- 空状态 -->
+                <div v-if="entries.length === 0 && !loading" class="empty-state">
+                    <div class="empty-icon">📭</div>
+                    <h3>还没有条目</h3>
+                    <p>点击下方按钮新建条目</p>
+                    <button class="btn-primary" @click="showCreateModal = true">
+                        + 新建条目
+                    </button>
+                </div>
+                
+                <!-- 条目列表 -->
+                <div v-else class="entries-grid">
+                    <div 
+                        v-for="entry in entries" 
+                        :key="entry.id"
+                        class="entry-card"
+                        @click="viewEntry(entry)"
+                    >
+                        <div class="card-header">
+                            <input
+                                type="checkbox"
+                                class="entry-select"
+                                :checked="isEntrySelected(entry.id)"
+                                @click.stop
+                                @change="toggleEntrySelection(entry.id)"
+                            >
+                            <img 
+                                v-if="entry.url" 
+                                :src="getFavicon(entry.url)" 
+                                class="favicon" 
+                                @error="e => e.target.style.display='none'"
+                            >
+                            <span v-else class="favicon-placeholder">🔗</span>
+                            <h3 class="entry-title">{{ entry.title }}</h3>
+                            <button 
+                                class="star-btn" 
+                                :class="{ starred: entry.starred }"
+                                @click.stop="toggleStar(entry)"
+                            >
+                                {{ entry.starred ? '★' : '☆' }}
+                            </button>
+                        </div>
+                        
+                        <div class="card-tags" v-if="entry.tags.length > 0">
+                            <span 
+                                v-for="tag in entry.tags" 
+                                :key="tag"
+                                class="tag"
+                                :style="{ backgroundColor: getTagColor(tag) }"
+                                @click.stop="filterByTag(tag)"
+                            >
+                                {{ tag }}
+                            </span>
+                        </div>
+                        
+                        <div class="card-fields">
+                            <div 
+                                v-for="field in entry.fields.slice(0, 3)" 
+                                :key="field.name"
+                                class="field-row"
+                            >
+                                <span class="field-name">{{ field.name }}</span>
+                                <span class="field-value">{{ field.copyable ? '••••••' : field.value }}</span>
+                            </div>
+                        </div>
+                        
+                        <div class="card-actions">
+                            <div class="copy-dropdown" v-if="entry.fields.some(f => f.copyable)">
+                                <button class="btn-small" @click.stop="toggleCopyMenu(entry.id)">
+                                    复制 ▼
+                                </button>
+                                <div v-if="copyMenuEntryId === entry.id" class="copy-menu">
+                                    <button 
+                                        v-for="field in entry.fields.filter(f => f.copyable)" 
+                                        :key="field.name"
+                                        class="copy-item"
+                                        @click.stop="copyField(entry.id, field)"
+                                    >
+                                        复制{{ field.name }}
+                                    </button>
+                                    <div class="divider"></div>
+                                    <button class="copy-item" @click.stop="copyAllFields(entry.id)">
+                                        复制全部
+                                    </button>
+                                </div>
+                            </div>
+                            <button 
+                                v-if="entry.url" 
+                                class="btn-small"
+                                @click.stop="openUrl(entry.url)"
+                            >
+                                打开
+                            </button>
+                            <button 
+                                class="btn-small"
+                                @click.stop="editEntry(entry)"
+                            >
+                                编辑
+                            </button>
+                            <button 
+                                class="btn-small btn-small-danger"
+                                @click.stop="confirmDeleteEntry(entry)"
+                            >
+                                删除
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 分页 -->
+                <div v-if="totalPages > 1" class="pagination">
+                    <button 
+                        class="page-btn" 
+                        :disabled="currentPage === 1"
+                        @click="goToPage(1)"
+                    >
+                        首页
+                    </button>
+                    <button 
+                        class="page-btn" 
+                        :disabled="currentPage === 1"
+                        @click="goToPage(currentPage - 1)"
+                    >
+                        上一页
+                    </button>
+                    
+                    <template v-for="page in visiblePages" :key="page">
+                        <button 
+                            v-if="page === '...'"
+                            class="page-btn ellipsis"
+                            disabled
+                        >
+                            ...
+                        </button>
+                        <button 
+                            v-else
+                            class="page-btn" 
+                            :class="{ active: page === currentPage }"
+                            @click="goToPage(page)"
+                        >
+                            {{ page }}
+                        </button>
+                    </template>
+                    
+                    <button 
+                        class="page-btn" 
+                        :disabled="currentPage === totalPages"
+                        @click="goToPage(currentPage + 1)"
+                    >
+                        下一页
+                    </button>
+                    <button 
+                        class="page-btn" 
+                        :disabled="currentPage === totalPages"
+                        @click="goToPage(totalPages)"
+                    >
+                        末页
+                    </button>
+                    
+                    <span class="page-info">
+                        共 {{ totalEntries }} 条
+                    </span>
+                </div>
+            </main>
+            
+            <!-- 底部操作栏 -->
+            <footer class="app-footer">
+                <button class="btn-primary" @click="openCreateModal">
+                    + 新建条目
+                </button>
+                <button class="btn-secondary select-page-btn" :disabled="entries.length === 0" @click="toggleCurrentPageSelection">
+                    {{ allCurrentPageSelected ? '取消当前页选择' : '选择当前页' }}
+                </button>
+                <div v-if="selectedEntryIds.length > 0" class="batch-actions">
+                    <span class="batch-count">已选 {{ selectedEntryIds.length }} 条</span>
+                    <button class="btn-small" @click="batchStarSelected(true)">设为星标</button>
+                    <button class="btn-small" @click="batchStarSelected(false)">取消星标</button>
+                    <input type="text" v-model="batchTagName" placeholder="批量添加标签" @keydown.enter="batchAddTagSelected">
+                    <button class="btn-small" @click="batchAddTagSelected">加标签</button>
+                    <button class="btn-small" @click="batchRemoveTagSelected">移除标签</button>
+                    <button class="btn-small btn-small-danger" @click="batchDeleteSelected">删除</button>
+                    <button class="btn-small" @click="clearSelection">取消选择</button>
+                </div>
+                <div class="footer-links">
+                    <a href="#" @click.prevent="showTagManager = true">🏷️ 标签管理</a>
+                    <a href="#" @click.prevent="showTrash = true">🗑️ 回收站</a>
+                    <a href="#" @click.prevent="openToolsModal">🧰 工具</a>
+                </div>
+            </footer>
+            </div>
+        </div>
+
+        <!-- 首次引导弹窗 -->
+        <div v-if="showOnboarding" class="modal-overlay" @click.self="skipOnboarding">
+            <div class="modal-content onboarding-modal">
+                <div class="modal-header">
+                    <h2>欢迎使用 SecretBase</h2>
+                    <button class="modal-close" @click="skipOnboarding">✕</button>
+                </div>
+                <div class="modal-body">
+                    <p class="onboarding-intro">开始保存真实密码前，请先确认这些使用边界：</p>
+                    <ul class="onboarding-list">
+                        <li>主密码不可找回，请妥善保存。</li>
+                        <li>数据写入本地加密文件，不会上传到第三方服务。</li>
+                        <li>建议定期导出加密备份，并保存到安全位置。</li>
+                        <li>自动锁定会在长时间无操作后清除解锁状态。</li>
+                    </ul>
+                    <p class="onboarding-note">可以导入 3 条明显的假示例数据，先熟悉创建、复制、标签和删除流程。</p>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn-secondary" @click="skipOnboarding">跳过</button>
+                    <button class="btn-primary inline" @click="importSampleData" :disabled="importingSamples">
+                        {{ importingSamples ? '导入中...' : '导入示例数据' }}
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 条目详情弹窗 -->
+        <div v-if="selectedEntry" class="modal-overlay" @click.self="closeEntryDetail">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2>{{ selectedEntry.title }}</h2>
+                    <button class="modal-close" @click="closeEntryDetail">✕</button>
+                </div>
+                <div class="modal-body">
+                    <div v-if="selectedEntry.url" class="detail-row">
+                        <span>网址</span>
+                        <a :href="selectedEntry.url" target="_blank" rel="noopener noreferrer">{{ selectedEntry.url }}</a>
+                    </div>
+                    <div class="detail-tags" v-if="selectedEntry.tags.length > 0">
+                        <span
+                            v-for="tag in selectedEntry.tags"
+                            :key="tag"
+                            class="tag"
+                            :style="{ backgroundColor: getTagColor(tag) }"
+                        >
+                            {{ tag }}
+                        </span>
+                    </div>
+                    <div class="detail-fields">
+                        <div v-for="field in selectedEntry.fields" :key="field.name" class="detail-field">
+                            <span class="field-name">{{ field.name }}</span>
+                            <span class="field-value">{{ field.copyable && !isFieldRevealed(field.name) ? '••••••' : field.value }}</span>
+                            <button v-if="field.copyable" class="btn-small" @click="toggleFieldReveal(field.name)">
+                                {{ isFieldRevealed(field.name) ? '隐藏' : '显示' }}
+                            </button>
+                            <button v-if="field.copyable" class="btn-small" @click="copyField(selectedEntry.id, field)">复制</button>
+                        </div>
+                    </div>
+                    <div v-if="selectedEntry.remarks" class="detail-remarks">
+                        <h4>备注</h4>
+                        <p>{{ selectedEntry.remarks }}</p>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn-secondary" @click="editEntry(selectedEntry); closeEntryDetail()">编辑</button>
+                    <button class="btn-danger" @click="confirmDeleteEntry(selectedEntry)">删除</button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 创建/编辑条目弹窗 -->
+        <div v-if="showCreateModal || showEditModal" class="modal-overlay" @click.self="closeEntryModal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2>{{ showEditModal ? '编辑条目' : '新建条目' }}</h2>
+                    <button class="modal-close" @click="closeEntryModal">✕</button>
+                </div>
+                <div class="modal-body">
+                    <div v-if="!showEditModal" class="form-group">
+                        <label>条目模板</label>
+                        <select v-model="selectedTemplate" @change="applyEntryTemplate">
+                            <option value="">空白条目</option>
+                            <option v-for="template in entryTemplates" :key="template.id" :value="template.id">{{ template.name }}</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>标题 *</label>
+                        <input type="text" v-model="entryForm.title" placeholder="请输入标题" required>
+                    </div>
+                    <div class="form-group">
+                        <label>网址</label>
+                        <input type="url" v-model="entryForm.url" placeholder="https://example.com">
+                    </div>
+                    <div class="form-group">
+                        <label>标签</label>
+                        <div class="tags-input" @click="$refs.tagInput?.focus()">
+                            <span v-for="(tag, index) in entryForm.tags" :key="index" class="tag">
+                                {{ tag }}
+                                <span class="remove-tag" @click="removeTag(index)">✕</span>
+                            </span>
+                            <input 
+                                ref="tagInput"
+                                type="text" 
+                                v-model="newTag" 
+                                placeholder="输入标签后按回车"
+                                @keydown.enter.prevent="addTag"
+                                @keydown.tab.prevent="addTag"
+                            >
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>自定义字段</label>
+                        <div class="fields-editor">
+                            <div v-for="(field, index) in entryForm.fields" :key="index" class="field-item">
+                                <input type="text" v-model="field.name" placeholder="字段名">
+                                <input type="text" v-model="field.value" placeholder="字段值">
+                                <label class="checkbox-label">
+                                    <input type="checkbox" v-model="field.copyable">
+                                    可复制
+                                </label>
+                                <button class="remove-btn" @click="removeField(index)">✕</button>
+                            </div>
+                            <button class="add-field-btn" @click="addField">
+                                + 添加字段
+                            </button>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>备注</label>
+                        <textarea v-model="entryForm.remarks" placeholder="添加备注..." rows="3"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn-secondary" @click="closeEntryModal">取消</button>
+                    <button class="btn-primary" @click="saveEntry" :disabled="!entryForm.title">
+                        {{ showEditModal ? '保存' : '创建' }}
+                    </button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- AI 智能录入弹窗 -->
+        <div v-if="showAiParse" class="modal-overlay" @click.self="showAiParse = false">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2>🤖 AI 智能录入</h2>
+                    <button class="modal-close" @click="showAiParse = false">✕</button>
+                </div>
+                <div class="modal-body">
+                    <div v-if="aiStatusError" class="warning-panel">
+                        {{ aiStatusError }}
+                    </div>
+                    <div v-else-if="aiStatus && !aiStatus.configured" class="warning-panel">
+                        AI 未配置，可继续手动录入。粘贴内容可以转入新建条目的备注。
+                    </div>
+                    <div v-else-if="aiStatus" class="info-panel">
+                        当前模型：{{ aiStatus.model }}
+                    </div>
+                    <div class="form-group">
+                        <label>粘贴你的密码信息</label>
+                        <textarea 
+                            v-model="aiText" 
+                            placeholder="例如：示例云 账号:xxx 密码:yyy。也可以一次粘贴多个系统/账号，AI 会尝试拆成多条。"
+                            rows="5"
+                        ></textarea>
+                        <div class="ai-input-meta">
+                            <span :class="{ 'warning-message': aiTextLength > aiSoftInputChars, 'error-message': aiTextLength > aiMaxInputChars }">
+                                {{ aiTextLength }} / {{ aiMaxInputChars }} 字符
+                            </span>
+                            <span v-if="aiInputWarning" class="warning-message">{{ aiInputWarning }}</span>
+                        </div>
+                    </div>
+                    <div v-if="aiResult" class="ai-parse-result">
+                        <h4>解析结果（{{ aiResult.entryCount }} 条）</h4>
+                        <div v-if="aiResult.warnings && aiResult.warnings.length > 0" class="warning-panel ai-quality-warning">
+                            <strong>请重点检查解析结果</strong>
+                            <p v-for="warning in aiResult.warnings" :key="warning">{{ warning }}</p>
+                        </div>
+                        <div v-for="(entry, index) in aiResult.entries" :key="entry.aiKey" class="ai-parse-entry" :class="{ muted: !entry.selected }">
+                            <label class="checkbox-label ai-entry-select">
+                                <input type="checkbox" v-model="entry.selected">
+                                选择第 {{ index + 1 }} 条
+                            </label>
+                            <div class="ai-edit-grid">
+                                <label>标题 <input type="text" v-model="entry.title" placeholder="条目标题"></label>
+                                <label>网址 <input type="text" v-model="entry.url" placeholder="https://example.com"></label>
+                                <label class="full-width">标签 <input type="text" v-model="entry.tagsText" placeholder="多个标签用逗号分隔"></label>
+                                <label class="full-width">备注 <textarea v-model="entry.remarks" rows="2" placeholder="备注"></textarea></label>
+                            </div>
+                            <div class="ai-field-editor">
+                                <div v-for="(field, fieldIndex) in entry.fields" :key="fieldIndex" class="ai-field-row">
+                                    <input type="text" v-model="field.name" placeholder="字段名">
+                                    <input type="text" v-model="field.value" placeholder="字段值">
+                                    <label class="checkbox-label"><input type="checkbox" v-model="field.copyable"> 可复制</label>
+                                    <button class="remove-btn" @click="removeAiEntryField(entry, fieldIndex)">✕</button>
+                                </div>
+                                <button class="btn-small" @click="addAiEntryField(entry)">+ 添加字段</button>
+                            </div>
+                        </div>
+                        <p v-if="aiResult.entryCount > 1" class="warning-message">检测到多条信息，将创建已勾选的 {{ selectedAiEntryCount }} 条新条目。</p>
+                    </div>
+                    <p v-if="aiParsing" class="info-message">正在智能解析，请稍候...</p>
+                    <p v-if="aiText && aiText.trim() === lastAiParseText" class="warning-message">内容未变化，不能重复智能解析。</p>
+                    <p v-if="aiCooldownSeconds > 0" class="warning-message">智能解析冷却中，请等待 {{ aiCooldownSeconds }} 秒。</p>
+                    <div v-if="aiFailureMessage" class="warning-panel ai-failure-panel">
+                        <strong>AI 解析未完成</strong>
+                        <p>{{ aiFailureMessage }}</p>
+                        <button class="btn-small" @click="manualEntryFromAi()">保留原文并转为手动录入</button>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn-secondary" @click="showAiParse = false">取消</button>
+                    <button class="btn-secondary" @click="manualEntryFromAi()">
+                        转为手动录入
+                    </button>
+                    <button class="btn-primary" @click="parseAiText" :disabled="!canParseAi">
+                        {{ aiParsing ? '解析中...' : aiCooldownSeconds > 0 ? `等待 ${aiCooldownSeconds}s` : '✨ 智能解析' }}
+                    </button>
+                    <button v-if="aiResult" class="btn-primary" @click="applyAiResult" :disabled="selectedAiEntryCount === 0">
+                        {{ selectedAiEntryCount > 1 ? `应用并创建 ${selectedAiEntryCount} 条` : '应用结果' }}
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 更多标签弹窗 -->
+        <div v-if="showTagBrowser" class="modal-overlay tag-browser-overlay" @click.self="closeTagBrowser">
+            <div class="modal-content tag-browser-modal" role="dialog" aria-modal="true" aria-label="更多标签">
+                <div class="modal-header tag-browser-header">
+                    <div>
+                        <h2>🏷️ 更多标签</h2>
+                        <p>共 {{ tags.length }} 个标签，点击即可筛选</p>
+                    </div>
+                    <button class="modal-close" @click="closeTagBrowser">✕</button>
+                </div>
+                <div class="modal-body tag-browser-body">
+                    <div class="tag-browser-controls">
+                        <input
+                            type="text"
+                            v-model="tagBrowserQuery"
+                            class="tag-browser-search"
+                            placeholder="搜索标签..."
+                            autofocus
+                        >
+                        <div class="tag-browser-sort" role="group" aria-label="标签排序">
+                            <span class="tag-browser-sort-label">排序</span>
+                            <div class="tag-browser-sort-options">
+                                <button
+                                    v-for="option in tagBrowserSortOptions"
+                                    :key="option.value"
+                                    type="button"
+                                    class="tag-browser-sort-option"
+                                    :class="{ active: tagBrowserSort === option.value }"
+                                    @click="tagBrowserSort = option.value"
+                                >{{ option.label }}</button>
+                            </div>
+                        </div>
+                    </div>
+                    <div v-if="filteredTagBrowserTags.length > 0" class="tag-browser-list">
+                        <button
+                            v-for="tag in filteredTagBrowserTags"
+                            :key="tag.name"
+                            class="tag-browser-item"
+                            :class="{ active: activeTagName === tag.name }"
+                            @click="filterByTag(tag.name)"
+                        >
+                            <span class="tag-browser-name">
+                                <i class="tag-dot" :style="{ backgroundColor: tag.color }"></i>
+                                <span>{{ tag.name }}</span>
+                            </span>
+                            <strong>{{ tag.count }}</strong>
+                        </button>
+                    </div>
+                    <div v-else class="empty-state tag-browser-empty">
+                        <div class="empty-icon">🔎</div>
+                        <h3>没有匹配标签</h3>
+                        <p>换个关键词试试</p>
+                    </div>
+                </div>
+                <div class="modal-footer tag-browser-footer">
+                    <button class="btn-secondary" @click="showTagManager = true; closeTagBrowser();">标签管理</button>
+                    <button class="btn-primary" @click="closeTagBrowser">关闭</button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 设置弹窗 -->
+        <div v-if="showSettings" class="modal-overlay" @click.self="showSettings = false">
+            <div class="modal-content settings-modal">
+                <div class="modal-header">
+                    <h2>⚙️ 设置</h2>
+                    <button class="modal-close" @click="showSettings = false">✕</button>
+                </div>
+                <div class="modal-body">
+                    <div class="settings-section">
+                        <h3>外观</h3>
+                        <div class="setting-item">
+                            <label>主题</label>
+                            <select v-model="settingsForm.theme" @change="saveSettings">
+                                <option value="system">跟随系统</option>
+                                <option value="light">亮色</option>
+                                <option value="dark">暗色</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="settings-section">
+                        <h3>显示</h3>
+                        <div class="setting-item">
+                            <label>每页条目数</label>
+                            <input type="number" v-model.number="settingsForm.pageSize" min="1" max="1000" @change="saveSettings">
+                        </div>
+                    </div>
+                    <div class="settings-section">
+                        <h3>安全</h3>
+                        <div class="setting-item">
+                            <label>自动锁定时间</label>
+                            <select v-model.number="settingsForm.autoLockMinutes" @change="saveSettings">
+                                <option value="5">5 分钟</option>
+                                <option value="10">10 分钟</option>
+                                <option value="30">30 分钟</option>
+                                <option value="0">永不锁定</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="settings-section">
+                        <h3>密码管理</h3>
+                        <button class="btn-secondary" @click="showChangePassword = true">修改主密码</button>
+                    </div>
+                    <div class="settings-section settings-backup-section">
+                        <h3>备份</h3>
+                        <div class="setting-item">
+                            <label>明文导入冲突处理</label>
+                            <select v-model="importConflictStrategy">
+                                <option value="skip">跳过已有条目</option>
+                                <option value="overwrite">覆盖已有条目</option>
+                                <option value="ask">发现冲突时停止</option>
+                            </select>
+                        </div>
+                        <p v-if="importConflictMessage" class="warning-message">{{ importConflictMessage }}</p>
+                        <div class="setting-item setting-actions">
+                            <button class="btn-secondary" @click="exportEncrypted">导出加密备份</button>
+                            <button class="btn-secondary" @click="exportPlain">导出明文 JSON</button>
+                            <button class="btn-secondary" @click="createManualBackup" :disabled="backupBusy">
+                                {{ creatingBackup ? '创建中...' : '手动创建备份' }}
+                            </button>
+                            <button class="btn-secondary" @click="loadBackups" :disabled="backupBusy">刷新备份列表</button>
+                            <label class="btn-secondary file-action">
+                                导入加密备份
+                                <input type="file" accept=".enc,.bak,application/octet-stream" @change="importEncryptedFile">
+                            </label>
+                            <label class="btn-secondary file-action">
+                                导入明文 JSON
+                                <input type="file" accept=".json,application/json" @change="importPlainFile">
+                            </label>
+                        </div>
+                        <div class="backup-list" v-if="backups.length > 0">
+                            <div v-for="backup in backups" :key="backup.filename" class="backup-item" :class="{ highlighted: highlightedBackupFilename === backup.filename }">
+                                <div class="backup-item-main">
+                                    <strong>{{ backup.filename }}</strong>
+                                    <p>{{ formatBytes(backup.size) }} · {{ formatDate(backup.modified_at) }} <span v-if="highlightedBackupFilename === backup.filename">· 刚创建</span></p>
+                                </div>
+                                <button class="btn-small backup-restore-btn" @click="restoreBackup(backup)" :disabled="backupBusy">
+                                    {{ restoringBackupFilename === backup.filename ? '读取概况...' : '恢复' }}
+                                </button>
+                            </div>
+                        </div>
+                        <p v-else class="warning-message">暂无自动备份或尚未刷新。</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 修改密码弹窗 -->
+        <div v-if="showChangePassword" class="modal-overlay" @click.self="showChangePassword = false">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2>修改主密码</h2>
+                    <button class="modal-close" @click="showChangePassword = false">✕</button>
+                </div>
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label>旧密码</label>
+                        <input type="password" v-model="passwordForm.oldPassword" placeholder="请输入旧密码">
+                    </div>
+                    <div class="form-group">
+                        <label>新密码</label>
+                        <input type="password" v-model="passwordForm.newPassword" placeholder="请输入新密码（至少 8 位）">
+                    </div>
+                    <div class="form-group">
+                        <label>确认新密码</label>
+                        <input type="password" v-model="passwordForm.confirmPassword" placeholder="请再次输入新密码">
+                    </div>
+                    <p v-if="passwordForm.error" class="error-message">{{ passwordForm.error }}</p>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn-secondary" @click="showChangePassword = false">取消</button>
+                    <button class="btn-primary" @click="changePassword">确认修改</button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 回收站弹窗 -->
+        <div v-if="showTrash" class="modal-overlay" @click.self="showTrash = false">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2>🗑️ 回收站</h2>
+                    <button class="modal-close" @click="showTrash = false">✕</button>
+                </div>
+                <div class="modal-body">
+                    <div v-if="trashItems.length === 0" class="empty-state">
+                        <p>回收站是空的</p>
+                    </div>
+                    <div v-else>
+                        <div v-for="item in trashItems" :key="item.id" class="trash-item">
+                            <div class="trash-item-info">
+                                <h4>{{ item.title }}</h4>
+                                <p>删除于 {{ formatDate(item.deleted_at) }} · 剩余 {{ item.remaining_days }} 天</p>
+                            </div>
+                            <div class="trash-item-actions">
+                                <button class="btn-small" @click="restoreTrashItem(item.id)">恢复</button>
+                                <button class="btn-small btn-danger" @click="deleteTrashItem(item.id)">彻底删除</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer" v-if="trashItems.length > 0">
+                    <button class="btn-secondary" :disabled="trashPage <= 1" @click="goToTrashPage(trashPage - 1)">上一页</button>
+                    <span class="page-info">{{ trashPage }} / {{ trashTotalPages }} · 共 {{ trashTotal }} 条</span>
+                    <button class="btn-secondary" :disabled="trashPage >= trashTotalPages" @click="goToTrashPage(trashPage + 1)">下一页</button>
+                    <button class="btn-danger" @click="emptyTrashConfirm">清空回收站</button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 标签管理弹窗 -->
+        <div v-if="showTagManager" class="modal-overlay" @click.self="showTagManager = false">
+            <div class="modal-content tag-manager-modal">
+                <div class="modal-header">
+                    <h2>🏷️ 标签管理</h2>
+                    <button class="modal-close" @click="showTagManager = false">✕</button>
+                </div>
+                <div class="modal-body">
+                    <div v-if="tags.length === 0" class="empty-state">
+                        <p>暂无标签</p>
+                    </div>
+                    <div v-else>
+                        <div v-for="tag in tags" :key="tag.name" class="tag-item">
+                            <span class="tag-dot" :style="{ backgroundColor: tag.color }"></span>
+                            <span class="tag-name">{{ tag.name }}</span>
+                            <span class="tag-count">{{ tag.count }} 个条目</span>
+                            <button class="btn-small" @click="renameTag(tag)">重命名</button>
+                            <button class="btn-small btn-danger" @click="deleteTag(tag)">删除</button>
+                        </div>
+                    </div>
+                    <div class="tag-merge-panel">
+                        <h3>合并标签</h3>
+                        <div class="form-group">
+                            <label>源标签</label>
+                            <div class="filter-tags-input tag-merge-source-input">
+                                <span v-for="tag in tagMergeSourceList" :key="tag" class="tag filter-chip">
+                                    {{ tag }}
+                                    <button @click="removeTagMergeSourceTag(tag)">✕</button>
+                                </span>
+                                <input
+                                    type="text"
+                                    v-model="tagMergeForm.sourceTags"
+                                    placeholder="输入源标签后回车，支持中英文逗号"
+                                    @keydown.enter.prevent="commitTagMergeSourceTags"
+                                    @keydown.tab.prevent="commitTagMergeSourceTags"
+                                    @keydown="handleTagMergeSourceKey"
+                                    @input="handleTagMergeSourceInput"
+                                    @blur="commitTagMergeSourceTags"
+                                >
+                            </div>
+                            <p class="muted-text">多个源标签可用中文逗号、英文逗号或回车逐个锁定。</p>
+                        </div>
+                        <div class="form-group">
+                            <label>目标标签</label>
+                            <input type="text" v-model="tagMergeForm.targetTag" placeholder="合并后的标签名" @keydown.enter.prevent="mergeTags">
+                        </div>
+                        <button class="btn-secondary" @click="mergeTags" :disabled="(!tagMergeForm.sourceTags && tagMergeSourceList.length === 0) || !tagMergeForm.targetTag">
+                            合并标签
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 导入冲突弹窗 -->
+        <div v-if="showImportConflicts" class="modal-overlay" @click.self="closeImportConflicts">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2>导入发现冲突</h2>
+                    <button class="modal-close" @click="closeImportConflicts">✕</button>
+                </div>
+                <div class="modal-body">
+                    <p>发现 {{ importConflicts.length }} 个可能重复的条目。请选择处理方式后重新导入。</p>
+                    <div class="conflict-list">
+                        <div v-for="conflict in importConflicts.slice(0, 8)" :key="conflict.id || conflict.import_title" class="conflict-item">
+                            <span>现有：{{ conflict.existing_title || '未知条目' }}</span>
+                            <span>导入：{{ conflict.import_title || '未知条目' }}</span>
+                        </div>
+                    </div>
+                    <p v-if="importConflicts.length > 8" class="warning-message">还有 {{ importConflicts.length - 8 }} 个冲突未显示。</p>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn-secondary" @click="retryImportPlain('skip')">跳过已有条目</button>
+                    <button class="btn-secondary" @click="retryImportPlain('overwrite')">覆盖已有条目</button>
+                    <button class="btn-danger" @click="closeImportConflicts">取消</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 导入预览弹窗 -->
+        <div v-if="showImportPreview" class="modal-overlay" @click.self="closeImportPreview">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2>导入预览</h2>
+                    <button class="modal-close" @click="closeImportPreview">✕</button>
+                </div>
+                <div class="modal-body" v-if="importPreview">
+                    <p>总条目：{{ importPreview.total_count }}，新增：{{ importPreview.new_count }}，冲突：{{ importPreview.conflict_count }}，已选择：{{ selectedImportPreviewCount }}，已选冲突：{{ selectedImportConflictCount }}</p>
+                    <div class="setting-actions">
+                        <button class="btn-small" @click="selectAllImportPreviewEntries">全选</button>
+                        <button class="btn-small" @click="clearImportPreviewSelection">清空选择</button>
+                    </div>
+                    <div v-if="importPreview.entries && importPreview.entries.length > 0" class="import-preview-list">
+                        <div v-for="entry in importPreview.entries" :key="entry.id" class="import-preview-item" :class="{ conflict: entry.is_conflict }">
+                            <input type="checkbox" :checked="isImportPreviewSelected(entry.id)" @change="toggleImportPreviewSelection(entry.id)">
+                            <span>
+                                <strong>{{ entry.title }}</strong>
+                                <small>{{ entry.is_conflict ? '冲突' : '新增' }} · 字段 {{ entry.field_count }} · 标签 {{ entry.tag_count }}</small>
+                            </span>
+                            <label v-if="entry.is_conflict" class="conflict-resolution-select">
+                                冲突处理
+                                <select :value="importConflictResolutions[entry.id] || 'skip'" @change="setImportConflictResolution(entry.id, $event.target.value)">
+                                    <option value="skip">跳过</option>
+                                    <option value="overwrite">覆盖</option>
+                                    <option value="ask">停止</option>
+                                </select>
+                            </label>
+                        </div>
+                    </div>
+                    <div v-if="importPreview.conflicts.length > 0" class="conflict-list">
+                        <div v-for="conflict in importPreview.conflicts.slice(0, 8)" :key="conflict.id" class="conflict-item">
+                            <span>现有：{{ conflict.existing_title }}</span>
+                            <span>导入：{{ conflict.import_title }}</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn-secondary" @click="confirmImportPlain" :disabled="selectedImportPreviewCount === 0">导入已选择 {{ selectedImportPreviewCount }} 条</button>
+                    <button class="btn-danger" @click="closeImportPreview">取消</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 导入完成报告弹窗 -->
+        <div v-if="showImportReport" class="modal-overlay" @click.self="showImportReport = false">
+            <div class="modal-content import-report-modal">
+                <div class="modal-header">
+                    <h2>导入完成报告</h2>
+                    <button class="modal-close" @click="showImportReport = false">✕</button>
+                </div>
+                <div class="modal-body" v-if="importReport">
+                    <div class="report-grid import-result-grid">
+                        <div><strong>{{ importReport.selectedCount }}</strong><span>本次选择</span></div>
+                        <div><strong>{{ importReport.importedCount }}</strong><span>成功导入</span></div>
+                        <div><strong>{{ importReport.createdCount }}</strong><span>新增条目</span></div>
+                        <div><strong>{{ importReport.overwrittenCount }}</strong><span>覆盖条目</span></div>
+                        <div><strong>{{ importReport.skippedCount }}</strong><span>跳过条目</span></div>
+                        <div><strong>{{ importReport.conflictCount }}</strong><span>冲突条目</span></div>
+                    </div>
+                    <p class="info-message">列表已刷新。若本次覆盖了条目，可通过自动备份恢复导入前状态。</p>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn-primary inline" @click="showImportReport = false">完成</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 工具弹窗 -->
+        <div v-if="showTools" class="modal-overlay" @click.self="showTools = false">
+            <div class="modal-content tools-modal">
+                <div class="modal-header">
+                    <h2>🧰 管理工具</h2>
+                    <button class="modal-close" @click="showTools = false">✕</button>
+                </div>
+                <div class="modal-body">
+                    <div class="settings-section">
+                        <h3>密码健康检查</h3>
+                        <button class="btn-secondary" @click="loadHealthReport">刷新健康报告</button>
+                        <div v-if="healthReport" class="report-grid">
+                            <button class="report-action" @click="focusReportItems(healthReport.weak_items, '弱密码条目')">弱密码字段：{{ healthReport.weak_count }}</button>
+                            <button class="report-action" @click="focusReportGroups(healthReport.duplicate_groups, '重复密码条目')">重复密码条目：{{ healthReport.duplicate_count }}</button>
+                            <button class="report-action" @click="focusReportItems(healthReport.stale_items, '长期未更新条目')">长期未更新：{{ healthReport.stale_count }}</button>
+                        </div>
+                    </div>
+                    <div class="settings-section">
+                        <h3>数据维护</h3>
+                        <button class="btn-secondary" @click="loadMaintenanceReport">刷新维护报告</button>
+                        <div v-if="maintenanceReport" class="report-grid">
+                            <button class="report-action" @click="focusReportGroups(maintenanceReport.duplicate_title_groups, '重复标题条目')">重复标题：{{ maintenanceReport.duplicate_title_count }}</button>
+                            <button class="report-action" @click="focusUntaggedItems">无标签：{{ maintenanceReport.untagged_count }}</button>
+                            <button class="report-action" @click="focusReportItems(maintenanceReport.empty_field_items, '空字段条目')">空字段：{{ maintenanceReport.empty_field_count }}</button>
+                            <button class="report-action" @click="focusReportItems(maintenanceReport.sample_items, '示例数据')">示例数据：{{ maintenanceReport.sample_count }}</button>
+                        </div>
+                        <button v-if="maintenanceReport && maintenanceReport.untagged_count > 0" class="btn-secondary" @click="addTagToUntaggedItems">
+                            给无标签条目批量加标签
+                        </button>
+                        <button v-if="maintenanceReport && maintenanceReport.sample_count > 0" class="btn-danger" @click="deleteSampleEntries">
+                            删除示例数据
+                        </button>
+                    </div>
+                    <div class="settings-section tools-security-section">
+                        <h3>安全自检</h3>
+                        <button class="btn-secondary" @click="loadSecurityReport">刷新安全自检</button>
+                        <div v-if="securityReport" class="report-grid">
+                            <div class="report-action">通过：{{ securityReport.summary.ok }}</div>
+                            <div class="report-action">警告：{{ securityReport.summary.warning }}</div>
+                            <div class="report-action">错误：{{ securityReport.summary.error }}</div>
+                        </div>
+                        <div v-if="securityReport" class="settings-list">
+                            <div v-for="check in securityReport.checks" :key="check.name" class="settings-row">
+                                <div>
+                                    <strong>{{ check.name }}</strong>
+                                    <p class="muted-text">{{ check.message }}</p>
+                                </div>
+                                <span class="tag" :class="check.status === 'ok' ? 'tag-success' : check.status === 'warning' ? 'tag-warning' : 'tag-danger'">
+                                    {{ check.status }}
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 确认弹窗 -->
+        <div v-if="showConfirm" class="modal-overlay" @click.self="showConfirm = false">
+            <div class="modal-content" style="max-width: 400px;">
+                <div class="modal-body confirm-dialog">
+                    <div class="confirm-icon">⚠️</div>
+                    <h3>{{ confirmTitle }}</h3>
+                    <p>{{ confirmMessage }}</p>
+                    <div class="confirm-actions">
+                        <button class="btn-secondary" @click="showConfirm = false">取消</button>
+                        <button class="btn-danger" @click="confirmAction">确认</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Toast 提示 -->
+        <div id="toast-container"></div>
+    </div>
+    
+    <!-- JS 模块 -->
+    <script src="js/api.js"></script>
+    <script src="js/utils.js"></script>
+    <script src="js/store.js"></script>
+    <script src="js/app.js"></script>
+</body>
+</html>
