@@ -8,7 +8,7 @@
 </p>
 
 <p align="center">
-  <a href="#中文">中文</a> · <a href="#english">English</a> · <a href="docs/security-design.md">Security Design</a> · <a href="docs/deployment.md">Deployment</a>
+  <a href="#screenshots--界面预览">Screenshots</a> · <a href="#中文">中文</a> · <a href="#english">English</a> · <a href="docs/security-design.md">Security Design</a> · <a href="docs/deployment.md">Deployment</a>
 </p>
 
 <p align="center">
@@ -20,6 +20,45 @@
 </p>
 
 ---
+
+## Screenshots / 界面预览
+
+The screenshots below use demo-only data. They do not contain real credentials, real servers, or private deployment details.
+
+以下截图均使用演示数据，不包含真实密码、真实服务器或私人部署信息。
+
+<table>
+  <tr>
+    <td width="50%">
+      <strong>Desktop Overview / 桌面总览</strong><br>
+      <img src="docs/assets/screenshots/secretbase-dark-01-overview.png" alt="SecretBase dark theme desktop overview">
+    </td>
+    <td width="50%">
+      <strong>Entry Detail / 条目详情</strong><br>
+      <img src="docs/assets/screenshots/secretbase-dark-02-entry-detail.png" alt="SecretBase entry detail with masked fields">
+    </td>
+  </tr>
+  <tr>
+    <td width="50%">
+      <strong>Tag Browser / 标签浏览</strong><br>
+      <img src="docs/assets/screenshots/secretbase-dark-03-tag-browser.png" alt="SecretBase tag browser in dark theme">
+    </td>
+    <td width="50%">
+      <strong>AI Parsing / AI 智能录入</strong><br>
+      <img src="docs/assets/screenshots/secretbase-dark-04-ai-parse.png" alt="SecretBase AI parsing modal">
+    </td>
+  </tr>
+  <tr>
+    <td width="50%">
+      <strong>Backup Settings / 备份设置</strong><br>
+      <img src="docs/assets/screenshots/secretbase-dark-05-backup-settings.png" alt="SecretBase backup settings in dark theme">
+    </td>
+    <td width="50%">
+      <strong>Mobile Layout / 移动端布局</strong><br>
+      <img src="docs/assets/screenshots/secretbase-dark-06-mobile.png" alt="SecretBase mobile layout in dark theme">
+    </td>
+  </tr>
+</table>
 
 ## 中文
 
