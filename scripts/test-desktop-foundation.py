@@ -1,15 +1,20 @@
 from __future__ import annotations
 
 import os
+import json
+import re
 import subprocess
 import sys
 import tempfile
+import time
+import urllib.request
 from pathlib import Path
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 BACKEND_DIR = PROJECT_ROOT / "backend"
 BACKEND_ENV = BACKEND_DIR / ".env"
+LAUNCHER = PROJECT_ROOT / "desktop" / "launcher.py"
 
 
 def run_config_probe(code: str, env: dict[str, str]) -> subprocess.CompletedProcess[str]:
@@ -240,6 +245,74 @@ assert "text/css" in asset_response.headers["content-type"]
         assert_probe_ok(result)
 
 
+def test_launcher_dry_run_reports_desktop_paths() -> None:
+    with tempfile.TemporaryDirectory() as raw:
+        root = Path(raw)
+        result = subprocess.run(
+            [sys.executable, str(LAUNCHER), "--dry-run"],
+            cwd=PROJECT_ROOT,
+            env={**os.environ, "SECRETBASE_DESKTOP_DATA_ROOT": str(root)},
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+        if result.returncode != 0:
+            raise AssertionError(f"dry-run failed\nSTDOUT:\n{result.stdout}\nSTDERR:\n{result.stderr}")
+        data = json.loads(result.stdout)
+        assert data["mode"] == "desktop"
+        assert data["host"] == "127.0.0.1"
+        assert int(data["port"]) > 0
+        assert data["data_root"] == str(root.resolve())
+        assert data["vault_path"] == str((root / "data" / "secretbase.enc").resolve())
+        assert data["backup_dir"] == str((root / "data" / "backups").resolve())
+        assert data["log_dir"] == str((root / "logs").resolve())
+        assert data["settings_path"] == str((root / "settings.json").resolve())
+        assert not (root / "data").exists()
+
+
+def test_launcher_no_browser_starts_health_endpoint() -> None:
+    with tempfile.TemporaryDirectory() as raw:
+        root = Path(raw)
+        process = subprocess.Popen(
+            [sys.executable, str(LAUNCHER), "--no-browser"],
+            cwd=PROJECT_ROOT,
+            env={**os.environ, "SECRETBASE_DESKTOP_DATA_ROOT": str(root)},
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+        )
+        output: list[str] = []
+        try:
+            deadline = time.time() + 20
+            url = None
+            while time.time() < deadline:
+                line = process.stdout.readline() if process.stdout else ""
+                if line:
+                    output.append(line)
+                    match = re.search(r"http://127\.0\.0\.1:\d+", line)
+                    if match:
+                        url = match.group(0)
+                        break
+                if process.poll() is not None:
+                    break
+            if not url:
+                raise AssertionError(f"launcher did not print URL. Output:\n{''.join(output)}")
+
+            with urllib.request.urlopen(f"{url}/health", timeout=5) as response:
+                body = response.read().decode("utf-8")
+            assert response.status == 200
+            assert '"healthy"' in body
+            assert (root / "data").is_dir()
+            assert (root / "logs").is_dir()
+        finally:
+            process.terminate()
+            try:
+                process.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                process.kill()
+                process.wait(timeout=5)
+
+
 def main() -> None:
     tests = [
         test_server_mode_loads_dotenv_without_overriding_system_env,
@@ -249,6 +322,8 @@ def main() -> None:
         test_importing_main_initializes_runtime_directories,
         test_runtime_config_endpoint_returns_javascript,
         test_desktop_mode_serves_frontend_index,
+        test_launcher_dry_run_reports_desktop_paths,
+        test_launcher_no_browser_starts_health_endpoint,
     ]
     for test in tests:
         test()
