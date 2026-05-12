@@ -1003,7 +1003,36 @@ POST /backups/{filename}/summary
 POST /backups/{filename}/restore
 ```
 
-`GET /backups` 返回自动备份文件名、大小、修改时间。`POST /backups` 手动创建当前 vault 的加密备份。`GET /backups/{filename}/summary` 使用当前会话密钥解密备份并返回条目数、回收站条目数、版本、文件大小和修改时间。
+`GET /backups` 返回备份文件名、类型、大小、修改时间。`type` 为 `manual`、`auto` 或兼容旧目录时的 `legacy`。`POST /backups` 手动创建当前 vault 的加密备份，并写入 `BACKUP_DIR/manual/`。写入 vault 或恢复备份前创建的自动快照写入 `BACKUP_DIR/auto/`。
+
+自动备份按 `MAX_BACKUPS` 数量轮转，默认保留 30 个；手动备份不参与自动轮转。旧版本根目录下的 `secretbase.enc.*.bak` 会在备份列表、手动备份或恢复路径解析时默认迁移到 `BACKUP_DIR/auto/`。
+
+`GET /backups/{filename}/summary` 使用当前会话密钥解密备份并返回条目数、回收站条目数、版本、文件大小、修改时间和类型。
+
+`GET /backups` 响应示例：
+
+```json
+{
+  "success": true,
+  "data": {
+    "items": [
+      {
+        "filename": "secretbase.manual.20260512_153000_123456.bak",
+        "type": "manual",
+        "size": 4096,
+        "modified_at": "2026-05-12T15:30:00"
+      },
+      {
+        "filename": "secretbase.auto.20260512_152900_123456.bak",
+        "type": "auto",
+        "size": 4096,
+        "modified_at": "2026-05-12T15:29:00"
+      }
+    ],
+    "total": 2
+  }
+}
+```
 
 V2.2 起，`POST /backups/{filename}/summary` 可使用请求体 `{ "password": "backup-master-password" }` 读取不同 salt 的旧备份概况。
 

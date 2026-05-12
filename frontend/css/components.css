@@ -734,8 +734,31 @@
 .backup-list {
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: 12px;
     margin-top: 12px;
+}
+
+.backup-group {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.backup-group-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 10px 12px;
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius);
+    background: var(--bg-tertiary);
+}
+
+.backup-group-header p,
+.backup-group-header span {
+    color: var(--text-secondary);
+    font-size: var(--font-size-sm);
 }
 
 .backup-item {
@@ -1289,8 +1312,8 @@ input[type="checkbox"] {
     }
 
     .backup-list {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+        display: flex;
+        flex-direction: column;
     }
 
     .backup-item {

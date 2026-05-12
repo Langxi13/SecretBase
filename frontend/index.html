@@ -861,16 +861,25 @@
                                 <input type="file" accept=".json,application/json" @change="importPlainFile">
                             </label>
                         </div>
-                        <div class="backup-list" v-if="backups.length > 0">
-                            <div v-for="backup in backups" :key="backup.filename" class="backup-item" :class="{ highlighted: highlightedBackupFilename === backup.filename }">
-                                <div class="backup-item-main">
-                                    <strong>{{ backup.filename }}</strong>
-                                    <p>{{ formatBytes(backup.size) }} · {{ formatDate(backup.modified_at) }} <span v-if="highlightedBackupFilename === backup.filename">· 刚创建</span></p>
+                        <div class="backup-list" v-if="backupGroups.length > 0">
+                            <section v-for="group in backupGroups" :key="group.type" class="backup-group">
+                                <div class="backup-group-header">
+                                    <div>
+                                        <strong>{{ group.title }}</strong>
+                                        <p>{{ group.hint }}</p>
+                                    </div>
+                                    <span>{{ group.items.length }} 个</span>
                                 </div>
-                                <button class="btn-small backup-restore-btn" @click="restoreBackup(backup)" :disabled="backupBusy">
-                                    {{ restoringBackupFilename === backup.filename ? '读取概况...' : '恢复' }}
-                                </button>
-                            </div>
+                                <div v-for="backup in group.items" :key="backup.filename" class="backup-item" :class="{ highlighted: highlightedBackupFilename === backup.filename }">
+                                    <div class="backup-item-main">
+                                        <strong>{{ backup.filename }}</strong>
+                                        <p>{{ backupTypeLabel(backup.type) }} · {{ formatBytes(backup.size) }} · {{ formatDate(backup.modified_at) }} <span v-if="highlightedBackupFilename === backup.filename">· 刚创建</span></p>
+                                    </div>
+                                    <button class="btn-small backup-restore-btn" @click="restoreBackup(backup)" :disabled="backupBusy">
+                                        {{ restoringBackupFilename === backup.filename ? '读取概况...' : '恢复' }}
+                                    </button>
+                                </div>
+                            </section>
                         </div>
                         <p v-else class="warning-message">暂无自动备份或尚未刷新。</p>
                     </div>

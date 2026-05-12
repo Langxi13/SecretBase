@@ -5,7 +5,6 @@ from pathlib import Path
 from fastapi import APIRouter, Body, File, Form, HTTPException, UploadFile
 from fastapi.responses import Response
 
-from config import BACKUP_DIR
 from models import VaultData
 from storage import (
     create_backup,
@@ -17,8 +16,10 @@ from storage import (
     import_plain_vault,
     is_initialized,
     is_unlocked,
+    list_backup_files,
     read_encrypted_vault_with_current_key,
     read_encrypted_vault_with_password,
+    resolve_backup_file,
     VaultLockTimeoutError,
 )
 
@@ -52,10 +53,11 @@ async def read_import_json(file: UploadFile) -> dict:
 
 
 def get_backup_path(filename: str) -> Path:
-    if Path(filename).name != filename:
+    try:
+        path, _backup_type = resolve_backup_file(filename)
+    except ValueError:
         raise HTTPException(status_code=422, detail="备份文件名无效")
-    path = Path(BACKUP_DIR) / filename
-    if not path.exists() or not path.is_file() or not filename.startswith("secretbase.enc."):
+    except FileNotFoundError:
         raise HTTPException(status_code=404, detail="备份文件不存在")
     return path
 
@@ -274,10 +276,12 @@ async def list_backups():
     """列出自动备份文件。"""
     check_unlocked()
     backups = []
-    for path in sorted(Path(BACKUP_DIR).glob("secretbase.enc.*.bak"), reverse=True):
+    for item in list_backup_files():
+        path = item["path"]
         stat = path.stat()
         backups.append({
             "filename": path.name,
+            "type": item["type"],
             "size": stat.st_size,
             "modified_at": datetime.fromtimestamp(stat.st_mtime).isoformat()
         })
@@ -307,6 +311,7 @@ async def create_manual_backup():
         "success": True,
         "data": {
             "filename": path.name,
+            "type": "manual",
             "size": stat.st_size,
             "modified_at": datetime.fromtimestamp(stat.st_mtime).isoformat()
         },
@@ -330,6 +335,7 @@ async def get_backup_summary(filename: str):
         "data": {
             **summary,
             "filename": path.name,
+            "type": resolve_backup_file(filename)[1],
             "size": stat.st_size,
             "modified_at": datetime.fromtimestamp(stat.st_mtime).isoformat()
         }
@@ -355,6 +361,7 @@ async def post_backup_summary(filename: str, payload: dict = Body(default_factor
         "data": {
             **summary,
             "filename": path.name,
+            "type": resolve_backup_file(filename)[1],
             "size": stat.st_size,
             "modified_at": datetime.fromtimestamp(stat.st_mtime).isoformat(),
             "used_password": True,

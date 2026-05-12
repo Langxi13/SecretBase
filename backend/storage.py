@@ -23,6 +23,12 @@ from models import VaultData, Entry, EntryCreate, EntryUpdate
 
 logger = logging.getLogger(__name__)
 
+AUTO_BACKUP_TYPE = "auto"
+MANUAL_BACKUP_TYPE = "manual"
+BACKUP_TYPES = {AUTO_BACKUP_TYPE, MANUAL_BACKUP_TYPE}
+BACKUP_SUFFIX = ".bak"
+LEGACY_BACKUP_PREFIX = "secretbase.enc."
+
 # 内存中缓存解锁状态。V2 不再长期保存主密码字符串。
 _vault_key: Optional[SecureKey] = None
 _vault_data: Optional[VaultData] = None
@@ -156,6 +162,114 @@ def save_vault(content: bytes):
             os.fsync(f.fileno())
         os.replace(tmp_path, VAULT_PATH)
         _set_vault_fingerprint_from_content(content)
+
+
+def _backup_root() -> Path:
+    return Path(BACKUP_DIR)
+
+
+def _backup_dir(backup_type: str) -> Path:
+    if backup_type not in BACKUP_TYPES:
+        raise ValueError("备份类型无效")
+    return _backup_root() / backup_type
+
+
+def _ensure_backup_dirs() -> None:
+    _backup_root().mkdir(parents=True, exist_ok=True)
+    _backup_dir(AUTO_BACKUP_TYPE).mkdir(parents=True, exist_ok=True)
+    _backup_dir(MANUAL_BACKUP_TYPE).mkdir(parents=True, exist_ok=True)
+
+
+def _is_backup_filename(filename: str) -> bool:
+    return (
+        filename.endswith(BACKUP_SUFFIX)
+        and (
+            filename.startswith("secretbase.auto.")
+            or filename.startswith("secretbase.manual.")
+            or filename.startswith(LEGACY_BACKUP_PREFIX)
+        )
+    )
+
+
+def _legacy_backup_paths() -> list[Path]:
+    root = _backup_root()
+    if not root.exists():
+        return []
+    return [
+        path for path in root.glob(f"{LEGACY_BACKUP_PREFIX}*{BACKUP_SUFFIX}")
+        if path.is_file()
+    ]
+
+
+def _dedupe_backup_path(directory: Path, filename: str) -> Path:
+    target = directory / filename
+    if not target.exists():
+        return target
+
+    stem = filename[:-len(BACKUP_SUFFIX)] if filename.endswith(BACKUP_SUFFIX) else filename
+    for index in range(1, 1000):
+        candidate = directory / f"{stem}.dup{index}{BACKUP_SUFFIX}"
+        if not candidate.exists():
+            return candidate
+    raise RuntimeError("无法生成唯一备份文件名")
+
+
+def migrate_legacy_backups_to_auto(strict: bool = False) -> list[Path]:
+    """Move root-level legacy backups into the automatic backup directory."""
+    moved = []
+    try:
+        _ensure_backup_dirs()
+        auto_dir = _backup_dir(AUTO_BACKUP_TYPE)
+        for path in _legacy_backup_paths():
+            target = _dedupe_backup_path(auto_dir, path.name)
+            shutil.move(str(path), str(target))
+            moved.append(target)
+            logger.info(f"迁移旧备份到自动备份目录: {target}")
+    except Exception as e:
+        logger.error(f"迁移旧备份失败: {e}")
+        if strict:
+            raise
+    return moved
+
+
+def _backup_filename(backup_type: str) -> str:
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+    return f"secretbase.{backup_type}.{timestamp}{BACKUP_SUFFIX}"
+
+
+def list_backup_files() -> list[dict]:
+    """Return managed backups with type metadata for API responses."""
+    migrate_legacy_backups_to_auto()
+    _ensure_backup_dirs()
+    items = []
+    for backup_type in (MANUAL_BACKUP_TYPE, AUTO_BACKUP_TYPE):
+        for path in _backup_dir(backup_type).glob(f"*{BACKUP_SUFFIX}"):
+            if path.is_file() and _is_backup_filename(path.name):
+                items.append({"path": path, "type": backup_type})
+
+    for path in _legacy_backup_paths():
+        if _is_backup_filename(path.name):
+            items.append({"path": path, "type": "legacy"})
+
+    return sorted(items, key=lambda item: item["path"].stat().st_mtime, reverse=True)
+
+
+def resolve_backup_file(filename: str) -> tuple[Path, str]:
+    """Resolve a backup filename from manual, auto, or legacy locations."""
+    if Path(filename).name != filename or not _is_backup_filename(filename):
+        raise ValueError("备份文件名无效")
+
+    migrate_legacy_backups_to_auto()
+    _ensure_backup_dirs()
+    candidates = [
+        (_backup_dir(MANUAL_BACKUP_TYPE) / filename, MANUAL_BACKUP_TYPE),
+        (_backup_dir(AUTO_BACKUP_TYPE) / filename, AUTO_BACKUP_TYPE),
+        (_backup_root() / filename, "legacy"),
+    ]
+    for path, backup_type in candidates:
+        if path.exists() and path.is_file():
+            return path, backup_type
+    raise FileNotFoundError("备份文件不存在")
 
 
 def import_encrypted_vault(content: bytes) -> int:
@@ -298,18 +412,19 @@ def import_plain_vault(
     }
 
 
-def _create_backup_unlocked(strict: bool = False):
-    """创建自动备份"""
+def _create_backup_unlocked(strict: bool = False, backup_type: str = AUTO_BACKUP_TYPE):
+    """创建加密 vault 备份。"""
     try:
         if not is_initialized():
             raise ValueError("数据文件不存在")
-        os.makedirs(BACKUP_DIR, exist_ok=True)
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
-        backup_path = os.path.join(BACKUP_DIR, f"secretbase.enc.{timestamp}.bak")
+        migrate_legacy_backups_to_auto(strict=strict)
+        _ensure_backup_dirs()
+        backup_path = _backup_dir(backup_type) / _backup_filename(backup_type)
         shutil.copy2(VAULT_PATH, backup_path)
-        _cleanup_backups()
+        if backup_type == AUTO_BACKUP_TYPE:
+            _cleanup_backups()
         logger.info(f"创建备份: {backup_path}")
-        return Path(backup_path)
+        return backup_path
     except Exception as e:
         logger.error(f"创建备份失败: {e}")
         if strict:
@@ -321,13 +436,17 @@ def create_backup() -> Path:
     """手动创建当前 vault 的加密备份。"""
     with VaultFileLock(VAULT_PATH):
         _ensure_current_vault_unchanged()
-        return _create_backup_unlocked(strict=True)
+        return _create_backup_unlocked(strict=True, backup_type=MANUAL_BACKUP_TYPE)
 
 
 def _cleanup_backups():
-    """清理旧备份"""
+    """清理旧自动备份。"""
     try:
-        backups = sorted(Path(BACKUP_DIR).glob("secretbase.enc.*.bak"))
+        _ensure_backup_dirs()
+        backups = sorted(
+            [path for path in _backup_dir(AUTO_BACKUP_TYPE).glob(f"*{BACKUP_SUFFIX}") if path.is_file()],
+            key=lambda path: path.stat().st_mtime,
+        )
         while len(backups) > MAX_BACKUPS:
             oldest = backups.pop(0)
             oldest.unlink()

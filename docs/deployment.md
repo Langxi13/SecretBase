@@ -67,6 +67,8 @@ server {
 
 - Never deploy local `backend/data/`, `backend/logs/`, or `backend/.env` from a development machine.
 - Before restoring a backup, create a separate backup of the current vault.
+- In-app automatic backups are stored under `BACKUP_DIR/auto/`; manual backups are stored under `BACKUP_DIR/manual/` and are not removed by automatic rotation.
+- Existing root-level `secretbase.enc.*.bak` files are migrated into `BACKUP_DIR/auto/` when backup management runs.
 - Do not change vault format or migration behavior without an explicit backup and restore rehearsal.
 
 ## Health Checks

@@ -294,6 +294,31 @@ const app = createApp({
         });
 
         const backupBusy = computed(() => creatingBackup.value || Boolean(restoringBackupFilename.value));
+        const backupGroups = computed(() => {
+            const definitions = [
+                {
+                    type: 'manual',
+                    title: '手动备份',
+                    hint: '由你主动创建，不会被自动备份轮转清理。'
+                },
+                {
+                    type: 'auto',
+                    title: '自动备份',
+                    hint: '写入或恢复前自动创建，会按保留数量清理旧文件。'
+                },
+                {
+                    type: 'legacy',
+                    title: '旧版备份',
+                    hint: '旧目录中的兼容备份。刷新后通常会迁移到自动备份。'
+                }
+            ];
+            return definitions
+                .map(group => ({
+                    ...group,
+                    items: backups.value.filter(backup => (backup.type || 'legacy') === group.type)
+                }))
+                .filter(group => group.items.length > 0);
+        });
 
         // 分页
         const visiblePages = computed(() => {
@@ -1596,6 +1621,12 @@ const app = createApp({
             return `${(size / 1024 / 1024).toFixed(1)} MB`;
         }
 
+        function backupTypeLabel(type) {
+            if (type === 'manual') return '手动备份';
+            if (type === 'auto') return '自动备份';
+            return '旧版备份';
+        }
+
         function friendlyApiMessage(error, fallback) {
             if (!error) return fallback;
             if (error.status === 401) return '当前会话已失效，请重新解锁后再操作。';
@@ -2068,6 +2099,7 @@ const app = createApp({
             hasActiveListState,
             allCurrentPageSelected,
             backupBusy,
+            backupGroups,
 
             // 方法
             initPassword,
@@ -2150,6 +2182,7 @@ const app = createApp({
             handleTagMergeSourceKey,
             handleTagMergeSourceInput,
             formatBytes,
+            backupTypeLabel,
             loadBackups,
             createManualBackup,
             restoreBackup,
