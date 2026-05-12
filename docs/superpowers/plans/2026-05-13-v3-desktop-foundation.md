@@ -42,6 +42,8 @@
 
 - [ ] **Step 1: Verify planning docs have no obvious placeholders**
 
+Run from the implementation worktree. If the worktree does not contain `venv/`, use `/usr/local/Web-Project/Secert-Base/venv/bin/python` in place of `venv/bin/python`.
+
 Run:
 
 ```bash
@@ -51,6 +53,8 @@ rg -n "TBD|待定|以后再说|%APPDATA%" README.md docs/roadmap.md docs/app-roa
 Expected: no matches.
 
 - [ ] **Step 2: Verify diff whitespace**
+
+Run from the implementation worktree. If the worktree does not contain `venv/`, use `/usr/local/Web-Project/Secert-Base/venv/bin/python` in place of `venv/bin/python`.
 
 Run:
 

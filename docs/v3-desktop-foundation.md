@@ -161,6 +161,8 @@ python desktop/launcher.py --dry-run
 
 `--dry-run` 用于输出解析后的运行配置，不启动后端、不打开浏览器，便于测试和排查。
 
+如果在 Git worktree 中开发，而主仓库的 `venv/` 被 `.gitignore` 排除，可以使用主仓库已有虚拟环境解释器运行测试，也可以在 worktree 内重新创建虚拟环境。V3.0 实施期间默认复用主仓库虚拟环境。
+
 ## 7. 前端访问方式
 
 桌面模式应尽量使用同源访问，减少 CORS 复杂度。
@@ -408,6 +410,8 @@ venv/bin/python scripts/test-desktop-foundation.py
 venv/bin/python scripts/test-backup-separation.py
 env DEEPSEEK_API_KEY= AI_API_KEY= AI_MODEL=deepseek-v4-flash venv/bin/python scripts/v1-fake-smoke-test.py
 ```
+
+如果当前目录是 `.worktrees/v3-desktop-foundation` 且没有本地 `venv/`，可以把上面的 `venv/bin/python` 替换为主仓库虚拟环境的绝对路径，例如 `/usr/local/Web-Project/Secert-Base/venv/bin/python`。
 
 ## 13. 仍需继续讨论的问题
 
