@@ -17,6 +17,7 @@ backend/logs/
 backend/settings.json
 
 # Local planning/session notes
+.worktrees/
 task_plan.md
 findings.md
 progress.md
