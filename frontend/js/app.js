@@ -78,6 +78,7 @@ const app = createApp({
         const revealedFields = ref([]);
         const backups = ref([]);
         const highlightedBackupFilename = ref('');
+        const backupListLoading = ref(false);
         const creatingBackup = ref(false);
         const restoringBackupFilename = ref('');
         const downloadingBackupFilename = ref('');
@@ -314,7 +315,12 @@ const app = createApp({
             return entries.value.length > 0 && entries.value.every(entry => selectedEntryIds.value.includes(entry.id));
         });
 
-        const backupBusy = computed(() => creatingBackup.value || Boolean(restoringBackupFilename.value));
+        const backupBusy = computed(() => (
+            backupListLoading.value ||
+            creatingBackup.value ||
+            Boolean(restoringBackupFilename.value) ||
+            Boolean(downloadingBackupFilename.value)
+        ));
         const sortedBackups = computed(() => {
             return [...backups.value].sort((a, b) => new Date(b.modified_at || 0) - new Date(a.modified_at || 0));
         });
@@ -1690,17 +1696,20 @@ const app = createApp({
         }
 
         async function loadBackups() {
+            if (backupListLoading.value) return;
+            backupListLoading.value = true;
             try {
                 const result = await api.get('/backups');
                 backups.value = result.data.items || [];
             } catch (error) {
                 showToast(error.message || '备份列表加载失败', 'error');
+            } finally {
+                backupListLoading.value = false;
             }
         }
 
-        async function openBackupCenter() {
+        function openBackupCenter() {
             showBackupCenter.value = true;
-            await loadBackups();
         }
 
         function setBackupPage(type, page) {
@@ -1728,19 +1737,26 @@ const app = createApp({
 
         async function downloadBackupFile(backup, kind) {
             if (downloadingBackupFilename.value) return;
-            downloadingBackupFilename.value = backup.filename;
-            try {
-                if (kind === 'encrypted') {
+            if (kind === 'encrypted') {
+                downloadingBackupFilename.value = backup.filename;
+                try {
                     await downloadBackup(
                         `/backups/${encodeURIComponent(backup.filename)}/download/encrypted`,
                         null,
                         backup.download_name_encrypted || backup.filename,
                         'GET'
                     );
-                    return;
+                } catch (error) {
+                    showToast(friendlyApiMessage(error, '备份下载失败'), 'error');
+                } finally {
+                    downloadingBackupFilename.value = '';
                 }
+                return;
+            }
 
-                showConfirmDialog('下载明文 JSON', `明文 JSON 会包含这个备份里的所有密码和密钥。\n\n备份：${backupDisplayName(backup)}\n\n确认下载？`, async () => {
+            showConfirmDialog('下载明文 JSON', `明文 JSON 会包含这个备份里的所有密码和密钥。\n\n备份：${backupDisplayName(backup)}\n\n确认下载？`, async () => {
+                downloadingBackupFilename.value = backup.filename;
+                try {
                     try {
                         await downloadBackup(
                             `/backups/${encodeURIComponent(backup.filename)}/download/plain`,
@@ -1768,12 +1784,10 @@ const app = createApp({
                             showToast(friendlyApiMessage(error, '明文 JSON 下载失败'), 'error');
                         }
                     }
-                });
-            } catch (error) {
-                showToast(friendlyApiMessage(error, '备份下载失败'), 'error');
-            } finally {
-                downloadingBackupFilename.value = '';
-            }
+                } finally {
+                    downloadingBackupFilename.value = '';
+                }
+            });
         }
 
         function openRestoreWizard(backup) {
@@ -2202,6 +2216,7 @@ const app = createApp({
             importConflictResolutions,
             backups,
             highlightedBackupFilename,
+            backupListLoading,
             creatingBackup,
             restoringBackupFilename,
             downloadingBackupFilename,

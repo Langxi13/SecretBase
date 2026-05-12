@@ -1011,7 +1011,7 @@ POST /backups/{filename}/restore
 
 `GET /backups/{filename}/download/encrypted` 下载指定服务器备份的加密 `.bak` 文件。`POST /backups/{filename}/download/plain` 下载指定服务器备份的明文 JSON，请求体必须包含 `{ "confirm": true }`；旧备份或不同 salt 备份还可传 `{ "password": "backup-master-password" }`。未确认、未提供所需密码或密码错误均返回 422。
 
-`GET /backups/{filename}/summary` 使用当前会话密钥解密备份并返回条目数、回收站条目数、版本、文件大小、修改时间和类型。
+`GET /backups/{filename}/summary` 使用当前会话密钥解密备份并返回条目数、回收站条目数、版本、文件大小、修改时间、类型，以及当前 vault 的条目数和回收站条目数，供恢复向导核对影响。
 
 `GET /backups` 响应示例：
 
@@ -1057,6 +1057,8 @@ POST /backups/{filename}/restore
 ```
 
 V2.2 起，`POST /backups/{filename}/summary` 可使用请求体 `{ "password": "backup-master-password" }` 读取不同 salt 的旧备份概况。
+
+备份概况响应中的 `current_entry_count` 和 `current_deleted_count` 表示当前 vault 状态；`entry_count` 和 `deleted_count` 表示该备份恢复后的目标状态。
 
 V2.2 起，`POST /backups/{filename}/restore` 支持请求体 `{ "password": "backup-master-password" }`。带密码恢复成功后，后端会用当前解锁会话密钥重新写回 vault，不升级文件格式。
 

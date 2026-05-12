@@ -140,6 +140,23 @@ def test_backup_downloads_encrypted_and_plain_with_confirmation() -> None:
         assert "filename*=UTF-8''" in plain_response.headers["content-disposition"]
 
 
+def test_backup_summary_includes_current_vault_counts() -> None:
+    with tempfile.TemporaryDirectory() as raw:
+        tmpdir = Path(raw)
+        reset_storage(tmpdir, max_backups=5)
+        write_entry("Before backup")
+        manual_path = storage.create_backup()
+        write_entry("After backup")
+
+        result = asyncio.run(transfer.get_backup_summary(manual_path.name))
+        data = result["data"]
+
+        assert data["entry_count"] == 1
+        assert data["deleted_count"] == 0
+        assert data["current_entry_count"] == 2
+        assert data["current_deleted_count"] == 0
+
+
 def test_plain_backup_download_requires_correct_legacy_password() -> None:
     with tempfile.TemporaryDirectory() as raw:
         tmpdir = Path(raw)
@@ -176,6 +193,7 @@ def main() -> None:
         test_auto_backup_cleanup_uses_settings_retention,
         test_backup_list_includes_display_and_download_names,
         test_backup_downloads_encrypted_and_plain_with_confirmation,
+        test_backup_summary_includes_current_vault_counts,
         test_plain_backup_download_requires_correct_legacy_password,
     ]
     for test in tests:

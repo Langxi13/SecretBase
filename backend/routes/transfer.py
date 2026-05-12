@@ -130,6 +130,14 @@ def backup_summary_from_data(data: VaultData) -> dict:
     }
 
 
+def current_vault_counts() -> dict:
+    data = get_vault_data()
+    return {
+        "current_entry_count": len(data.entries),
+        "current_deleted_count": len(data.deleted_entries),
+    }
+
+
 def backup_summary_from_content(content: bytes, password: str | None = None) -> dict:
     if password:
         data = read_encrypted_vault_with_password(content, password)
@@ -421,6 +429,7 @@ async def get_backup_summary(filename: str):
         "success": True,
         "data": {
             **summary,
+            **current_vault_counts(),
             "filename": path.name,
             "type": resolve_backup_file(filename)[1],
             "size": stat.st_size,
@@ -447,6 +456,7 @@ async def post_backup_summary(filename: str, payload: dict = Body(default_factor
         "success": True,
         "data": {
             **summary,
+            **current_vault_counts(),
             "filename": path.name,
             "type": resolve_backup_file(filename)[1],
             "size": stat.st_size,

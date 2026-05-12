@@ -904,9 +904,16 @@
                             <button class="btn-primary inline" @click="createManualBackup" :disabled="backupBusy">
                                 {{ creatingBackup ? '创建中...' : '创建手动备份' }}
                             </button>
-                            <button class="btn-secondary" @click="loadBackups" :disabled="backupBusy">刷新列表</button>
+                            <button class="btn-secondary" @click="loadBackups" :disabled="backupBusy">
+                                {{ backupListLoading ? '刷新中...' : '刷新列表' }}
+                            </button>
                         </div>
                     </section>
+
+                    <div v-if="backupListLoading" class="backup-loading-state">
+                        <span class="loading-spinner"></span>
+                        <span>正在加载备份列表...</span>
+                    </div>
 
                     <div class="backup-list">
                         <section v-for="group in backupGroups" :key="group.type" class="backup-group" :class="'backup-group-' + group.type">
@@ -932,8 +939,12 @@
                                         </p>
                                     </div>
                                     <div class="backup-item-actions">
-                                        <button class="btn-small" @click="downloadBackupFile(backup, 'encrypted')" :disabled="backupBusy || downloadingBackupFilename === backup.filename">下载加密备份</button>
-                                        <button class="btn-small" @click="downloadBackupFile(backup, 'plain')" :disabled="backupBusy || downloadingBackupFilename === backup.filename">下载明文 JSON</button>
+                                        <button class="btn-small" @click="downloadBackupFile(backup, 'encrypted')" :disabled="backupBusy || downloadingBackupFilename === backup.filename">
+                                            {{ downloadingBackupFilename === backup.filename ? '下载中...' : '下载加密备份' }}
+                                        </button>
+                                        <button class="btn-small" @click="downloadBackupFile(backup, 'plain')" :disabled="backupBusy || downloadingBackupFilename === backup.filename">
+                                            {{ downloadingBackupFilename === backup.filename ? '下载中...' : '下载明文 JSON' }}
+                                        </button>
                                         <button class="btn-small backup-restore-btn" @click="restoreBackup(backup)" :disabled="backupBusy">
                                             {{ restoringBackupFilename === backup.filename ? '恢复中...' : '恢复' }}
                                         </button>
@@ -1008,11 +1019,19 @@
                     <section v-else-if="restoreWizard.step === 2" class="restore-step">
                         <div class="settings-list">
                             <div class="settings-row">
-                                <span>将恢复条目</span>
+                                <span>当前条目</span>
+                                <strong>{{ restoreWizard.summary?.current_entry_count ?? '-' }}</strong>
+                            </div>
+                            <div class="settings-row">
+                                <span>恢复后条目</span>
                                 <strong>{{ restoreWizard.summary?.entry_count ?? '-' }}</strong>
                             </div>
                             <div class="settings-row">
-                                <span>将恢复回收站</span>
+                                <span>当前回收站</span>
+                                <strong>{{ restoreWizard.summary?.current_deleted_count ?? '-' }}</strong>
+                            </div>
+                            <div class="settings-row">
+                                <span>恢复后回收站</span>
                                 <strong>{{ restoreWizard.summary?.deleted_count ?? '-' }}</strong>
                             </div>
                             <div class="settings-row">
