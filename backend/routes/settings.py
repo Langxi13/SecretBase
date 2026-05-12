@@ -63,6 +63,7 @@ async def update_settings(updates: dict):
     field_mapping = {
         'pageSize': 'page_size',
         'autoLockMinutes': 'auto_lock_minutes',
+        'autoBackupRetention': 'auto_backup_retention',
         'theme': 'theme',
         'language': 'language'
     }

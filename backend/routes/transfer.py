@@ -1,6 +1,7 @@
 import json
 from datetime import datetime
 from pathlib import Path
+from urllib.parse import quote
 
 from fastapi import APIRouter, Body, File, Form, HTTPException, UploadFile
 from fastapi.responses import Response
@@ -36,6 +37,35 @@ def check_unlocked():
 def backup_filename(suffix: str) -> str:
     date = datetime.now().strftime("%Y%m%d")
     return f"secretbase-backup-{date}.{suffix}"
+
+
+def backup_type_label(backup_type: str) -> str:
+    if backup_type == "manual":
+        return "手动备份"
+    if backup_type == "auto":
+        return "自动备份"
+    return "旧版备份"
+
+
+def backup_timestamp(path: Path) -> datetime:
+    return datetime.fromtimestamp(path.stat().st_mtime)
+
+
+def readable_backup_name(path: Path, backup_type: str, suffix: str = "bak") -> str:
+    timestamp = backup_timestamp(path).strftime("%Y年%m月%d日%H时%M分%S秒")
+    return f"{backup_type_label(backup_type)}-{timestamp}.{suffix}"
+
+
+def ascii_download_name(path: Path, suffix: str) -> str:
+    return f"{path.stem}.{suffix}"
+
+
+def content_disposition(path: Path, backup_type: str, suffix: str) -> str:
+    readable = readable_backup_name(path, backup_type, suffix)
+    return (
+        f'attachment; filename="{ascii_download_name(path, suffix)}"; '
+        f"filename*=UTF-8''{quote(readable)}"
+    )
 
 
 async def read_import_json(file: UploadFile) -> dict:
@@ -106,6 +136,40 @@ def backup_summary_from_content(content: bytes, password: str | None = None) -> 
     else:
         data = read_encrypted_vault_with_current_key(content)
     return backup_summary_from_data(data)
+
+
+def backup_summary_for_list(path: Path) -> dict:
+    try:
+        return {
+            **backup_summary_from_content(path.read_bytes()),
+            "summary_available": True,
+            "needs_password": False,
+        }
+    except Exception:
+        return {
+            "entry_count": None,
+            "deleted_count": None,
+            "created_at": None,
+            "version": None,
+            "summary_available": False,
+            "needs_password": True,
+        }
+
+
+def backup_response_item(path: Path, backup_type: str, include_summary: bool = True) -> dict:
+    stat = path.stat()
+    item = {
+        "filename": path.name,
+        "type": backup_type,
+        "display_name": readable_backup_name(path, backup_type),
+        "download_name_encrypted": readable_backup_name(path, backup_type, "bak"),
+        "download_name_plain": readable_backup_name(path, backup_type, "json"),
+        "size": stat.st_size,
+        "modified_at": datetime.fromtimestamp(stat.st_mtime).isoformat(),
+    }
+    if include_summary:
+        item.update(backup_summary_for_list(path))
+    return item
 
 
 def backup_password_required_error():
@@ -277,14 +341,7 @@ async def list_backups():
     check_unlocked()
     backups = []
     for item in list_backup_files():
-        path = item["path"]
-        stat = path.stat()
-        backups.append({
-            "filename": path.name,
-            "type": item["type"],
-            "size": stat.st_size,
-            "modified_at": datetime.fromtimestamp(stat.st_mtime).isoformat()
-        })
+        backups.append(backup_response_item(item["path"], item["type"]))
 
     return {
         "success": True,
@@ -306,17 +363,47 @@ async def create_manual_backup():
     except Exception:
         raise HTTPException(status_code=500, detail="创建备份失败")
 
-    stat = path.stat()
+    backup_type = resolve_backup_file(path.name)[1]
     return {
         "success": True,
-        "data": {
-            "filename": path.name,
-            "type": "manual",
-            "size": stat.st_size,
-            "modified_at": datetime.fromtimestamp(stat.st_mtime).isoformat()
-        },
+        "data": backup_response_item(path, backup_type),
         "message": "已创建手动备份"
     }
+
+
+@router.get("/backups/{filename}/download/encrypted")
+async def download_backup_encrypted(filename: str):
+    """下载指定服务器备份的加密文件。"""
+    check_unlocked()
+    path, backup_type = resolve_backup_file(filename)
+    return Response(
+        content=path.read_bytes(),
+        media_type="application/octet-stream",
+        headers={"Content-Disposition": content_disposition(path, backup_type, "bak")}
+    )
+
+
+@router.post("/backups/{filename}/download/plain")
+async def download_backup_plain(filename: str, payload: dict = Body(default_factory=dict)):
+    """下载指定服务器备份的明文 JSON，必须显式确认。"""
+    check_unlocked()
+    if payload.get("confirm") is not True:
+        raise HTTPException(status_code=422, detail="下载明文备份前必须确认")
+
+    path, backup_type = resolve_backup_file(filename)
+    password = payload.get("password")
+    try:
+        data = read_encrypted_vault_with_password(path.read_bytes(), password) if password else read_encrypted_vault_with_current_key(path.read_bytes())
+    except Exception:
+        if password:
+            raise HTTPException(status_code=422, detail="备份无效或主密码不匹配")
+        backup_password_required_error()
+
+    return Response(
+        content=data.model_dump_json(),
+        media_type="application/json",
+        headers={"Content-Disposition": content_disposition(path, backup_type, "json")}
+    )
 
 
 @router.get("/backups/{filename}/summary")

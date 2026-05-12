@@ -174,6 +174,7 @@ class Settings(BaseModel):
     theme: str = Field(default="system", pattern="^(dark|light|system)$")
     page_size: int = Field(default=20, ge=1, le=1000)
     auto_lock_minutes: int = Field(default=5, ge=0, le=1440)
+    auto_backup_retention: int = Field(default=30, ge=5, le=200)
     language: str = Field(default="zh-CN")
 
 

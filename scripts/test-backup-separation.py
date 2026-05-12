@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import sys
 import tempfile
 from pathlib import Path
@@ -12,9 +13,10 @@ sys.path.insert(0, str(BACKEND))
 import storage  # noqa: E402
 from models import Entry  # noqa: E402
 from routes import transfer  # noqa: E402
+from routes import settings as settings_route  # noqa: E402
 
 
-def reset_storage(tmpdir: Path, max_backups: int = 2) -> None:
+def reset_storage(tmpdir: Path, max_backups: int = 5, auto_backup_retention: int | None = None) -> None:
     storage.lock_vault()
     data_dir = tmpdir / "data"
     backup_dir = data_dir / "backups"
@@ -23,8 +25,12 @@ def reset_storage(tmpdir: Path, max_backups: int = 2) -> None:
 
     storage.VAULT_PATH = str(data_dir / "secretbase.enc")
     storage.BACKUP_DIR = str(backup_dir)
-    storage.MAX_BACKUPS = max_backups
-    transfer.BACKUP_DIR = str(backup_dir)
+    storage.SETTINGS_PATH = str(data_dir / "settings.json")
+    settings_route.SETTINGS_PATH = storage.SETTINGS_PATH
+    Path(settings_route.SETTINGS_PATH).write_text(
+        json.dumps({"auto_backup_retention": auto_backup_retention or max_backups}),
+        encoding="utf-8"
+    )
 
     assert storage.init_vault("correct horse battery staple")
 
@@ -38,7 +44,7 @@ def write_entry(title: str) -> None:
 def test_manual_backup_uses_manual_dir_and_survives_auto_cleanup() -> None:
     with tempfile.TemporaryDirectory() as raw:
         tmpdir = Path(raw)
-        reset_storage(tmpdir, max_backups=2)
+        reset_storage(tmpdir, max_backups=5)
 
         manual_path = storage.create_backup()
         assert manual_path.parent.name == "manual"
@@ -47,7 +53,7 @@ def test_manual_backup_uses_manual_dir_and_survives_auto_cleanup() -> None:
             write_entry(f"Entry {index}")
 
         auto_backups = sorted((tmpdir / "data" / "backups" / "auto").glob("*.bak"))
-        assert len(auto_backups) <= 2
+        assert len(auto_backups) <= 5
         assert manual_path.exists()
 
 
@@ -82,11 +88,95 @@ def test_backup_list_reports_manual_and_auto_types() -> None:
         assert "auto" in types_by_name.values()
 
 
+def test_auto_backup_cleanup_uses_settings_retention() -> None:
+    with tempfile.TemporaryDirectory() as raw:
+        tmpdir = Path(raw)
+        reset_storage(tmpdir, max_backups=30, auto_backup_retention=5)
+
+        manual_paths = [storage.create_backup() for _ in range(2)]
+        for index in range(7):
+            write_entry(f"Entry {index}")
+
+        auto_backups = sorted((tmpdir / "data" / "backups" / "auto").glob("*.bak"))
+        assert len(auto_backups) <= 5
+        assert all(path.exists() for path in manual_paths)
+
+
+def test_backup_list_includes_display_and_download_names() -> None:
+    with tempfile.TemporaryDirectory() as raw:
+        tmpdir = Path(raw)
+        reset_storage(tmpdir, max_backups=5)
+
+        manual_path = storage.create_backup()
+        result = asyncio.run(transfer.list_backups())
+        item = next(item for item in result["data"]["items"] if item["filename"] == manual_path.name)
+
+        assert item["display_name"].startswith("手动备份-")
+        assert item["download_name_encrypted"].startswith("手动备份-")
+        assert item["download_name_encrypted"].endswith(".bak")
+        assert item["download_name_plain"].endswith(".json")
+
+
+def test_backup_downloads_encrypted_and_plain_with_confirmation() -> None:
+    with tempfile.TemporaryDirectory() as raw:
+        tmpdir = Path(raw)
+        reset_storage(tmpdir, max_backups=5)
+        write_entry("Exportable")
+        manual_path = storage.create_backup()
+
+        encrypted_response = asyncio.run(transfer.download_backup_encrypted(manual_path.name))
+        assert encrypted_response.body == manual_path.read_bytes()
+        assert "filename*=UTF-8''" in encrypted_response.headers["content-disposition"]
+
+        try:
+            asyncio.run(transfer.download_backup_plain(manual_path.name, {}))
+            raise AssertionError("plain download without confirmation should fail")
+        except Exception as exc:
+            assert getattr(exc, "status_code", None) == 422
+
+        plain_response = asyncio.run(transfer.download_backup_plain(manual_path.name, {"confirm": True}))
+        plain = json.loads(plain_response.body.decode("utf-8"))
+        assert plain["entries"][0]["title"] == "Exportable"
+        assert "filename*=UTF-8''" in plain_response.headers["content-disposition"]
+
+
+def test_plain_backup_download_requires_correct_legacy_password() -> None:
+    with tempfile.TemporaryDirectory() as raw:
+        tmpdir = Path(raw)
+        reset_storage(tmpdir, max_backups=5)
+        write_entry("Before password change")
+        manual_path = storage.create_backup()
+        assert storage.change_vault_password("correct horse battery staple", "new correct horse battery staple")
+
+        try:
+            asyncio.run(transfer.download_backup_plain(manual_path.name, {"confirm": True}))
+            raise AssertionError("legacy plain download without password should fail")
+        except Exception as exc:
+            assert getattr(exc, "status_code", None) == 422
+
+        try:
+            asyncio.run(transfer.download_backup_plain(manual_path.name, {"confirm": True, "password": "wrong"}))
+            raise AssertionError("legacy plain download with wrong password should fail")
+        except Exception as exc:
+            assert getattr(exc, "status_code", None) == 422
+
+        response = asyncio.run(transfer.download_backup_plain(
+            manual_path.name,
+            {"confirm": True, "password": "correct horse battery staple"}
+        ))
+        plain = json.loads(response.body.decode("utf-8"))
+        assert plain["entries"][0]["title"] == "Before password change"
+
+
 def main() -> None:
     tests = [
         test_manual_backup_uses_manual_dir_and_survives_auto_cleanup,
         test_legacy_root_backups_are_migrated_to_auto_dir,
         test_backup_list_reports_manual_and_auto_types,
+        test_auto_backup_cleanup_uses_settings_retention,
+        test_backup_list_includes_display_and_download_names,
+        test_backup_downloads_encrypted_and_plain_with_confirmation,
+        test_plain_backup_download_requires_correct_legacy_password,
     ]
     for test in tests:
         test()

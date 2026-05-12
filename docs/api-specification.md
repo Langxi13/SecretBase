@@ -993,19 +993,23 @@ V1.4 起，`POST /import/plain` 成功响应的 `data` 中除保留 `imported_co
 
 ### 8.7 备份管理
 
-阶段：V1.2/V1.3。备份管理接口必须要求解锁。
+阶段：V1.2/V1.3/V2.4。备份管理接口必须要求解锁。
 
 ```
 GET /backups
 POST /backups
+GET /backups/{filename}/download/encrypted
+POST /backups/{filename}/download/plain
 GET /backups/{filename}/summary
 POST /backups/{filename}/summary
 POST /backups/{filename}/restore
 ```
 
-`GET /backups` 返回备份文件名、类型、大小、修改时间。`type` 为 `manual`、`auto` 或兼容旧目录时的 `legacy`。`POST /backups` 手动创建当前 vault 的加密备份，并写入 `BACKUP_DIR/manual/`。写入 vault 或恢复备份前创建的自动快照写入 `BACKUP_DIR/auto/`。
+`GET /backups` 返回备份文件名、类型、可读显示名、建议下载名、大小、修改时间，以及能用当前会话密钥读取时的条目数和回收站数。`type` 为 `manual`、`auto` 或兼容旧目录时的 `legacy`。`POST /backups` 手动创建当前 vault 的加密备份，并写入 `BACKUP_DIR/manual/`。写入 vault 或恢复备份前创建的自动快照写入 `BACKUP_DIR/auto/`。
 
-自动备份按 `MAX_BACKUPS` 数量轮转，默认保留 30 个；手动备份不参与自动轮转。旧版本根目录下的 `secretbase.enc.*.bak` 会在备份列表、手动备份或恢复路径解析时默认迁移到 `BACKUP_DIR/auto/`。
+自动备份按设置项 `auto_backup_retention` 数量轮转，默认保留 30 个，范围 5-200；手动备份不参与自动轮转。旧版本根目录下的 `secretbase.enc.*.bak` 会在备份列表、手动备份或恢复路径解析时默认迁移到 `BACKUP_DIR/auto/`。
+
+`GET /backups/{filename}/download/encrypted` 下载指定服务器备份的加密 `.bak` 文件。`POST /backups/{filename}/download/plain` 下载指定服务器备份的明文 JSON，请求体必须包含 `{ "confirm": true }`；旧备份或不同 salt 备份还可传 `{ "password": "backup-master-password" }`。未确认、未提供所需密码或密码错误均返回 422。
 
 `GET /backups/{filename}/summary` 使用当前会话密钥解密备份并返回条目数、回收站条目数、版本、文件大小、修改时间和类型。
 
@@ -1019,14 +1023,32 @@ POST /backups/{filename}/restore
       {
         "filename": "secretbase.manual.20260512_153000_123456.bak",
         "type": "manual",
+        "display_name": "手动备份-2026年05月12日15时30分00秒.bak",
+        "download_name_encrypted": "手动备份-2026年05月12日15时30分00秒.bak",
+        "download_name_plain": "手动备份-2026年05月12日15时30分00秒.json",
         "size": 4096,
-        "modified_at": "2026-05-12T15:30:00"
+        "modified_at": "2026-05-12T15:30:00",
+        "entry_count": 50,
+        "deleted_count": 2,
+        "created_at": "2026-05-01T10:00:00",
+        "version": "1.0",
+        "summary_available": true,
+        "needs_password": false
       },
       {
         "filename": "secretbase.auto.20260512_152900_123456.bak",
         "type": "auto",
+        "display_name": "自动备份-2026年05月12日15时29分00秒.bak",
+        "download_name_encrypted": "自动备份-2026年05月12日15时29分00秒.bak",
+        "download_name_plain": "自动备份-2026年05月12日15时29分00秒.json",
         "size": 4096,
-        "modified_at": "2026-05-12T15:29:00"
+        "modified_at": "2026-05-12T15:29:00",
+        "entry_count": null,
+        "deleted_count": null,
+        "created_at": null,
+        "version": null,
+        "summary_available": false,
+        "needs_password": true
       }
     ],
     "total": 2
@@ -1085,6 +1107,8 @@ GET /tools/security-report
 
 前端内部状态可以使用 camelCase 字段（如 `pageSize`、`autoLockMinutes`、`totalPages`），但后端 API 请求和响应统一使用 snake_case（如 `page_size`、`auto_lock_minutes`、`total_pages`）。前端必须在 API 边界做字段映射，不能直接假设后端返回 camelCase。
 
+`auto_backup_retention` 控制自动备份保留数量，默认 `30`，有效范围 `5-200`。该设置只影响自动备份轮转，不会删除手动备份。
+
 ### 9.1 获取设置
 
 ```
@@ -1100,6 +1124,7 @@ GET /settings
     "theme": "dark",
     "page_size": 20,
     "auto_lock_minutes": 5,
+    "auto_backup_retention": 30,
     "language": "zh-CN"
   }
 }
@@ -1116,7 +1141,8 @@ PUT /settings
 ```json
 {
   "theme": "light",
-  "page_size": 30
+  "page_size": 30,
+  "auto_backup_retention": 60
 }
 ```
 
@@ -1129,6 +1155,7 @@ PUT /settings
     "theme": "light",
     "page_size": 30,
     "auto_lock_minutes": 5,
+    "auto_backup_retention": 60,
     "language": "zh-CN"
   },
   "message": "设置已更新"

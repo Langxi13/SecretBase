@@ -9,7 +9,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
-from config import VAULT_PATH, BACKUP_DIR, MAX_BACKUPS
+from config import VAULT_PATH, BACKUP_DIR, SETTINGS_PATH
 from crypto import (
     SecureKey,
     decrypt_vault,
@@ -19,7 +19,7 @@ from crypto import (
     generate_salt,
     parse_vault_header,
 )
-from models import VaultData, Entry, EntryCreate, EntryUpdate
+from models import VaultData, Entry, EntryCreate, EntryUpdate, Settings
 
 logger = logging.getLogger(__name__)
 
@@ -237,6 +237,15 @@ def _backup_filename(backup_type: str) -> str:
     return f"secretbase.{backup_type}.{timestamp}{BACKUP_SUFFIX}"
 
 
+def get_auto_backup_retention() -> int:
+    """Return the automatic backup retention count from settings."""
+    try:
+        with open(SETTINGS_PATH, "r", encoding="utf-8") as f:
+            return Settings(**json.load(f)).auto_backup_retention
+    except Exception:
+        return Settings().auto_backup_retention
+
+
 def list_backup_files() -> list[dict]:
     """Return managed backups with type metadata for API responses."""
     migrate_legacy_backups_to_auto()
@@ -443,11 +452,12 @@ def _cleanup_backups():
     """清理旧自动备份。"""
     try:
         _ensure_backup_dirs()
+        retention = get_auto_backup_retention()
         backups = sorted(
             [path for path in _backup_dir(AUTO_BACKUP_TYPE).glob(f"*{BACKUP_SUFFIX}") if path.is_file()],
             key=lambda path: path.stat().st_mtime,
         )
-        while len(backups) > MAX_BACKUPS:
+        while len(backups) > retention:
             oldest = backups.pop(0)
             oldest.unlink()
             logger.info(f"删除旧备份: {oldest}")

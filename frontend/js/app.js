@@ -54,6 +54,7 @@ const app = createApp({
         const showTagBrowser = ref(false);
         const showConfirm = ref(false);
         const showTools = ref(false);
+        const showBackupCenter = ref(false);
         const showAdvancedFilters = ref(false);
         const selectedEntry = ref(null);
         const editingEntry = ref(null);
@@ -79,6 +80,25 @@ const app = createApp({
         const highlightedBackupFilename = ref('');
         const creatingBackup = ref(false);
         const restoringBackupFilename = ref('');
+        const downloadingBackupFilename = ref('');
+        const backupPages = reactive({
+            manual: 1,
+            auto: 1,
+            legacy: 1
+        });
+        const backupPageSize = 3;
+        const restoreWizard = reactive({
+            visible: false,
+            step: 1,
+            backup: null,
+            summary: null,
+            password: '',
+            needsPassword: false,
+            confirmation: '',
+            loadingSummary: false,
+            restoring: false,
+            error: ''
+        });
         const healthReport = ref(null);
         const maintenanceReport = ref(null);
         const securityReport = ref(null);
@@ -120,7 +140,8 @@ const app = createApp({
         const settingsForm = reactive({
             theme: 'system',
             pageSize: 20,
-            autoLockMinutes: 5
+            autoLockMinutes: 5,
+            autoBackupRetention: 30
         });
         const importConflictStrategy = ref('skip');
         const advancedFilters = reactive({
@@ -294,6 +315,20 @@ const app = createApp({
         });
 
         const backupBusy = computed(() => creatingBackup.value || Boolean(restoringBackupFilename.value));
+        const sortedBackups = computed(() => {
+            return [...backups.value].sort((a, b) => new Date(b.modified_at || 0) - new Date(a.modified_at || 0));
+        });
+        const backupSummary = computed(() => {
+            const manualCount = backups.value.filter(backup => backup.type === 'manual').length;
+            const autoCount = backups.value.filter(backup => backup.type === 'auto').length;
+            const recent = sortedBackups.value[0] || null;
+            return {
+                manualCount,
+                autoCount,
+                retention: settingsForm.autoBackupRetention,
+                recent
+            };
+        });
         const backupGroups = computed(() => {
             const definitions = [
                 {
@@ -317,7 +352,20 @@ const app = createApp({
                     ...group,
                     items: backups.value.filter(backup => (backup.type || 'legacy') === group.type)
                 }))
-                .filter(group => group.items.length > 0);
+                .filter(group => group.type !== 'legacy' || group.items.length > 0)
+                .map(group => {
+                    const totalPages = Math.max(1, Math.ceil(group.items.length / backupPageSize));
+                    const current = Math.min(backupPages[group.type] || 1, totalPages);
+                    const start = (current - 1) * backupPageSize;
+                    const pagedItems = group.items.slice(start, start + backupPageSize);
+                    return {
+                        ...group,
+                        page: current,
+                        totalPages,
+                        pagedItems,
+                        emptySlots: Math.max(0, backupPageSize - pagedItems.length)
+                    };
+                });
         });
 
         // 分页
@@ -394,6 +442,7 @@ const app = createApp({
             settingsForm.theme = settings.theme;
             settingsForm.pageSize = settings.pageSize;
             settingsForm.autoLockMinutes = settings.autoLockMinutes;
+            settingsForm.autoBackupRetention = settings.autoBackupRetention;
         }
 
         // 加载条目
@@ -1380,11 +1429,13 @@ const app = createApp({
 
         // 保存设置
         async function saveSettings() {
+            settingsForm.autoBackupRetention = Math.min(200, Math.max(5, Number(settingsForm.autoBackupRetention || 30)));
             const previousPageSize = settingsForm.pageSize;
             await store.updateSettings({
                 theme: settingsForm.theme,
                 pageSize: settingsForm.pageSize,
-                autoLockMinutes: settingsForm.autoLockMinutes
+                autoLockMinutes: settingsForm.autoLockMinutes,
+                autoBackupRetention: settingsForm.autoBackupRetention
             });
             currentTheme.value = settingsForm.theme;
             applyTheme(settingsForm.theme);
@@ -1647,6 +1698,15 @@ const app = createApp({
             }
         }
 
+        async function openBackupCenter() {
+            showBackupCenter.value = true;
+            await loadBackups();
+        }
+
+        function setBackupPage(type, page) {
+            backupPages[type] = Math.max(1, page);
+        }
+
         async function createManualBackup() {
             if (creatingBackup.value) return;
             creatingBackup.value = true;
@@ -1662,56 +1722,142 @@ const app = createApp({
             }
         }
 
-        async function restoreBackup(backup) {
-            if (restoringBackupFilename.value) return;
-            restoringBackupFilename.value = backup.filename;
-            let summaryText = `文件：${backup.filename}\n大小：${formatBytes(backup.size)}\n修改时间：${formatDate(backup.modified_at)}`;
-            let backupPassword = '';
+        function backupDisplayName(backup) {
+            return backup.display_name || backup.filename;
+        }
+
+        async function downloadBackupFile(backup, kind) {
+            if (downloadingBackupFilename.value) return;
+            downloadingBackupFilename.value = backup.filename;
             try {
-                showToast('正在读取备份概况...', 'info');
-                const summary = await api.get(`/backups/${encodeURIComponent(backup.filename)}/summary`);
-                summaryText = `文件：${summary.data.filename}\n条目数：${summary.data.entry_count}\n回收站：${summary.data.deleted_count}\n大小：${formatBytes(summary.data.size)}\n修改时间：${formatDate(summary.data.modified_at)}`;
+                if (kind === 'encrypted') {
+                    await downloadBackup(
+                        `/backups/${encodeURIComponent(backup.filename)}/download/encrypted`,
+                        null,
+                        backup.download_name_encrypted || backup.filename,
+                        'GET'
+                    );
+                    return;
+                }
+
+                showConfirmDialog('下载明文 JSON', `明文 JSON 会包含这个备份里的所有密码和密钥。\n\n备份：${backupDisplayName(backup)}\n\n确认下载？`, async () => {
+                    try {
+                        await downloadBackup(
+                            `/backups/${encodeURIComponent(backup.filename)}/download/plain`,
+                            { confirm: true },
+                            backup.download_name_plain || backup.filename.replace(/\.bak$/, '.json'),
+                            'POST',
+                            true
+                        );
+                    } catch (error) {
+                        if (error.data?.needs_password) {
+                            const password = window.prompt('该备份需要对应的主密码才能下载明文 JSON。') || '';
+                            if (!password) return;
+                            try {
+                                await downloadBackup(
+                                    `/backups/${encodeURIComponent(backup.filename)}/download/plain`,
+                                    { confirm: true, password },
+                                    backup.download_name_plain || backup.filename.replace(/\.bak$/, '.json'),
+                                    'POST',
+                                    true
+                                );
+                            } catch (passwordError) {
+                                showToast(friendlyApiMessage(passwordError, '明文 JSON 下载失败'), 'error');
+                            }
+                        } else {
+                            showToast(friendlyApiMessage(error, '明文 JSON 下载失败'), 'error');
+                        }
+                    }
+                });
+            } catch (error) {
+                showToast(friendlyApiMessage(error, '备份下载失败'), 'error');
+            } finally {
+                downloadingBackupFilename.value = '';
+            }
+        }
+
+        function openRestoreWizard(backup) {
+            restoreWizard.visible = true;
+            restoreWizard.step = 1;
+            restoreWizard.backup = backup;
+            restoreWizard.summary = null;
+            restoreWizard.password = '';
+            restoreWizard.needsPassword = false;
+            restoreWizard.confirmation = '';
+            restoreWizard.loadingSummary = false;
+            restoreWizard.restoring = false;
+            restoreWizard.error = '';
+            loadRestoreSummary();
+        }
+
+        function closeRestoreWizard() {
+            if (restoreWizard.restoring) return;
+            restoreWizard.visible = false;
+            restoreWizard.backup = null;
+        }
+
+        async function loadRestoreSummary() {
+            if (!restoreWizard.backup || restoreWizard.loadingSummary) return;
+            restoreWizard.loadingSummary = true;
+            restoreWizard.error = '';
+            try {
+                const path = `/backups/${encodeURIComponent(restoreWizard.backup.filename)}/summary`;
+                const result = restoreWizard.password
+                    ? await api.post(path, { password: restoreWizard.password })
+                    : await api.get(path);
+                restoreWizard.summary = result.data;
+                restoreWizard.needsPassword = false;
+                restoreWizard.error = '';
             } catch (error) {
                 if (error.data?.needs_password) {
-                    backupPassword = window.prompt('该备份可能是旧备份或使用了不同 salt。请输入该备份对应的主密码以读取概况。') || '';
-                    if (backupPassword) {
-                        try {
-                            const summary = await api.post(`/backups/${encodeURIComponent(backup.filename)}/summary`, { password: backupPassword });
-                            summaryText = `文件：${summary.data.filename}\n条目数：${summary.data.entry_count}\n回收站：${summary.data.deleted_count}\n大小：${formatBytes(summary.data.size)}\n修改时间：${formatDate(summary.data.modified_at)}\n读取方式：已使用备份主密码`;
-                        } catch (summaryError) {
-                            showToast(friendlyApiMessage(summaryError, '备份主密码不匹配或备份无效，将仅显示文件信息'), 'warning');
-                            backupPassword = '';
-                        }
-                    } else {
-                        showToast('未输入备份主密码，将仅显示文件信息', 'warning');
-                    }
+                    restoreWizard.needsPassword = true;
+                    restoreWizard.error = '该备份需要输入对应的主密码后才能读取概况。';
                 } else {
-                    showToast(friendlyApiMessage(error, '备份概况读取失败，将仅显示文件信息'), 'warning');
+                    restoreWizard.error = friendlyApiMessage(error, '备份概况读取失败');
                 }
             } finally {
+                restoreWizard.loadingSummary = false;
+            }
+        }
+
+        function restoreWizardNext() {
+            if (restoreWizard.step === 1 && !restoreWizard.summary) {
+                showToast('请先读取备份概况', 'warning');
+                return;
+            }
+            restoreWizard.step = Math.min(3, restoreWizard.step + 1);
+        }
+
+        function restoreWizardBack() {
+            restoreWizard.step = Math.max(1, restoreWizard.step - 1);
+        }
+
+        async function restoreBackup(backup) {
+            openRestoreWizard(backup);
+        }
+
+        async function confirmRestoreBackup() {
+            if (!restoreWizard.backup || restoreWizard.confirmation !== 'RESTORE') {
+                showToast('请输入 RESTORE 后再恢复', 'warning');
+                return;
+            }
+            restoreWizard.restoring = true;
+            restoringBackupFilename.value = restoreWizard.backup.filename;
+            try {
+                const body = restoreWizard.password ? { password: restoreWizard.password } : {};
+                const result = await api.post(`/backups/${encodeURIComponent(restoreWizard.backup.filename)}/restore`, body);
+                showToast(result.message || '备份已恢复', 'success');
+                restoreWizard.visible = false;
+                restoreWizard.backup = null;
+                await loadAllData();
+                await loadBackups();
+            } catch (error) {
+                restoreWizard.error = friendlyApiMessage(error, '备份恢复失败');
+                showToast(restoreWizard.error, 'error');
+            } finally {
+                restoreWizard.restoring = false;
                 restoringBackupFilename.value = '';
             }
-            showConfirmDialog('恢复备份', `${summaryText}\n\n重要：恢复会替换当前 vault。系统会先自动备份当前数据，但仍建议确认这是你要恢复的文件。确认继续？`, async () => {
-                try {
-                    let result;
-                    try {
-                        result = await api.post(`/backups/${encodeURIComponent(backup.filename)}/restore`, backupPassword ? { password: backupPassword } : {});
-                    } catch (error) {
-                        if (!backupPassword && error.data?.needs_password) {
-                            const password = window.prompt('恢复该备份需要输入该备份对应的主密码。') || '';
-                            if (!password) throw error;
-                            result = await api.post(`/backups/${encodeURIComponent(backup.filename)}/restore`, { password });
-                        } else {
-                            throw error;
-                        }
-                    }
-                    showToast(result.message || '备份已恢复', 'success');
-                    await loadAllData();
-                    await loadBackups();
-                } catch (error) {
-                    showToast(friendlyApiMessage(error, '备份恢复失败'), 'error');
-                }
-            });
         }
 
         function showImportResultReport(resultData = {}, fallbackConflictCount = 0) {
@@ -1781,21 +1927,27 @@ const app = createApp({
             });
         }
 
-        async function downloadBackup(path, body, filename) {
+        async function downloadBackup(path, body, filename, method = 'POST', throwOnError = false) {
             try {
+                const headers = {
+                    'X-SecretBase-Token': api.getToken()
+                };
+                const options = {
+                    method,
+                    headers,
+                    credentials: 'same-origin'
+                };
+                if (method !== 'GET') {
+                    headers['Content-Type'] = 'application/json';
+                    options.body = JSON.stringify(body || {});
+                }
                 const response = await fetch(`${api.baseUrl}${path}`, {
-                    method: 'POST',
-                    headers: {
-                        'X-SecretBase-Token': api.getToken(),
-                        'Content-Type': 'application/json'
-                    },
-                    credentials: 'same-origin',
-                    body: JSON.stringify(body)
+                    ...options
                 });
 
                 if (!response.ok) {
                     const error = await response.json().catch(() => ({}));
-                    throw new Error(error.message || '导出失败');
+                    throw new ApiError(error.error, error.message || '导出失败', response.status, error.data || error.details);
                 }
 
                 const blob = await response.blob();
@@ -1807,7 +1959,8 @@ const app = createApp({
                 URL.revokeObjectURL(url);
                 showToast('备份已下载', 'success');
             } catch (error) {
-                showToast(error.message || '导出失败', 'error');
+                if (!throwOnError) showToast(error.message || '导出失败', 'error');
+                if (throwOnError) throw error;
             }
         }
 
@@ -1986,7 +2139,7 @@ const app = createApp({
             if (val) loadTrash();
         });
 
-        watch(showSettings, (val) => {
+        watch(showBackupCenter, (val) => {
             if (val) loadBackups();
         });
 
@@ -2029,6 +2182,7 @@ const app = createApp({
             showTagManager,
             showConfirm,
             showTools,
+            showBackupCenter,
             showAdvancedFilters,
             selectedEntry,
             editingEntry,
@@ -2050,6 +2204,9 @@ const app = createApp({
             highlightedBackupFilename,
             creatingBackup,
             restoringBackupFilename,
+            downloadingBackupFilename,
+            backupPages,
+            restoreWizard,
             healthReport,
             maintenanceReport,
             securityReport,
@@ -2099,6 +2256,7 @@ const app = createApp({
             hasActiveListState,
             allCurrentPageSelected,
             backupBusy,
+            backupSummary,
             backupGroups,
 
             // 方法
@@ -2184,8 +2342,17 @@ const app = createApp({
             formatBytes,
             backupTypeLabel,
             loadBackups,
+            openBackupCenter,
+            setBackupPage,
             createManualBackup,
+            backupDisplayName,
+            downloadBackupFile,
             restoreBackup,
+            closeRestoreWizard,
+            loadRestoreSummary,
+            restoreWizardNext,
+            restoreWizardBack,
+            confirmRestoreBackup,
             openToolsModal,
             loadHealthReport,
             loadMaintenanceReport,

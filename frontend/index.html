@@ -28,7 +28,7 @@
             <div class="loading-spinner"></div>
             <p>加载中...</p>
         </div>
-        
+
         <!-- 未初始化 - 设置主密码 -->
         <div v-else-if="!initialized" class="auth-screen">
             <div class="auth-card">
@@ -139,6 +139,7 @@
                     <button class="sidebar-nav-item" @click="openAiParse"><span>AI 智能录入</span><strong>🤖</strong></button>
                     <button class="sidebar-nav-item" @click="showTagManager = true"><span>标签管理</span><strong>🏷️</strong></button>
                     <button class="sidebar-nav-item" @click="showTrash = true"><span>回收站</span><strong>🗑️</strong></button>
+                    <button class="sidebar-nav-item" @click="openBackupCenter"><span>备份</span><strong>💾</strong></button>
                     <button class="sidebar-nav-item" @click="openToolsModal"><span>工具</span><strong>🧰</strong></button>
                     <button class="sidebar-nav-item" @click="showSettings = true"><span>设置</span><strong>⚙️</strong></button>
                 </nav>
@@ -155,6 +156,9 @@
                     </button>
                     <button class="btn-icon" @click="toggleTheme" title="切换主题">
                         {{ themeIcon }}
+                    </button>
+                    <button class="btn-icon" @click="openBackupCenter" title="备份">
+                        💾
                     </button>
                     <button class="btn-icon" @click="showSettings = true" title="设置">
                         ⚙️
@@ -500,6 +504,7 @@
                 <div class="footer-links">
                     <a href="#" @click.prevent="showTagManager = true">🏷️ 标签管理</a>
                     <a href="#" @click.prevent="showTrash = true">🗑️ 回收站</a>
+                    <a href="#" @click.prevent="openBackupCenter">💾 备份</a>
                     <a href="#" @click.prevent="openToolsModal">🧰 工具</a>
                 </div>
             </footer>
@@ -835,7 +840,7 @@
                         <button class="btn-secondary" @click="showChangePassword = true">修改主密码</button>
                     </div>
                     <div class="settings-section settings-backup-section">
-                        <h3>备份</h3>
+                        <h3>数据迁移 / 导入导出</h3>
                         <div class="setting-item">
                             <label>明文导入冲突处理</label>
                             <select v-model="importConflictStrategy">
@@ -848,10 +853,6 @@
                         <div class="setting-item setting-actions">
                             <button class="btn-secondary" @click="exportEncrypted">导出加密备份</button>
                             <button class="btn-secondary" @click="exportPlain">导出明文 JSON</button>
-                            <button class="btn-secondary" @click="createManualBackup" :disabled="backupBusy">
-                                {{ creatingBackup ? '创建中...' : '手动创建备份' }}
-                            </button>
-                            <button class="btn-secondary" @click="loadBackups" :disabled="backupBusy">刷新备份列表</button>
                             <label class="btn-secondary file-action">
                                 导入加密备份
                                 <input type="file" accept=".enc,.bak,application/octet-stream" @change="importEncryptedFile">
@@ -861,32 +862,185 @@
                                 <input type="file" accept=".json,application/json" @change="importPlainFile">
                             </label>
                         </div>
-                        <div class="backup-list" v-if="backupGroups.length > 0">
-                            <section v-for="group in backupGroups" :key="group.type" class="backup-group">
-                                <div class="backup-group-header">
-                                    <div>
-                                        <strong>{{ group.title }}</strong>
-                                        <p>{{ group.hint }}</p>
-                                    </div>
-                                    <span>{{ group.items.length }} 个</span>
-                                </div>
-                                <div v-for="backup in group.items" :key="backup.filename" class="backup-item" :class="{ highlighted: highlightedBackupFilename === backup.filename }">
-                                    <div class="backup-item-main">
-                                        <strong>{{ backup.filename }}</strong>
-                                        <p>{{ backupTypeLabel(backup.type) }} · {{ formatBytes(backup.size) }} · {{ formatDate(backup.modified_at) }} <span v-if="highlightedBackupFilename === backup.filename">· 刚创建</span></p>
-                                    </div>
-                                    <button class="btn-small backup-restore-btn" @click="restoreBackup(backup)" :disabled="backupBusy">
-                                        {{ restoringBackupFilename === backup.filename ? '读取概况...' : '恢复' }}
-                                    </button>
-                                </div>
-                            </section>
-                        </div>
-                        <p v-else class="warning-message">暂无自动备份或尚未刷新。</p>
+                        <button class="btn-secondary" @click="openBackupCenter">打开备份中心</button>
                     </div>
                 </div>
             </div>
         </div>
-        
+
+        <!-- 备份中心 -->
+        <div v-if="showBackupCenter" class="modal-overlay" @click.self="showBackupCenter = false">
+            <div class="modal-content backup-center-modal">
+                <div class="modal-header">
+                    <h2>💾 备份中心</h2>
+                    <button class="modal-close" @click="showBackupCenter = false">✕</button>
+                </div>
+                <div class="modal-body">
+                    <section class="backup-summary-grid">
+                        <div>
+                            <strong>{{ backupSummary.autoCount }}</strong>
+                            <span>自动备份</span>
+                        </div>
+                        <div>
+                            <strong>{{ backupSummary.manualCount }}</strong>
+                            <span>手动备份</span>
+                        </div>
+                        <div>
+                            <strong>{{ backupSummary.retention }}</strong>
+                            <span>自动保留上限</span>
+                        </div>
+                        <div>
+                            <strong>{{ backupSummary.recent ? formatDate(backupSummary.recent.modified_at) : '暂无' }}</strong>
+                            <span>最近备份</span>
+                        </div>
+                    </section>
+
+                    <section class="backup-toolbar">
+                        <div class="setting-item backup-retention-control">
+                            <label>自动备份保留数量</label>
+                            <input type="number" v-model.number="settingsForm.autoBackupRetention" min="5" max="200" @change="saveSettings">
+                        </div>
+                        <div class="backup-toolbar-actions">
+                            <button class="btn-primary inline" @click="createManualBackup" :disabled="backupBusy">
+                                {{ creatingBackup ? '创建中...' : '创建手动备份' }}
+                            </button>
+                            <button class="btn-secondary" @click="loadBackups" :disabled="backupBusy">刷新列表</button>
+                        </div>
+                    </section>
+
+                    <div class="backup-list">
+                        <section v-for="group in backupGroups" :key="group.type" class="backup-group" :class="'backup-group-' + group.type">
+                            <div class="backup-group-header">
+                                <div>
+                                    <strong>{{ group.title }}</strong>
+                                    <p>{{ group.hint }}</p>
+                                </div>
+                                <span>{{ group.items.length }} 个</span>
+                            </div>
+                            <div class="backup-group-items">
+                                <div v-for="backup in group.pagedItems" :key="backup.filename" class="backup-item" :class="{ highlighted: highlightedBackupFilename === backup.filename }">
+                                    <div class="backup-item-main">
+                                        <strong>{{ backupDisplayName(backup) }}</strong>
+                                        <p class="backup-real-name">{{ backup.filename }}</p>
+                                        <p class="backup-meta-line">
+                                            <span>{{ formatBytes(backup.size) }}</span>
+                                            <span>{{ formatDate(backup.modified_at) }}</span>
+                                            <span v-if="backup.summary_available">条目 {{ backup.entry_count }}</span>
+                                            <span v-if="backup.summary_available">回收站 {{ backup.deleted_count }}</span>
+                                            <span v-else>需要备份主密码读取概况</span>
+                                            <span v-if="highlightedBackupFilename === backup.filename" class="backup-new-chip">刚创建</span>
+                                        </p>
+                                    </div>
+                                    <div class="backup-item-actions">
+                                        <button class="btn-small" @click="downloadBackupFile(backup, 'encrypted')" :disabled="backupBusy || downloadingBackupFilename === backup.filename">下载加密备份</button>
+                                        <button class="btn-small" @click="downloadBackupFile(backup, 'plain')" :disabled="backupBusy || downloadingBackupFilename === backup.filename">下载明文 JSON</button>
+                                        <button class="btn-small backup-restore-btn" @click="restoreBackup(backup)" :disabled="backupBusy">
+                                            {{ restoringBackupFilename === backup.filename ? '恢复中...' : '恢复' }}
+                                        </button>
+                                    </div>
+                                </div>
+                                <div v-for="slot in group.emptySlots" :key="group.type + '-empty-' + slot" class="backup-item backup-item-placeholder">
+                                    <div v-if="group.items.length === 0 && slot === 1" class="backup-placeholder-text">
+                                        <strong>暂无{{ group.title }}</strong>
+                                        <p>{{ group.type === 'manual' ? '创建手动备份后会显示在这里。' : '数据写入或恢复前会生成自动备份。' }}</p>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="backup-pagination">
+                                <button class="btn-small" :disabled="group.page <= 1" @click="setBackupPage(group.type, group.page - 1)">上一页</button>
+                                <span>{{ group.page }} / {{ group.totalPages }}</span>
+                                <button class="btn-small" :disabled="group.page >= group.totalPages" @click="setBackupPage(group.type, group.page + 1)">下一页</button>
+                            </div>
+                        </section>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 恢复备份向导 -->
+        <div v-if="restoreWizard.visible" class="modal-overlay" @click.self="closeRestoreWizard">
+            <div class="modal-content restore-wizard-modal">
+                <div class="modal-header">
+                    <h2>恢复备份</h2>
+                    <button class="modal-close" @click="closeRestoreWizard">✕</button>
+                </div>
+                <div class="modal-body">
+                    <div class="wizard-steps">
+                        <span :class="{ active: restoreWizard.step === 1 }">1 概况</span>
+                        <span :class="{ active: restoreWizard.step === 2 }">2 核对</span>
+                        <span :class="{ active: restoreWizard.step === 3 }">3 确认</span>
+                    </div>
+                    <p v-if="restoreWizard.error" class="warning-message">{{ restoreWizard.error }}</p>
+
+                    <section v-if="restoreWizard.step === 1" class="restore-step">
+                        <div class="settings-list">
+                            <div class="settings-row">
+                                <span>备份文件</span>
+                                <strong>{{ restoreWizard.backup?.display_name || restoreWizard.backup?.filename }}</strong>
+                            </div>
+                            <div class="settings-row">
+                                <span>真实文件名</span>
+                                <strong>{{ restoreWizard.backup?.filename }}</strong>
+                            </div>
+                            <div class="settings-row">
+                                <span>大小</span>
+                                <strong>{{ formatBytes(restoreWizard.backup?.size || 0) }}</strong>
+                            </div>
+                            <div class="settings-row">
+                                <span>修改时间</span>
+                                <strong>{{ formatDate(restoreWizard.backup?.modified_at) }}</strong>
+                            </div>
+                        </div>
+                        <div v-if="restoreWizard.needsPassword" class="form-group">
+                            <label>备份主密码</label>
+                            <input type="password" v-model="restoreWizard.password" placeholder="输入该备份对应的主密码">
+                        </div>
+                        <button class="btn-secondary" @click="loadRestoreSummary" :disabled="restoreWizard.loadingSummary">
+                            {{ restoreWizard.loadingSummary ? '读取中...' : '读取备份概况' }}
+                        </button>
+                        <div v-if="restoreWizard.summary" class="report-grid">
+                            <div><strong>{{ restoreWizard.summary.entry_count }}</strong><span>条目数</span></div>
+                            <div><strong>{{ restoreWizard.summary.deleted_count }}</strong><span>回收站</span></div>
+                            <div><strong>{{ restoreWizard.summary.version }}</strong><span>版本</span></div>
+                        </div>
+                    </section>
+
+                    <section v-else-if="restoreWizard.step === 2" class="restore-step">
+                        <div class="settings-list">
+                            <div class="settings-row">
+                                <span>将恢复条目</span>
+                                <strong>{{ restoreWizard.summary?.entry_count ?? '-' }}</strong>
+                            </div>
+                            <div class="settings-row">
+                                <span>将恢复回收站</span>
+                                <strong>{{ restoreWizard.summary?.deleted_count ?? '-' }}</strong>
+                            </div>
+                            <div class="settings-row">
+                                <span>当前数据</span>
+                                <strong>会被备份后替换</strong>
+                            </div>
+                        </div>
+                    </section>
+
+                    <section v-else class="restore-step">
+                        <p class="warning-message">恢复会替换当前 vault。系统会先自动备份当前数据。</p>
+                        <div class="form-group">
+                            <label>输入 RESTORE 确认</label>
+                            <input type="text" v-model="restoreWizard.confirmation" placeholder="RESTORE">
+                        </div>
+                    </section>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn-secondary" v-if="restoreWizard.step > 1" @click="restoreWizardBack" :disabled="restoreWizard.restoring">上一步</button>
+                    <button class="btn-secondary" @click="closeRestoreWizard" :disabled="restoreWizard.restoring">取消</button>
+                    <button class="btn-primary" v-if="restoreWizard.step < 3" @click="restoreWizardNext">下一步</button>
+                    <button class="btn-danger" v-else @click="confirmRestoreBackup" :disabled="restoreWizard.restoring || restoreWizard.confirmation !== 'RESTORE'">
+                        {{ restoreWizard.restoring ? '恢复中...' : '执行恢复' }}
+                    </button>
+                </div>
+            </div>
+        </div>
+
         <!-- 修改密码弹窗 -->
         <div v-if="showChangePassword" class="modal-overlay" @click.self="showChangePassword = false">
             <div class="modal-content">
