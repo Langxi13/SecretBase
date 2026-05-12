@@ -12,7 +12,7 @@ import os
 import json
 import re
 
-from config import PORT, HOST, LOG_LEVEL, LOG_DIR_PATH, SETTINGS_PATH, get_cors_origins
+from config import PORT, HOST, LOG_LEVEL, LOG_DIR_PATH, SETTINGS_PATH, ensure_runtime_dirs, get_cors_origins
 from models import Settings
 from storage import ConflictError, VaultLockTimeoutError, enforce_auto_lock, is_unlocked, touch_activity, validate_session_token
 from routes import auth, entries, trash, tags, ai, settings, health, transfer, tools
@@ -83,6 +83,7 @@ def setup_logging():
     root_logger.addHandler(console_handler)
     root_logger._secretbase_logging_configured = True
 
+ensure_runtime_dirs()
 setup_logging()
 logger = logging.getLogger(__name__)
 
