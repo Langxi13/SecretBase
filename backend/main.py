@@ -4,7 +4,8 @@ from logging.handlers import TimedRotatingFileHandler
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
+from fastapi.staticfiles import StaticFiles
 from fastapi.exceptions import RequestValidationError
 from fastapi.encoders import jsonable_encoder
 import time
@@ -12,7 +13,17 @@ import os
 import json
 import re
 
-from config import PORT, HOST, LOG_LEVEL, LOG_DIR_PATH, SETTINGS_PATH, ensure_runtime_dirs, get_cors_origins
+from config import (
+    PORT,
+    HOST,
+    LOG_LEVEL,
+    LOG_DIR_PATH,
+    SETTINGS_PATH,
+    BASE_DIR,
+    ensure_runtime_dirs,
+    get_cors_origins,
+    is_desktop_mode,
+)
 from models import Settings
 from storage import ConflictError, VaultLockTimeoutError, enforce_auto_lock, is_unlocked, touch_activity, validate_session_token
 from routes import auth, entries, trash, tags, ai, settings, health, transfer, tools
@@ -89,7 +100,19 @@ logger = logging.getLogger(__name__)
 
 NORMAL_BODY_LIMIT_BYTES = 1 * 1024 * 1024
 IMPORT_BODY_LIMIT_BYTES = 10 * 1024 * 1024
-PUBLIC_PATHS = {"/health", "/auth/status", "/auth/init", "/auth/unlock"}
+PUBLIC_PATHS = {"/health", "/auth/status", "/auth/init", "/auth/unlock", "/secretbase-runtime-config.js"}
+API_PREFIXES = (
+    "/auth",
+    "/entries",
+    "/trash",
+    "/tags",
+    "/ai",
+    "/settings",
+    "/tools",
+    "/export",
+    "/import",
+    "/backups",
+)
 
 
 def session_token(request: Request) -> str | None:
@@ -102,6 +125,15 @@ def session_token(request: Request) -> str | None:
     if scheme.lower() != "bearer" or not token:
         return None
     return token.strip()
+
+
+def is_public_request(request: Request) -> bool:
+    path = request.url.path
+    if path in PUBLIC_PATHS:
+        return True
+    if is_desktop_mode() and request.method == "GET":
+        return not path.startswith(API_PREFIXES)
+    return False
 
 
 def get_auto_lock_minutes() -> int:
@@ -149,7 +181,7 @@ async def log_requests(request: Request, call_next):
                 }
             )
 
-    if request.method != "OPTIONS" and request.url.path not in PUBLIC_PATHS:
+    if request.method != "OPTIONS" and not is_public_request(request):
         if is_unlocked() and enforce_auto_lock(get_auto_lock_minutes()):
             return JSONResponse(
                 status_code=401,
@@ -193,6 +225,22 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.get("/secretbase-runtime-config.js", include_in_schema=False)
+async def runtime_config_js():
+    api_base_url = "" if is_desktop_mode() else None
+    config = {
+        "mode": "desktop" if is_desktop_mode() else "server",
+        "apiBaseUrl": api_base_url,
+    }
+    script = (
+        f"window.SECRETBASE_RUNTIME_CONFIG = {json.dumps(config, ensure_ascii=False)};\n"
+        "if (window.SECRETBASE_RUNTIME_CONFIG.apiBaseUrl !== null) {\n"
+        "  window.SECRETBASE_API_BASE_URL = window.SECRETBASE_RUNTIME_CONFIG.apiBaseUrl;\n"
+        "}\n"
+    )
+    return Response(content=script, media_type="application/javascript")
 
 
 # 全局异常处理
@@ -305,6 +353,10 @@ app.include_router(ai.router, prefix="/ai", tags=["AI 智能录入"])
 app.include_router(settings.router, prefix="/settings", tags=["设置"])
 app.include_router(transfer.router, tags=["导入导出"])
 app.include_router(tools.router, prefix="/tools", tags=["管理工具"])
+
+if is_desktop_mode():
+    frontend_dir = BASE_DIR.parent / "frontend"
+    app.mount("/", StaticFiles(directory=frontend_dir, html=True), name="desktop_frontend")
 
 
 if __name__ == "__main__":

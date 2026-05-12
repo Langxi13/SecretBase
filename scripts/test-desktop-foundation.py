@@ -187,6 +187,59 @@ assert Path(config.SETTINGS_PATH).parent.is_dir()
         assert_probe_ok(result)
 
 
+def test_runtime_config_endpoint_returns_javascript() -> None:
+    with tempfile.TemporaryDirectory() as raw:
+        root = Path(raw)
+        result = run_config_probe(
+            """
+from fastapi.testclient import TestClient
+import main
+client = TestClient(main.app)
+response = client.get("/secretbase-runtime-config.js")
+assert response.status_code == 200
+assert "javascript" in response.headers["content-type"]
+assert "window.SECRETBASE_RUNTIME_CONFIG" in response.text
+assert '"apiBaseUrl": ""' in response.text
+assert '"mode": "desktop"' in response.text
+""",
+            {
+                "SECRETBASE_MODE": "desktop",
+                "DATA_DIR": str(root / "data"),
+                "BACKUP_DIR": str(root / "data" / "backups"),
+                "LOG_DIR": str(root / "logs"),
+                "SETTINGS_PATH": str(root / "settings.json"),
+            },
+        )
+        assert_probe_ok(result)
+
+
+def test_desktop_mode_serves_frontend_index() -> None:
+    with tempfile.TemporaryDirectory() as raw:
+        root = Path(raw)
+        result = run_config_probe(
+            """
+from fastapi.testclient import TestClient
+import main
+client = TestClient(main.app)
+index_response = client.get("/")
+assert index_response.status_code == 200
+assert "text/html" in index_response.headers["content-type"]
+assert '<div id="app">' in index_response.text
+asset_response = client.get("/css/style.css")
+assert asset_response.status_code == 200
+assert "text/css" in asset_response.headers["content-type"]
+""",
+            {
+                "SECRETBASE_MODE": "desktop",
+                "DATA_DIR": str(root / "data"),
+                "BACKUP_DIR": str(root / "data" / "backups"),
+                "LOG_DIR": str(root / "logs"),
+                "SETTINGS_PATH": str(root / "settings.json"),
+            },
+        )
+        assert_probe_ok(result)
+
+
 def main() -> None:
     tests = [
         test_server_mode_loads_dotenv_without_overriding_system_env,
@@ -194,6 +247,8 @@ def main() -> None:
         test_importing_config_does_not_create_runtime_directories,
         test_ensure_runtime_dirs_creates_required_directories,
         test_importing_main_initializes_runtime_directories,
+        test_runtime_config_endpoint_returns_javascript,
+        test_desktop_mode_serves_frontend_index,
     ]
     for test in tests:
         test()

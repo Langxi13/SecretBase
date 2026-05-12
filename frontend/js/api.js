@@ -11,7 +11,14 @@ class ApiClient {
      * 解析 API 地址：Windows 本地开发直连后端，Ubuntu 生产走 nginx /api 代理。
      */
     resolveBaseUrl() {
-        if (window.SECRETBASE_API_BASE_URL) {
+        const runtimeConfig = window.SECRETBASE_RUNTIME_CONFIG || {};
+        if (Object.prototype.hasOwnProperty.call(runtimeConfig, 'apiBaseUrl')
+            && runtimeConfig.apiBaseUrl !== null
+            && runtimeConfig.apiBaseUrl !== undefined) {
+            return this.normalizeBaseUrl(runtimeConfig.apiBaseUrl);
+        }
+
+        if (Object.prototype.hasOwnProperty.call(window, 'SECRETBASE_API_BASE_URL')) {
             return this.normalizeBaseUrl(window.SECRETBASE_API_BASE_URL);
         }
 
@@ -29,7 +36,7 @@ class ApiClient {
     }
 
     normalizeBaseUrl(url) {
-        return String(url).replace(/\/+$/, '') || '/api';
+        return String(url).replace(/\/+$/, '');
     }
 
     /**
