@@ -15,6 +15,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 BACKEND_DIR = PROJECT_ROOT / "backend"
 BACKEND_ENV = BACKEND_DIR / ".env"
 LAUNCHER = PROJECT_ROOT / "desktop" / "launcher.py"
+DEV_TEST_BACKEND = PROJECT_ROOT / "scripts" / "dev-test-backend.sh"
 
 
 def run_config_probe(code: str, env: dict[str, str]) -> subprocess.CompletedProcess[str]:
@@ -348,6 +349,30 @@ def test_launcher_no_browser_starts_health_endpoint() -> None:
                 process.wait(timeout=5)
 
 
+def test_dev_test_backend_script_uses_isolated_runtime() -> None:
+    assert DEV_TEST_BACKEND.exists()
+    content = DEV_TEST_BACKEND.read_text(encoding="utf-8")
+    assert "SECRETBASE_TEST_DATA_ROOT" in content
+    assert "/tmp/secretbase-test-runtime" in content
+    assert "SECRETBASE_TEST_PASSWORD" in content
+    assert "SecretBase-Test-123456!" in content
+    assert "SECRETBASE_TEST_PORT" in content
+    assert "10014" in content
+    assert "--reset" in content
+    assert "rm -rf" in content
+    assert "DATA_DIR=" in content
+    assert "VAULT_PATH=" in content
+    assert "SETTINGS_PATH=" in content
+    assert "BACKUP_DIR=" in content
+    assert "LOG_DIR=" in content
+    assert "backend/data" not in content
+    assert "backend/settings.json" not in content
+    assert "unset DEEPSEEK_API_KEY" in content
+    assert "unset AI_API_KEY" in content
+    assert "unset AI_MODEL" in content
+    assert "unset AI_API_URL" in content
+
+
 def main() -> None:
     tests = [
         test_server_mode_loads_dotenv_without_overriding_system_env,
@@ -360,6 +385,7 @@ def main() -> None:
         test_api_prefix_aliases_work_in_desktop_mode,
         test_launcher_dry_run_reports_desktop_paths,
         test_launcher_no_browser_starts_health_endpoint,
+        test_dev_test_backend_script_uses_isolated_runtime,
     ]
     for test in tests:
         test()
