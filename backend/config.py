@@ -34,9 +34,7 @@ class RuntimeConfig:
     port: int
     vault_path: Path
     settings_path: Path
-    ai_model: str
-    ai_api_key: str
-    ai_api_url: str
+    secure_settings_path: Path
     cors_origins: str
     log_level: str
 
@@ -51,6 +49,7 @@ def load_runtime_config() -> RuntimeConfig:
     log_dir = resolve_backend_path(os.getenv("LOG_DIR", "logs"))
     vault_path = resolve_backend_path(os.getenv("VAULT_PATH", data_dir / "secretbase.enc"))
     settings_path = resolve_backend_path(os.getenv("SETTINGS_PATH", "settings.json"))
+    secure_settings_path = data_dir / "secure-settings.enc"
 
     return RuntimeConfig(
         mode=APP_MODE,
@@ -62,9 +61,7 @@ def load_runtime_config() -> RuntimeConfig:
         port=int(os.getenv("PORT", 10004)),
         vault_path=vault_path,
         settings_path=settings_path,
-        ai_model=os.getenv("AI_MODEL", "deepseek-v4-flash"),
-        ai_api_key=os.getenv("DEEPSEEK_API_KEY") or os.getenv("AI_API_KEY", ""),
-        ai_api_url=os.getenv("AI_API_URL", "https://api.deepseek.com/chat/completions"),
+        secure_settings_path=secure_settings_path,
         cors_origins=os.getenv("CORS_ORIGINS", "*"),
         log_level=os.getenv("LOG_LEVEL", "INFO"),
     )
@@ -83,11 +80,7 @@ HOST = RUNTIME_CONFIG.host
 # 数据文件路径
 VAULT_PATH = str(RUNTIME_CONFIG.vault_path)
 SETTINGS_PATH = str(RUNTIME_CONFIG.settings_path)
-
-# AI 配置
-AI_MODEL = RUNTIME_CONFIG.ai_model
-AI_API_KEY = RUNTIME_CONFIG.ai_api_key
-AI_API_URL = RUNTIME_CONFIG.ai_api_url
+SECURE_SETTINGS_FILE = str(RUNTIME_CONFIG.secure_settings_path)
 
 # CORS 配置
 CORS_ORIGINS = RUNTIME_CONFIG.cors_origins
@@ -117,6 +110,7 @@ def ensure_runtime_dirs() -> None:
     LOG_DIR.mkdir(parents=True, exist_ok=True)
     Path(VAULT_PATH).parent.mkdir(parents=True, exist_ok=True)
     Path(SETTINGS_PATH).parent.mkdir(parents=True, exist_ok=True)
+    Path(SECURE_SETTINGS_FILE).parent.mkdir(parents=True, exist_ok=True)
 
 
 def get_cors_origins() -> list:

@@ -32,10 +32,6 @@ def run_config_probe(code: str, env: dict[str, str]) -> subprocess.CompletedProc
                 "VAULT_PATH",
                 "SETTINGS_PATH",
                 "CORS_ORIGINS",
-                "AI_MODEL",
-                "AI_API_KEY",
-                "AI_API_URL",
-                "DEEPSEEK_API_KEY",
                 "LOG_LEVEL",
             }
         )
@@ -82,15 +78,14 @@ import config
 assert hasattr(config, "RuntimeConfig")
 assert config.APP_MODE == "server"
 assert config.PORT == 54321
-assert config.AI_MODEL == "dotenv-model"
 assert config.RUNTIME_CONFIG.port == 54321
-assert config.RUNTIME_CONFIG.ai_model == "dotenv-model"
+assert not any(name.startswith("ai_") for name in config.RUNTIME_CONFIG.__dataclass_fields__)
 """,
             {"PORT": "54321"},
         )
         assert_probe_ok(result)
 
-    with_backend_env("PORT=12345\nAI_MODEL=dotenv-model\n", probe)
+    with_backend_env("PORT=12345\n", probe)
 
 
 def test_desktop_mode_does_not_load_backend_dotenv() -> None:
@@ -99,14 +94,14 @@ def test_desktop_mode_does_not_load_backend_dotenv() -> None:
             """
 import config
 assert config.APP_MODE == "desktop"
-assert config.AI_MODEL == "deepseek-v4-flash"
 assert config.RUNTIME_CONFIG.mode == "desktop"
+assert not any(name.startswith("ai_") for name in config.RUNTIME_CONFIG.__dataclass_fields__)
 """,
             {"SECRETBASE_MODE": "desktop"},
         )
         assert_probe_ok(result)
 
-    with_backend_env("AI_MODEL=dotenv-should-not-load\n", probe)
+    with_backend_env("PORT=12345\n", probe)
 
 
 def test_importing_config_does_not_create_runtime_directories() -> None:
@@ -153,6 +148,7 @@ assert Path(config.BACKUP_DIR).is_dir()
 assert Path(config.LOG_DIR_PATH).is_dir()
 assert Path(config.VAULT_PATH).parent.is_dir()
 assert Path(config.SETTINGS_PATH).parent.is_dir()
+assert Path(config.SECURE_SETTINGS_FILE).parent == Path(config.DATA_DIR)
 """,
             {
                 "DATA_DIR": str(data_dir),
@@ -230,9 +226,48 @@ index_response = client.get("/")
 assert index_response.status_code == 200
 assert "text/html" in index_response.headers["content-type"]
 assert '<div id="app">' in index_response.text
+assert 'class="settings-tabs"' in index_response.text
+assert "AI 配置" in index_response.text
+assert "@click.self" not in index_response.text
+assert "清空解析" in index_response.text
+assert "去配置 AI" in index_response.text
+assert "当前 AI 配置" in index_response.text
+assert "修改配置" in index_response.text
+assert "取消修改" in index_response.text
+assert "ai-config-summary" in index_response.text
+assert "当前已保存" in index_response.text
+assert "aiConfiguredBaseUrl" in index_response.text
 asset_response = client.get("/css/style.css")
 assert asset_response.status_code == 200
 assert "text/css" in asset_response.headers["content-type"]
+""",
+            {
+                "SECRETBASE_MODE": "desktop",
+                "DATA_DIR": str(root / "data"),
+                "BACKUP_DIR": str(root / "data" / "backups"),
+                "LOG_DIR": str(root / "logs"),
+                "SETTINGS_PATH": str(root / "settings.json"),
+            },
+        )
+        assert_probe_ok(result)
+
+
+def test_api_prefix_aliases_work_in_desktop_mode() -> None:
+    with tempfile.TemporaryDirectory() as raw:
+        root = Path(raw)
+        result = run_config_probe(
+            """
+from fastapi.testclient import TestClient
+import main
+client = TestClient(main.app)
+status_response = client.get("/api/auth/status")
+assert status_response.status_code == 200
+init_response = client.post("/api/auth/init", json={"password": "desktop-alias-pass"})
+assert init_response.status_code == 200
+token = init_response.json()["data"]["token"]
+ai_response = client.get("/api/ai/status", headers={"X-SecretBase-Token": token})
+assert ai_response.status_code == 200
+assert ai_response.json()["data"]["configured"] is False
 """,
             {
                 "SECRETBASE_MODE": "desktop",
@@ -322,6 +357,7 @@ def main() -> None:
         test_importing_main_initializes_runtime_directories,
         test_runtime_config_endpoint_returns_javascript,
         test_desktop_mode_serves_frontend_index,
+        test_api_prefix_aliases_work_in_desktop_mode,
         test_launcher_dry_run_reports_desktop_paths,
         test_launcher_no_browser_starts_health_endpoint,
     ]

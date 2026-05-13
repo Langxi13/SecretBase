@@ -184,10 +184,11 @@ python desktop/launcher.py --dry-run
 V3.0 桌面模式下，AI 解析保持可选：
 
 - 未配置 API Key 时，AI 解析继续显示为未配置或不可用。
-- 用户主动配置 `DEEPSEEK_API_KEY` 或 `AI_API_KEY` 后，可以继续使用 AI 解析。
+- 用户在解锁后通过设置页 AI 配置区填写 Base URL、API Key 并选择模型后，可以继续使用 AI 解析。
+- API Key 保存在本机数据目录的 `secure-settings.enc`，由当前解锁 vault 的 `ai-settings` 用途密钥加密，不写入明文 `settings.json`，也不进入 vault 备份/恢复。
 - 文档必须说明：AI 解析不是离线能力，使用时会访问外部模型服务。
 
-V3.0 不新增桌面专用 AI 配置界面。
+V3.0 不新增桌面专用 AI 配置界面；桌面模式和服务器模式共用同一套设置页 AI 配置。
 
 ## 9. 实施设计暂定方案
 
@@ -408,7 +409,7 @@ python -m compileall backend
 node --check frontend/js/app.js frontend/js/api.js frontend/js/store.js frontend/js/utils.js
 venv/bin/python scripts/test-desktop-foundation.py
 venv/bin/python scripts/test-backup-separation.py
-env DEEPSEEK_API_KEY= AI_API_KEY= AI_MODEL=deepseek-v4-flash venv/bin/python scripts/v1-fake-smoke-test.py
+venv/bin/python scripts/v1-fake-smoke-test.py
 ```
 
 如果当前目录是 `.worktrees/v3-desktop-foundation` 且没有本地 `venv/`，可以把上面的 `venv/bin/python` 替换为主仓库虚拟环境的绝对路径，例如 `/usr/local/Web-Project/Secert-Base/venv/bin/python`。

@@ -3,11 +3,14 @@ import hashlib
 import json
 import re
 import time
+import os
+from pathlib import Path
 import httpx
 from fastapi import APIRouter, HTTPException
 from models import AiParseRequest
-from config import AI_MODEL, AI_API_KEY, AI_API_URL
-from storage import is_unlocked
+from config import SECURE_SETTINGS_FILE
+from crypto import decrypt_vault_with_key, encrypt_vault_with_key, parse_vault_header
+from storage import derive_unlocked_purpose_key, is_unlocked
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -15,6 +18,7 @@ AI_PARSE_COOLDOWN_SECONDS = 5
 AI_PARSE_MAX_INPUT_CHARS = 6000
 _last_parse_at = 0.0
 _last_parse_text_hash = ""
+AI_SETTINGS_PURPOSE = "ai-settings"
 
 SYSTEM_PROMPT = """你是 SecretBase 的密码条目解析器。你的任务是把用户输入的一段自然语言、聊天记录、备忘录或混杂文本解析成一个或多个独立的密码管理条目。
 
@@ -80,6 +84,220 @@ def _extract_json_content(content: str):
         except json.JSONDecodeError:
             continue
     raise json.JSONDecodeError("No JSON object found", content, 0)
+
+
+def _empty_ai_status() -> dict:
+    return {
+        "configured": False,
+        "base_url": "",
+        "model": "",
+        "api_key_mask": "",
+    }
+
+
+def _mask_api_key(api_key: str) -> str:
+    api_key = str(api_key or "").strip()
+    if not api_key:
+        return ""
+    if len(api_key) <= 8:
+        return "****"
+    return f"{api_key[:3]}...{api_key[-4:]}"
+
+
+def _normalize_base_url(base_url: str) -> str:
+    base_url = str(base_url or "").strip().rstrip("/")
+    for suffix in ("/chat/completions", "/models"):
+        if base_url.endswith(suffix):
+            base_url = base_url[: -len(suffix)].rstrip("/")
+    if not base_url.startswith(("https://", "http://")):
+        raise HTTPException(status_code=422, detail="Base URL 必须以 http:// 或 https:// 开头")
+    return base_url
+
+
+def _payload_value(payload: dict, *names: str) -> str:
+    for name in names:
+        value = payload.get(name)
+        if value is not None:
+            return str(value).strip()
+    return ""
+
+
+def _load_secure_settings() -> dict:
+    path = Path(SECURE_SETTINGS_FILE)
+    if not path.exists():
+        return {}
+
+    key, salt = derive_unlocked_purpose_key(AI_SETTINGS_PURPOSE)
+    content = path.read_bytes()
+    header = parse_vault_header(content)
+    if header["salt"] != salt:
+        raise ValueError("安全设置不是当前 vault 可解密的数据")
+    plaintext = decrypt_vault_with_key(key, content)
+    data = json.loads(plaintext.decode("utf-8"))
+    return data if isinstance(data, dict) else {}
+
+
+def _load_secure_settings_for_write() -> dict:
+    try:
+        return _load_secure_settings()
+    except Exception as e:
+        logger.warning(f"AI 安全设置不可读取，将重新创建: {e}")
+        return {}
+
+
+def _save_secure_settings(data: dict) -> None:
+    path = Path(SECURE_SETTINGS_FILE)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    if not data:
+        path.unlink(missing_ok=True)
+        return
+
+    key, salt = derive_unlocked_purpose_key(AI_SETTINGS_PURPOSE)
+    plaintext = json.dumps(data, ensure_ascii=False, indent=2).encode("utf-8")
+    encrypted = encrypt_vault_with_key(key, salt, plaintext)
+    tmp_path = path.with_suffix(path.suffix + ".tmp")
+    tmp_path.write_bytes(encrypted)
+    os.replace(tmp_path, path)
+
+
+def _load_ai_config() -> dict | None:
+    try:
+        settings = _load_secure_settings()
+    except FileNotFoundError:
+        return None
+    except Exception as e:
+        logger.error(f"加载 AI 安全设置失败: {e}")
+        return None
+
+    ai_config = settings.get("ai") if isinstance(settings, dict) else None
+    if not isinstance(ai_config, dict):
+        return None
+    if not all(ai_config.get(key) for key in ("base_url", "api_key", "model")):
+        return None
+    return {
+        "base_url": str(ai_config["base_url"]).rstrip("/"),
+        "api_key": str(ai_config["api_key"]),
+        "model": str(ai_config["model"]),
+        "api_key_mask": str(ai_config.get("api_key_mask") or _mask_api_key(ai_config["api_key"])),
+    }
+
+
+def _ai_status_from_config(config: dict | None) -> dict:
+    if not config:
+        return _empty_ai_status()
+    return {
+        "configured": True,
+        "base_url": config["base_url"],
+        "model": config["model"],
+        "api_key_mask": config["api_key_mask"],
+    }
+
+
+def _model_endpoint(base_url: str) -> str:
+    return f"{base_url.rstrip('/')}/models"
+
+
+def _chat_endpoint(base_url: str) -> str:
+    return f"{base_url.rstrip('/')}/chat/completions"
+
+
+def _auth_headers(api_key: str) -> dict:
+    return {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json",
+    }
+
+
+async def _fetch_model_ids(base_url: str, api_key: str) -> list[str]:
+    try:
+        async with httpx.AsyncClient(timeout=15.0, trust_env=False) as client:
+            response = await client.get(_model_endpoint(base_url), headers=_auth_headers(api_key))
+    except httpx.TimeoutException:
+        raise HTTPException(status_code=502, detail="获取模型列表超时")
+    except httpx.HTTPError:
+        raise HTTPException(status_code=502, detail="无法连接 AI 服务")
+
+    if response.status_code in {401, 403}:
+        raise HTTPException(status_code=502, detail="获取模型列表失败：API Key 无效或无权限")
+    if response.status_code != 200:
+        raise HTTPException(status_code=502, detail=f"获取模型列表失败：服务返回 {response.status_code}")
+
+    try:
+        payload = response.json()
+    except Exception:
+        raise HTTPException(status_code=502, detail="获取模型列表失败：响应不是有效 JSON")
+
+    raw_models = payload.get("data") if isinstance(payload, dict) else None
+    if not isinstance(raw_models, list):
+        raise HTTPException(status_code=502, detail="获取模型列表失败：响应格式无效")
+
+    models = []
+    seen = set()
+    for item in raw_models:
+        model_id = item.get("id") if isinstance(item, dict) else item
+        model_id = str(model_id or "").strip()
+        if model_id and model_id not in seen:
+            seen.add(model_id)
+            models.append(model_id)
+
+    if not models:
+        raise HTTPException(status_code=502, detail="获取模型列表失败：服务商未返回可用模型")
+    return models
+
+
+async def _request_chat_completion(
+    base_url: str,
+    api_key: str,
+    model: str,
+    messages: list[dict],
+    max_tokens: int,
+) -> str:
+    try:
+        async with httpx.AsyncClient(timeout=30.0, trust_env=False) as client:
+            response = await client.post(
+                _chat_endpoint(base_url),
+                headers=_auth_headers(api_key),
+                json={
+                    "model": model,
+                    "messages": messages,
+                    "temperature": 0,
+                    "max_tokens": max_tokens,
+                    "response_format": {"type": "json_object"},
+                },
+            )
+    except httpx.TimeoutException:
+        raise HTTPException(status_code=502, detail="AI 服务响应超时")
+    except httpx.HTTPError:
+        raise HTTPException(status_code=502, detail="AI 服务连接失败")
+
+    if response.status_code in {401, 403}:
+        raise HTTPException(status_code=502, detail="AI 服务认证失败，请检查 API Key")
+    if response.status_code != 200:
+        logger.error(f"AI 服务返回错误: {response.status_code}")
+        raise HTTPException(status_code=502, detail="AI 服务调用失败")
+
+    try:
+        result = response.json()
+        return result["choices"][0]["message"]["content"]
+    except Exception as e:
+        logger.error(f"AI 服务响应格式错误: {e}")
+        raise HTTPException(status_code=422, detail="AI 返回格式错误")
+
+
+async def _verify_ai_config(base_url: str, api_key: str, model: str) -> None:
+    content = await _request_chat_completion(
+        base_url,
+        api_key,
+        model,
+        [{"role": "user", "content": 'Return exactly this JSON object: {"ok": true}'}],
+        100,
+    )
+    try:
+        payload = _extract_json_content(content)
+    except json.JSONDecodeError:
+        raise HTTPException(status_code=502, detail="AI 连通测试失败：模型未返回有效 JSON")
+    if not isinstance(payload, dict) or payload.get("ok") is not True:
+        raise HTTPException(status_code=502, detail="AI 连通测试失败：模型返回内容不符合预期")
 
 
 def _clean_text(value, max_length: int = 10000) -> str:
@@ -228,10 +446,88 @@ async def ai_status():
 
     return {
         "success": True,
-        "data": {
-            "configured": bool(AI_API_KEY),
-            "model": AI_MODEL
-        }
+        "data": _ai_status_from_config(_load_ai_config())
+    }
+
+
+@router.post("/models")
+async def ai_models(payload: dict):
+    """实时从 OpenAI-compatible 服务商拉取模型列表，不保存配置。"""
+    if not is_unlocked():
+        raise HTTPException(status_code=401, detail="请先解锁")
+
+    base_url = _normalize_base_url(_payload_value(payload, "baseUrl", "base_url"))
+    api_key = _payload_value(payload, "apiKey", "api_key")
+    if not api_key:
+        saved_config = _load_ai_config()
+        if saved_config and saved_config.get("base_url") == base_url:
+            api_key = saved_config["api_key"]
+        else:
+            raise HTTPException(status_code=422, detail="API Key 不能为空")
+
+    models = await _fetch_model_ids(base_url, api_key)
+    return {
+        "success": True,
+        "data": {"models": models}
+    }
+
+
+@router.put("/settings")
+async def save_ai_settings(payload: dict):
+    """保存 AI 配置。保存前必须拉取模型列表并完成固定连通测试。"""
+    if not is_unlocked():
+        raise HTTPException(status_code=401, detail="请先解锁")
+
+    base_url = _normalize_base_url(_payload_value(payload, "baseUrl", "base_url"))
+    api_key = _payload_value(payload, "apiKey", "api_key")
+    model = _payload_value(payload, "model")
+    if not model:
+        raise HTTPException(status_code=422, detail="请选择模型")
+
+    saved_config = _load_ai_config()
+    if not api_key:
+        if saved_config and saved_config.get("base_url") == base_url:
+            api_key = saved_config["api_key"]
+        else:
+            raise HTTPException(status_code=422, detail="API Key 不能为空")
+
+    models = await _fetch_model_ids(base_url, api_key)
+    if model not in models:
+        raise HTTPException(status_code=422, detail="只能保存服务商模型列表中返回的模型")
+    await _verify_ai_config(base_url, api_key, model)
+
+    settings = _load_secure_settings_for_write()
+    settings["ai"] = {
+        "base_url": base_url,
+        "api_key": api_key,
+        "api_key_mask": _mask_api_key(api_key),
+        "model": model,
+        "saved_at": int(time.time()),
+    }
+    _save_secure_settings(settings)
+
+    return {
+        "success": True,
+        "data": _ai_status_from_config(settings["ai"]),
+        "message": "AI 设置已保存"
+    }
+
+
+@router.delete("/settings")
+async def clear_ai_settings():
+    """显式清除本机保存的 AI 配置。"""
+    if not is_unlocked():
+        raise HTTPException(status_code=401, detail="请先解锁")
+
+    settings = _load_secure_settings_for_write()
+    if "ai" in settings or Path(SECURE_SETTINGS_FILE).exists():
+        settings.pop("ai", None)
+        _save_secure_settings(settings)
+
+    return {
+        "success": True,
+        "data": _empty_ai_status(),
+        "message": "AI 设置已清除"
     }
 
 
@@ -243,7 +539,8 @@ async def ai_parse(request: AiParseRequest):
     if not is_unlocked():
         raise HTTPException(status_code=401, detail="请先解锁")
 
-    if not AI_API_KEY:
+    ai_config = _load_ai_config()
+    if not ai_config:
         raise HTTPException(status_code=502, detail="AI 服务未配置")
 
     text = request.text.strip()
@@ -262,52 +559,37 @@ async def ai_parse(request: AiParseRequest):
     _last_parse_text_hash = text_hash
     
     try:
-        async with httpx.AsyncClient(timeout=30.0) as client:
-            response = await client.post(
-                AI_API_URL,
-                headers={
-                    "Authorization": f"Bearer {AI_API_KEY}",
-                    "Content-Type": "application/json"
-                },
-                json={
-                    "model": AI_MODEL,
-                    "messages": [
-                        {"role": "system", "content": SYSTEM_PROMPT},
-                        {"role": "user", "content": text}
-                    ],
-                    "temperature": 0,
-                    "max_tokens": 3000,
-                    "response_format": {"type": "json_object"}
-                }
-            )
-            
-            if response.status_code != 200:
-                logger.error(f"AI 服务返回错误: {response.status_code}")
-                raise HTTPException(status_code=502, detail="AI 服务调用失败")
-            
-            result = response.json()
-            content = result["choices"][0]["message"]["content"]
-            
-            payload = _extract_json_content(content)
-            parsed_entries = _normalize_ai_payload(payload)
-            warnings = _quality_warnings(parsed_entries, text)
-            parsed = parsed_entries[0]
-            
-            logger.info(f"AI 解析成功: {len(parsed_entries)} 条")
-            
-            return {
-                "success": True,
-                "data": {
-                    "parsed": parsed,
-                    "parsed_entries": parsed_entries,
-                    "entry_count": len(parsed_entries),
-                    "warnings": warnings,
-                    "confidence": 0.9
-                }
+        content = await _request_chat_completion(
+            ai_config["base_url"],
+            ai_config["api_key"],
+            ai_config["model"],
+            [
+                {"role": "system", "content": SYSTEM_PROMPT},
+                {"role": "user", "content": text}
+            ],
+            3000,
+        )
+
+        payload = _extract_json_content(content)
+        parsed_entries = _normalize_ai_payload(payload)
+        warnings = _quality_warnings(parsed_entries, text)
+        parsed = parsed_entries[0]
+
+        logger.info(f"AI 解析成功: {len(parsed_entries)} 条")
+
+        return {
+            "success": True,
+            "data": {
+                "parsed": parsed,
+                "parsed_entries": parsed_entries,
+                "entry_count": len(parsed_entries),
+                "warnings": warnings,
+                "confidence": 0.9
             }
-            
-    except httpx.TimeoutException:
-        raise HTTPException(status_code=502, detail="AI 服务响应超时")
+        }
+
+    except HTTPException:
+        raise
     except json.JSONDecodeError as e:
         logger.error(f"AI 返回的 JSON 解析失败: {e}")
         raise HTTPException(status_code=422, detail="AI 返回格式错误")

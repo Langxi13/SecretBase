@@ -530,6 +530,11 @@
     opacity: 0.9;
 }
 
+.btn-danger:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
 .btn-secondary {
     display: inline-flex;
     align-items: center;
@@ -547,6 +552,40 @@
 }
 
 /* 设置页面 */
+.settings-body {
+    display: block;
+}
+
+.settings-tabs {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 18px;
+    overflow-x: auto;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.settings-tab {
+    padding: 10px 14px;
+    color: var(--text-secondary);
+    border-bottom: 2px solid transparent;
+    white-space: nowrap;
+    transition: color var(--transition-fast), border-color var(--transition-fast), background var(--transition-fast);
+}
+
+.settings-tab:hover {
+    color: var(--text-primary);
+    background: var(--bg-secondary);
+}
+
+.settings-tab.active {
+    color: var(--color-primary);
+    border-bottom-color: var(--color-primary);
+}
+
+.settings-tab-panel {
+    min-height: 280px;
+}
+
 .settings-section {
     margin-bottom: 32px;
 }
@@ -577,12 +616,54 @@
 }
 
 .setting-item select,
-.setting-item input[type="number"] {
+.setting-item input[type="number"],
+.setting-item input[type="text"],
+.setting-item input[type="password"] {
     padding: 8px 12px;
     border: 1px solid var(--border-color);
     border-radius: var(--border-radius);
     background: var(--bg-primary);
     color: var(--text-primary);
+    min-width: min(100%, 260px);
+}
+
+.ai-settings-section .info-panel,
+.ai-settings-section .warning-panel {
+    margin-bottom: 8px;
+}
+
+.ai-config-summary h4 {
+    margin: 0 0 12px;
+    font-size: 14px;
+}
+
+.ai-config-summary dl {
+    display: grid;
+    gap: 8px;
+    margin: 0 0 14px;
+}
+
+.ai-config-summary dl > div {
+    display: grid;
+    grid-template-columns: 96px minmax(0, 1fr);
+    gap: 12px;
+}
+
+.ai-config-summary dt {
+    color: var(--text-secondary);
+}
+
+.ai-config-summary dd {
+    margin: 0;
+    word-break: break-all;
+}
+
+.ai-config-current {
+    word-break: break-all;
+}
+
+.ai-settings-actions {
+    align-items: stretch;
 }
 
 .report-grid {
@@ -1537,14 +1618,16 @@ input[type="checkbox"] {
         max-width: min(1180px, calc(100vw - 72px));
     }
 
+    .settings-modal {
+        max-width: min(860px, calc(100vw - 72px));
+    }
+
     .tag-manager-modal {
         max-width: min(860px, calc(100vw - 72px));
     }
 
     .settings-modal .modal-body {
-        display: grid;
-        grid-template-columns: repeat(3, minmax(0, 1fr));
-        gap: 16px;
+        display: block;
     }
 
     .tools-modal .modal-body {
@@ -1566,6 +1649,10 @@ input[type="checkbox"] {
         grid-column: 1 / -1;
     }
 
+    .ai-settings-section {
+        grid-column: span 2;
+    }
+
     .tools-security-section {
         grid-column: 1 / -1;
     }
@@ -1584,7 +1671,8 @@ input[type="checkbox"] {
     .setting-actions .btn-secondary,
     .setting-actions .file-action,
     .setting-actions .btn-small,
-    .setting-actions .btn-danger {
+    .setting-actions .btn-danger,
+    .setting-actions .btn-primary {
         width: 100%;
     }
 

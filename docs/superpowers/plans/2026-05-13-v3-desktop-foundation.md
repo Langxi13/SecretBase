@@ -143,7 +143,7 @@ Run:
 python -m compileall backend
 node --check frontend/js/app.js frontend/js/api.js frontend/js/store.js frontend/js/utils.js
 venv/bin/python scripts/test-backup-separation.py
-env DEEPSEEK_API_KEY= AI_API_KEY= AI_MODEL=deepseek-v4-flash venv/bin/python scripts/v1-fake-smoke-test.py
+venv/bin/python scripts/v1-fake-smoke-test.py
 ```
 
 Expected: all pass. If baseline fails, stop and diagnose before implementation.
@@ -194,7 +194,7 @@ In `backend/config.py`:
 - Add `is_desktop_mode()`.
 - Add `RuntimeConfig` dataclass.
 - Add `load_runtime_config()`.
-- Keep compatibility constants: `DATA_DIR`, `BACKUP_DIR`, `LOG_DIR`, `PORT`, `HOST`, `VAULT_PATH`, `SETTINGS_PATH`, `AI_MODEL`, `AI_API_KEY`, `AI_API_URL`, `CORS_ORIGINS`, `LOG_LEVEL`, `LOG_DIR_PATH`.
+- Keep compatibility constants: `DATA_DIR`, `BACKUP_DIR`, `LOG_DIR`, `PORT`, `HOST`, `VAULT_PATH`, `SETTINGS_PATH`, `CORS_ORIGINS`, `LOG_LEVEL`, `LOG_DIR_PATH`.
 - Move directory creation out of import time into `ensure_runtime_dirs()`.
 - In server mode, load `backend/.env` with system environment priority.
 - In desktop mode, do not load `backend/.env`.
@@ -216,7 +216,7 @@ Run:
 ```bash
 python -m compileall backend
 venv/bin/python scripts/test-backup-separation.py
-env DEEPSEEK_API_KEY= AI_API_KEY= AI_MODEL=deepseek-v4-flash venv/bin/python scripts/v1-fake-smoke-test.py
+venv/bin/python scripts/v1-fake-smoke-test.py
 ```
 
 Expected: pass.
@@ -432,7 +432,7 @@ python -m compileall backend desktop scripts
 node --check frontend/js/app.js frontend/js/api.js frontend/js/store.js frontend/js/utils.js
 venv/bin/python scripts/test-desktop-foundation.py
 venv/bin/python scripts/test-backup-separation.py
-env DEEPSEEK_API_KEY= AI_API_KEY= AI_MODEL=deepseek-v4-flash venv/bin/python scripts/v1-fake-smoke-test.py
+venv/bin/python scripts/v1-fake-smoke-test.py
 ```
 
 Expected: all pass.

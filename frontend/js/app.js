@@ -144,6 +144,26 @@ const app = createApp({
             autoLockMinutes: 5,
             autoBackupRetention: 30
         });
+        const activeSettingsTab = ref('general');
+        const settingsTabs = [
+            { key: 'general', label: '通用' },
+            { key: 'security', label: '安全' },
+            { key: 'ai', label: 'AI' },
+            { key: 'data', label: '数据' }
+        ];
+        const aiSettingsForm = reactive({
+            baseUrl: '',
+            apiKey: '',
+            model: ''
+        });
+        const aiSettingsStatus = ref(null);
+        const aiSettingsEditing = ref(false);
+        const aiModels = ref([]);
+        const aiModelsLoading = ref(false);
+        const aiSettingsSaving = ref(false);
+        const aiSettingsError = ref('');
+        const aiSettingsMessage = ref('');
+        const aiConfiguredBaseUrl = computed(() => aiSettingsStatus.value?.base_url || aiSettingsStatus.value?.baseUrl || '');
         const importConflictStrategy = ref('skip');
         const advancedFilters = reactive({
             untagged: false,
@@ -209,6 +229,7 @@ const app = createApp({
         const canParseAi = computed(() => {
             const text = aiText.value.trim();
             return Boolean(text)
+                && Boolean(aiStatus.value?.configured)
                 && aiText.value.length <= aiMaxInputChars
                 && !aiParsing.value
                 && aiCooldownSeconds.value === 0
@@ -449,6 +470,40 @@ const app = createApp({
             settingsForm.pageSize = settings.pageSize;
             settingsForm.autoLockMinutes = settings.autoLockMinutes;
             settingsForm.autoBackupRetention = settings.autoBackupRetention;
+        }
+
+        async function openSettings() {
+            showSettings.value = true;
+            activeSettingsTab.value = 'general';
+            if (aiSettingsStatus.value === null) {
+                await loadAiSettingsStatus();
+            }
+        }
+
+        async function selectSettingsTab(tabKey) {
+            activeSettingsTab.value = tabKey;
+            if (tabKey === 'ai') {
+                await loadAiSettingsStatus();
+            }
+        }
+
+        async function loadAiSettingsStatus() {
+            aiSettingsError.value = '';
+            try {
+                const result = await api.get('/ai/status');
+                const status = result.data || {};
+                status.base_url = status.base_url || status.baseUrl || '';
+                aiSettingsStatus.value = status;
+                aiSettingsForm.baseUrl = status.base_url || '';
+                aiSettingsForm.model = status.model || '';
+                aiSettingsForm.apiKey = '';
+                aiModels.value = status.model ? [status.model] : [];
+                aiSettingsEditing.value = !status.configured;
+            } catch (error) {
+                aiSettingsStatus.value = null;
+                aiSettingsEditing.value = true;
+                aiSettingsError.value = error.message || '无法加载 AI 配置状态';
+            }
         }
 
         // 加载条目
@@ -1266,9 +1321,29 @@ const app = createApp({
             }
         }
 
+        function clearAiParse() {
+            aiText.value = '';
+            aiResult.value = null;
+            aiFailureMessage.value = '';
+            lastAiParseText.value = '';
+            aiCooldownUntil.value = 0;
+            aiNow.value = Date.now();
+        }
+
+        async function openAiSettingsFromParse() {
+            showAiParse.value = false;
+            await openSettings();
+            selectSettingsTab('ai');
+        }
+
         async function parseAiText() {
             const text = aiText.value.trim();
             if (!text) return;
+            if (!aiStatus.value?.configured) {
+                aiFailureMessage.value = 'AI 未配置，请先到设置页填写 Base URL、API Key 并选择模型后再使用智能解析。';
+                showToast(aiFailureMessage.value, 'warning');
+                return;
+            }
             if (aiText.value.length > aiMaxInputChars) {
                 aiFailureMessage.value = `内容过长，请分批解析，单次最多 ${aiMaxInputChars} 字符。原文仍保留，可转为手动录入。`;
                 showToast(aiFailureMessage.value, 'warning');
@@ -1279,6 +1354,8 @@ const app = createApp({
                     showToast(`请等待 ${aiCooldownSeconds.value} 秒后再解析`, 'warning');
                 } else if (text === lastAiParseText.value) {
                     showToast('内容未变化，不能重复智能解析', 'warning');
+                } else if (!aiStatus.value?.configured) {
+                    showToast('请先配置 AI 接入信息后再解析', 'warning');
                 }
                 return;
             }
@@ -1449,6 +1526,110 @@ const app = createApp({
             if (previousPageSize !== store.state.settings.pageSize || !locked.value) {
                 await loadEntries(1);
             }
+        }
+
+        async function fetchAiModels() {
+            aiSettingsError.value = '';
+            aiSettingsMessage.value = '';
+            const baseUrl = aiSettingsForm.baseUrl.trim();
+            const apiKey = aiSettingsForm.apiKey.trim();
+            if (!baseUrl || !apiKey) {
+                if (!(aiSettingsStatus.value?.configured && baseUrl === aiSettingsStatus.value.base_url)) {
+                    aiSettingsError.value = '请先填写 Base URL 和 API Key';
+                    return;
+                }
+            }
+            if (!baseUrl) {
+                aiSettingsError.value = '请先填写 Base URL';
+                return;
+            }
+
+            aiModelsLoading.value = true;
+            try {
+                const result = await api.post('/ai/models', { baseUrl, apiKey });
+                aiModels.value = result.data?.models || [];
+                if (!aiModels.value.includes(aiSettingsForm.model)) {
+                    aiSettingsForm.model = aiModels.value[0] || '';
+                }
+                aiSettingsMessage.value = aiModels.value.length > 0
+                    ? `已获取 ${aiModels.value.length} 个模型`
+                    : '服务商未返回可用模型';
+            } catch (error) {
+                aiModels.value = [];
+                aiSettingsForm.model = '';
+                aiSettingsError.value = error.message || '获取模型列表失败';
+            } finally {
+                aiModelsLoading.value = false;
+            }
+        }
+
+        async function saveAiConfiguration() {
+            aiSettingsError.value = '';
+            aiSettingsMessage.value = '';
+            const baseUrl = aiSettingsForm.baseUrl.trim();
+            const apiKey = aiSettingsForm.apiKey.trim();
+            const model = aiSettingsForm.model;
+            if (!baseUrl || !model) {
+                aiSettingsError.value = '请填写 Base URL，并从模型列表中选择模型';
+                return;
+            }
+            if (!apiKey && !(aiSettingsStatus.value?.configured && baseUrl === aiSettingsStatus.value.base_url)) {
+                aiSettingsError.value = '请填写 API Key';
+                return;
+            }
+
+            aiSettingsSaving.value = true;
+            try {
+                const result = await api.put('/ai/settings', { baseUrl, apiKey, model });
+                aiSettingsStatus.value = result.data;
+                aiSettingsForm.apiKey = '';
+                aiModels.value = result.data?.model ? [result.data.model] : [];
+                aiSettingsEditing.value = false;
+                aiSettingsMessage.value = 'AI 连通测试通过，设置已保存';
+                showToast('AI 设置已保存', 'success');
+            } catch (error) {
+                aiSettingsError.value = error.message || 'AI 连通测试失败，设置未保存';
+            } finally {
+                aiSettingsSaving.value = false;
+            }
+        }
+
+        async function clearAiConfiguration() {
+            aiSettingsError.value = '';
+            aiSettingsMessage.value = '';
+            try {
+                const result = await api.delete('/ai/settings');
+                aiSettingsStatus.value = result.data;
+                aiSettingsForm.baseUrl = '';
+                aiSettingsForm.apiKey = '';
+                aiSettingsForm.model = '';
+                aiModels.value = [];
+                aiSettingsEditing.value = true;
+                aiSettingsMessage.value = 'AI 设置已清除';
+                showToast('AI 设置已清除', 'success');
+            } catch (error) {
+                aiSettingsError.value = error.message || '清除 AI 设置失败';
+            }
+        }
+
+        function editAiConfiguration() {
+            aiSettingsEditing.value = true;
+            aiSettingsError.value = '';
+            aiSettingsMessage.value = '';
+            aiSettingsForm.baseUrl = aiSettingsStatus.value?.base_url || '';
+            aiSettingsForm.model = aiSettingsStatus.value?.model || '';
+            aiSettingsForm.apiKey = '';
+            aiModels.value = aiSettingsStatus.value?.model ? [aiSettingsStatus.value.model] : [];
+        }
+
+        function cancelAiConfigurationEdit() {
+            aiSettingsEditing.value = false;
+            aiSettingsError.value = '';
+            aiSettingsMessage.value = '';
+            aiSettingsForm.baseUrl = aiSettingsStatus.value?.base_url || '';
+            aiSettingsForm.model = aiSettingsStatus.value?.model || '';
+            aiSettingsForm.apiKey = '';
+            aiModels.value = aiSettingsStatus.value?.model ? [aiSettingsStatus.value.model] : [];
         }
 
         function startAutoLockTimer() {
@@ -2246,6 +2427,17 @@ const app = createApp({
             selectedAiEntryCount,
             lastAiParseText,
             settingsForm,
+            activeSettingsTab,
+            settingsTabs,
+            aiSettingsForm,
+            aiSettingsStatus,
+            aiSettingsEditing,
+            aiConfiguredBaseUrl,
+            aiModels,
+            aiModelsLoading,
+            aiSettingsSaving,
+            aiSettingsError,
+            aiSettingsMessage,
             importConflictStrategy,
             advancedFilters,
             defaultTimeRange,
@@ -2287,6 +2479,8 @@ const app = createApp({
             showAllEntries,
             showStarredEntries,
             toggleTheme,
+            openSettings,
+            selectSettingsTab,
             getFavicon,
             getTagColor,
             formatDate,
@@ -2335,12 +2529,19 @@ const app = createApp({
             toggleFieldReveal,
             openAiParse,
             manualEntryFromAi,
+            clearAiParse,
+            openAiSettingsFromParse,
             parseAiText,
             applyAiResult,
             toggleAiEntrySelection,
             addAiEntryField,
             removeAiEntryField,
             saveSettings,
+            fetchAiModels,
+            saveAiConfiguration,
+            clearAiConfiguration,
+            editAiConfiguration,
+            cancelAiConfigurationEdit,
             changePassword,
             restoreTrashItem,
             deleteTrashItem,
