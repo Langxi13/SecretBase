@@ -218,14 +218,7 @@ python desktop/launcher.py --dry-run
 SECRETBASE_DESKTOP_DATA_ROOT=/tmp/secretbase-v3-manual-test python desktop/launcher.py
 ```
 
-桌面模式不会读取仓库内的 `backend/.env`。如需临时测试 AI 解析，可在启动时显式传入环境变量：
-
-```bash
-SECRETBASE_DESKTOP_DATA_ROOT=/tmp/secretbase-v3-manual-test \
-AI_API_KEY=your-api-key \
-AI_MODEL=deepseek-v4-flash \
-python desktop/launcher.py
-```
+桌面模式不会读取仓库内的 `backend/.env`。AI 接入请在解锁后进入“设置 -> AI”填写 Base URL、API Key 并获取模型列表。
 
 详细设计和验收边界见 `docs/v3-desktop-foundation.md`。
 
@@ -239,9 +232,6 @@ PORT=10004
 VAULT_PATH=./data/secretbase.enc
 BACKUP_DIR=./data/backups/
 CORS_ORIGINS=https://your-domain.example
-DEEPSEEK_API_KEY=
-AI_API_URL=https://api.deepseek.com/chat/completions
-AI_MODEL=deepseek-v4-flash
 ```
 
 | 变量 | 说明 |
@@ -251,13 +241,10 @@ AI_MODEL=deepseek-v4-flash
 | `VAULT_PATH` | 加密 vault 文件路径。 |
 | `BACKUP_DIR` | 备份根目录，内部区分 `auto/` 自动备份和 `manual/` 手动备份。 |
 | `CORS_ORIGINS` | 允许访问 API 的前端来源。 |
-| `DEEPSEEK_API_KEY` | 可选，留空时禁用 AI 解析。 |
-| `AI_API_URL` | DeepSeek 兼容 chat completions 接口。 |
-| `AI_MODEL` | AI 解析使用的模型名。 |
 
 ### AI 解析
 
-AI 解析是可选功能。未配置 API key 时，核心密码管理、搜索、备份和恢复功能不受影响。
+AI 解析是可选功能。用户需要在解锁后进入“设置 -> AI”填写 Base URL、API Key，实时获取模型列表并选择模型。API Key 加密保存在本机 `secure-settings.enc`，不会写入明文 `settings.json` 或进入 vault 备份。未配置 API Key 时，核心密码管理、搜索、备份和恢复功能不受影响。
 
 示例输入：
 
@@ -274,7 +261,7 @@ python -m compileall backend
 python -m compileall desktop scripts
 python scripts\test-backup-separation.py
 python scripts\test-desktop-foundation.py
-$env:DEEPSEEK_API_KEY=''; $env:AI_API_KEY=''; python scripts\v1-fake-smoke-test.py
+python scripts\v1-fake-smoke-test.py
 node --check frontend\js\app.js
 node --check frontend\js\api.js
 node --check frontend\js\store.js
@@ -350,6 +337,7 @@ scripts/
 - `docs/deployment.md`：通用生产部署步骤。
 - `docs/app-roadmap.md`：桌面和手机 App 长期路线。
 - `docs/v3-desktop-foundation.md`：V3.0 桌面基础模式规划、边界和验收。
+- `docs/v3.1-windows-desktop-mvp.md`：V3.1 Windows 桌面便携版规划。
 - `docs/release-safety-checklist.md`：发布前安全检查清单。
 - `docs/roadmap.md`：路线图。
 
@@ -517,14 +505,7 @@ Desktop mode stores vault, backups, logs, and settings under the local user data
 SECRETBASE_DESKTOP_DATA_ROOT=/tmp/secretbase-v3-manual-test python desktop/launcher.py
 ```
 
-Desktop mode does not read `backend/.env`. To test AI parsing in desktop mode, pass AI configuration explicitly:
-
-```bash
-SECRETBASE_DESKTOP_DATA_ROOT=/tmp/secretbase-v3-manual-test \
-AI_API_KEY=your-api-key \
-AI_MODEL=deepseek-v4-flash \
-python desktop/launcher.py
-```
+Desktop mode does not read `backend/.env`. Configure AI after unlocking from Settings -> AI by entering Base URL, API Key, and fetching the provider model list.
 
 See `docs/v3-desktop-foundation.md` for design details and acceptance boundaries.
 
@@ -538,9 +519,6 @@ PORT=10004
 VAULT_PATH=./data/secretbase.enc
 BACKUP_DIR=./data/backups/
 CORS_ORIGINS=https://your-domain.example
-DEEPSEEK_API_KEY=
-AI_API_URL=https://api.deepseek.com/chat/completions
-AI_MODEL=deepseek-v4-flash
 ```
 
 | Variable | Description |
@@ -550,13 +528,10 @@ AI_MODEL=deepseek-v4-flash
 | `VAULT_PATH` | Encrypted vault file path. |
 | `BACKUP_DIR` | Backup root directory containing `auto/` automatic backups and `manual/` manual backups. |
 | `CORS_ORIGINS` | Allowed frontend origins for API access. |
-| `DEEPSEEK_API_KEY` | Optional. Leave empty to disable AI parsing. |
-| `AI_API_URL` | DeepSeek-compatible chat completions endpoint. |
-| `AI_MODEL` | Model name used for AI parsing. |
 
 ### AI Parsing
 
-AI parsing is optional. If no API key is configured, core password management, search, backup, and restore workflows remain available.
+AI parsing is optional. Users configure it after unlocking from Settings -> AI by entering Base URL, API Key, fetching the provider model list, and selecting a model. The API key is encrypted in the local `secure-settings.enc` file and is not written to plaintext `settings.json` or included in vault backups. If no API key is configured, core password management, search, backup, and restore workflows remain available.
 
 Example input:
 
@@ -573,7 +548,7 @@ python -m compileall backend
 python -m compileall desktop scripts
 python scripts\test-backup-separation.py
 python scripts\test-desktop-foundation.py
-$env:DEEPSEEK_API_KEY=''; $env:AI_API_KEY=''; python scripts\v1-fake-smoke-test.py
+python scripts\v1-fake-smoke-test.py
 node --check frontend\js\app.js
 node --check frontend\js\api.js
 node --check frontend\js\store.js
@@ -649,6 +624,7 @@ scripts/
 - `docs/deployment.md`: generic production deployment steps.
 - `docs/app-roadmap.md`: long-term desktop and mobile app roadmap.
 - `docs/v3-desktop-foundation.md`: V3.0 desktop foundation plan, boundaries, and acceptance checks.
+- `docs/v3.1-windows-desktop-mvp.md`: V3.1 Windows desktop portable package plan.
 - `docs/release-safety-checklist.md`: release safety checklist.
 - `docs/roadmap.md`: roadmap.
 

@@ -142,7 +142,7 @@
                     <button class="sidebar-nav-item" @click="showTrash = true"><span>回收站</span><strong>🗑️</strong></button>
                     <button class="sidebar-nav-item" @click="openBackupCenter"><span>备份</span><strong>💾</strong></button>
                     <button class="sidebar-nav-item" @click="openToolsModal"><span>工具</span><strong>🧰</strong></button>
-                    <button class="sidebar-nav-item" @click="showSettings = true"><span>设置</span><strong>⚙️</strong></button>
+                    <button class="sidebar-nav-item" @click="openSettings"><span>设置</span><strong>⚙️</strong></button>
                 </nav>
             </aside>
             <div class="workspace-shell">
@@ -161,7 +161,7 @@
                     <button class="btn-icon" @click="openBackupCenter" title="备份">
                         💾
                     </button>
-                    <button class="btn-icon" @click="showSettings = true" title="设置">
+                    <button class="btn-icon" @click="openSettings" title="设置">
                         ⚙️
                     </button>
                     <button class="btn-icon" @click="lock" title="锁定">
@@ -513,7 +513,7 @@
         </div>
 
         <!-- 首次引导弹窗 -->
-        <div v-if="showOnboarding" class="modal-overlay" @click.self="skipOnboarding">
+        <div v-if="showOnboarding" class="modal-overlay">
             <div class="modal-content onboarding-modal">
                 <div class="modal-header">
                     <h2>欢迎使用 SecretBase</h2>
@@ -539,7 +539,7 @@
         </div>
 
         <!-- 条目详情弹窗 -->
-        <div v-if="selectedEntry" class="modal-overlay" @click.self="closeEntryDetail">
+        <div v-if="selectedEntry" class="modal-overlay">
             <div class="modal-content">
                 <div class="modal-header">
                     <h2>{{ selectedEntry.title }}</h2>
@@ -583,7 +583,7 @@
         </div>
         
         <!-- 创建/编辑条目弹窗 -->
-        <div v-if="showCreateModal || showEditModal" class="modal-overlay" @click.self="closeEntryModal">
+        <div v-if="showCreateModal || showEditModal" class="modal-overlay">
             <div class="modal-content">
                 <div class="modal-header">
                     <h2>{{ showEditModal ? '编辑条目' : '新建条目' }}</h2>
@@ -654,7 +654,7 @@
         </div>
         
         <!-- AI 智能录入弹窗 -->
-        <div v-if="showAiParse" class="modal-overlay" @click.self="showAiParse = false">
+        <div v-if="showAiParse" class="modal-overlay">
             <div class="modal-content">
                 <div class="modal-header">
                     <h2>🤖 AI 智能录入</h2>
@@ -665,7 +665,8 @@
                         {{ aiStatusError }}
                     </div>
                     <div v-else-if="aiStatus && !aiStatus.configured" class="warning-panel">
-                        AI 未配置，可继续手动录入。粘贴内容可以转入新建条目的备注。
+                        AI 未配置，请先到设置页填写 Base URL、API Key 并选择模型后再使用智能解析。
+                        <button class="btn-small" @click="openAiSettingsFromParse">去配置 AI</button>
                     </div>
                     <div v-else-if="aiStatus" class="info-panel">
                         当前模型：{{ aiStatus.model }}
@@ -715,6 +716,7 @@
                     </div>
                     <p v-if="aiParsing" class="info-message">正在智能解析，请稍候...</p>
                     <p v-if="aiText && aiText.trim() === lastAiParseText" class="warning-message">内容未变化，不能重复智能解析。</p>
+                    <p v-if="aiText && aiStatus && !aiStatus.configured" class="warning-message">请先配置 AI 接入信息后再解析。</p>
                     <p v-if="aiCooldownSeconds > 0" class="warning-message">智能解析冷却中，请等待 {{ aiCooldownSeconds }} 秒。</p>
                     <div v-if="aiFailureMessage" class="warning-panel ai-failure-panel">
                         <strong>AI 解析未完成</strong>
@@ -724,6 +726,9 @@
                 </div>
                 <div class="modal-footer">
                     <button class="btn-secondary" @click="showAiParse = false">取消</button>
+                    <button class="btn-secondary" @click="clearAiParse" :disabled="!aiText && !aiResult && !aiFailureMessage">
+                        清空解析
+                    </button>
                     <button class="btn-secondary" @click="manualEntryFromAi()">
                         转为手动录入
                     </button>
@@ -738,7 +743,7 @@
         </div>
 
         <!-- 更多标签弹窗 -->
-        <div v-if="showTagBrowser" class="modal-overlay tag-browser-overlay" @click.self="closeTagBrowser">
+        <div v-if="showTagBrowser" class="modal-overlay tag-browser-overlay">
             <div class="modal-content tag-browser-modal" role="dialog" aria-modal="true" aria-label="更多标签">
                 <div class="modal-header tag-browser-header">
                     <div>
@@ -799,78 +804,161 @@
         </div>
         
         <!-- 设置弹窗 -->
-        <div v-if="showSettings" class="modal-overlay" @click.self="showSettings = false">
+        <div v-if="showSettings" class="modal-overlay">
             <div class="modal-content settings-modal">
                 <div class="modal-header">
                     <h2>⚙️ 设置</h2>
                     <button class="modal-close" @click="showSettings = false">✕</button>
                 </div>
-                <div class="modal-body">
-                    <div class="settings-section">
-                        <h3>外观</h3>
-                        <div class="setting-item">
-                            <label>主题</label>
-                            <select v-model="settingsForm.theme" @change="saveSettings">
-                                <option value="system">跟随系统</option>
-                                <option value="light">亮色</option>
-                                <option value="dark">暗色</option>
-                            </select>
-                        </div>
+                <div class="modal-body settings-body">
+                    <div class="settings-tabs" role="tablist" aria-label="设置分类">
+                        <button
+                            v-for="tab in settingsTabs"
+                            :key="tab.key"
+                            class="settings-tab"
+                            :class="{ active: activeSettingsTab === tab.key }"
+                            role="tab"
+                            :aria-selected="activeSettingsTab === tab.key"
+                            @click="selectSettingsTab(tab.key)"
+                        >
+                            {{ tab.label }}
+                        </button>
                     </div>
-                    <div class="settings-section">
-                        <h3>显示</h3>
-                        <div class="setting-item">
-                            <label>每页条目数</label>
-                            <input type="number" v-model.number="settingsForm.pageSize" min="1" max="1000" @change="saveSettings">
+
+                    <div class="settings-tab-panel">
+                        <div v-if="activeSettingsTab === 'general'" class="settings-section">
+                            <h3>通用</h3>
+                            <div class="setting-item">
+                                <label>主题</label>
+                                <select v-model="settingsForm.theme" @change="saveSettings">
+                                    <option value="system">跟随系统</option>
+                                    <option value="light">亮色</option>
+                                    <option value="dark">暗色</option>
+                                </select>
+                            </div>
+                            <div class="setting-item">
+                                <label>每页条目数</label>
+                                <input type="number" v-model.number="settingsForm.pageSize" min="1" max="1000" @change="saveSettings">
+                            </div>
                         </div>
-                    </div>
-                    <div class="settings-section">
-                        <h3>安全</h3>
-                        <div class="setting-item">
-                            <label>自动锁定时间</label>
-                            <select v-model.number="settingsForm.autoLockMinutes" @change="saveSettings">
-                                <option value="5">5 分钟</option>
-                                <option value="10">10 分钟</option>
-                                <option value="30">30 分钟</option>
-                                <option value="0">永不锁定</option>
-                            </select>
+
+                        <div v-if="activeSettingsTab === 'security'" class="settings-section">
+                            <h3>安全</h3>
+                            <div class="setting-item">
+                                <label>自动锁定时间</label>
+                                <select v-model.number="settingsForm.autoLockMinutes" @change="saveSettings">
+                                    <option value="5">5 分钟</option>
+                                    <option value="10">10 分钟</option>
+                                    <option value="30">30 分钟</option>
+                                    <option value="0">永不锁定</option>
+                                </select>
+                            </div>
+                            <div class="setting-item">
+                                <label>主密码</label>
+                                <button class="btn-secondary" @click="showChangePassword = true">修改主密码</button>
+                            </div>
                         </div>
-                    </div>
-                    <div class="settings-section">
-                        <h3>密码管理</h3>
-                        <button class="btn-secondary" @click="showChangePassword = true">修改主密码</button>
-                    </div>
-                    <div class="settings-section settings-backup-section">
-                        <h3>数据迁移 / 导入导出</h3>
-                        <div class="setting-item">
-                            <label>明文导入冲突处理</label>
-                            <select v-model="importConflictStrategy">
-                                <option value="skip">跳过已有条目</option>
-                                <option value="overwrite">覆盖已有条目</option>
-                                <option value="ask">发现冲突时停止</option>
-                            </select>
+
+                        <div v-if="activeSettingsTab === 'ai'" class="settings-section ai-settings-section">
+                            <h3>AI 配置</h3>
+                            <div v-if="aiSettingsStatus && aiSettingsStatus.configured && !aiSettingsEditing" class="info-panel ai-config-summary">
+                                <h4>当前 AI 配置</h4>
+                                <dl>
+                                    <div>
+                                        <dt>Base URL</dt>
+                                        <dd>{{ aiConfiguredBaseUrl || '未记录' }}</dd>
+                                    </div>
+                                    <div>
+                                        <dt>模型</dt>
+                                        <dd>{{ aiSettingsStatus.model }}</dd>
+                                    </div>
+                                    <div>
+                                        <dt>API Key</dt>
+                                        <dd>{{ aiSettingsStatus.api_key_mask }}</dd>
+                                    </div>
+                                </dl>
+                                <div class="setting-actions ai-settings-actions">
+                                    <button class="btn-secondary" @click="loadAiSettingsStatus" :disabled="aiModelsLoading || aiSettingsSaving">刷新状态</button>
+                                    <button class="btn-secondary" @click="editAiConfiguration" :disabled="aiModelsLoading || aiSettingsSaving">修改配置</button>
+                                    <button class="btn-danger" @click="clearAiConfiguration" :disabled="aiSettingsSaving || aiModelsLoading">清除 API Key</button>
+                                </div>
+                            </div>
+                            <div v-else-if="!(aiSettingsStatus && aiSettingsStatus.configured)" class="warning-panel">
+                                AI 未配置。保存前会用所选模型执行一次无敏感连通测试。
+                            </div>
+                            <div v-if="aiSettingsEditing" class="ai-config-editor">
+                                <div v-if="aiSettingsStatus && aiSettingsStatus.configured" class="info-panel ai-config-current">
+                                    当前已保存：{{ aiConfiguredBaseUrl || '未记录 URL' }} · {{ aiSettingsStatus.model }} · {{ aiSettingsStatus.api_key_mask }}
+                                </div>
+                                <div class="setting-item">
+                                    <label>Base URL</label>
+                                    <input type="text" v-model="aiSettingsForm.baseUrl" placeholder="https://api.deepseek.com 或 https://api.openai.com/v1">
+                                </div>
+                                <div class="setting-item">
+                                    <label>API Key</label>
+                                    <input type="password" v-model="aiSettingsForm.apiKey" :placeholder="aiSettingsStatus && aiSettingsStatus.api_key_mask ? `${aiSettingsStatus.api_key_mask}（留空继续使用已保存 Key）` : 'sk-...'">
+                                </div>
+                                <div class="setting-item setting-actions ai-settings-actions">
+                                    <button class="btn-secondary" @click="fetchAiModels" :disabled="aiModelsLoading || aiSettingsSaving">
+                                        {{ aiModelsLoading ? '获取中...' : '获取模型列表' }}
+                                    </button>
+                                    <button class="btn-secondary" @click="loadAiSettingsStatus" :disabled="aiModelsLoading || aiSettingsSaving">刷新状态</button>
+                                </div>
+                                <div class="setting-item">
+                                    <label>模型</label>
+                                    <select v-model="aiSettingsForm.model" :disabled="aiModels.length === 0 || aiModelsLoading || aiSettingsSaving">
+                                        <option value="" disabled>请先获取模型列表</option>
+                                        <option v-for="model in aiModels" :key="model" :value="model">{{ model }}</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <p v-if="aiSettingsMessage" class="info-message">{{ aiSettingsMessage }}</p>
+                            <p v-if="aiSettingsError" class="error-message">{{ aiSettingsError }}</p>
+                            <div v-if="aiSettingsEditing" class="setting-item setting-actions ai-settings-actions">
+                                <button class="btn-primary inline" @click="saveAiConfiguration" :disabled="aiSettingsSaving || aiModelsLoading || !aiSettingsForm.model">
+                                    {{ aiSettingsSaving ? '测试并保存中...' : '测试并保存' }}
+                                </button>
+                                <button v-if="aiSettingsStatus && aiSettingsStatus.configured" class="btn-secondary" @click="cancelAiConfigurationEdit" :disabled="aiSettingsSaving || aiModelsLoading">
+                                    取消修改
+                                </button>
+                                <button class="btn-danger" @click="clearAiConfiguration" :disabled="aiSettingsSaving || aiModelsLoading || !(aiSettingsStatus && aiSettingsStatus.configured)">
+                                    清除 API Key
+                                </button>
+                            </div>
                         </div>
-                        <p v-if="importConflictMessage" class="warning-message">{{ importConflictMessage }}</p>
-                        <div class="setting-item setting-actions">
-                            <button class="btn-secondary" @click="exportEncrypted">导出加密备份</button>
-                            <button class="btn-secondary" @click="exportPlain">导出明文 JSON</button>
-                            <label class="btn-secondary file-action">
-                                导入加密备份
-                                <input type="file" accept=".enc,.bak,application/octet-stream" @change="importEncryptedFile">
-                            </label>
-                            <label class="btn-secondary file-action">
-                                导入明文 JSON
-                                <input type="file" accept=".json,application/json" @change="importPlainFile">
-                            </label>
+
+                        <div v-if="activeSettingsTab === 'data'" class="settings-section settings-backup-section">
+                            <h3>数据迁移 / 导入导出</h3>
+                            <div class="setting-item">
+                                <label>明文导入冲突处理</label>
+                                <select v-model="importConflictStrategy">
+                                    <option value="skip">跳过已有条目</option>
+                                    <option value="overwrite">覆盖已有条目</option>
+                                    <option value="ask">发现冲突时停止</option>
+                                </select>
+                            </div>
+                            <p v-if="importConflictMessage" class="warning-message">{{ importConflictMessage }}</p>
+                            <div class="setting-item setting-actions">
+                                <button class="btn-secondary" @click="exportEncrypted">导出加密备份</button>
+                                <button class="btn-secondary" @click="exportPlain">导出明文 JSON</button>
+                                <label class="btn-secondary file-action">
+                                    导入加密备份
+                                    <input type="file" accept=".enc,.bak,application/octet-stream" @change="importEncryptedFile">
+                                </label>
+                                <label class="btn-secondary file-action">
+                                    导入明文 JSON
+                                    <input type="file" accept=".json,application/json" @change="importPlainFile">
+                                </label>
+                            </div>
+                            <button class="btn-secondary" @click="openBackupCenter">打开备份中心</button>
                         </div>
-                        <button class="btn-secondary" @click="openBackupCenter">打开备份中心</button>
                     </div>
                 </div>
             </div>
         </div>
 
         <!-- 备份中心 -->
-        <div v-if="showBackupCenter" class="modal-overlay" @click.self="showBackupCenter = false">
+        <div v-if="showBackupCenter" class="modal-overlay">
             <div class="modal-content backup-center-modal">
                 <div class="modal-header">
                     <h2>💾 备份中心</h2>
@@ -970,7 +1058,7 @@
         </div>
 
         <!-- 恢复备份向导 -->
-        <div v-if="restoreWizard.visible" class="modal-overlay" @click.self="closeRestoreWizard">
+        <div v-if="restoreWizard.visible" class="modal-overlay">
             <div class="modal-content restore-wizard-modal">
                 <div class="modal-header">
                     <h2>恢复备份</h2>
@@ -1062,7 +1150,7 @@
         </div>
 
         <!-- 修改密码弹窗 -->
-        <div v-if="showChangePassword" class="modal-overlay" @click.self="showChangePassword = false">
+        <div v-if="showChangePassword" class="modal-overlay">
             <div class="modal-content">
                 <div class="modal-header">
                     <h2>修改主密码</h2>
@@ -1091,7 +1179,7 @@
         </div>
         
         <!-- 回收站弹窗 -->
-        <div v-if="showTrash" class="modal-overlay" @click.self="showTrash = false">
+        <div v-if="showTrash" class="modal-overlay">
             <div class="modal-content">
                 <div class="modal-header">
                     <h2>🗑️ 回收站</h2>
@@ -1124,7 +1212,7 @@
         </div>
         
         <!-- 标签管理弹窗 -->
-        <div v-if="showTagManager" class="modal-overlay" @click.self="showTagManager = false">
+        <div v-if="showTagManager" class="modal-overlay">
             <div class="modal-content tag-manager-modal">
                 <div class="modal-header">
                     <h2>🏷️ 标签管理</h2>
@@ -1178,7 +1266,7 @@
         </div>
 
         <!-- 导入冲突弹窗 -->
-        <div v-if="showImportConflicts" class="modal-overlay" @click.self="closeImportConflicts">
+        <div v-if="showImportConflicts" class="modal-overlay">
             <div class="modal-content">
                 <div class="modal-header">
                     <h2>导入发现冲突</h2>
@@ -1203,7 +1291,7 @@
         </div>
 
         <!-- 导入预览弹窗 -->
-        <div v-if="showImportPreview" class="modal-overlay" @click.self="closeImportPreview">
+        <div v-if="showImportPreview" class="modal-overlay">
             <div class="modal-content">
                 <div class="modal-header">
                     <h2>导入预览</h2>
@@ -1247,7 +1335,7 @@
         </div>
 
         <!-- 导入完成报告弹窗 -->
-        <div v-if="showImportReport" class="modal-overlay" @click.self="showImportReport = false">
+        <div v-if="showImportReport" class="modal-overlay">
             <div class="modal-content import-report-modal">
                 <div class="modal-header">
                     <h2>导入完成报告</h2>
@@ -1271,7 +1359,7 @@
         </div>
 
         <!-- 工具弹窗 -->
-        <div v-if="showTools" class="modal-overlay" @click.self="showTools = false">
+        <div v-if="showTools" class="modal-overlay">
             <div class="modal-content tools-modal">
                 <div class="modal-header">
                     <h2>🧰 管理工具</h2>
@@ -1328,7 +1416,7 @@
         </div>
         
         <!-- 确认弹窗 -->
-        <div v-if="showConfirm" class="modal-overlay" @click.self="showConfirm = false">
+        <div v-if="showConfirm" class="modal-overlay">
             <div class="modal-content" style="max-width: 400px;">
                 <div class="modal-body confirm-dialog">
                     <div class="confirm-icon">⚠️</div>

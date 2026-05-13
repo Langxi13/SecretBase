@@ -100,8 +100,19 @@ logger = logging.getLogger(__name__)
 
 NORMAL_BODY_LIMIT_BYTES = 1 * 1024 * 1024
 IMPORT_BODY_LIMIT_BYTES = 10 * 1024 * 1024
-PUBLIC_PATHS = {"/health", "/auth/status", "/auth/init", "/auth/unlock", "/secretbase-runtime-config.js"}
+PUBLIC_PATHS = {
+    "/health",
+    "/api/health",
+    "/auth/status",
+    "/api/auth/status",
+    "/auth/init",
+    "/api/auth/init",
+    "/auth/unlock",
+    "/api/auth/unlock",
+    "/secretbase-runtime-config.js",
+}
 API_PREFIXES = (
+    "/api",
     "/auth",
     "/entries",
     "/trash",
@@ -353,6 +364,18 @@ app.include_router(ai.router, prefix="/ai", tags=["AI 智能录入"])
 app.include_router(settings.router, prefix="/settings", tags=["设置"])
 app.include_router(transfer.router, tags=["导入导出"])
 app.include_router(tools.router, prefix="/tools", tags=["管理工具"])
+
+# 兼容前端以 /api 作为 API Base URL 的部署形态。生产 nginx 可继续 rewrite
+# /api/* 到顶层路径；后端别名让未 rewrite 的请求也不会落到 404。
+app.include_router(health.router, prefix="/api", tags=["健康检查"])
+app.include_router(auth.router, prefix="/api/auth", tags=["认证"])
+app.include_router(entries.router, prefix="/api/entries", tags=["条目管理"])
+app.include_router(trash.router, prefix="/api/trash", tags=["回收站"])
+app.include_router(tags.router, prefix="/api/tags", tags=["标签管理"])
+app.include_router(ai.router, prefix="/api/ai", tags=["AI 智能录入"])
+app.include_router(settings.router, prefix="/api/settings", tags=["设置"])
+app.include_router(transfer.router, prefix="/api", tags=["导入导出"])
+app.include_router(tools.router, prefix="/api/tools", tags=["管理工具"])
 
 if is_desktop_mode():
     frontend_dir = BASE_DIR.parent / "frontend"

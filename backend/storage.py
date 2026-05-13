@@ -123,6 +123,21 @@ def _decrypt_with_current_key(content: bytes) -> bytes:
     return decrypt_vault_with_key(_vault_key.get(), content)
 
 
+def derive_unlocked_purpose_key(purpose: str) -> tuple[bytes, bytes]:
+    """Derive an AES key scoped to a named local setting purpose."""
+    if _vault_key is None:
+        raise ValueError("Vault 未解锁")
+    purpose_bytes = purpose.encode("utf-8")
+    key = hashlib.pbkdf2_hmac(
+        "sha256",
+        _vault_key.get(),
+        b"SecretBase:" + _vault_key.salt + b":" + purpose_bytes,
+        iterations=100_000,
+        dklen=32,
+    )
+    return key, _vault_key.salt
+
+
 def create_session_token() -> str:
     """创建新的单用户 session token，旧 token 立即失效。"""
     global _session_token

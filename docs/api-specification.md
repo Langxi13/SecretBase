@@ -727,11 +727,11 @@ POST /tags/merge
 
 ## 7. AI 智能录入模块
 
-阶段：V1.1/V1.2。若未配置 AI API Key，前端必须允许用户继续手动录入，不能阻塞核心功能。V1.2 默认使用 DeepSeek：环境变量 `DEEPSEEK_API_KEY`，接口 `https://api.deepseek.com/chat/completions`，模型 `deepseek-v4-flash`。
+阶段：V1.1/V1.2。若未配置 AI API Key，前端必须允许用户继续手动录入，不能阻塞核心功能。AI 接入由用户在解锁后进入设置页配置 Base URL、API Key，并实时拉取模型列表选择模型。
 
 ### 7.0 查询 AI 状态
 
-**查询 AI 是否已配置。该接口只返回配置状态和模型名，绝不能返回 `AI_API_KEY`。**
+**查询 AI 是否已配置。该接口只返回配置状态、Base URL、模型名和 Key 掩码，绝不能返回完整 API Key。**
 
 ```
 GET /ai/status
@@ -744,7 +744,9 @@ GET /ai/status
   "success": true,
   "data": {
     "configured": false,
-    "model": "deepseek-v4-flash"
+    "base_url": "",
+    "model": "",
+    "api_key_mask": ""
   }
 }
 ```
@@ -753,11 +755,115 @@ GET /ai/status
 
 - 401: 未解锁
 
-### 7.1 解析文本
+### 7.1 获取模型列表
+
+**实时从 OpenAI-compatible 服务商拉取模型列表，不保存配置。Base URL 示例：`https://api.deepseek.com`、`https://api.openai.com/v1`。**
+
+```
+POST /ai/models
+```
+
+**请求体：**
+
+```json
+{
+  "baseUrl": "https://api.deepseek.com",
+  "apiKey": "sk-..."
+}
+```
+
+已保存 AI 配置后，如果 `baseUrl` 与当前保存值一致，`apiKey` 可以省略，后端会使用本机加密保存的 Key 重新拉取模型列表。
+
+**响应：**
+
+```json
+{
+  "success": true,
+  "data": {
+    "models": ["deepseek-v4-flash", "deepseek-v4-pro"]
+  }
+}
+```
+
+**错误情况：**
+
+- 401: 未解锁
+- 422: Base URL 或 API Key 缺失/无效
+- 502: 服务商认证失败、网络错误、超时或模型列表响应格式无效
+
+### 7.2 保存 AI 设置
+
+**保存 AI Base URL、模型和 API Key。保存前后端必须先拉取模型列表，确认 `model` 来自服务商返回列表，再用所选模型执行固定无敏感连通测试。**
+
+```
+PUT /ai/settings
+```
+
+**请求体：**
+
+```json
+{
+  "baseUrl": "https://api.deepseek.com",
+  "apiKey": "sk-...",
+  "model": "deepseek-v4-flash"
+}
+```
+
+已保存 AI 配置后，如果只更换同一 Base URL 下的模型，`apiKey` 可以省略。API Key 只写入本机加密安全设置文件，不写入明文 `settings.json`，也不进入 vault 备份/恢复。
+
+**响应：**
+
+```json
+{
+  "success": true,
+  "data": {
+    "configured": true,
+    "base_url": "https://api.deepseek.com",
+    "model": "deepseek-v4-flash",
+    "api_key_mask": "sk-...abcd"
+  },
+  "message": "AI 设置已保存"
+}
+```
+
+**错误情况：**
+
+- 401: 未解锁
+- 422: Base URL、API Key 或模型无效，或模型不在服务商返回列表中
+- 502: 获取模型列表失败或固定连通测试失败
+
+### 7.3 清除 AI 设置
+
+**显式清除本机加密保存的 AI 设置。**
+
+```
+DELETE /ai/settings
+```
+
+**响应：**
+
+```json
+{
+  "success": true,
+  "data": {
+    "configured": false,
+    "base_url": "",
+    "model": "",
+    "api_key_mask": ""
+  },
+  "message": "AI 设置已清除"
+}
+```
+
+**错误情况：**
+
+- 401: 未解锁
+
+### 7.4 解析文本
 
 **使用 AI 解析自然语言文本为条目结构。**
 
-AI 会尝试自主判断输入中是否包含多个独立条目。后端请求模型时使用严格 JSON object 输出约束，要求顶层返回 `entries` 数组。为兼容旧前端，响应仍保留 `parsed` 表示第一条解析结果；V1.2 新增 `parsed_entries` 和 `entry_count` 用于多条目录入。后端会归一化常见 AI 格式偏差，如 `items`、`accounts`、`records`、字段字典、标签字符串、`copyable` 字符串等。
+AI 解析要求用户已解锁并完成 AI 设置。前端调用前必须先查询 `GET /ai/status`，未配置时提示用户进入设置页配置 AI。AI 会尝试自主判断输入中是否包含多个独立条目。后端请求模型时使用严格 JSON object 输出约束，要求顶层返回 `entries` 数组。为兼容旧前端，响应仍保留 `parsed` 表示第一条解析结果；V1.2 新增 `parsed_entries` 和 `entry_count` 用于多条目录入。后端会归一化常见 AI 格式偏差，如 `items`、`accounts`、`records`、字段字典、标签字符串、`copyable` 字符串等。
 
 ```
 POST /ai/parse
@@ -809,7 +915,7 @@ POST /ai/parse
 
 **错误情况：**
 
-- 502: AI 服务不可用
+- 502: AI 服务未配置或服务不可用
 - 422: 无法解析输入文本
 - 429: 5 秒内重复解析，或内容未变化重复解析
 

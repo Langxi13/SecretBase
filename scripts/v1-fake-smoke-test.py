@@ -12,17 +12,18 @@ BACKEND_DIR = PROJECT_ROOT / "backend"
 TMP = tempfile.TemporaryDirectory(ignore_cleanup_errors=True)
 TMP_ROOT = Path(TMP.name)
 
+os.environ["DATA_DIR"] = str(TMP_ROOT)
 os.environ["VAULT_PATH"] = str(TMP_ROOT / "secretbase.enc")
 os.environ["BACKUP_DIR"] = str(TMP_ROOT / "backups")
 os.environ["LOG_DIR"] = str(TMP_ROOT / "logs")
 os.environ["SETTINGS_PATH"] = str(TMP_ROOT / "settings.json")
-os.environ["AI_API_KEY"] = ""
 
 sys.path.insert(0, str(BACKEND_DIR))
 
 from fastapi.testclient import TestClient  # noqa: E402
 import main  # noqa: E402
 import storage  # noqa: E402
+import routes.ai as ai_route  # noqa: E402
 from crypto import encrypt_vault  # noqa: E402
 
 
@@ -112,6 +113,67 @@ def sample_entry_payloads():
     ]
 
 
+class FakeAiResponse:
+    def __init__(self, status_code=200, data=None):
+        self.status_code = status_code
+        self._data = data or {}
+
+    def json(self):
+        return self._data
+
+
+class FakeAiClient:
+    calls = []
+    init_options = []
+
+    def __init__(self, timeout=30.0, trust_env=True):
+        self.timeout = timeout
+        self.trust_env = trust_env
+        self.init_options.append({"timeout": timeout, "trust_env": trust_env})
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, exc_type, exc, tb):
+        return False
+
+    async def get(self, url, headers=None):
+        self.calls.append({"method": "GET", "url": url, "headers": headers or {}})
+        return FakeAiResponse(200, {
+            "object": "list",
+            "data": [
+                {"id": "deepseek-chat"},
+                {"id": "gpt-test"},
+            ],
+        })
+
+    async def post(self, url, headers=None, json=None):
+        self.calls.append({"method": "POST", "url": url, "headers": headers or {}, "json": json or {}})
+        payload = json or {}
+        if payload.get("max_tokens") == 100:
+            return FakeAiResponse(200, {
+                "choices": [{"message": {"content": "{\"ok\": true}"}}],
+            })
+        return FakeAiResponse(200, {
+            "choices": [{
+                "message": {
+                    "content": json_module.dumps({
+                        "entries": [{
+                            "title": "Fake AI Account",
+                            "url": "",
+                            "fields": [{"name": "password", "value": "from-saved-ai", "copyable": True}],
+                            "tags": ["AI"],
+                            "remarks": ""
+                        }]
+                    })
+                }
+            }]
+        })
+
+
+json_module = json
+
+
 def run():
     client = TestClient(main.app)
 
@@ -150,7 +212,106 @@ def run():
     assert settings["page_size"] == 2
 
     ai_status = expect_success(client.get("/ai/status"), "ai status unconfigured")["data"]
-    assert ai_status == {"configured": False, "model": "deepseek-v4-flash"}
+    assert ai_status == {"configured": False, "base_url": "", "model": "", "api_key_mask": ""}
+    expect_json(client.post("/ai/parse", json={"text": "cannot parse before ai setup"}), 502, "ai parse before configuration")
+
+    original_ai_client = ai_route.httpx.AsyncClient
+    ai_route.httpx.AsyncClient = FakeAiClient
+    try:
+        models = expect_success(
+            client.post("/ai/models", json={"baseUrl": "https://api.example.test/v1/", "apiKey": "sk-test-secret"}),
+            "ai models"
+        )["data"]["models"]
+        assert models == ["deepseek-chat", "gpt-test"]
+        assert FakeAiClient.init_options[-1]["trust_env"] is False
+        assert FakeAiClient.calls[-1]["url"] == "https://api.example.test/v1/models"
+        assert FakeAiClient.calls[-1]["headers"]["Authorization"] == "Bearer sk-test-secret"
+
+        saved = expect_success(
+            client.put("/ai/settings", json={
+                "baseUrl": "https://api.example.test/v1/",
+                "apiKey": "sk-test-secret",
+                "model": "deepseek-chat",
+            }),
+            "save ai settings"
+        )["data"]
+        assert saved == {
+            "configured": True,
+            "base_url": "https://api.example.test/v1",
+            "model": "deepseek-chat",
+            "api_key_mask": "sk-...cret",
+        }
+        assert any(call["method"] == "GET" and call["url"] == "https://api.example.test/v1/models" for call in FakeAiClient.calls)
+        assert any(
+            call["method"] == "POST"
+            and call["url"] == "https://api.example.test/v1/chat/completions"
+            and call["json"].get("model") == "deepseek-chat"
+            and call["json"].get("max_tokens") == 100
+            for call in FakeAiClient.calls
+        )
+        settings_text = Path(os.environ["SETTINGS_PATH"]).read_text(encoding="utf-8")
+        assert "sk-test-secret" not in settings_text
+        secure_bytes = Path(ai_route.SECURE_SETTINGS_FILE).read_bytes()
+        assert b"sk-test-secret" not in secure_bytes
+
+        ai_status = expect_success(client.get("/ai/status"), "ai status configured")["data"]
+        assert ai_status == saved
+
+        models_with_saved_key = expect_success(
+            client.post("/ai/models", json={"baseUrl": "https://api.example.test/v1"}),
+            "ai models with saved key"
+        )["data"]["models"]
+        assert models_with_saved_key == ["deepseek-chat", "gpt-test"]
+
+        updated = expect_success(
+            client.put("/ai/settings", json={
+                "baseUrl": "https://api.example.test/v1",
+                "model": "gpt-test",
+            }),
+            "save ai settings with saved key"
+        )["data"]
+        assert updated == {
+            "configured": True,
+            "base_url": "https://api.example.test/v1",
+            "model": "gpt-test",
+            "api_key_mask": "sk-...cret",
+        }
+        saved = updated
+
+        parsed = expect_success(client.post("/ai/parse", json={"text": "fake account password unique ai"}), "ai parse configured")["data"]
+        assert parsed["parsed"]["title"] == "Fake AI Account"
+        assert any(
+            call["method"] == "POST"
+            and call["url"] == "https://api.example.test/v1/chat/completions"
+            and call["headers"]["Authorization"] == "Bearer sk-test-secret"
+            and call["json"].get("model") == "gpt-test"
+            and call["json"].get("max_tokens") == 3000
+            for call in FakeAiClient.calls
+        )
+
+        cleared = expect_success(client.delete("/ai/settings"), "clear ai settings")["data"]
+        assert cleared == {"configured": False, "base_url": "", "model": "", "api_key_mask": ""}
+        expect_json(client.post("/ai/parse", json={"text": "cannot parse after ai setup cleared"}), 502, "ai parse after configuration cleared")
+
+        secure_path = Path(ai_route.SECURE_SETTINGS_FILE)
+        secure_path.write_bytes(b"stale local secure settings")
+        ai_status = expect_success(client.get("/ai/status"), "ai status with stale secure settings")["data"]
+        assert ai_status == {"configured": False, "base_url": "", "model": "", "api_key_mask": ""}
+        resaved = expect_success(
+            client.put("/ai/settings", json={
+                "baseUrl": "https://api.example.test/v1",
+                "apiKey": "sk-test-secret",
+                "model": "deepseek-chat",
+            }),
+            "resave ai settings over stale secure settings"
+        )["data"]
+        assert resaved["configured"] is True
+        secure_path.write_bytes(b"stale local secure settings")
+        cleared_stale = expect_success(client.delete("/ai/settings"), "clear stale ai settings")["data"]
+        assert cleared_stale == {"configured": False, "base_url": "", "model": "", "api_key_mask": ""}
+        assert not secure_path.exists()
+    finally:
+        ai_route.httpx.AsyncClient = original_ai_client
 
     expect_json(client.post("/entries", json={"title": ""}), 422, "invalid empty title")
     duplicate_fields = entry_payload("Invalid Duplicate", "invalid")
@@ -423,6 +584,8 @@ def run():
     expect_json(client.get("/backups"), 401, "backups after lock")
     expect_json(client.get("/tools/health-report"), 401, "tools after lock")
     expect_json(client.get("/ai/status"), 401, "ai status after lock")
+    expect_json(client.post("/ai/models", json={"baseUrl": "https://api.example.test/v1", "apiKey": "sk-test-secret"}), 401, "ai models after lock")
+    expect_json(client.put("/ai/settings", json={"baseUrl": "https://api.example.test/v1", "apiKey": "sk-test-secret", "model": "deepseek-chat"}), 401, "ai settings after lock")
     expect_json(client.post("/ai/parse", json={"text": "fake"}), 401, "ai after lock")
 
     unlock = expect_success(client.post("/auth/unlock", json={"password": PASSWORD}), "unlock")
