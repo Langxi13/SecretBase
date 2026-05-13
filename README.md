@@ -270,6 +270,16 @@ node --check frontend\js\utils.js
 
 `scripts/v1-fake-smoke-test.py` 使用临时 vault，不会读取或修改真实数据。
 
+### 独立接口测试环境
+
+手动测试接口时不要使用真实 vault。启动独立测试后端：
+
+```bash
+scripts/dev-test-backend.sh --reset
+```
+
+默认地址是 `http://127.0.0.1:10014`，默认测试主密码是 `SecretBase-Test-123456!`。测试 vault、设置、备份、日志和 AI 安全设置都会写入 `/tmp/secretbase-test-runtime`，不会读写仓库内真实运行数据。去掉 `--reset` 可以复用上一次测试 vault。
+
 ### 生产部署概览
 
 推荐部署拓扑：
@@ -297,6 +307,7 @@ Encrypted vault + backups
 | `scripts/backup.sh` | 备份加密 vault 和配置文件。 |
 | `scripts/restore.sh` | 从备份恢复 vault。 |
 | `scripts/healthcheck.sh` | 检查服务状态和健康接口。 |
+| `scripts/dev-test-backend.sh` | 启动隔离测试后端，用固定测试 vault 做手动接口测试。 |
 | `scripts/dev-backend.ps1` | Windows 本地后端启动脚本。 |
 | `scripts/dev-frontend.ps1` | Windows 本地前端启动脚本。 |
 
@@ -557,6 +568,16 @@ node --check frontend\js\utils.js
 
 `scripts/v1-fake-smoke-test.py` uses a temporary vault and does not read or modify real data.
 
+### Isolated API Test Environment
+
+For manual API testing, do not use the real vault. Start an isolated test backend:
+
+```bash
+scripts/dev-test-backend.sh --reset
+```
+
+The default URL is `http://127.0.0.1:10014`, and the default test master password is `SecretBase-Test-123456!`. The test vault, settings, backups, logs, and AI secure settings are written under `/tmp/secretbase-test-runtime`, not the repository runtime data. Omit `--reset` to reuse the previous test vault.
+
 ### Production Deployment Overview
 
 Recommended topology:
@@ -584,6 +605,7 @@ Helper scripts:
 | `scripts/backup.sh` | Back up encrypted vault and configuration files. |
 | `scripts/restore.sh` | Restore vault from backup. |
 | `scripts/healthcheck.sh` | Check service status and health endpoint. |
+| `scripts/dev-test-backend.sh` | Start an isolated test backend with a fixed test vault for manual API testing. |
 | `scripts/dev-backend.ps1` | Windows local backend starter. |
 | `scripts/dev-frontend.ps1` | Windows local frontend starter. |
 
