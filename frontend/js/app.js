@@ -204,7 +204,7 @@ const app = createApp({
         let confirmCallback = null;
         let autoLockTimer = null;
         let entriesRequestSeq = 0;
-        let systemThemeMediaQuery = null;
+        let autoThemeTimer = null;
         const activityEventNames = ['click', 'keydown', 'mousemove', 'touchstart'];
 
         // 主题
@@ -213,7 +213,7 @@ const app = createApp({
             switch (currentTheme.value) {
                 case 'dark': return '🌙';
                 case 'light': return '☀️';
-                default: return '💻';
+                default: return resolveAutoTheme() === 'dark' ? '🌙' : '☀️';
             }
         });
 
@@ -439,9 +439,9 @@ const app = createApp({
                         autoLockMinutes: authStatus.auto_lock_minutes ?? store.state.settings.autoLockMinutes
                     }
                     : await store.loadSettings();
-                bindSystemThemeListener();
                 applySettings(settings);
                 applyTheme(currentTheme.value);
+                startAutoThemeTimer();
                 loadSavedAdvancedFilters();
                 bindActivityListeners();
                 setInterval(() => {
@@ -465,7 +465,7 @@ const app = createApp({
             activityEventNames.forEach(eventName => {
                 window.removeEventListener(eventName, resetAutoLockTimer);
             });
-            unbindSystemThemeListener();
+            clearAutoThemeTimer();
             clearAutoLockTimer();
         });
 
@@ -769,45 +769,34 @@ const app = createApp({
         function applyTheme(theme) {
             const root = document.documentElement;
             if (theme === 'system') {
-                root.setAttribute('data-theme', getResolvedSystemTheme());
-                root.setAttribute('data-theme-mode', 'system');
+                root.setAttribute('data-theme', resolveAutoTheme());
+                root.setAttribute('data-theme-mode', 'auto');
             } else {
                 root.setAttribute('data-theme', theme);
                 root.setAttribute('data-theme-mode', theme);
             }
         }
 
-        function getResolvedSystemTheme() {
-            if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
-                return 'dark';
-            }
-            return 'light';
+        function resolveAutoTheme(date = new Date()) {
+            const hour = date.getHours();
+            return hour >= 18 || hour < 6 ? 'dark' : 'light';
         }
 
-        function handleSystemThemeChange() {
+        function applyAutoThemeIfNeeded() {
             if (currentTheme.value === 'system') {
                 applyTheme('system');
             }
         }
 
-        function bindSystemThemeListener() {
-            if (!window.matchMedia || systemThemeMediaQuery) return;
-            systemThemeMediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
-            if (systemThemeMediaQuery.addEventListener) {
-                systemThemeMediaQuery.addEventListener('change', handleSystemThemeChange);
-            } else if (systemThemeMediaQuery.addListener) {
-                systemThemeMediaQuery.addListener(handleSystemThemeChange);
-            }
+        function startAutoThemeTimer() {
+            clearAutoThemeTimer();
+            autoThemeTimer = setInterval(applyAutoThemeIfNeeded, 60 * 1000);
         }
 
-        function unbindSystemThemeListener() {
-            if (!systemThemeMediaQuery) return;
-            if (systemThemeMediaQuery.removeEventListener) {
-                systemThemeMediaQuery.removeEventListener('change', handleSystemThemeChange);
-            } else if (systemThemeMediaQuery.removeListener) {
-                systemThemeMediaQuery.removeListener(handleSystemThemeChange);
-            }
-            systemThemeMediaQuery = null;
+        function clearAutoThemeTimer() {
+            if (!autoThemeTimer) return;
+            clearInterval(autoThemeTimer);
+            autoThemeTimer = null;
         }
 
         // 获取 favicon

@@ -7,17 +7,16 @@
     
     <!-- Vue 3 CDN (Production) -->
     <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
-    <script src="/secretbase-runtime-config.js?v=20260708-ui-v27"></script>
+    <script src="/secretbase-runtime-config.js?v=20260708-ui-v28"></script>
     
     <!-- 基础样式 -->
-    <link rel="stylesheet" href="css/style.css?v=20260708-ui-v27">
-    <link rel="stylesheet" href="css/components.css?v=20260708-ui-v27">
+    <link rel="stylesheet" href="css/style.css?v=20260708-ui-v28">
+    <link rel="stylesheet" href="css/components.css?v=20260708-ui-v28">
     
     <!-- 主题样式 -->
-    <link rel="stylesheet" href="css/themes/variables.css?v=20260708-ui-v27">
-    <link rel="stylesheet" href="css/themes/dark.css?v=20260708-ui-v27">
-    <link rel="stylesheet" href="css/themes/light.css?v=20260708-ui-v27">
-    <link rel="stylesheet" href="css/themes/system.css?v=20260708-ui-v27">
+    <link rel="stylesheet" href="css/themes/variables.css?v=20260708-ui-v28">
+    <link rel="stylesheet" href="css/themes/dark.css?v=20260708-ui-v28">
+    <link rel="stylesheet" href="css/themes/light.css?v=20260708-ui-v28">
     
     <!-- Favicon -->
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🔐</text></svg>">
@@ -831,7 +830,7 @@
                             <div class="setting-item">
                                 <label>主题</label>
                                 <select v-model="settingsForm.theme" @change="saveSettings">
-                                    <option value="system">跟随系统</option>
+                                    <option value="system">自动（按时间）</option>
                                     <option value="light">亮色</option>
                                     <option value="dark">暗色</option>
                                 </select>
@@ -1435,9 +1434,9 @@
     </div>
     
     <!-- JS 模块 -->
-    <script src="js/api.js?v=20260708-ui-v27"></script>
-    <script src="js/utils.js?v=20260708-ui-v27"></script>
-    <script src="js/store.js?v=20260708-ui-v27"></script>
-    <script src="js/app.js?v=20260708-ui-v27"></script>
+    <script src="js/api.js?v=20260708-ui-v28"></script>
+    <script src="js/utils.js?v=20260708-ui-v28"></script>
+    <script src="js/store.js?v=20260708-ui-v28"></script>
+    <script src="js/app.js?v=20260708-ui-v28"></script>
 </body>
 </html>

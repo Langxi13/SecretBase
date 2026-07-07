@@ -262,6 +262,7 @@ python -m compileall desktop scripts
 python scripts\test-backup-separation.py
 python scripts\test-desktop-foundation.py
 python scripts\v1-fake-smoke-test.py
+node scripts\test-frontend-auto-theme.js
 node --check frontend\js\app.js
 node --check frontend\js\api.js
 node --check frontend\js\store.js
@@ -560,6 +561,7 @@ python -m compileall desktop scripts
 python scripts\test-backup-separation.py
 python scripts\test-desktop-foundation.py
 python scripts\v1-fake-smoke-test.py
+node scripts\test-frontend-auto-theme.js
 node --check frontend\js\app.js
 node --check frontend\js\api.js
 node --check frontend\js\store.js

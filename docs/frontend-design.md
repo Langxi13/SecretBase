@@ -50,8 +50,7 @@ frontend/
 │   └── themes/
 │       ├── variables.css   # CSS 变量定义
 │       ├── dark.css        # 暗色主题
-│       ├── light.css       # 亮色主题
-│       └── system.css      # 跟随系统
+│       └── light.css       # 亮色主题
 └── js/
     ├── app.js              # Vue 应用入口、状态、页面方法
     ├── api.js              # Fetch API 封装，Windows 开发直连后端，生产环境使用 /api 前缀
@@ -72,8 +71,7 @@ frontend/
 │   └── themes/
 │       ├── variables.css   # CSS 变量定义
 │       ├── dark.css        # 暗色主题
-│       ├── light.css       # 亮色主题
-│       └── system.css      # 跟随系统
+│       └── light.css       # 亮色主题
 └── js/
     ├── app.js              # Vue 应用入口
     ├── api.js              # API 调用封装
@@ -206,7 +204,7 @@ V2.4 以“高级暗色 + 克制工具层级”为主方向，优化 SecretBase 
 
 实现边界：
 
-- 主题变量补齐表面层级、焦点环、状态背景、阴影和固定控件尺寸；暗色、亮色和系统主题均保持可读。
+- 主题变量补齐表面层级、焦点环、状态背景、阴影和固定控件尺寸；暗色、亮色和自动按时间主题均保持可读。
 - 主工作台保持“桌面侧边栏 + 右侧卡片工作区”的结构，优化搜索筛选区、条目卡片、列表状态提示、分页和底部批量操作栏。
 - 模态框、设置、工具、AI 解析、备份中心、恢复向导、标签管理、回收站和导入流程统一 8px 圆角、边框、长文本换行、加载态和移动端按钮触达。
 - CSS 使用现有 `style.css`、`components.css` 和 `themes/*.css`，不引入 npm 构建链或外部图标库。
@@ -707,86 +705,33 @@ const SearchBar = {
 }
 ```
 
-### 5.4 系统主题
+### 5.4 自动主题
 
-```css
-/* css/themes/system.css */
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme]) {
-    --color-primary: #5a9fe6;
-    --color-primary-hover: #6ab0f0;
-    --color-primary-light: rgba(90, 159, 230, 0.15);
-    
-    --bg-primary: #1a1a1a;
-    --bg-secondary: #2d2d2d;
-    --bg-card: #333333;
-    --bg-modal: rgba(0, 0, 0, 0.7);
-    
-    --text-primary: #ffffff;
-    --text-secondary: #cccccc;
-    --text-tertiary: #999999;
-    --text-inverse: #333333;
-    
-    --border-color: #444444;
-    
-    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.2);
-    --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.3);
-    --shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.3);
-  }
-}
-```
+设置值 `system` 保留为兼容字段，但界面展示为“自动（按时间）”。自动主题不再依赖操作系统深色模式，而是按浏览器本地时间解析：
+
+- `06:00 - 17:59` 使用 `data-theme="light"`。
+- `18:00 - 05:59` 使用 `data-theme="dark"`。
+- 手动选择 `light` 或 `dark` 时固定主题，不受时间影响。
+- 页面运行期间每分钟重算一次，跨过 06:00 或 18:00 自动切换。
 
 ### 5.5 主题切换逻辑
 
 ```javascript
-// js/theme.js
-class ThemeManager {
-  constructor() {
-    this.currentTheme = 'system';
-    this.mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
-  }
-
-  async init() {
-    // 从后端获取设置
-    const settings = await api.get('/settings');
-    this.currentTheme = settings.data.theme || 'system';
-    this.apply();
-    
-    // 监听系统主题变化
-    this.mediaQuery.addEventListener('change', () => {
-      if (this.currentTheme === 'system') {
-        this.apply();
-      }
-    });
-  }
-
-  async setTheme(theme) {
-    this.currentTheme = theme;
-    this.apply();
-    
-    // 保存到后端
-    await api.put('/settings', { theme });
-  }
-
-  apply() {
-    const root = document.documentElement;
-    
-    if (this.currentTheme === 'system') {
-      root.removeAttribute('data-theme');
-    } else {
-      root.setAttribute('data-theme', this.currentTheme);
-    }
-  }
-
-  getEffectiveTheme() {
-    if (this.currentTheme === 'system') {
-      return this.mediaQuery.matches ? 'dark' : 'light';
-    }
-    return this.currentTheme;
-  }
+function resolveAutoTheme(date = new Date()) {
+  const hour = date.getHours();
+  return hour >= 18 || hour < 6 ? 'dark' : 'light';
 }
 
-const themeManager = new ThemeManager();
+function applyTheme(theme) {
+  const root = document.documentElement;
+  if (theme === 'system') {
+    root.setAttribute('data-theme', resolveAutoTheme());
+    root.setAttribute('data-theme-mode', 'auto');
+  } else {
+    root.setAttribute('data-theme', theme);
+    root.setAttribute('data-theme-mode', theme);
+  }
+}
 ```
 
 ## 6. 移动端适配
