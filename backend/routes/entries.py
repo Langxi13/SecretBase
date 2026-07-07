@@ -46,6 +46,7 @@ async def get_entries(
     search_scopes: Optional[str] = None,
     ids: Optional[str] = None,
     tag: Optional[str] = None,
+    group: Optional[str] = None,
     tags: Optional[str] = None,
     untagged: bool = False,
     starred: Optional[bool] = None,
@@ -93,6 +94,9 @@ async def get_entries(
     # 标签筛选
     if tag:
         entries = [e for e in entries if tag in e.tags]
+
+    if group:
+        entries = [e for e in entries if group in (getattr(e, "groups", []) or [])]
 
     if tags:
         required_tags = [t.strip() for t in tags.split(",") if t.strip()]
@@ -147,6 +151,7 @@ async def get_entries(
             "url": entry.url,
             "starred": entry.starred,
             "tags": entry.tags,
+            "groups": getattr(entry, "groups", []) or [],
             "fields": fields,
             "remarks": entry.remarks,
             "created_at": entry.created_at,
@@ -186,6 +191,7 @@ async def get_entry_detail(entry_id: str):
             "url": entry.url,
             "starred": entry.starred,
             "tags": entry.tags,
+            "groups": getattr(entry, "groups", []) or [],
             "fields": fields,
             "remarks": entry.remarks,
             "created_at": entry.created_at,

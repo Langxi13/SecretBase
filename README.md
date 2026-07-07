@@ -123,10 +123,11 @@ Encrypted vault file
 | 模块 | 功能 |
 | --- | --- |
 | 认证 | 主密码初始化、解锁、锁定、自动锁定、随机 session token。 |
-| 条目管理 | 标题、网址、自定义字段、可复制字段、隐藏字段、备注、星标、标签。 |
+| 条目管理 | 标题、网址、自定义字段、可复制字段、隐藏字段、备注、星标、标签和密码组。 |
 | 搜索与筛选 | 标题、网址、标签、字段名、非敏感字段值、备注、高级筛选、排序和分页。 |
 | 字段保护 | 隐藏字段在列表中默认掩码，详情页可按需显示明文；可复制只控制复制入口。 |
 | 标签管理 | 标签列表、重命名、删除、合并、按数量和名称排序。 |
+| 密码组 | 一个条目可属于多个密码组，密码组有名称和简介，主页可切换到密码组模式并按组查看条目。 |
 | 回收站 | 软删除、恢复、永久删除、清空回收站。 |
 | 批量操作 | 批量删除、批量星标、批量更新标签。 |
 | 备份中心 | 手动/自动备份两列分离、各自分页、固定占位、加载态、可配置自动保留数量、指定备份下载和三步恢复向导。 |
@@ -263,7 +264,9 @@ python scripts\test-backup-separation.py
 python scripts\test-desktop-foundation.py
 python scripts\v1-fake-smoke-test.py
 python scripts\test-field-hidden-semantics.py
+python scripts\test-password-groups.py
 node scripts\test-frontend-auto-theme.js
+node scripts\test-frontend-password-groups.js
 node --check frontend\js\app.js
 node --check frontend\js\api.js
 node --check frontend\js\store.js
@@ -423,10 +426,11 @@ Encrypted vault file
 | Module | Capabilities |
 | --- | --- |
 | Authentication | Master-password initialization, unlock, lock, auto-lock, random session token. |
-| Entries | Title, URL, custom fields, copyable fields, hidden fields, notes, stars, and tags. |
+| Entries | Title, URL, custom fields, copyable fields, hidden fields, notes, stars, tags, and password groups. |
 | Search and filters | Title, URL, tags, field names, non-sensitive field values, notes, advanced filters, sorting, and pagination. |
 | Field protection | Hidden fields are masked in list responses and can be revealed in the detail view; copyable only controls copy actions. |
 | Tags | List, rename, delete, merge, and sort by count or name. |
+| Password groups | Entries can belong to multiple groups; groups have names and descriptions; the workspace can switch to group mode and then filter by group. |
 | Trash | Soft delete, restore, permanent delete, and empty trash. |
 | Batch operations | Batch delete, batch star, and batch tag updates. |
 | Backup center | Two-column manual/automatic backups, independent pagination, fixed placeholders, loading states, configurable automatic retention, per-backup downloads, and a three-step restore wizard. |
@@ -563,7 +567,9 @@ python scripts\test-backup-separation.py
 python scripts\test-desktop-foundation.py
 python scripts\v1-fake-smoke-test.py
 python scripts\test-field-hidden-semantics.py
+python scripts\test-password-groups.py
 node scripts\test-frontend-auto-theme.js
+node scripts\test-frontend-password-groups.js
 node --check frontend\js\app.js
 node --check frontend\js\api.js
 node --check frontend\js\store.js

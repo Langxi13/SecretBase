@@ -18,6 +18,7 @@ const app = createApp({
         // 主界面状态
         const entries = ref([]);
         const tags = ref([]);
+        const groups = ref([]);
         const currentPage = ref(1);
         const totalPages = ref(0);
         const totalEntries = ref(0);
@@ -36,6 +37,7 @@ const app = createApp({
         const sortOrder = ref('desc');
         const filter = ref('all');
         const activeTagName = ref('');
+        const activeGroupName = ref('');
         const listContextNotice = ref('');
         const showTagDropdown = ref(false);
         const tagBrowserQuery = ref('');
@@ -112,10 +114,13 @@ const app = createApp({
             url: '',
             starred: false,
             tags: [],
+            groups: [],
             fields: [],
             remarks: ''
         });
         const newTag = ref('');
+        const newGroup = ref('');
+        const newGroupDescription = ref('');
         const tagInput = ref(null);
         const selectedTemplate = ref('');
         const entryTemplates = [
@@ -324,6 +329,7 @@ const app = createApp({
             }
             if (filter.value === 'starred') items.push('仅星标');
             if (filter.value === 'tag' && activeTagName.value) items.push(`标签：${activeTagName.value}`);
+            if (filter.value === 'group' && activeGroupName.value) items.push(`密码组：${activeGroupName.value}`);
             activeAdvancedFilterChips.value.forEach(chip => items.push(chip.label));
             if (sortBy.value !== 'updated_at' || sortOrder.value !== 'desc') {
                 const sortLabel = sortBy.value === 'title' ? '标题' : sortBy.value === 'created_at' ? '创建时间' : '更新时间';
@@ -473,7 +479,8 @@ const app = createApp({
         async function loadAllData() {
             await Promise.all([
                 loadEntries(),
-                loadTags()
+                loadTags(),
+                loadGroups()
             ]);
         }
 
@@ -552,6 +559,7 @@ const app = createApp({
             searchQuery.value = '';
             filter.value = 'all';
             activeTagName.value = '';
+            activeGroupName.value = '';
             listContextNotice.value = `工具定位：${label || '条目'}（${ids.length} 条）`;
             store.setFilter('entryIds', ids);
             showTools.value = false;
@@ -587,6 +595,11 @@ const app = createApp({
         // 加载标签
         async function loadTags() {
             tags.value = await store.loadTags();
+        }
+
+        // 加载密码组
+        async function loadGroups() {
+            groups.value = await store.loadGroups();
         }
 
         // 初始化密码
@@ -660,6 +673,7 @@ const app = createApp({
             password.value = '';
             entries.value = [];
             tags.value = [];
+            groups.value = [];
             selectedEntry.value = null;
             editingEntry.value = null;
             selectedEntryIds.value = [];
@@ -715,11 +729,45 @@ const app = createApp({
             store.setFilter('entryIds', []);
             listContextNotice.value = '';
             store.setFilter('tag', tagName);
+            store.setFilter('group', null);
             store.setFilter('starred', false);
             filter.value = 'tag';
             activeTagName.value = tagName;
+            activeGroupName.value = '';
             showTagDropdown.value = false;
             showTagBrowser.value = false;
+            await loadEntries(1);
+        }
+
+        async function showGroupMode() {
+            filter.value = 'groups';
+            activeTagName.value = '';
+            activeGroupName.value = '';
+            listContextNotice.value = '';
+            searchQuery.value = '';
+            resetSearchScopes();
+            store.clearFilters();
+            resetAdvancedFilterForm();
+            selectedEntryIds.value = [];
+            await loadGroups();
+        }
+
+        async function filterByGroup(groupName) {
+            const normalized = String(groupName || '').trim();
+            if (!normalized) return;
+            searchQuery.value = '';
+            resetSearchScopes();
+            resetAdvancedFilterForm();
+            store.clearFilters();
+            listContextNotice.value = '';
+            store.setFilter('group', normalized);
+            store.setFilter('starred', false);
+            sortBy.value = store.state.filters.sortBy;
+            sortOrder.value = store.state.filters.sortOrder;
+            filter.value = 'group';
+            activeTagName.value = '';
+            activeGroupName.value = normalized;
+            selectedEntryIds.value = [];
             await loadEntries(1);
         }
 
@@ -735,6 +783,7 @@ const app = createApp({
         async function showAllEntries() {
             filter.value = 'all';
             activeTagName.value = '';
+            activeGroupName.value = '';
             listContextNotice.value = '';
             searchQuery.value = '';
             resetSearchScopes();
@@ -748,9 +797,11 @@ const app = createApp({
         async function showStarredEntries() {
             filter.value = 'starred';
             activeTagName.value = '';
+            activeGroupName.value = '';
             listContextNotice.value = '';
             store.setFilter('entryIds', []);
             store.setFilter('tag', null);
+            store.setFilter('group', null);
             store.setFilter('starred', true);
             await loadEntries(1);
         }
@@ -928,6 +979,7 @@ const app = createApp({
                 entryForm.url = fullEntry.url || '';
                 entryForm.starred = fullEntry.starred;
                 entryForm.tags = [...fullEntry.tags];
+                entryForm.groups = [...(fullEntry.groups || [])];
                 entryForm.fields = fullEntry.fields.map(normalizeFieldForEdit);
                 entryForm.remarks = fullEntry.remarks || '';
                 showEditModal.value = true;
@@ -941,9 +993,12 @@ const app = createApp({
             entryForm.url = '';
             entryForm.starred = false;
             entryForm.tags = [];
+            entryForm.groups = [];
             entryForm.fields = [];
             entryForm.remarks = '';
             newTag.value = '';
+            newGroup.value = '';
+            newGroupDescription.value = '';
             selectedTemplate.value = '';
         }
 
@@ -963,9 +1018,45 @@ const app = createApp({
             newTag.value = '';
         }
 
+        function addExistingTag(tag) {
+            const tagName = String(tag?.name || tag || '').trim();
+            if (tagName && !entryForm.tags.includes(tagName)) {
+                entryForm.tags.push(tagName);
+            }
+        }
+
         // 移除标签
         function removeTag(index) {
             entryForm.tags.splice(index, 1);
+        }
+
+        async function addGroup() {
+            const groupName = newGroup.value.trim();
+            if (!groupName) return;
+            if (!entryForm.groups.includes(groupName)) {
+                entryForm.groups.push(groupName);
+            }
+            const existingGroup = groups.value.find(group => group.name === groupName);
+            if (!existingGroup) {
+                await store.createGroup({
+                    name: groupName,
+                    description: newGroupDescription.value.trim()
+                });
+                await loadGroups();
+            }
+            newGroup.value = '';
+            newGroupDescription.value = '';
+        }
+
+        function addExistingGroup(group) {
+            const groupName = String(group?.name || group || '').trim();
+            if (groupName && !entryForm.groups.includes(groupName)) {
+                entryForm.groups.push(groupName);
+            }
+        }
+
+        function removeGroup(index) {
+            entryForm.groups.splice(index, 1);
         }
 
         // 添加字段
@@ -984,12 +1075,19 @@ const app = createApp({
                 showToast('请输入标题', 'error');
                 return;
             }
+            if (newTag.value.trim()) {
+                addTag();
+            }
+            if (newGroup.value.trim()) {
+                await addGroup();
+            }
 
             const data = {
                 title: entryForm.title,
                 url: entryForm.url || '',
                 starred: entryForm.starred,
-                tags: entryForm.tags,
+                tags: Array.from(new Set(entryForm.tags.map(tag => String(tag).trim()).filter(Boolean))),
+                groups: Array.from(new Set(entryForm.groups.map(group => String(group).trim()).filter(Boolean))),
                 fields: entryForm.fields.map(normalizeFieldForEdit).filter(f => f.name),
                 remarks: entryForm.remarks
             };
@@ -1004,7 +1102,7 @@ const app = createApp({
             if (result) {
                 closeEntryModal();
                 await loadEntries(currentPage.value);
-                await loadTags();
+                await Promise.all([loadTags(), loadGroups()]);
             }
         }
 
@@ -1015,7 +1113,7 @@ const app = createApp({
                     selectedEntry.value = null;
                     selectedEntryIds.value = selectedEntryIds.value.filter(id => id !== entry.id);
                     await loadEntries(currentPage.value);
-                    await loadTags();
+                    await Promise.all([loadTags(), loadGroups()]);
                 }
             });
         }
@@ -1053,7 +1151,7 @@ const app = createApp({
                 await store.batchDelete(selectedEntryIds.value);
                 clearSelection();
                 await loadEntries(1);
-                await loadTags();
+                await Promise.all([loadTags(), loadGroups()]);
             });
         }
 
@@ -1213,6 +1311,7 @@ const app = createApp({
         async function clearListState() {
             listContextNotice.value = '';
             activeTagName.value = '';
+            activeGroupName.value = '';
             searchQuery.value = '';
             resetSearchScopes();
             filter.value = 'all';
@@ -1499,7 +1598,7 @@ const app = createApp({
                 aiResult.value = null;
                 aiText.value = '';
                 await loadEntries(1);
-                await loadTags();
+                await Promise.all([loadTags(), loadGroups()]);
             } catch (error) {
                 showToast(error.message || 'AI 多条目创建失败，请检查解析结果', 'error');
             }
@@ -2415,6 +2514,7 @@ const app = createApp({
             submitting,
             entries,
             tags,
+            groups,
             currentPage,
             totalPages,
             totalEntries,
@@ -2427,6 +2527,7 @@ const app = createApp({
             sortOrder,
             filter,
             activeTagName,
+            activeGroupName,
             listContextNotice,
             showTagDropdown,
             showTagBrowser,
@@ -2474,6 +2575,8 @@ const app = createApp({
             savedAdvancedFilters,
             entryForm,
             newTag,
+            newGroup,
+            newGroupDescription,
             tagInput,
             selectedTemplate,
             entryTemplates,
@@ -2539,6 +2642,8 @@ const app = createApp({
             debounceSearch,
             toggleSearchScope,
             filterByTag,
+            showGroupMode,
+            filterByGroup,
             openTagBrowser,
             closeTagBrowser,
             showAllEntries,
@@ -2559,7 +2664,11 @@ const app = createApp({
             importSampleData,
             applyEntryTemplate,
             addTag,
+            addExistingTag,
             removeTag,
+            addGroup,
+            addExistingGroup,
+            removeGroup,
             addField,
             removeField,
             saveEntry,

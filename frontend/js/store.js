@@ -8,6 +8,7 @@ class Store {
             locked: true,
             entries: [],
             tags: [],
+            groups: [],
             trash: [],
             settings: {
                 theme: 'system',
@@ -25,6 +26,7 @@ class Store {
                 search: '',
                 entryIds: [],
                 tag: null,
+                group: null,
                 searchScopes: [],
                 tags: [],
                 untagged: false,
@@ -188,6 +190,9 @@ class Store {
             }
             if (this.state.filters.tag) {
                 params.append('tag', this.state.filters.tag);
+            }
+            if (this.state.filters.group) {
+                params.append('group', this.state.filters.group);
             }
             if (this.state.filters.tags?.length) {
                 params.append('tags', this.state.filters.tags.join(','));
@@ -371,6 +376,59 @@ class Store {
     }
 
     /**
+     * 加载密码组
+     */
+    async loadGroups() {
+        try {
+            const result = await api.get('/groups');
+            this.setState({ groups: result.data.groups });
+            return result.data.groups;
+        } catch (error) {
+            console.error('加载密码组失败:', error);
+            return [];
+        }
+    }
+
+    async createGroup(groupData) {
+        try {
+            const result = await api.post('/groups', groupData);
+            showToast(result.message || '密码组已创建', 'success');
+            await this.loadGroups();
+            return result.data;
+        } catch (error) {
+            console.error('创建密码组失败:', error);
+            showToast(error.message || '创建密码组失败', 'error');
+            return null;
+        }
+    }
+
+    async updateGroup(groupName, groupData) {
+        try {
+            const result = await api.put(`/groups/${encodeURIComponent(groupName)}`, groupData);
+            showToast(result.message || '密码组已更新', 'success');
+            await this.loadGroups();
+            return result.data;
+        } catch (error) {
+            console.error('更新密码组失败:', error);
+            showToast(error.message || '更新密码组失败', 'error');
+            return null;
+        }
+    }
+
+    async deleteGroup(groupName) {
+        try {
+            const result = await api.delete(`/groups/${encodeURIComponent(groupName)}`);
+            showToast(result.message || '密码组已删除', 'success');
+            await Promise.all([this.loadGroups(), this.loadEntries(1)]);
+            return result.data;
+        } catch (error) {
+            console.error('删除密码组失败:', error);
+            showToast(error.message || '删除密码组失败', 'error');
+            return null;
+        }
+    }
+
+    /**
      * 加载回收站
      */
     async loadTrash(page = 1) {
@@ -448,6 +506,7 @@ class Store {
             search: '',
             entryIds: [],
             tag: null,
+            group: null,
             searchScopes: [],
             tags: [],
             untagged: false,

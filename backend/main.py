@@ -26,7 +26,7 @@ from config import (
 )
 from models import Settings
 from storage import ConflictError, VaultLockTimeoutError, enforce_auto_lock, is_unlocked, touch_activity, validate_session_token
-from routes import auth, entries, trash, tags, ai, settings, health, transfer, tools
+from routes import auth, entries, trash, tags, groups, ai, settings, health, transfer, tools
 
 
 SENSITIVE_KEYS = {"password", "token", "key", "secret", "api_key", "authorization"}
@@ -117,6 +117,7 @@ API_PREFIXES = (
     "/entries",
     "/trash",
     "/tags",
+    "/groups",
     "/ai",
     "/settings",
     "/tools",
@@ -360,6 +361,7 @@ app.include_router(auth.router, prefix="/auth", tags=["认证"])
 app.include_router(entries.router, prefix="/entries", tags=["条目管理"])
 app.include_router(trash.router, prefix="/trash", tags=["回收站"])
 app.include_router(tags.router, prefix="/tags", tags=["标签管理"])
+app.include_router(groups.router, prefix="/groups", tags=["密码组"])
 app.include_router(ai.router, prefix="/ai", tags=["AI 智能录入"])
 app.include_router(settings.router, prefix="/settings", tags=["设置"])
 app.include_router(transfer.router, tags=["导入导出"])
@@ -372,6 +374,7 @@ app.include_router(auth.router, prefix="/api/auth", tags=["认证"])
 app.include_router(entries.router, prefix="/api/entries", tags=["条目管理"])
 app.include_router(trash.router, prefix="/api/trash", tags=["回收站"])
 app.include_router(tags.router, prefix="/api/tags", tags=["标签管理"])
+app.include_router(groups.router, prefix="/api/groups", tags=["密码组"])
 app.include_router(ai.router, prefix="/api/ai", tags=["AI 智能录入"])
 app.include_router(settings.router, prefix="/api/settings", tags=["设置"])
 app.include_router(transfer.router, prefix="/api", tags=["导入导出"])

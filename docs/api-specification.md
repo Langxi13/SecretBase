@@ -232,6 +232,7 @@ GET /entries
 | search_scopes | string | 否 | 搜索范围，逗号分隔；可选值：`title`、`url`、`tags`、`field_names`、`field_values`、`remarks`。未传或传空字符串时不匹配任何范围；可复制字段明文值始终不参与搜索 |
 | ids | string | 否 | 指定条目 id 列表，逗号分隔，用于工具报告定位 |
 | tag | string | 否 | 标签筛选 |
+| group | string | 否 | 密码组筛选 |
 | tags | string | 否 | 多标签筛选，逗号分隔，要求同时包含所有标签 |
 | untagged | boolean | 否 | 仅无标签 |
 | created_from | string | 否 | 创建时间起，ISO 字符串或日期前缀 |
@@ -257,6 +258,7 @@ GET /entries
         "url": "https://example.com/",
         "starred": true,
         "tags": ["示例云", "服务器", "重要"],
+        "groups": ["工作账号", "服务器"],
         "fields": [
           {"name": "账号", "value": "demo-user", "copyable": true, "hidden": false, "masked": false},
           {"name": "密码", "value": "••••••", "copyable": true, "hidden": true, "masked": true}
@@ -297,6 +299,7 @@ GET /entries/{id}
     "url": "https://example.com/",
     "starred": true,
     "tags": ["示例云", "服务器", "重要"],
+    "groups": ["工作账号", "服务器"],
     "fields": [
       {"name": "账号", "value": "demo-user", "copyable": true, "hidden": false, "masked": false},
       {"name": "密码", "value": "demo-password", "copyable": true, "hidden": true, "masked": false}
@@ -328,6 +331,7 @@ POST /entries
   "url": "https://example.com",
   "starred": false,
   "tags": ["标签1", "标签2"],
+  "groups": ["工作账号"],
   "fields": [
     {"name": "账号", "value": "user@example.com", "copyable": true, "hidden": false},
     {"name": "密码", "value": "demo-password", "copyable": true, "hidden": true}
@@ -724,6 +728,124 @@ POST /tags/merge
 
 - 404: 源标签不存在
 - 422: 目标标签名无效
+
+## 6A. 密码组管理模块
+
+阶段：V1.4。
+
+### 6A.1 获取所有密码组
+
+```
+GET /groups
+```
+
+**响应：**
+
+```json
+{
+  "success": true,
+  "data": {
+    "groups": [
+      {
+        "name": "工作账号",
+        "description": "公司系统、云平台、协作工具",
+        "count": 3,
+        "updated_at": "2026-07-08T10:00:00+08:00",
+        "color": "#0066ff"
+      }
+    ]
+  }
+}
+```
+
+### 6A.2 创建密码组
+
+```
+POST /groups
+```
+
+**请求体：**
+
+```json
+{
+  "name": "工作账号",
+  "description": "公司系统、云平台、协作工具"
+}
+```
+
+**响应：**
+
+```json
+{
+  "success": true,
+  "data": {
+    "name": "工作账号"
+  },
+  "message": "密码组已创建"
+}
+```
+
+**错误情况：**
+
+- 409: 密码组已存在
+- 422: 密码组名称为空或无效
+
+### 6A.3 更新密码组
+
+```
+PUT /groups/{group_name}
+```
+
+**请求体：**
+
+```json
+{
+  "name": "工作",
+  "description": "工作相关密码"
+}
+```
+
+**响应：**
+
+```json
+{
+  "success": true,
+  "data": {
+    "old_name": "工作账号",
+    "new_name": "工作"
+  },
+  "message": "密码组已更新"
+}
+```
+
+**错误情况：**
+
+- 404: 密码组不存在
+- 409: 新密码组名称已存在
+
+### 6A.4 删除密码组
+
+**删除密码组元数据，并从所有条目中移除该组；不会删除条目。**
+
+```
+DELETE /groups/{group_name}
+```
+
+**响应：**
+
+```json
+{
+  "success": true,
+  "data": {
+    "affected_count": 5
+  },
+  "message": "密码组已移除，影响 5 个条目"
+}
+```
+
+**错误情况：**
+
+- 404: 密码组不存在
 
 ## 7. AI 智能录入模块
 

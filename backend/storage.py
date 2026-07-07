@@ -626,6 +626,7 @@ def add_entry(entry_data: EntryCreate) -> Entry:
         url=entry_data.url or "",
         starred=entry_data.starred,
         tags=entry_data.tags,
+        groups=entry_data.groups,
         fields=entry_data.fields,
         remarks=entry_data.remarks or ""
     )
@@ -650,6 +651,8 @@ def update_entry(entry_id: str, entry_data: EntryUpdate) -> Optional[Entry]:
                 entry.starred = entry_data.starred
             if entry_data.tags is not None:
                 entry.tags = entry_data.tags
+            if entry_data.groups is not None:
+                entry.groups = entry_data.groups
             if entry_data.fields is not None:
                 entry.fields = entry_data.fields
             if entry_data.remarks is not None:

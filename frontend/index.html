@@ -7,16 +7,16 @@
     
     <!-- Vue 3 CDN (Production) -->
     <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
-    <script src="/secretbase-runtime-config.js?v=20260708-ui-v31"></script>
+    <script src="/secretbase-runtime-config.js?v=20260708-ui-v32"></script>
     
     <!-- 基础样式 -->
-    <link rel="stylesheet" href="css/style.css?v=20260708-ui-v31">
-    <link rel="stylesheet" href="css/components.css?v=20260708-ui-v31">
+    <link rel="stylesheet" href="css/style.css?v=20260708-ui-v32">
+    <link rel="stylesheet" href="css/components.css?v=20260708-ui-v32">
     
     <!-- 主题样式 -->
-    <link rel="stylesheet" href="css/themes/variables.css?v=20260708-ui-v31">
-    <link rel="stylesheet" href="css/themes/dark.css?v=20260708-ui-v31">
-    <link rel="stylesheet" href="css/themes/light.css?v=20260708-ui-v31">
+    <link rel="stylesheet" href="css/themes/variables.css?v=20260708-ui-v32">
+    <link rel="stylesheet" href="css/themes/dark.css?v=20260708-ui-v32">
+    <link rel="stylesheet" href="css/themes/light.css?v=20260708-ui-v32">
     
     <!-- Favicon -->
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🔐</text></svg>">
@@ -111,6 +111,10 @@
                     <button class="sidebar-nav-item" :class="{ active: filter === 'starred' }" @click="showStarredEntries">
                         <span>星标条目</span>
                         <strong>★</strong>
+                    </button>
+                    <button class="sidebar-nav-item" :class="{ active: filter === 'groups' }" @click="showGroupMode">
+                        <span>密码组模式</span>
+                        <strong>{{ groups.length }}</strong>
                     </button>
                 </nav>
                 <nav class="sidebar-section sidebar-tags" aria-label="标签筛选">
@@ -306,6 +310,13 @@
                             🏷️ 标签
                         </button>
                     </div>
+                    <button
+                        class="tab-btn"
+                        :class="{ active: filter === 'groups' }"
+                        @click="showGroupMode"
+                    >
+                        🗂️ 密码组
+                    </button>
                 </div>
                 <div v-if="hasActiveListState" class="list-state-banner">
                     <div>
@@ -318,8 +329,42 @@
             
             <!-- 主内容区 -->
             <main class="main-content">
+                <section v-if="filter === 'groups'" class="group-mode-panel">
+                    <div class="group-mode-header">
+                        <div>
+                            <h2>密码组</h2>
+                            <p>像相册一样整理密码。点击任一密码组后，会切换到该组筛选后的条目列表。</p>
+                        </div>
+                        <button class="btn-primary" @click="openCreateModal">+ 新建条目</button>
+                    </div>
+                    <div v-if="groups.length === 0" class="empty-state group-empty-state">
+                        <div class="empty-icon">🗂️</div>
+                        <h3>还没有密码组</h3>
+                        <p>在新建或编辑条目时添加密码组即可生成。</p>
+                    </div>
+                    <div v-else class="group-cards">
+                        <button
+                            v-for="group in groups"
+                            :key="group.name"
+                            class="group-card"
+                            @click="filterByGroup(group.name)"
+                        >
+                            <span class="group-card-accent" :style="{ backgroundColor: group.color || getTagColor(group.name) }"></span>
+                            <span class="group-card-main">
+                                <strong>{{ group.name }}</strong>
+                                <small>{{ group.description || '暂无简介' }}</small>
+                            </span>
+                            <span class="group-card-meta">
+                                <b>{{ group.count || 0 }}</b>
+                                <small>条目</small>
+                            </span>
+                            <span class="group-card-date">{{ group.updated_at ? formatDate(group.updated_at) : '暂无更新' }}</span>
+                        </button>
+                    </div>
+                </section>
+
                 <!-- 空状态 -->
-                <div v-if="entries.length === 0 && !loading" class="empty-state">
+                <div v-else-if="entries.length === 0 && !loading" class="empty-state">
                     <div class="empty-icon">📭</div>
                     <h3>还没有条目</h3>
                     <p>点击下方按钮新建条目</p>
@@ -370,6 +415,17 @@
                                 @click.stop="filterByTag(tag)"
                             >
                                 {{ tag }}
+                            </span>
+                        </div>
+
+                        <div class="card-groups" v-if="entry.groups && entry.groups.length > 0">
+                            <span
+                                v-for="group in entry.groups"
+                                :key="group"
+                                class="group-chip"
+                                @click.stop="filterByGroup(group)"
+                            >
+                                {{ group }}
                             </span>
                         </div>
                         
@@ -428,7 +484,7 @@
                 </div>
                 
                 <!-- 分页 -->
-                <div v-if="totalPages > 1" class="pagination">
+                <div v-if="filter !== 'groups' && totalPages > 1" class="pagination">
                     <button 
                         class="page-btn" 
                         :disabled="currentPage === 1"
@@ -559,6 +615,16 @@
                             {{ tag }}
                         </span>
                     </div>
+                    <div class="detail-tags" v-if="selectedEntry.groups && selectedEntry.groups.length > 0">
+                        <span
+                            v-for="group in selectedEntry.groups"
+                            :key="group"
+                            class="group-chip"
+                            @click="filterByGroup(group); closeEntryDetail()"
+                        >
+                            {{ group }}
+                        </span>
+                    </div>
                     <div class="detail-fields">
                         <div v-for="field in selectedEntry.fields" :key="field.name" class="detail-field">
                             <span class="field-name">{{ field.name }}</span>
@@ -620,6 +686,55 @@
                                 @keydown.tab.prevent="addTag"
                             >
                         </div>
+                        <div v-if="tags.length > 0" class="existing-choice-row">
+                            <span>已有标签</span>
+                            <button
+                                v-for="tag in tags"
+                                :key="tag.name"
+                                type="button"
+                                class="choice-chip"
+                                :class="{ selected: entryForm.tags.includes(tag.name) }"
+                                @click="addExistingTag(tag)"
+                            >
+                                {{ tag.name }}
+                            </button>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>密码组</label>
+                        <div class="tags-input group-input">
+                            <span v-for="(group, index) in entryForm.groups" :key="group" class="group-chip selected">
+                                {{ group }}
+                                <span class="remove-tag" @click="removeGroup(index)">✕</span>
+                            </span>
+                            <input
+                                type="text"
+                                v-model="newGroup"
+                                placeholder="输入密码组后按回车"
+                                @keydown.enter.prevent="addGroup"
+                                @keydown.tab.prevent="addGroup"
+                            >
+                        </div>
+                        <input
+                            v-model="newGroupDescription"
+                            class="group-description-input"
+                            type="text"
+                            placeholder="新密码组简介，可选"
+                            @keydown.enter.prevent="addGroup"
+                        >
+                        <div v-if="groups.length > 0" class="existing-choice-row">
+                            <span>已有密码组</span>
+                            <button
+                                v-for="group in groups"
+                                :key="group.name"
+                                type="button"
+                                class="choice-chip group-choice-chip"
+                                :class="{ selected: entryForm.groups.includes(group.name) }"
+                                @click="addExistingGroup(group)"
+                            >
+                                {{ group.name }}
+                            </button>
+                        </div>
                     </div>
                     <div class="form-group">
                         <label>自定义字段</label>
@@ -627,11 +742,11 @@
                             <div v-for="(field, index) in entryForm.fields" :key="index" class="field-item">
                                 <input type="text" v-model="field.name" placeholder="字段名">
                                 <input type="text" v-model="field.value" placeholder="字段值">
-                                <label class="checkbox-label">
+                                <label class="checkbox-label compact-check-option">
                                     <input type="checkbox" v-model="field.copyable">
                                     可复制
                                 </label>
-                                <label class="checkbox-label">
+                                <label class="checkbox-label compact-check-option">
                                     <input type="checkbox" v-model="field.hidden">
                                     隐藏
                                 </label>
@@ -709,8 +824,8 @@
                                 <div v-for="(field, fieldIndex) in entry.fields" :key="fieldIndex" class="ai-field-row">
                                     <input type="text" v-model="field.name" placeholder="字段名">
                                     <input type="text" v-model="field.value" placeholder="字段值">
-                                    <label class="checkbox-label"><input type="checkbox" v-model="field.copyable"> 可复制</label>
-                                    <label class="checkbox-label"><input type="checkbox" v-model="field.hidden"> 隐藏</label>
+                                    <label class="checkbox-label compact-check-option"><input type="checkbox" v-model="field.copyable"> 可复制</label>
+                                    <label class="checkbox-label compact-check-option"><input type="checkbox" v-model="field.hidden"> 隐藏</label>
                                     <button class="remove-btn" @click="removeAiEntryField(entry, fieldIndex)">✕</button>
                                 </div>
                                 <button class="btn-small" @click="addAiEntryField(entry)">+ 添加字段</button>
@@ -1439,9 +1554,9 @@
     </div>
     
     <!-- JS 模块 -->
-    <script src="js/api.js?v=20260708-ui-v31"></script>
-    <script src="js/utils.js?v=20260708-ui-v31"></script>
-    <script src="js/store.js?v=20260708-ui-v31"></script>
-    <script src="js/app.js?v=20260708-ui-v31"></script>
+    <script src="js/api.js?v=20260708-ui-v32"></script>
+    <script src="js/utils.js?v=20260708-ui-v32"></script>
+    <script src="js/store.js?v=20260708-ui-v32"></script>
+    <script src="js/app.js?v=20260708-ui-v32"></script>
 </body>
 </html>

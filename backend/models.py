@@ -18,6 +18,7 @@ class EntryBase(BaseModel):
     url: Optional[str] = Field(default="", max_length=2000)
     starred: bool = False
     tags: List[str] = Field(default_factory=list)
+    groups: List[str] = Field(default_factory=list)
     fields: List[FieldItem] = Field(default_factory=list)
     remarks: Optional[str] = Field(default="", max_length=2000)
 
@@ -33,6 +34,15 @@ class EntryBase(BaseModel):
             if not tag.strip():
                 raise ValueError('标签不能为空')
         return list(set(tag.strip() for tag in v if tag.strip()))
+
+    @validator('groups')
+    def validate_groups(cls, v):
+        for group in v:
+            if not group.strip():
+                raise ValueError('密码组不能为空')
+            if len(group.strip()) > 50:
+                raise ValueError('密码组名称不能超过 50 个字符')
+        return list(set(group.strip() for group in v if group.strip()))
 
     @validator('fields')
     def validate_fields(cls, v):
@@ -57,6 +67,7 @@ class EntryUpdate(BaseModel):
     url: Optional[str] = Field(None, max_length=2000)
     starred: Optional[bool] = None
     tags: Optional[List[str]] = None
+    groups: Optional[List[str]] = None
     fields: Optional[List[FieldItem]] = None
     remarks: Optional[str] = Field(None, max_length=2000)
 
@@ -74,6 +85,17 @@ class EntryUpdate(BaseModel):
             if not tag.strip():
                 raise ValueError('标签不能为空')
         return list(set(tag.strip() for tag in v if tag.strip()))
+
+    @validator('groups')
+    def validate_groups(cls, v):
+        if v is None:
+            return v
+        for group in v:
+            if not group.strip():
+                raise ValueError('密码组不能为空')
+            if len(group.strip()) > 50:
+                raise ValueError('密码组名称不能超过 50 个字符')
+        return list(set(group.strip() for group in v if group.strip()))
 
     @validator('fields')
     def validate_fields(cls, v):
@@ -105,6 +127,7 @@ class EntryResponse(BaseModel):
     url: str = ""
     starred: bool = False
     tags: List[str] = []
+    groups: List[str] = []
     fields: List[dict] = []
     remarks: str = ""
     created_at: str
@@ -160,6 +183,12 @@ class TagMergeRequest(BaseModel):
     target_tag: str = Field(..., min_length=1, max_length=50)
 
 
+class GroupRequest(BaseModel):
+    """密码组创建/更新请求"""
+    name: Optional[str] = Field(default=None, min_length=1, max_length=50)
+    description: str = Field(default="", max_length=300)
+
+
 class AiParseRequest(BaseModel):
     """AI 解析请求"""
     text: str = Field(..., min_length=1)
@@ -193,3 +222,4 @@ class VaultData(BaseModel):
     entries: List[Entry] = Field(default_factory=list)
     deleted_entries: List[Entry] = Field(default_factory=list)
     tags_meta: dict = Field(default_factory=dict)
+    groups_meta: dict = Field(default_factory=dict)
