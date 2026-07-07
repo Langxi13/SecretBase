@@ -1703,15 +1703,25 @@ textarea {
     border-color: var(--border-subtle);
 }
 
+.field-row {
+    display: grid;
+    grid-template-columns: minmax(96px, 32%) minmax(0, 1fr);
+    align-items: start;
+    column-gap: 18px;
+    row-gap: 4px;
+}
+
 .field-name {
-    flex: 0 0 94px;
+    flex: initial;
     min-width: 0;
     color: var(--text-tertiary);
+    line-height: 1.5;
 }
 
 .field-value {
     min-width: 0;
     color: var(--text-secondary);
+    line-height: 1.5;
 }
 
 .app-footer {
@@ -1781,9 +1791,10 @@ textarea {
     }
 
     .field-row {
+        display: flex;
         align-items: flex-start;
         flex-direction: column;
-        gap: 2px;
+        gap: 4px;
     }
 
     .field-name {
