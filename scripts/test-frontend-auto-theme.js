@@ -10,6 +10,10 @@ const systemCssPath = path.join(projectRoot, 'frontend/css/themes/system.css');
 const appSource = fs.readFileSync(appPath, 'utf8');
 const indexSource = fs.readFileSync(indexPath, 'utf8');
 
+if (!appSource.includes("default: return '🕒';")) {
+    throw new Error('Auto time theme should keep its own clock icon');
+}
+
 const resolverMatch = appSource.match(/function resolveAutoTheme\(date = new Date\(\)\) \{[\s\S]*?\n        \}/);
 if (!resolverMatch) {
     throw new Error('resolveAutoTheme function not found');

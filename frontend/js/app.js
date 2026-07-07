@@ -213,7 +213,7 @@ const app = createApp({
             switch (currentTheme.value) {
                 case 'dark': return '🌙';
                 case 'light': return '☀️';
-                default: return resolveAutoTheme() === 'dark' ? '🌙' : '☀️';
+                default: return '🕒';
             }
         });
 
