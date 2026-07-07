@@ -1726,3 +1726,394 @@ input[type="checkbox"] {
         grid-column: 1 / -1;
     }
 }
+
+/* Final 2026 component overrides: keep this block last in components.css. */
+.modal-overlay {
+    padding: clamp(12px, 2vw, 24px);
+    background: var(--bg-modal);
+    backdrop-filter: blur(10px);
+}
+
+.modal-content {
+    display: flex;
+    flex-direction: column;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    background: var(--bg-elevated);
+    box-shadow: var(--shadow-lg);
+    overflow: hidden;
+}
+
+.modal-header,
+.modal-footer {
+    flex: 0 0 auto;
+    border-color: var(--border-subtle);
+    background: color-mix(in srgb, var(--surface-1) 82%, transparent);
+}
+
+.modal-header h2 {
+    letter-spacing: 0;
+}
+
+.modal-body {
+    min-height: 0;
+    overflow-y: auto;
+}
+
+.modal-close {
+    border: 1px solid var(--border-subtle);
+    border-radius: 8px;
+    background: var(--surface-2);
+}
+
+.modal-close:hover {
+    background: var(--surface-3);
+}
+
+.warning-panel,
+.info-panel,
+.error-message,
+.warning-message,
+.info-message {
+    overflow-wrap: anywhere;
+}
+
+.warning-panel,
+.info-panel {
+    border: 1px solid transparent;
+    border-radius: 8px;
+}
+
+.warning-panel {
+    border-color: color-mix(in srgb, var(--color-warning) 38%, var(--border-color));
+    background: var(--status-warning-bg);
+}
+
+.info-panel {
+    border-color: color-mix(in srgb, var(--color-primary) 34%, var(--border-color));
+    background: var(--status-info-bg);
+}
+
+.form-group input,
+.form-group textarea,
+.form-group select,
+.fields-editor .field-item input,
+.tags-input,
+.ai-edit-grid input,
+.ai-edit-grid textarea,
+.ai-field-row input,
+.setting-item select,
+.setting-item input[type="number"],
+.setting-item input[type="text"],
+.setting-item input[type="password"],
+.tag-browser-search,
+.conflict-resolution-select select {
+    border-color: var(--border-color);
+    border-radius: 8px;
+    background: var(--surface-1);
+}
+
+.form-group input:focus,
+.form-group textarea:focus,
+.form-group select:focus,
+.tags-input:focus-within,
+.ai-edit-grid input:focus,
+.ai-edit-grid textarea:focus,
+.ai-field-row input:focus,
+.tag-browser-search:focus {
+    border-color: var(--color-primary);
+    box-shadow: var(--focus-ring);
+}
+
+.fields-editor .field-item,
+.ai-parse-result,
+.ai-parse-entry,
+.import-preview-item,
+.settings-section,
+.settings-row,
+.report-action,
+.report-grid div,
+.conflict-item,
+.trash-item,
+.tag-item,
+.tag-merge-panel,
+.backup-summary-grid div,
+.backup-toolbar,
+.backup-group,
+.backup-item,
+.backup-item-actions,
+.backup-loading-state,
+.tag-browser-item {
+    border-color: var(--border-subtle);
+    border-radius: 8px;
+    background: var(--surface-2);
+}
+
+.fields-editor .field-item,
+.ai-parse-entry,
+.import-preview-item,
+.settings-row,
+.trash-item,
+.tag-item,
+.backup-item,
+.tag-browser-item {
+    overflow-wrap: anywhere;
+}
+
+.tags-input .tag,
+.tag-success,
+.tag-warning,
+.tag-danger,
+.backup-meta-line span,
+.backup-group-header span,
+.wizard-steps span,
+.tag-browser-sort-option {
+    border-radius: 999px;
+}
+
+.ai-parse-result {
+    border: 1px solid var(--border-subtle);
+}
+
+.ai-parse-entry {
+    margin-top: 10px;
+    padding: 12px;
+}
+
+.ai-edit-grid label,
+.ai-field-row {
+    align-items: stretch;
+    flex-direction: column;
+}
+
+.ai-field-row {
+    display: grid;
+    grid-template-columns: minmax(120px, 0.8fr) minmax(160px, 1fr) auto;
+    align-items: center;
+}
+
+.ai-input-meta {
+    color: var(--text-muted);
+}
+
+.ai-quality-warning,
+.warning-panel.ai-failure-panel {
+    border-color: color-mix(in srgb, var(--color-warning) 40%, var(--border-color));
+    background: var(--status-warning-bg);
+}
+
+.settings-tabs {
+    gap: 8px;
+    border-bottom-color: var(--border-subtle);
+}
+
+.settings-tab {
+    border: 1px solid transparent;
+    border-radius: 8px 8px 0 0;
+}
+
+.settings-tab.active {
+    border-color: var(--border-subtle);
+    border-bottom-color: var(--color-primary);
+    background: var(--color-primary-light);
+}
+
+.settings-section h3 {
+    letter-spacing: 0;
+}
+
+.settings-list {
+    gap: 12px;
+}
+
+.detail-row,
+.detail-field,
+.detail-remarks p,
+.ai-config-summary dd,
+.ai-config-current,
+.backup-real-name,
+.backup-item-main strong,
+.backup-item p,
+.tag-browser-name span,
+.trash-item-info,
+.tag-item .tag-name {
+    overflow-wrap: anywhere;
+    word-break: break-word;
+}
+
+.detail-field {
+    border-bottom-color: var(--border-subtle);
+}
+
+.backup-center-modal {
+    max-width: min(1240px, calc(100vw - 28px));
+}
+
+.backup-summary-grid strong {
+    font-size: 20px;
+}
+
+.backup-toolbar {
+    align-items: center;
+}
+
+.backup-group {
+    border-top-width: 3px;
+}
+
+.backup-item {
+    background: color-mix(in srgb, var(--surface-2) 80%, var(--surface-1));
+}
+
+.backup-item.highlighted {
+    border-color: var(--color-success);
+    box-shadow: 0 0 0 3px var(--status-success-bg);
+}
+
+.backup-item-actions .btn-small {
+    min-width: 0;
+    white-space: normal;
+}
+
+.restore-wizard-modal {
+    max-width: min(760px, calc(100vw - 32px));
+}
+
+.wizard-steps {
+    flex-wrap: wrap;
+}
+
+.tag-browser-modal {
+    border-radius: 8px;
+}
+
+.tag-browser-sort-option.active {
+    box-shadow: var(--shadow-glow);
+}
+
+.import-preview-list {
+    border: 1px solid var(--border-subtle);
+    border-radius: 8px;
+    background: var(--bg-sunken);
+    padding: 8px;
+}
+
+.import-preview-item.conflict {
+    border-color: color-mix(in srgb, var(--color-warning) 48%, var(--border-color));
+    background: var(--status-warning-bg);
+}
+
+.import-result-grid strong {
+    color: var(--color-primary);
+}
+
+.confirm-dialog .confirm-actions {
+    flex-wrap: wrap;
+}
+
+.btn-danger,
+.btn-secondary {
+    min-height: var(--control-height);
+    border: 1px solid var(--border-subtle);
+    border-radius: 8px;
+}
+
+.btn-danger {
+    background: var(--color-error);
+}
+
+.btn-secondary {
+    background: var(--surface-2);
+    color: var(--text-secondary);
+}
+
+.btn-secondary:hover {
+    border-color: var(--border-strong);
+    background: var(--surface-3);
+    color: var(--text-primary);
+}
+
+@media (min-width: 900px) {
+    .modal-content {
+        max-height: min(90vh, 900px);
+    }
+
+    .modal-body {
+        padding: 22px;
+    }
+
+    .settings-modal,
+    .tools-modal,
+    .tag-manager-modal {
+        max-width: min(960px, calc(100vw - 72px));
+    }
+
+    .backup-list {
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    }
+}
+
+@media (max-width: 767px) {
+    .modal-overlay {
+        align-items: stretch;
+        padding: 0;
+    }
+
+    .modal-content {
+        width: 100vw;
+        max-width: none;
+        height: 100dvh;
+        max-height: 100dvh;
+        border-radius: 0;
+    }
+
+    .modal-header,
+    .modal-footer {
+        padding: 14px 16px;
+    }
+
+    .modal-body {
+        padding: 16px;
+    }
+
+    .form-row,
+    .ai-edit-grid,
+    .ai-field-row,
+    .setting-item,
+    .setting-actions,
+    .backup-toolbar,
+    .backup-item-actions,
+    .trash-item,
+    .tag-item {
+        align-items: stretch;
+        grid-template-columns: 1fr;
+        flex-direction: column;
+    }
+
+    .modal-footer .btn-primary,
+    .modal-footer .btn-secondary,
+    .modal-footer .btn-danger,
+    .backup-toolbar-actions,
+    .backup-toolbar-actions .btn-primary,
+    .backup-toolbar-actions .btn-secondary,
+    .backup-item-actions .btn-small,
+    .backup-restore-btn,
+    .setting-actions .btn-secondary,
+    .setting-actions .btn-primary,
+    .setting-actions .btn-danger,
+    .setting-actions .file-action,
+    .trash-item-actions .btn-small,
+    .tag-item .btn-small {
+        width: 100%;
+    }
+
+    .backup-list,
+    .settings-list,
+    .tag-browser-list {
+        grid-template-columns: 1fr;
+    }
+
+    .tag-browser-modal {
+        border-radius: 0;
+    }
+}
