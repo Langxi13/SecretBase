@@ -204,6 +204,7 @@ const app = createApp({
         let confirmCallback = null;
         let autoLockTimer = null;
         let entriesRequestSeq = 0;
+        let systemThemeMediaQuery = null;
         const activityEventNames = ['click', 'keydown', 'mousemove', 'touchstart'];
 
         // 主题
@@ -438,6 +439,7 @@ const app = createApp({
                         autoLockMinutes: authStatus.auto_lock_minutes ?? store.state.settings.autoLockMinutes
                     }
                     : await store.loadSettings();
+                bindSystemThemeListener();
                 applySettings(settings);
                 applyTheme(currentTheme.value);
                 loadSavedAdvancedFilters();
@@ -463,6 +465,7 @@ const app = createApp({
             activityEventNames.forEach(eventName => {
                 window.removeEventListener(eventName, resetAutoLockTimer);
             });
+            unbindSystemThemeListener();
             clearAutoLockTimer();
         });
 
@@ -766,10 +769,45 @@ const app = createApp({
         function applyTheme(theme) {
             const root = document.documentElement;
             if (theme === 'system') {
-                root.removeAttribute('data-theme');
+                root.setAttribute('data-theme', getResolvedSystemTheme());
+                root.setAttribute('data-theme-mode', 'system');
             } else {
                 root.setAttribute('data-theme', theme);
+                root.setAttribute('data-theme-mode', theme);
             }
+        }
+
+        function getResolvedSystemTheme() {
+            if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+                return 'dark';
+            }
+            return 'light';
+        }
+
+        function handleSystemThemeChange() {
+            if (currentTheme.value === 'system') {
+                applyTheme('system');
+            }
+        }
+
+        function bindSystemThemeListener() {
+            if (!window.matchMedia || systemThemeMediaQuery) return;
+            systemThemeMediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+            if (systemThemeMediaQuery.addEventListener) {
+                systemThemeMediaQuery.addEventListener('change', handleSystemThemeChange);
+            } else if (systemThemeMediaQuery.addListener) {
+                systemThemeMediaQuery.addListener(handleSystemThemeChange);
+            }
+        }
+
+        function unbindSystemThemeListener() {
+            if (!systemThemeMediaQuery) return;
+            if (systemThemeMediaQuery.removeEventListener) {
+                systemThemeMediaQuery.removeEventListener('change', handleSystemThemeChange);
+            } else if (systemThemeMediaQuery.removeListener) {
+                systemThemeMediaQuery.removeListener(handleSystemThemeChange);
+            }
+            systemThemeMediaQuery = null;
         }
 
         // 获取 favicon
