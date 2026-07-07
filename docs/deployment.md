@@ -44,7 +44,20 @@ server {
     index index.html;
 
     location / {
+        expires -1;
+        add_header Cache-Control "no-cache, must-revalidate";
         try_files $uri $uri/ /index.html;
+    }
+
+    location = /secretbase-runtime-config.js {
+        expires -1;
+        add_header Cache-Control "no-store, no-cache, must-revalidate, max-age=0";
+        try_files $uri =404;
+    }
+
+    location ~* \.(css|js|png|jpg|jpeg|gif|ico|svg)$ {
+        expires 7d;
+        add_header Cache-Control "public, immutable";
     }
 
     location /api/ {
@@ -62,6 +75,8 @@ server {
     }
 }
 ```
+
+生产环境如果对 CSS/JS 使用长缓存，`frontend/index.html` 中的本地 CSS/JS 引用必须带版本查询参数，并在每次前端发布时递增。入口 HTML 应要求浏览器重新验证，`/secretbase-runtime-config.js` 是运行时配置脚本，应单独禁用缓存。
 
 ## Data Safety
 
