@@ -1,7 +1,7 @@
 /**
  * SecretBase Vue 应用
  */
-const { createApp, ref, reactive, computed, watch, onMounted, nextTick } = Vue;
+const { createApp, ref, reactive, computed, watch, onMounted, onUnmounted, nextTick } = Vue;
 
 const app = createApp({
     setup() {
@@ -204,6 +204,7 @@ const app = createApp({
         let confirmCallback = null;
         let autoLockTimer = null;
         let entriesRequestSeq = 0;
+        const activityEventNames = ['click', 'keydown', 'mousemove', 'touchstart'];
 
         // 主题
         const currentTheme = ref('system');
@@ -422,6 +423,7 @@ const app = createApp({
                 const authStatus = await store.checkAuth();
                 initialized.value = authStatus.initialized;
                 window.addEventListener('secretbase:unauthorized', handleUnauthorizedLock);
+                document.addEventListener('click', handleDocumentClick);
 
                 const hasSessionToken = Boolean(api.getToken());
                 locked.value = authStatus.locked || (authStatus.initialized && !hasSessionToken);
@@ -453,6 +455,15 @@ const app = createApp({
             } finally {
                 loading.value = false;
             }
+        });
+
+        onUnmounted(() => {
+            window.removeEventListener('secretbase:unauthorized', handleUnauthorizedLock);
+            document.removeEventListener('click', handleDocumentClick);
+            activityEventNames.forEach(eventName => {
+                window.removeEventListener(eventName, resetAutoLockTimer);
+            });
+            clearAutoLockTimer();
         });
 
         // 加载所有数据
@@ -643,9 +654,11 @@ const app = createApp({
         function applyLockedState() {
             api.setToken(null);
             locked.value = true;
+            password.value = '';
             entries.value = [];
             tags.value = [];
             selectedEntry.value = null;
+            editingEntry.value = null;
             selectedEntryIds.value = [];
             showCreateModal.value = false;
             showEditModal.value = false;
@@ -654,10 +667,17 @@ const app = createApp({
             showTrash.value = false;
             showTagManager.value = false;
             showTagBrowser.value = false;
+            showChangePassword.value = false;
+            showBackupCenter.value = false;
+            showConfirm.value = false;
             showTools.value = false;
             showImportPreview.value = false;
             showImportConflicts.value = false;
             showImportReport.value = false;
+            copyMenuEntryId.value = null;
+            showTagDropdown.value = false;
+            restoreWizard.visible = false;
+            revealedFields.value = [];
             clearAutoLockTimer();
         }
 
@@ -1069,16 +1089,17 @@ const app = createApp({
             copyMenuEntryId.value = null;
         }
 
-        // 点击其他区域关闭复制菜单
-        document.addEventListener('click', () => {
-            copyMenuEntryId.value = null;
-        });
-
-        document.addEventListener('click', (event) => {
-            if (!event.target.closest?.('.tag-filter')) {
+        // 点击其他区域关闭轻量浮层。模态框由各自按钮控制，避免误关高风险流程。
+        function handleDocumentClick(event) {
+            const target = event.target;
+            if (!(target instanceof Element)) return;
+            if (!target.closest('.copy-dropdown')) {
+                copyMenuEntryId.value = null;
+            }
+            if (!target.closest('.tag-filter')) {
                 showTagDropdown.value = false;
             }
-        });
+        }
 
         // 跳转页面
         async function goToPage(page) {
@@ -1663,7 +1684,7 @@ const app = createApp({
         }
 
         function bindActivityListeners() {
-            ['click', 'keydown', 'mousemove', 'touchstart'].forEach(eventName => {
+            activityEventNames.forEach(eventName => {
                 window.addEventListener(eventName, resetAutoLockTimer, { passive: true });
             });
         }
