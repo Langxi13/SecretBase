@@ -921,8 +921,7 @@ img {
         padding: 22px 18px;
         border-right: 1px solid var(--border-color);
         background:
-            linear-gradient(180deg, color-mix(in srgb, var(--bg-elevated, var(--bg-card)) 94%, transparent), var(--bg-card)),
-            radial-gradient(circle at 20% 0%, rgba(37, 99, 235, 0.16), transparent 18rem);
+            linear-gradient(180deg, color-mix(in srgb, var(--bg-elevated, var(--bg-card)) 94%, transparent), var(--bg-card));
         box-shadow: 16px 0 40px rgba(15, 23, 42, 0.06);
         overflow-y: auto;
         z-index: 140;
@@ -1056,7 +1055,6 @@ img {
     .workspace-shell {
         min-height: 100vh;
         background:
-            radial-gradient(circle at 76% 0%, rgba(14, 165, 233, 0.1), transparent 28rem),
             linear-gradient(180deg, transparent, color-mix(in srgb, var(--bg-secondary) 70%, transparent));
     }
 
@@ -1966,13 +1964,11 @@ textarea {
 /* V1.4 visual refresh: denser workspace, clearer state, same DOM behavior. */
 body {
     background:
-        radial-gradient(circle at top left, rgba(37, 99, 235, 0.12), transparent 34rem),
         linear-gradient(180deg, var(--bg-primary), var(--bg-secondary));
 }
 
 .auth-screen {
     background:
-        radial-gradient(circle at 20% 20%, rgba(37, 99, 235, 0.18), transparent 26rem),
         linear-gradient(135deg, var(--bg-primary), var(--bg-secondary));
 }
 
