@@ -149,6 +149,7 @@
 
 .fields-editor .field-item input {
     flex: 1;
+    min-width: 120px;
     padding: 8px 12px;
     border: 1px solid var(--border-color);
     border-radius: var(--border-radius);
@@ -1900,7 +1901,7 @@ input[type="checkbox"] {
 
 .ai-field-row {
     display: grid;
-    grid-template-columns: minmax(120px, 0.8fr) minmax(160px, 1fr) auto;
+    grid-template-columns: minmax(120px, 0.8fr) minmax(160px, 1fr) auto auto auto;
     align-items: center;
 }
 

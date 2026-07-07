@@ -19,6 +19,25 @@ def check_unlocked():
         raise HTTPException(status_code=401, detail="请先解锁")
 
 
+def field_is_hidden(field) -> bool:
+    """字段隐藏状态。旧数据没有 hidden 时沿用 copyable=true 的旧保护行为。"""
+    hidden = getattr(field, "hidden", None)
+    if hidden is None:
+        return bool(getattr(field, "copyable", False))
+    return bool(hidden)
+
+
+def serialize_field(field, include_plain_value: bool = False) -> dict:
+    hidden = field_is_hidden(field)
+    return {
+        "name": field.name,
+        "value": field.value if include_plain_value or not hidden else "••••••",
+        "copyable": field.copyable,
+        "hidden": hidden,
+        "masked": hidden and not include_plain_value,
+    }
+
+
 @router.get("")
 async def get_entries(
     page: int = Query(1, ge=1),
@@ -59,8 +78,8 @@ async def get_entries(
         def field_matches(field) -> bool:
             if "field_names" in scopes and search_lower in field.name.lower():
                 return True
-            # 不搜索可复制字段的明文值，避免密码/API Key 等隐藏内容造成看似无关的命中。
-            return "field_values" in scopes and (not field.copyable) and search_lower in field.value.lower()
+            # 不搜索隐藏字段的明文值，避免密码/API Key 等隐藏内容造成看似无关的命中。
+            return "field_values" in scopes and (not field_is_hidden(field)) and search_lower in field.value.lower()
 
         entries = [
             e for e in entries
@@ -121,14 +140,7 @@ async def get_entries(
     # 转换为响应格式（隐藏敏感字段）
     items = []
     for entry in page_entries:
-        fields = []
-        for f in entry.fields:
-            fields.append({
-                "name": f.name,
-                "value": "••••••" if f.copyable else f.value,
-                "copyable": f.copyable,
-                "masked": f.copyable
-            })
+        fields = [serialize_field(f) for f in entry.fields]
         items.append({
             "id": entry.id,
             "title": entry.title,
@@ -164,7 +176,7 @@ async def get_entry_detail(entry_id: str):
     if not entry:
         raise HTTPException(status_code=404, detail="条目不存在")
     
-    fields = [{"name": f.name, "value": f.value, "copyable": f.copyable} for f in entry.fields]
+    fields = [serialize_field(f, include_plain_value=True) for f in entry.fields]
     
     return {
         "success": True,

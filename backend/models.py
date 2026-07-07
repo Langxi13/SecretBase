@@ -9,6 +9,7 @@ class FieldItem(BaseModel):
     name: str = Field(..., min_length=1, max_length=100)
     value: str = Field(default="", max_length=10000)
     copyable: bool = False
+    hidden: Optional[bool] = None
 
 
 class EntryBase(BaseModel):

@@ -123,9 +123,9 @@ Encrypted vault file
 | 模块 | 功能 |
 | --- | --- |
 | 认证 | 主密码初始化、解锁、锁定、自动锁定、随机 session token。 |
-| 条目管理 | 标题、网址、自定义字段、可复制字段、备注、星标、标签。 |
+| 条目管理 | 标题、网址、自定义字段、可复制字段、隐藏字段、备注、星标、标签。 |
 | 搜索与筛选 | 标题、网址、标签、字段名、非敏感字段值、备注、高级筛选、排序和分页。 |
-| 字段保护 | 列表接口默认掩码可复制字段，详情接口按需返回明文。 |
+| 字段保护 | 隐藏字段在列表中默认掩码，详情页可按需显示明文；可复制只控制复制入口。 |
 | 标签管理 | 标签列表、重命名、删除、合并、按数量和名称排序。 |
 | 回收站 | 软删除、恢复、永久删除、清空回收站。 |
 | 批量操作 | 批量删除、批量星标、批量更新标签。 |
@@ -262,6 +262,7 @@ python -m compileall desktop scripts
 python scripts\test-backup-separation.py
 python scripts\test-desktop-foundation.py
 python scripts\v1-fake-smoke-test.py
+python scripts\test-field-hidden-semantics.py
 node scripts\test-frontend-auto-theme.js
 node --check frontend\js\app.js
 node --check frontend\js\api.js
@@ -422,9 +423,9 @@ Encrypted vault file
 | Module | Capabilities |
 | --- | --- |
 | Authentication | Master-password initialization, unlock, lock, auto-lock, random session token. |
-| Entries | Title, URL, custom fields, copyable fields, notes, stars, and tags. |
+| Entries | Title, URL, custom fields, copyable fields, hidden fields, notes, stars, and tags. |
 | Search and filters | Title, URL, tags, field names, non-sensitive field values, notes, advanced filters, sorting, and pagination. |
-| Field protection | Copyable fields are masked in list responses and returned in plaintext only by detail APIs. |
+| Field protection | Hidden fields are masked in list responses and can be revealed in the detail view; copyable only controls copy actions. |
 | Tags | List, rename, delete, merge, and sort by count or name. |
 | Trash | Soft delete, restore, permanent delete, and empty trash. |
 | Batch operations | Batch delete, batch star, and batch tag updates. |
@@ -561,6 +562,7 @@ python -m compileall desktop scripts
 python scripts\test-backup-separation.py
 python scripts\test-desktop-foundation.py
 python scripts\v1-fake-smoke-test.py
+python scripts\test-field-hidden-semantics.py
 node scripts\test-frontend-auto-theme.js
 node --check frontend\js\app.js
 node --check frontend\js\api.js

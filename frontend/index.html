@@ -7,16 +7,16 @@
     
     <!-- Vue 3 CDN (Production) -->
     <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
-    <script src="/secretbase-runtime-config.js?v=20260708-ui-v29"></script>
+    <script src="/secretbase-runtime-config.js?v=20260708-ui-v31"></script>
     
     <!-- 基础样式 -->
-    <link rel="stylesheet" href="css/style.css?v=20260708-ui-v29">
-    <link rel="stylesheet" href="css/components.css?v=20260708-ui-v29">
+    <link rel="stylesheet" href="css/style.css?v=20260708-ui-v31">
+    <link rel="stylesheet" href="css/components.css?v=20260708-ui-v31">
     
     <!-- 主题样式 -->
-    <link rel="stylesheet" href="css/themes/variables.css?v=20260708-ui-v29">
-    <link rel="stylesheet" href="css/themes/dark.css?v=20260708-ui-v29">
-    <link rel="stylesheet" href="css/themes/light.css?v=20260708-ui-v29">
+    <link rel="stylesheet" href="css/themes/variables.css?v=20260708-ui-v31">
+    <link rel="stylesheet" href="css/themes/dark.css?v=20260708-ui-v31">
+    <link rel="stylesheet" href="css/themes/light.css?v=20260708-ui-v31">
     
     <!-- Favicon -->
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🔐</text></svg>">
@@ -380,7 +380,7 @@
                                 class="field-row"
                             >
                                 <span class="field-name">{{ field.name }}</span>
-                                <span class="field-value">{{ field.copyable ? '••••••' : field.value }}</span>
+                                <span class="field-value">{{ field.masked ? '••••••' : field.value }}</span>
                             </div>
                         </div>
                         
@@ -562,8 +562,8 @@
                     <div class="detail-fields">
                         <div v-for="field in selectedEntry.fields" :key="field.name" class="detail-field">
                             <span class="field-name">{{ field.name }}</span>
-                            <span class="field-value">{{ field.copyable && !isFieldRevealed(field.name) ? '••••••' : field.value }}</span>
-                            <button v-if="field.copyable" class="btn-small" @click="toggleFieldReveal(field.name)">
+                            <span class="field-value">{{ field.hidden && !isFieldRevealed(field.name) ? '••••••' : field.value }}</span>
+                            <button v-if="field.hidden" class="btn-small" @click="toggleFieldReveal(field.name)">
                                 {{ isFieldRevealed(field.name) ? '隐藏' : '显示' }}
                             </button>
                             <button v-if="field.copyable" class="btn-small" @click="copyField(selectedEntry.id, field)">复制</button>
@@ -630,6 +630,10 @@
                                 <label class="checkbox-label">
                                     <input type="checkbox" v-model="field.copyable">
                                     可复制
+                                </label>
+                                <label class="checkbox-label">
+                                    <input type="checkbox" v-model="field.hidden">
+                                    隐藏
                                 </label>
                                 <button class="remove-btn" @click="removeField(index)">✕</button>
                             </div>
@@ -706,6 +710,7 @@
                                     <input type="text" v-model="field.name" placeholder="字段名">
                                     <input type="text" v-model="field.value" placeholder="字段值">
                                     <label class="checkbox-label"><input type="checkbox" v-model="field.copyable"> 可复制</label>
+                                    <label class="checkbox-label"><input type="checkbox" v-model="field.hidden"> 隐藏</label>
                                     <button class="remove-btn" @click="removeAiEntryField(entry, fieldIndex)">✕</button>
                                 </div>
                                 <button class="btn-small" @click="addAiEntryField(entry)">+ 添加字段</button>
@@ -1434,9 +1439,9 @@
     </div>
     
     <!-- JS 模块 -->
-    <script src="js/api.js?v=20260708-ui-v29"></script>
-    <script src="js/utils.js?v=20260708-ui-v29"></script>
-    <script src="js/store.js?v=20260708-ui-v29"></script>
-    <script src="js/app.js?v=20260708-ui-v29"></script>
+    <script src="js/api.js?v=20260708-ui-v31"></script>
+    <script src="js/utils.js?v=20260708-ui-v31"></script>
+    <script src="js/store.js?v=20260708-ui-v31"></script>
+    <script src="js/app.js?v=20260708-ui-v31"></script>
 </body>
 </html>

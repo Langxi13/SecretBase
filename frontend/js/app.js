@@ -27,7 +27,7 @@ const app = createApp({
             { key: 'url', label: '网址' },
             { key: 'tags', label: '标签' },
             { key: 'field_names', label: '字段名' },
-            { key: 'field_values', label: '非可复制字段值' },
+            { key: 'field_values', label: '非隐藏字段值' },
             { key: 'remarks', label: '备注' }
         ];
         const defaultSearchScopes = [];
@@ -119,11 +119,11 @@ const app = createApp({
         const tagInput = ref(null);
         const selectedTemplate = ref('');
         const entryTemplates = [
-            { id: 'website', name: '网站账号', fields: [{ name: '账号', value: '', copyable: true }, { name: '密码', value: '', copyable: true }, { name: '邮箱', value: '', copyable: true }] },
-            { id: 'server', name: '服务器', fields: [{ name: 'IP', value: '', copyable: true }, { name: '端口', value: '22', copyable: false }, { name: '用户名', value: '', copyable: true }, { name: '密码/密钥', value: '', copyable: true }] },
-            { id: 'api', name: 'API Key', fields: [{ name: 'API Key', value: '', copyable: true }, { name: 'Secret', value: '', copyable: true }, { name: '环境', value: '', copyable: false }] },
-            { id: 'note', name: '安全笔记', fields: [{ name: '内容', value: '', copyable: false }] },
-            { id: 'card', name: '银行卡/证件', fields: [{ name: '号码', value: '', copyable: true }, { name: '姓名', value: '', copyable: false }, { name: '有效期', value: '', copyable: false }] }
+            { id: 'website', name: '网站账号', fields: [{ name: '账号', value: '', copyable: true, hidden: false }, { name: '密码', value: '', copyable: true, hidden: true }, { name: '邮箱', value: '', copyable: true, hidden: false }] },
+            { id: 'server', name: '服务器', fields: [{ name: 'IP', value: '', copyable: true, hidden: false }, { name: '端口', value: '22', copyable: false, hidden: false }, { name: '用户名', value: '', copyable: true, hidden: false }, { name: '密码/密钥', value: '', copyable: true, hidden: true }] },
+            { id: 'api', name: 'API Key', fields: [{ name: 'API Key', value: '', copyable: true, hidden: true }, { name: 'Secret', value: '', copyable: true, hidden: true }, { name: '环境', value: '', copyable: false, hidden: false }] },
+            { id: 'note', name: '安全笔记', fields: [{ name: '内容', value: '', copyable: false, hidden: false }] },
+            { id: 'card', name: '银行卡/证件', fields: [{ name: '号码', value: '', copyable: true, hidden: true }, { name: '姓名', value: '', copyable: false, hidden: false }, { name: '有效期', value: '', copyable: false, hidden: false }] }
         ];
 
         // AI 解析
@@ -814,6 +814,22 @@ const app = createApp({
             return window.formatDate ? window.formatDate(dateString) : dateString;
         }
 
+        function normalizeFieldHidden(field = {}) {
+            if (Object.prototype.hasOwnProperty.call(field, 'hidden') && field.hidden !== null) {
+                return Boolean(field.hidden);
+            }
+            return Boolean(field.copyable);
+        }
+
+        function normalizeFieldForEdit(field = {}) {
+            return {
+                name: String(field.name || '').trim(),
+                value: String(field.value || ''),
+                copyable: Boolean(field.copyable),
+                hidden: normalizeFieldHidden(field)
+            };
+        }
+
         // 切换星标
         async function toggleStar(entry) {
             await store.toggleStar(entry);
@@ -839,7 +855,7 @@ const app = createApp({
         function applyEntryTemplate() {
             const template = entryTemplates.find(item => item.id === selectedTemplate.value);
             if (!template) return;
-            entryForm.fields = template.fields.map(field => ({ ...field }));
+            entryForm.fields = template.fields.map(normalizeFieldForEdit);
             if (!entryForm.title) {
                 entryForm.title = template.name;
             }
@@ -859,8 +875,8 @@ const app = createApp({
                         starred: true,
                         tags: ['示例', '云服务'],
                         fields: [
-                            { name: '账号', value: 'demo-cloud-user', copyable: true },
-                            { name: '密码', value: 'Demo-Password-123!', copyable: true }
+                            { name: '账号', value: 'demo-cloud-user', copyable: true, hidden: false },
+                            { name: '密码', value: 'Demo-Password-123!', copyable: true, hidden: true }
                         ],
                         remarks: '这是示例数据，可删除。用于体验字段复制、星标和标签筛选。'
                     },
@@ -870,8 +886,8 @@ const app = createApp({
                         starred: false,
                         tags: ['示例', '邮箱'],
                         fields: [
-                            { name: '邮箱', value: 'demo@example.invalid', copyable: true },
-                            { name: '恢复码', value: 'DEMO-CODE-0000', copyable: true }
+                            { name: '邮箱', value: 'demo@example.invalid', copyable: true, hidden: false },
+                            { name: '恢复码', value: 'DEMO-CODE-0000', copyable: true, hidden: true }
                         ],
                         remarks: '这是示例数据，可删除。这里不包含任何真实账号。'
                     },
@@ -881,8 +897,8 @@ const app = createApp({
                         starred: false,
                         tags: ['示例', '开发'],
                         fields: [
-                            { name: 'API Key', value: 'demo_api_key_not_real', copyable: true },
-                            { name: '环境', value: 'local-demo', copyable: false }
+                            { name: 'API Key', value: 'demo_api_key_not_real', copyable: true, hidden: true },
+                            { name: '环境', value: 'local-demo', copyable: false, hidden: false }
                         ],
                         remarks: '这是示例数据，可删除。用于体验备注和自定义字段。'
                     }
@@ -912,7 +928,7 @@ const app = createApp({
                 entryForm.url = fullEntry.url || '';
                 entryForm.starred = fullEntry.starred;
                 entryForm.tags = [...fullEntry.tags];
-                entryForm.fields = fullEntry.fields.map(f => ({ ...f }));
+                entryForm.fields = fullEntry.fields.map(normalizeFieldForEdit);
                 entryForm.remarks = fullEntry.remarks || '';
                 showEditModal.value = true;
             }
@@ -954,7 +970,7 @@ const app = createApp({
 
         // 添加字段
         function addField() {
-            entryForm.fields.push({ name: '', value: '', copyable: true });
+            entryForm.fields.push({ name: '', value: '', copyable: true, hidden: false });
         }
 
         // 移除字段
@@ -974,7 +990,7 @@ const app = createApp({
                 url: entryForm.url || '',
                 starred: entryForm.starred,
                 tags: entryForm.tags,
-                fields: entryForm.fields.filter(f => f.name),
+                fields: entryForm.fields.map(normalizeFieldForEdit).filter(f => f.name),
                 remarks: entryForm.remarks
             };
 
@@ -1499,7 +1515,8 @@ const app = createApp({
                     .map(field => ({
                         name: String(field.name || '').trim(),
                         value: String(field.value || ''),
-                        copyable: Boolean(field.copyable)
+                        copyable: Boolean(field.copyable),
+                        hidden: normalizeFieldHidden(field)
                     }))
                     .filter(field => field.name)
                 : [];
@@ -1518,7 +1535,7 @@ const app = createApp({
 
         function addAiEntryField(entry) {
             if (!Array.isArray(entry.fields)) entry.fields = [];
-            entry.fields.push({ name: '', value: '', copyable: true });
+            entry.fields.push({ name: '', value: '', copyable: true, hidden: false });
         }
 
         function removeAiEntryField(entry, index) {
