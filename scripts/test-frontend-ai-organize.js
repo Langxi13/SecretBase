@@ -7,6 +7,7 @@ const read = file => fs.readFileSync(path.join(root, file), 'utf8');
 const indexHtml = read('frontend/index.html');
 const appJs = read('frontend/js/app.js');
 const storeJs = read('frontend/js/store.js');
+const componentsCss = read('frontend/css/components.css');
 
 function assertIncludes(content, needle, message) {
     if (!content.includes(needle)) {
@@ -28,6 +29,7 @@ assertIncludes(indexHtml, '整体摘要', '整理建议必须先展示整体摘�
 assertIncludes(indexHtml, '逐条建议', '整理建议必须支持逐条确认');
 assertIncludes(indexHtml, '应用整理', '用户必须手动应用整理结果');
 assertIncludes(indexHtml, '不会发送字段值', 'AI 整理必须提示不会发送字段值');
+assertIncludes(indexHtml, 'ai-organize-select', '整理建议标题行必须使用专用紧凑选择样式');
 
 assertIncludes(appJs, "const aiMode = ref('parse')", 'AI 弹窗必须有 parse/organize 模式状态');
 assertIncludes(appJs, 'async function previewAiOrganize', '必须提供 AI 整理预览方法');
@@ -36,5 +38,10 @@ assertIncludes(appJs, '/ai/organize/preview', '前端必须调用整理预览接
 assertIncludes(appJs, '/ai/organize/apply', '前端必须调用整理应用接口');
 assertMatches(appJs, /organizeTags:\s*true[\s\S]*organizeGroups:\s*true/, '默认同时整理标签和密码组');
 assertIncludes(storeJs, 'filters:', '整理范围应复用当前列表筛选状态');
+assertMatches(
+    componentsCss,
+    /\.ai-organize-entry\s+summary[\s\S]*?display:\s*block[\s\S]*?\.ai-organize-select[\s\S]*?display:\s*grid[\s\S]*?grid-template-columns:\s*16px\s+minmax\(0,\s*1fr\)/,
+    '整理建议标题行必须固定勾选框列，避免勾选框和文字换行错位'
+);
 
 console.log('PASS frontend ai organize');

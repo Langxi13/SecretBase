@@ -34,6 +34,26 @@ def main() -> None:
             user_payload = json.loads(messages[-1]["content"])
             entry_payload = user_payload["entries"][0]
             assert "value" not in json.dumps(entry_payload, ensure_ascii=False)
+            if entry_payload["title"] == "家庭路由器":
+                return json.dumps({"suggestions": [], "warnings": []}, ensure_ascii=False)
+            if entry_payload["title"] == "项目 GitLab":
+                return json.dumps(
+                    {
+                        "suggestions": [
+                            {
+                                "entry_id": entry_payload["id"],
+                                "add_tags": ["开发资源"],
+                                "remove_tags": [],
+                                "add_groups": [],
+                                "remove_groups": [],
+                                "group_descriptions": {},
+                                "reason": "标题和字段名显示这是开发平台账号",
+                            }
+                        ],
+                        "warnings": [],
+                    },
+                    ensure_ascii=False,
+                )
             return json.dumps(
                 {
                     "suggestions": [
@@ -82,6 +102,39 @@ def main() -> None:
                 headers=headers,
             ),
             "create entry",
+        )
+        dev_entry = expect_success(
+            client.post(
+                "/entries",
+                json={
+                    "title": "项目 GitLab",
+                    "url": "https://gitlab.example.test",
+                    "tags": ["待分组"],
+                    "fields": [
+                        {"name": "用户名", "value": "developer", "copyable": True, "hidden": False},
+                        {"name": "Access Token", "value": "glpat-secret", "copyable": True, "hidden": True},
+                    ],
+                    "remarks": "代码仓库和 CI 登录",
+                },
+                headers=headers,
+            ),
+            "create dev entry",
+        )
+        router_entry = expect_success(
+            client.post(
+                "/entries",
+                json={
+                    "title": "家庭路由器",
+                    "tags": ["待自动分组"],
+                    "fields": [
+                        {"name": "管理地址", "value": "192.168.1.1", "copyable": True, "hidden": False},
+                        {"name": "WiFi 密码", "value": "router-secret", "copyable": True, "hidden": True},
+                    ],
+                    "remarks": "家里网络设备",
+                },
+                headers=headers,
+            ),
+            "create router entry",
         )
 
         preview = expect_success(
@@ -150,6 +203,43 @@ def main() -> None:
         assert group_only_suggestion["remove_groups"] == ["旧分组"]
         assert group_only_preview["summary"]["add_tags"] == 0
         assert group_only_preview["summary"]["remove_tags"] == 0
+
+        fallback_group_preview = expect_success(
+            client.post(
+                "/ai/organize/preview",
+                json={
+                    "filters": {"tag": "待分组"},
+                    "organize_tags": False,
+                    "organize_groups": True,
+                },
+                headers=headers,
+            ),
+            "organize preview group fallback",
+        )
+        fallback_group_suggestion = fallback_group_preview["suggestions"][0]
+        assert fallback_group_suggestion["entry_id"] == dev_entry["id"]
+        assert fallback_group_suggestion["add_tags"] == []
+        assert fallback_group_suggestion["add_groups"] == ["开发资源"]
+        assert fallback_group_suggestion["group_descriptions"]["开发资源"]
+        assert fallback_group_preview["summary"]["add_groups"] == 1
+
+        empty_ai_group_preview = expect_success(
+            client.post(
+                "/ai/organize/preview",
+                json={
+                    "filters": {"tag": "待自动分组"},
+                    "organize_tags": False,
+                    "organize_groups": True,
+                },
+                headers=headers,
+            ),
+            "organize preview empty ai group fallback",
+        )
+        empty_ai_group_suggestion = empty_ai_group_preview["suggestions"][0]
+        assert empty_ai_group_suggestion["entry_id"] == router_entry["id"]
+        assert empty_ai_group_suggestion["add_groups"] == ["家庭设备"]
+        assert empty_ai_group_suggestion["group_descriptions"]["家庭设备"]
+        assert empty_ai_group_preview["summary"]["add_groups"] == 1
 
         apply_result = expect_success(
             client.post(

@@ -7,16 +7,16 @@
     
     <!-- Vue 3 CDN (Production) -->
     <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
-    <script src="/secretbase-runtime-config.js?v=20260708-ui-v36"></script>
+    <script src="/secretbase-runtime-config.js?v=20260708-ui-v37"></script>
     
     <!-- 基础样式 -->
-    <link rel="stylesheet" href="css/style.css?v=20260708-ui-v36">
-    <link rel="stylesheet" href="css/components.css?v=20260708-ui-v36">
+    <link rel="stylesheet" href="css/style.css?v=20260708-ui-v37">
+    <link rel="stylesheet" href="css/components.css?v=20260708-ui-v37">
     
     <!-- 主题样式 -->
-    <link rel="stylesheet" href="css/themes/variables.css?v=20260708-ui-v36">
-    <link rel="stylesheet" href="css/themes/dark.css?v=20260708-ui-v36">
-    <link rel="stylesheet" href="css/themes/light.css?v=20260708-ui-v36">
+    <link rel="stylesheet" href="css/themes/variables.css?v=20260708-ui-v37">
+    <link rel="stylesheet" href="css/themes/dark.css?v=20260708-ui-v37">
+    <link rel="stylesheet" href="css/themes/light.css?v=20260708-ui-v37">
     
     <!-- Favicon -->
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🔐</text></svg>">
@@ -906,9 +906,9 @@
                                 open
                             >
                                 <summary>
-                                    <label class="checkbox-label ai-entry-select" @click.stop>
+                                    <label class="checkbox-label ai-entry-select ai-organize-select" @click.stop>
                                         <input type="checkbox" v-model="suggestion.selected">
-                                        {{ suggestion.entry_title || suggestion.entry_id }}
+                                        <span class="ai-organize-title">{{ suggestion.entry_title || suggestion.entry_id }}</span>
                                     </label>
                                 </summary>
                                 <p v-if="suggestion.reason" class="muted-text">{{ suggestion.reason }}</p>
@@ -1658,9 +1658,9 @@
     </div>
     
     <!-- JS 模块 -->
-    <script src="js/api.js?v=20260708-ui-v36"></script>
-    <script src="js/utils.js?v=20260708-ui-v36"></script>
-    <script src="js/store.js?v=20260708-ui-v36"></script>
-    <script src="js/app.js?v=20260708-ui-v36"></script>
+    <script src="js/api.js?v=20260708-ui-v37"></script>
+    <script src="js/utils.js?v=20260708-ui-v37"></script>
+    <script src="js/store.js?v=20260708-ui-v37"></script>
+    <script src="js/app.js?v=20260708-ui-v37"></script>
 </body>
 </html>
