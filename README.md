@@ -239,6 +239,7 @@ CORS_ORIGINS=https://your-domain.example
 | --- | --- |
 | `HOST` | 后端监听地址，生产建议使用 `127.0.0.1`。 |
 | `PORT` | 后端端口，默认 `10004`。 |
+| `AI_CHAT_TIMEOUT_SECONDS` | AI 对话请求超时秒数，默认 `120`。 |
 | `VAULT_PATH` | 加密 vault 文件路径。 |
 | `BACKUP_DIR` | 备份根目录，内部区分 `auto/` 自动备份和 `manual/` 手动备份。 |
 | `CORS_ORIGINS` | 允许访问 API 的前端来源。 |
@@ -265,6 +266,7 @@ python scripts\test-desktop-foundation.py
 python scripts\v1-fake-smoke-test.py
 python scripts\test-ai-organize.py
 python scripts\test-ai-tag-governance.py
+python scripts\test-ai-timeouts.py
 python scripts\test-field-hidden-semantics.py
 python scripts\test-password-groups.py
 python scripts\test-tag-entities.py
@@ -547,6 +549,7 @@ CORS_ORIGINS=https://your-domain.example
 | --- | --- |
 | `HOST` | Backend bind address. Use `127.0.0.1` in production. |
 | `PORT` | Backend port. Default is `10004`. |
+| `AI_CHAT_TIMEOUT_SECONDS` | AI chat request timeout in seconds. Default is `120`. |
 | `VAULT_PATH` | Encrypted vault file path. |
 | `BACKUP_DIR` | Backup root directory containing `auto/` automatic backups and `manual/` manual backups. |
 | `CORS_ORIGINS` | Allowed frontend origins for API access. |
@@ -573,6 +576,7 @@ python scripts\test-desktop-foundation.py
 python scripts\v1-fake-smoke-test.py
 python scripts\test-ai-organize.py
 python scripts\test-ai-tag-governance.py
+python scripts\test-ai-timeouts.py
 python scripts\test-field-hidden-semantics.py
 python scripts\test-password-groups.py
 python scripts\test-tag-entities.py

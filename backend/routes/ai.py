@@ -33,6 +33,7 @@ router = APIRouter()
 AI_PARSE_COOLDOWN_SECONDS = 5
 AI_PARSE_MAX_INPUT_CHARS = 6000
 AI_ORGANIZE_MAX_ENTRIES = 100
+AI_CHAT_TIMEOUT_SECONDS = int(os.getenv("AI_CHAT_TIMEOUT_SECONDS", "120"))
 _last_parse_at = 0.0
 _last_parse_text_hash = ""
 AI_SETTINGS_PURPOSE = "ai-settings"
@@ -351,7 +352,7 @@ async def _request_chat_completion(
     max_tokens: int,
 ) -> str:
     try:
-        async with httpx.AsyncClient(timeout=30.0, trust_env=False) as client:
+        async with httpx.AsyncClient(timeout=AI_CHAT_TIMEOUT_SECONDS, trust_env=False) as client:
             response = await client.post(
                 _chat_endpoint(base_url),
                 headers=_auth_headers(api_key),
