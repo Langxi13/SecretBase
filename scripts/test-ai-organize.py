@@ -34,9 +34,12 @@ def main() -> None:
         import routes.ai as ai_routes  # noqa: E402
         from main import app  # noqa: E402
 
+        captured_payloads = []
+
         async def fake_chat_completion(*args, **kwargs):
             messages = args[3]
             user_payload = json.loads(messages[-1]["content"])
+            captured_payloads.append(user_payload)
             entry_payload = user_payload["entries"][0]
             assert "value" not in json.dumps(entry_payload, ensure_ascii=False)
             if entry_payload["title"] == "家庭路由器":
@@ -198,11 +201,13 @@ def main() -> None:
                     "filters": {"tag": "待整理"},
                     "organize_tags": True,
                     "organize_groups": False,
+                    "user_prompt": "本次优先保留现有标签，只补充缺失标签",
                 },
                 headers=headers,
             ),
             "organize preview tag mode",
         )
+        assert captured_payloads[-1]["user_prompt"] == "本次优先保留现有标签，只补充缺失标签"
         assert preview["entry_count"] == 1
         assert preview["summary"]["affected_entries"] == 1
         assert preview["summary"]["add_tags"] == 2

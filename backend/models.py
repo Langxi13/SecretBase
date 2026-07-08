@@ -230,6 +230,7 @@ class AiOrganizePreviewRequest(BaseModel):
     filters: dict = Field(default_factory=dict)
     organize_tags: bool = True
     organize_groups: bool = False
+    user_prompt: str = Field(default="", max_length=1000)
 
 
 class AiOrganizeSuggestion(BaseModel):
@@ -266,6 +267,7 @@ class AiOrganizeApplyRequest(BaseModel):
 class AiTagGovernancePreviewRequest(BaseModel):
     """AI 标签系统管理预览请求"""
     filters: dict = Field(default_factory=dict)
+    user_prompt: str = Field(default="", max_length=1000)
 
 
 class AiTagGovernanceSuggestion(BaseModel):
@@ -303,6 +305,67 @@ class AiTagGovernanceSuggestion(BaseModel):
 class AiTagGovernanceApplyRequest(BaseModel):
     """应用 AI 标签系统管理建议请求"""
     suggestions: List[AiTagGovernanceSuggestion] = Field(..., min_items=1)
+
+
+class AiActionPreviewRequest(BaseModel):
+    """AI 自然语言操作计划预览请求"""
+    instruction: str = Field(..., min_length=1, max_length=2000)
+    filters: dict = Field(default_factory=dict)
+
+
+class AiActionPlanItem(BaseModel):
+    """AI 操作计划项。字段值不允许由 AI 提供。"""
+    type: str = Field(..., pattern="^(create_group|create_entry|create_entry_from_field|update_entry)$")
+    selected: bool = True
+    group: Optional[str] = Field(default=None, max_length=50)
+    description: str = Field(default="", max_length=300)
+    title: Optional[str] = Field(default=None, max_length=200)
+    url: Optional[str] = Field(default=None, max_length=2000)
+    tags: List[str] = Field(default_factory=list)
+    groups: List[str] = Field(default_factory=list)
+    remarks: str = Field(default="", max_length=2000)
+    fields: List[FieldItem] = Field(default_factory=list)
+    entry_id: Optional[str] = Field(default=None, max_length=100)
+    source_entry_id: Optional[str] = Field(default=None, max_length=100)
+    field_index: Optional[int] = Field(default=None, ge=0)
+    field_name: Optional[str] = Field(default=None, max_length=100)
+    field_name_new: Optional[str] = Field(default=None, max_length=100)
+    add_tags: List[str] = Field(default_factory=list)
+    remove_tags: List[str] = Field(default_factory=list)
+    add_groups: List[str] = Field(default_factory=list)
+    remove_groups: List[str] = Field(default_factory=list)
+    reason: str = Field(default="", max_length=500)
+
+    @validator('group', 'title', 'entry_id', 'source_entry_id', 'field_name', 'field_name_new')
+    def validate_optional_text(cls, v):
+        if v is None:
+            return v
+        cleaned = str(v).strip()
+        return cleaned or None
+
+    @validator('tags', 'groups', 'add_tags', 'remove_tags', 'add_groups', 'remove_groups')
+    def validate_name_lists(cls, v):
+        cleaned = []
+        seen = set()
+        for item in v:
+            name = str(item or "").strip()
+            if name and name not in seen:
+                if len(name) > 50:
+                    raise ValueError('标签或密码组名称不能超过 50 个字符')
+                seen.add(name)
+                cleaned.append(name)
+        return cleaned
+
+    @validator('url')
+    def validate_optional_url(cls, v):
+        if v and not v.startswith(('http://', 'https://')):
+            raise ValueError('URL 必须以 http:// 或 https:// 开头')
+        return v
+
+
+class AiActionApplyRequest(BaseModel):
+    """应用 AI 自然语言操作计划请求"""
+    actions: List[AiActionPlanItem] = Field(..., min_items=1)
 
 
 class ImportConflictRequest(BaseModel):

@@ -9,11 +9,15 @@ from datetime import datetime
 import httpx
 from fastapi import APIRouter, HTTPException
 from models import (
+    AiActionApplyRequest,
+    AiActionPreviewRequest,
     AiOrganizeApplyRequest,
     AiOrganizePreviewRequest,
     AiParseRequest,
     AiTagGovernanceApplyRequest,
     AiTagGovernancePreviewRequest,
+    Entry,
+    FieldItem,
 )
 from config import SECURE_SETTINGS_FILE
 from crypto import decrypt_vault_with_key, encrypt_vault_with_key, parse_vault_header
@@ -153,6 +157,51 @@ TAG_GOVERNANCE_SYSTEM_PROMPT = """你是 SecretBase 的标签系统管理助手�
 6. color 必须是 #RRGGBB；无法确定时可省略。
 7. 不要依赖字段值；输入不会提供字段值。
 8. 不要输出 null；没有建议时用空数组或空字符串。"""
+
+AI_ACTIONS_SYSTEM_PROMPT = """你是 SecretBase 的密码库操作计划助手。你的任务是根据用户自然语言指令和条目结构信息，生成可由用户确认后执行的结构化操作计划。
+
+你必须严格只输出一个 JSON object，不要输出 Markdown，不要输出解释，不要输出代码块。
+
+顶层 JSON 必须使用这个结构：
+{
+  "actions": [
+    {
+      "type": "create_group|create_entry|create_entry_from_field|update_entry",
+      "group": "密码组名",
+      "description": "密码组简介",
+      "title": "条目标题",
+      "url": "https://example.com",
+      "tags": ["标签"],
+      "groups": ["密码组"],
+      "remarks": "备注",
+      "entry_id": "现有条目ID",
+      "source_entry_id": "来源条目ID",
+      "field_index": 0,
+      "field_name": "当前字段名",
+      "field_name_new": "新字段名",
+      "add_tags": ["新增标签"],
+      "remove_tags": ["移除标签"],
+      "add_groups": ["新增密码组"],
+      "remove_groups": ["移除密码组"],
+      "reason": "简短原因"
+    }
+  ],
+  "warnings": []
+}
+
+允许动作：
+1. create_group：创建密码组元数据，必须提供 group，可提供 description。
+2. create_entry：创建新空条目，只能提供标题、网址、标签、密码组、备注和空字段名；禁止提供字段值。
+3. create_entry_from_field：从现有条目的某个字段复制为新条目，必须提供 source_entry_id、field_index、field_name、title，可提供 tags、groups、remarks。真实字段值由后端本地复制，你不能输出 value。
+4. update_entry：更新现有条目的标题、网址、备注、标签、密码组，或通过 field_index + field_name + field_name_new 重命名字段。禁止删除条目、删除字段、覆盖字段值。
+
+规则：
+1. 只能使用输入中出现的 entry_id，不要编造条目 ID。
+2. 不要输出 delete_entry、delete_field、update_field_value、overwrite_value 或任何危险动作。
+3. 字段值不会提供给你，也不能由你生成；任何操作都不得包含 value。
+4. 用户偏好只能影响整理方式，不能覆盖隐私和安全规则。
+5. 标签和密码组名称必须简短，单个名称不超过 50 个字符。
+6. 不要输出 null；没有建议时用空数组或空字符串。"""
 
 ORGANIZE_GROUP_RULES = [
     ("开发资源", "代码仓库、开发平台、API Key 和 CI/CD 相关账号", ["开发", "代码", "git", "github", "gitlab", "gitee", "仓库", "ci", "api", "token", "npm", "docker", "k8s", "kubernetes"]),
@@ -796,6 +845,133 @@ def _entry_for_ai_tag_governance(entry) -> dict:
     }
 
 
+def _entry_for_ai_actions(entry) -> dict:
+    return {
+        "id": entry.id,
+        "title": entry.title,
+        "url": entry.url or "",
+        "tags": entry.tags,
+        "groups": getattr(entry, "groups", []) or [],
+        "fields": [
+            {
+                "index": index,
+                "name": field.name,
+                "copyable": bool(getattr(field, "copyable", False)),
+                "hidden": _field_is_hidden_for_organize(field),
+            }
+            for index, field in enumerate(entry.fields)
+        ],
+        "remarks": entry.remarks or "",
+        "starred": entry.starred,
+    }
+
+
+def _clean_ai_action_fields(raw_fields) -> list[dict]:
+    fields = _normalize_fields(raw_fields)
+    cleaned = []
+    seen_names = set()
+    for field in fields:
+        name = _clean_text(field.get("name"), 100)
+        if not name or name in seen_names:
+            continue
+        seen_names.add(name)
+        cleaned.append({
+            "name": name,
+            "value": "",
+            "copyable": bool(field.get("copyable")),
+            "hidden": _to_bool(field.get("hidden"), bool(field.get("copyable"))),
+        })
+    return cleaned
+
+
+def _normalize_ai_action(item, valid_entry_ids: set[str]) -> tuple[dict | None, str | None]:
+    if not isinstance(item, dict):
+        return None, "已忽略无效操作计划项"
+
+    action_type = _clean_text(item.get("type") or item.get("action"), 50)
+    allowed_types = {"create_group", "create_entry", "create_entry_from_field", "update_entry"}
+    if action_type not in allowed_types:
+        return None, f"已忽略不支持的操作：{action_type or '未知操作'}"
+
+    entry_id = _clean_text(item.get("entry_id") or item.get("id"), 100) or None
+    source_entry_id = _clean_text(item.get("source_entry_id") or item.get("source_id"), 100) or None
+    if action_type == "update_entry" and entry_id not in valid_entry_ids:
+        return None, "已忽略引用未知条目的更新操作"
+    if action_type == "create_entry_from_field" and source_entry_id not in valid_entry_ids:
+        return None, "已忽略引用未知来源条目的字段拆分操作"
+
+    raw_field_index = item.get("field_index")
+    try:
+        field_index = int(raw_field_index) if raw_field_index is not None else None
+    except (TypeError, ValueError):
+        field_index = None
+
+    action = {
+        "type": action_type,
+        "selected": True,
+        "group": _clean_text(item.get("group") or item.get("name"), 50) or None,
+        "description": _clean_text(item.get("description"), 300),
+        "title": _clean_text(item.get("title"), 200) or None,
+        "url": _clean_text(item.get("url"), 2000) or None,
+        "tags": _clean_name_list(item.get("tags")),
+        "groups": _clean_name_list(item.get("groups")),
+        "remarks": _clean_text(item.get("remarks") or item.get("note"), 2000),
+        "fields": _clean_ai_action_fields(item.get("fields")),
+        "entry_id": entry_id,
+        "source_entry_id": source_entry_id,
+        "field_index": field_index,
+        "field_name": _clean_text(item.get("field_name"), 100) or None,
+        "field_name_new": _clean_text(item.get("field_name_new") or item.get("new_field_name"), 100) or None,
+        "add_tags": _clean_name_list(item.get("add_tags") or item.get("tags_to_add")),
+        "remove_tags": _clean_name_list(item.get("remove_tags") or item.get("tags_to_remove")),
+        "add_groups": _clean_name_list(item.get("add_groups") or item.get("groups_to_add")),
+        "remove_groups": _clean_name_list(item.get("remove_groups") or item.get("groups_to_remove")),
+        "reason": _clean_text(item.get("reason") or item.get("explanation"), 500),
+    }
+    if action["url"] and not action["url"].startswith(("http://", "https://")):
+        action["url"] = None
+    return action, None
+
+
+def _normalize_ai_actions_payload(payload, valid_entry_ids: set[str]) -> tuple[list[dict], list[str]]:
+    if isinstance(payload, list):
+        raw_actions = payload
+        raw_warnings = []
+    elif isinstance(payload, dict):
+        raw_actions = payload.get("actions") or payload.get("suggestions") or payload.get("items") or payload.get("data") or []
+        raw_warnings = payload.get("warnings") or []
+    else:
+        raw_actions = []
+        raw_warnings = []
+
+    actions = []
+    warnings = [_clean_text(warning, 200) for warning in raw_warnings if _clean_text(warning, 200)] if isinstance(raw_warnings, list) else []
+    if isinstance(raw_actions, list):
+        for item in raw_actions:
+            action, warning = _normalize_ai_action(item, valid_entry_ids)
+            if action:
+                actions.append(action)
+            if warning:
+                warnings.append(warning)
+    return actions, list(dict.fromkeys(warnings))
+
+
+def _ai_actions_summary(actions: list[dict]) -> dict:
+    selected = [item for item in actions if item.get("selected", True)]
+    summary = {
+        "total_actions": len(selected),
+        "create_group": 0,
+        "create_entry": 0,
+        "create_entry_from_field": 0,
+        "update_entry": 0,
+    }
+    for action in selected:
+        action_type = action.get("type")
+        if action_type in summary:
+            summary[action_type] += 1
+    return summary
+
+
 def _clean_color(value) -> str | None:
     color = _clean_text(value, 20)
     return color.lower() if TAG_COLOR_PATTERN.match(color) else None
@@ -1032,6 +1208,7 @@ async def ai_organize_preview(request: AiOrganizePreviewRequest):
     user_payload = {
         "organize_tags": request.organize_tags,
         "organize_groups": request.organize_groups,
+        "user_prompt": _clean_text(request.user_prompt, 1000),
         "existing_tags": existing_tags,
         "existing_groups": existing_groups,
         "entries": [_entry_for_ai_organize(entry) for entry in entries],
@@ -1167,6 +1344,278 @@ async def ai_organize_apply(request: AiOrganizeApplyRequest):
     }
 
 
+def _ensure_group_meta(vault, group: str, description: str = "") -> bool:
+    group = _clean_text(group, 50)
+    if not group:
+        return False
+    if not isinstance(vault.groups_meta, dict):
+        vault.groups_meta = {}
+    now = datetime.now().isoformat()
+    if group not in vault.groups_meta:
+        vault.groups_meta[group] = {
+            "description": _clean_text(description, 300),
+            "created_at": now,
+            "updated_at": now,
+        }
+        return True
+    if description and not str(vault.groups_meta[group].get("description", "")).strip():
+        vault.groups_meta[group]["description"] = _clean_text(description, 300)
+        vault.groups_meta[group]["updated_at"] = now
+    return False
+
+
+def _append_group(groups: list[str], group: str) -> bool:
+    group = _clean_text(group, 50)
+    if group and group not in groups:
+        groups.append(group)
+        return True
+    return False
+
+
+@router.post("/actions/preview")
+async def ai_actions_preview(request: AiActionPreviewRequest):
+    """AI 生成自然语言操作计划，不直接写入。"""
+    if not is_unlocked():
+        raise HTTPException(status_code=401, detail="请先解锁")
+
+    instruction = _clean_text(request.instruction, 2000)
+    if not instruction:
+        raise HTTPException(status_code=422, detail="请输入 AI 交互指令")
+
+    ai_config = _load_ai_config()
+    if not ai_config:
+        raise HTTPException(status_code=502, detail="AI 服务未配置")
+
+    vault = get_vault_data()
+    entries = _filter_entries_for_organize(vault, request.filters)
+    if not entries:
+        raise HTTPException(status_code=422, detail="当前筛选范围没有可供 AI 分析的条目")
+    if len(entries) > AI_ORGANIZE_MAX_ENTRIES:
+        raise HTTPException(status_code=413, detail=f"AI 交互最多支持 {AI_ORGANIZE_MAX_ENTRIES} 条，请缩小筛选范围")
+
+    user_payload = {
+        "instruction": instruction,
+        "existing_tags": sorted({tag for entry in vault.entries if not entry.deleted for tag in entry.tags}),
+        "existing_groups": sorted({
+            group
+            for entry in vault.entries
+            if not entry.deleted
+            for group in (getattr(entry, "groups", []) or [])
+        } | set((vault.groups_meta or {}).keys())),
+        "entries": [_entry_for_ai_actions(entry) for entry in entries],
+        "allowed_actions": ["create_group", "create_entry", "create_entry_from_field", "update_entry"],
+        "privacy_note": "不发送字段值；AI 只能看到字段名、字段索引、隐藏状态和条目结构。",
+    }
+
+    try:
+        content = await _request_chat_completion(
+            ai_config["base_url"],
+            ai_config["api_key"],
+            ai_config["model"],
+            [
+                {"role": "system", "content": AI_ACTIONS_SYSTEM_PROMPT},
+                {"role": "user", "content": json.dumps(user_payload, ensure_ascii=False)}
+            ],
+            5000,
+        )
+        payload = _extract_json_content(content)
+        actions, warnings = _normalize_ai_actions_payload(payload, {entry.id for entry in entries})
+    except HTTPException:
+        raise
+    except json.JSONDecodeError as e:
+        logger.error(f"AI 操作计划返回的 JSON 解析失败: {e}")
+        raise HTTPException(status_code=422, detail="AI 返回格式错误")
+    except Exception as e:
+        logger.error(f"AI 操作计划生成失败: {e}")
+        raise HTTPException(status_code=502, detail="AI 服务调用失败")
+
+    return {
+        "success": True,
+        "data": {
+            "entry_count": len(entries),
+            "actions": actions,
+            "summary": _ai_actions_summary(actions),
+            "warnings": warnings,
+            "privacy_note": "本次 AI 交互不会发送任何字段值，字段拆分由后端本地复制真实值。",
+        }
+    }
+
+
+@router.post("/actions/apply")
+async def ai_actions_apply(request: AiActionApplyRequest):
+    """应用用户确认后的 AI 操作计划。"""
+    if not is_unlocked():
+        raise HTTPException(status_code=401, detail="请先解锁")
+
+    vault = get_vault_data()
+    entries_by_id = {entry.id: entry for entry in vault.entries if not entry.deleted}
+    selected_actions = [action for action in request.actions if action.selected]
+    if not selected_actions:
+        raise HTTPException(status_code=422, detail="请选择要应用的操作计划")
+
+    for action in selected_actions:
+        if action.type == "create_group":
+            if not action.group:
+                raise HTTPException(status_code=422, detail="创建密码组操作缺少名称")
+
+        elif action.type == "create_entry":
+            if not action.title:
+                raise HTTPException(status_code=422, detail="创建条目操作缺少标题")
+            if any(field.value for field in action.fields):
+                raise HTTPException(status_code=422, detail="AI 操作计划不能包含字段值")
+
+        elif action.type == "create_entry_from_field":
+            source = entries_by_id.get(action.source_entry_id or "")
+            if not source:
+                raise HTTPException(status_code=422, detail="字段拆分操作引用的来源条目不存在")
+            if action.field_index is None or action.field_index >= len(source.fields):
+                raise HTTPException(status_code=422, detail="字段拆分操作引用的字段索引无效")
+            source_field = source.fields[action.field_index]
+            if source_field.name != action.field_name:
+                raise HTTPException(status_code=422, detail="字段拆分操作引用的字段名已变化，请重新生成计划")
+            if not action.title:
+                raise HTTPException(status_code=422, detail="字段拆分操作缺少新条目标题")
+
+        elif action.type == "update_entry":
+            entry = entries_by_id.get(action.entry_id or "")
+            if not entry:
+                raise HTTPException(status_code=422, detail="更新条目操作引用的条目不存在")
+            wants_field_rename = action.field_index is not None or bool(action.field_name) or bool(action.field_name_new)
+            if wants_field_rename:
+                if action.field_index is None or not action.field_name or not action.field_name_new:
+                    raise HTTPException(status_code=422, detail="字段重命名必须提供字段索引、当前字段名和新字段名")
+                if action.field_index >= len(entry.fields):
+                    raise HTTPException(status_code=422, detail="字段重命名引用的字段索引无效")
+                if entry.fields[action.field_index].name != action.field_name:
+                    raise HTTPException(status_code=422, detail="字段重命名引用的字段名已变化，请重新生成计划")
+                duplicate_names = [
+                    field.name
+                    for index, field in enumerate(entry.fields)
+                    if index != action.field_index
+                ]
+                if action.field_name_new in duplicate_names:
+                    raise HTTPException(status_code=422, detail="字段重命名后的名称已存在")
+
+        else:
+            raise HTTPException(status_code=422, detail="不支持的操作计划类型")
+
+    created_entries = 0
+    created_groups = 0
+    updated_entry_ids: set[str] = set()
+    applied_count = 0
+    now = datetime.now().isoformat()
+
+    for action in selected_actions:
+        if action.type == "create_group":
+            if _ensure_group_meta(vault, action.group or "", action.description):
+                created_groups += 1
+            applied_count += 1
+
+        elif action.type == "create_entry":
+            groups = list(action.groups)
+            tags = list(action.tags)
+            for group in groups:
+                if _ensure_group_meta(vault, group):
+                    created_groups += 1
+            ensure_entry_tags_meta(vault, tags)
+            entry = Entry(
+                title=action.title or "AI 新建条目",
+                url=action.url or "",
+                tags=tags,
+                groups=groups,
+                fields=[
+                    FieldItem(name=field.name, value="", copyable=field.copyable, hidden=_field_is_hidden_for_organize(field))
+                    for field in action.fields
+                ],
+                remarks=action.remarks or "",
+            )
+            vault.entries.append(entry)
+            created_entries += 1
+            applied_count += 1
+
+        elif action.type == "create_entry_from_field":
+            source = entries_by_id[action.source_entry_id or ""]
+            source_field = source.fields[action.field_index]
+            groups = list(action.groups)
+            tags = list(action.tags)
+            for group in groups:
+                if _ensure_group_meta(vault, group):
+                    created_groups += 1
+            ensure_entry_tags_meta(vault, tags)
+            entry = Entry(
+                title=action.title or source_field.name,
+                url=action.url or source.url or "",
+                tags=tags,
+                groups=groups,
+                fields=[
+                    FieldItem(
+                        name=source_field.name,
+                        value=source_field.value,
+                        copyable=source_field.copyable,
+                        hidden=_field_is_hidden_for_organize(source_field),
+                    )
+                ],
+                remarks=action.remarks or f"由 {source.title} 的字段「{source_field.name}」拆分生成",
+            )
+            vault.entries.append(entry)
+            created_entries += 1
+            applied_count += 1
+
+        elif action.type == "update_entry":
+            entry = entries_by_id[action.entry_id or ""]
+            changed = False
+            if action.title and action.title != entry.title:
+                entry.title = action.title
+                changed = True
+            if action.url is not None and action.url != (entry.url or ""):
+                entry.url = action.url
+                changed = True
+            if action.remarks and action.remarks != (entry.remarks or ""):
+                entry.remarks = action.remarks
+                changed = True
+
+            tags = [tag for tag in (entry.tags or []) if tag not in action.remove_tags]
+            for tag in action.add_tags:
+                if tag not in tags:
+                    tags.append(tag)
+            if tags != (entry.tags or []):
+                entry.tags = tags
+                ensure_entry_tags_meta(vault, entry.tags)
+                changed = True
+
+            groups = [group for group in (getattr(entry, "groups", []) or []) if group not in action.remove_groups]
+            for group in action.add_groups:
+                if _append_group(groups, group):
+                    if _ensure_group_meta(vault, group):
+                        created_groups += 1
+            if groups != (getattr(entry, "groups", []) or []):
+                entry.groups = groups
+                changed = True
+
+            if action.field_index is not None and action.field_name_new:
+                entry.fields[action.field_index].name = action.field_name_new
+                changed = True
+
+            if changed:
+                entry.updated_at = now
+                updated_entry_ids.add(entry.id)
+            applied_count += 1
+
+    if applied_count > 0:
+        save_vault_data(vault)
+
+    return {
+        "success": True,
+        "data": {
+            "applied_count": applied_count,
+            "created_entries": created_entries,
+            "created_groups": created_groups,
+            "updated_entries": len(updated_entry_ids),
+        },
+        "message": f"已应用 {applied_count} 项 AI 操作计划"
+    }
+
+
 @router.post("/tags/preview")
 async def ai_tag_governance_preview(request: AiTagGovernancePreviewRequest):
     """AI 生成全局标签系统管理建议，不直接写入。"""
@@ -1185,6 +1634,7 @@ async def ai_tag_governance_preview(request: AiTagGovernancePreviewRequest):
         raise HTTPException(status_code=502, detail="AI 服务未配置")
 
     user_payload = {
+        "user_prompt": _clean_text(request.user_prompt, 1000),
         "existing_tags": list_tag_entities(vault),
         "existing_groups": sorted({
             group

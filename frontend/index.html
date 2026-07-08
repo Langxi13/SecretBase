@@ -806,6 +806,7 @@
                     <div class="ai-mode-tabs" role="tablist" aria-label="AI 功能">
                         <button class="ai-mode-tab" :class="{ active: aiMode === 'parse' }" @click="setAiMode('parse')">智能录入</button>
                         <button class="ai-mode-tab" :class="{ active: aiMode === 'organize' }" @click="setAiMode('organize')">整理条目</button>
+                        <button class="ai-mode-tab" :class="{ active: aiMode === 'actions' }" @click="setAiMode('actions')">AI 交互</button>
                     </div>
                     <div v-if="aiStatusError" class="warning-panel">
                         {{ aiStatusError }}
@@ -872,7 +873,7 @@
                             <button class="btn-small" @click="manualEntryFromAi()">保留原文并转为手动录入</button>
                         </div>
                     </div>
-                    <div v-else class="ai-organize-panel">
+                    <div v-if="aiMode === 'organize'" class="ai-organize-panel">
                         <div class="info-panel">
                             整理当前筛选全部条目，最多 100 条；不会发送字段值。标签和密码组分开整理，避免建议冲突。
                         </div>
@@ -898,6 +899,14 @@
                             >
                                 标签系统管理
                             </button>
+                        </div>
+                        <div class="form-group">
+                            <label>本次偏好</label>
+                            <textarea
+                                v-model="currentAiOrganizePrompt"
+                                placeholder="例如：优先保留现有标签，只补充缺失标签"
+                                rows="3"
+                            ></textarea>
                         </div>
                         <div v-if="aiOrganizeError" class="warning-panel ai-failure-panel">
                             <strong>AI 整理未完成</strong>
@@ -977,6 +986,74 @@
                             </details>
                         </div>
                     </div>
+                    <div v-if="aiMode === 'actions'" class="ai-organize-panel">
+                        <div class="info-panel">
+                            输入希望 AI 协助整理的目标，系统会先生成操作计划；不会发送字段值，应用前需要你逐项确认。
+                        </div>
+                        <div class="form-group">
+                            <label>交互指令</label>
+                            <textarea
+                                v-model="aiActionInstruction"
+                                placeholder="例如：将 demo.example 条目的三个字段拆成独立条目，并放入 demo-service 密码组"
+                                rows="5"
+                            ></textarea>
+                        </div>
+                        <div v-if="aiActionError" class="warning-panel ai-failure-panel">
+                            <strong>AI 交互未完成</strong>
+                            <p>{{ aiActionError }}</p>
+                        </div>
+                        <div v-if="aiActionResult" class="ai-parse-result ai-action-result">
+                            <h4>操作计划</h4>
+                            <div class="ai-organize-summary">
+                                <div><strong>{{ aiActionResult.entry_count }}</strong><span>范围条目</span></div>
+                                <div><strong>{{ aiActionSummary.total_actions }}</strong><span>选中操作</span></div>
+                                <div><strong>{{ aiActionSummary.create_group }}</strong><span>新建密码组</span></div>
+                                <div><strong>{{ aiActionSummary.create_entry + aiActionSummary.create_entry_from_field }}</strong><span>新建条目</span></div>
+                                <div><strong>{{ aiActionSummary.update_entry }}</strong><span>更新条目</span></div>
+                            </div>
+                            <p class="info-message">{{ aiActionResult.privacy_note }}</p>
+                            <div v-if="aiActionResult.warnings && aiActionResult.warnings.length > 0" class="warning-panel">
+                                <p v-for="warning in aiActionResult.warnings" :key="warning">{{ warning }}</p>
+                            </div>
+                            <details
+                                v-for="(action, index) in aiActionResult.actions"
+                                :key="action.type + '-' + index"
+                                class="ai-parse-entry ai-organize-entry ai-action-entry"
+                                open
+                            >
+                                <summary>
+                                    <label class="checkbox-label ai-entry-select ai-organize-select" @click.stop>
+                                        <input type="checkbox" v-model="action.selected">
+                                        <span class="ai-organize-title">{{ aiActionTitle(action) }}</span>
+                                    </label>
+                                </summary>
+                                <p v-if="action.reason" class="muted-text">{{ action.reason }}</p>
+                                <div class="ai-organize-chip-row">
+                                    <strong>动作</strong>
+                                    <span class="tag">{{ aiActionTypeLabel(action.type) }}</span>
+                                </div>
+                                <div v-if="action.group || action.groups?.length" class="ai-organize-chip-row">
+                                    <strong>密码组</strong>
+                                    <span v-if="action.group" class="group-chip">{{ action.group }}</span>
+                                    <span v-for="group in action.groups" :key="action.type + '-group-' + group" class="group-chip">{{ group }}</span>
+                                </div>
+                                <div v-if="action.tags?.length || action.add_tags?.length || action.remove_tags?.length" class="ai-organize-chip-row">
+                                    <strong>标签</strong>
+                                    <span v-for="tag in action.tags" :key="action.type + '-tag-' + tag" class="tag">{{ tag }}</span>
+                                    <span v-for="tag in action.add_tags" :key="action.type + '-add-tag-' + tag" class="tag">{{ tag }}</span>
+                                    <span v-for="tag in action.remove_tags" :key="action.type + '-remove-tag-' + tag" class="tag remove-chip">{{ tag }}</span>
+                                </div>
+                                <div v-if="action.field_name" class="ai-organize-chip-row">
+                                    <strong>字段</strong>
+                                    <span class="group-chip">{{ action.field_index }} · {{ action.field_name }}<template v-if="action.field_name_new"> → {{ action.field_name_new }}</template></span>
+                                </div>
+                                <div v-if="action.description || action.remarks" class="ai-organize-chip-row">
+                                    <strong>说明</strong>
+                                    <span class="ai-action-note">{{ action.description || action.remarks }}</span>
+                                </div>
+                            </details>
+                        </div>
+                    </div>
                 </div>
                 <div class="modal-footer">
                     <button class="btn-secondary" @click="showAiParse = false">取消</button>
@@ -998,6 +1075,13 @@
                     </button>
                     <button v-if="aiMode === 'organize' && aiOrganizeResult" class="btn-primary" @click="applyAiOrganize" :disabled="selectedAiOrganizeCount === 0 || selectedAiOrganizeChangeCount === 0">
                         应用整理（{{ selectedAiOrganizeCount }} 条 / {{ selectedAiOrganizeChangeCount }} 项变更）
+                    </button>
+                    <button v-if="aiMode === 'actions'" class="btn-secondary" @click="clearAiActions" :disabled="!aiActionResult && !aiActionError">清空计划</button>
+                    <button v-if="aiMode === 'actions'" class="btn-primary" @click="previewAiActions" :disabled="!canPreviewAiActions">
+                        {{ aiOrganizing ? '生成中...' : '生成操作计划' }}
+                    </button>
+                    <button v-if="aiMode === 'actions' && aiActionResult" class="btn-primary" @click="applyAiActions" :disabled="selectedAiActionCount === 0">
+                        应用计划（{{ selectedAiActionCount }} 项）
                     </button>
                 </div>
             </div>

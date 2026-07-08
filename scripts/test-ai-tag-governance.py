@@ -138,8 +138,16 @@ def main() -> None:
             "create dev entry",
         )
 
-        preview = expect_success(client.post("/ai/tags/preview", json={}, headers=headers), "tag governance preview")
+        preview = expect_success(
+            client.post(
+                "/ai/tags/preview",
+                json={"user_prompt": "本次优先合并语义重复标签，不要删除高频标签"},
+                headers=headers,
+            ),
+            "tag governance preview",
+        )
         assert captured_payloads, "AI 标签治理必须调用模型生成建议"
+        assert captured_payloads[-1]["user_prompt"] == "本次优先合并语义重复标签，不要删除高频标签"
         assert preview["entry_count"] == 2
         assert preview["summary"]["total_actions"] == 5
         assert preview["suggestions"][0]["selected"] is True

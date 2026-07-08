@@ -152,6 +152,14 @@ const app = createApp({
             organizeTags: true,
             organizeGroups: false
         });
+        const aiOrganizePrompts = reactive({
+            tags: '',
+            groups: '',
+            'tag-governance': ''
+        });
+        const aiActionInstruction = ref('');
+        const aiActionResult = ref(null);
+        const aiActionError = ref('');
         const aiCooldownUntil = ref(0);
         const aiNow = ref(Date.now());
         const lastAiParseText = ref('');
@@ -282,6 +290,15 @@ const app = createApp({
 
         const isAiTagGovernanceMode = computed(() => aiOrganizeMode.value === 'tag-governance');
 
+        const currentAiOrganizePrompt = computed({
+            get() {
+                return aiOrganizePrompts[aiOrganizeMode.value] || '';
+            },
+            set(value) {
+                aiOrganizePrompts[aiOrganizeMode.value] = value;
+            }
+        });
+
         const aiOrganizeSummary = computed(() => {
             const suggestions = (aiOrganizeResult.value?.suggestions || []).filter(item => item.selected);
             if (isAiTagGovernanceMode.value) {
@@ -349,10 +366,37 @@ const app = createApp({
                 }, 0);
         });
 
+        const selectedAiActionCount = computed(() => {
+            return aiActionResult.value?.actions?.filter(action => action.selected).length || 0;
+        });
+
+        const aiActionSummary = computed(() => {
+            const actions = (aiActionResult.value?.actions || []).filter(action => action.selected);
+            return actions.reduce((summary, action) => {
+                summary.total_actions += 1;
+                if (Object.prototype.hasOwnProperty.call(summary, action.type)) {
+                    summary[action.type] += 1;
+                }
+                return summary;
+            }, {
+                total_actions: 0,
+                create_group: 0,
+                create_entry: 0,
+                create_entry_from_field: 0,
+                update_entry: 0
+            });
+        });
+
         const canPreviewAiOrganize = computed(() => {
             return Boolean(aiStatus.value?.configured)
                 && !aiOrganizing.value
                 && (isAiTagGovernanceMode.value || aiOrganizeOptions.organizeTags || aiOrganizeOptions.organizeGroups);
+        });
+
+        const canPreviewAiActions = computed(() => {
+            return Boolean(aiStatus.value?.configured)
+                && !aiOrganizing.value
+                && Boolean(aiActionInstruction.value.trim());
         });
 
         const selectedImportPreviewCount = computed(() => importPreviewSelectedIds.value.length);
@@ -1651,6 +1695,7 @@ const app = createApp({
             aiStatusError.value = '';
             aiFailureMessage.value = '';
             aiOrganizeError.value = '';
+            aiActionError.value = '';
             try {
                 const result = await api.get('/ai/status');
                 aiStatus.value = result.data;
@@ -1684,11 +1729,17 @@ const app = createApp({
             aiMode.value = mode;
             aiFailureMessage.value = '';
             aiOrganizeError.value = '';
+            aiActionError.value = '';
         }
 
         function clearAiOrganize() {
             aiOrganizeResult.value = null;
             aiOrganizeError.value = '';
+        }
+
+        function clearAiActions() {
+            aiActionResult.value = null;
+            aiActionError.value = '';
         }
 
         function setAiOrganizeMode(mode) {
@@ -1722,11 +1773,15 @@ const app = createApp({
             aiOrganizeResult.value = null;
             try {
                 const result = isAiTagGovernanceMode.value
-                    ? await api.post('/ai/tags/preview', {})
+                    ? await api.post('/ai/tags/preview', {
+                        filters: currentAiOrganizeFilters(),
+                        user_prompt: currentAiOrganizePrompt.value
+                    })
                     : await api.post('/ai/organize/preview', {
                         filters: currentAiOrganizeFilters(),
                         organize_tags: aiOrganizeOptions.organizeTags,
-                        organize_groups: aiOrganizeOptions.organizeGroups
+                        organize_groups: aiOrganizeOptions.organizeGroups,
+                        user_prompt: currentAiOrganizePrompt.value
                     });
                 aiOrganizeResult.value = result.data;
             } catch (error) {
@@ -1786,6 +1841,78 @@ const app = createApp({
                 return `${aiTagActionLabel(suggestion.action)}：${suggestion.tag || ''} → ${suggestion.new_tag || ''}`;
             }
             return `${aiTagActionLabel(suggestion.action)}：${suggestion.tag || suggestion.target_tag || ''}`;
+        }
+
+        function aiActionTypeLabel(type) {
+            const labels = {
+                create_group: '新建密码组',
+                create_entry: '新建条目',
+                create_entry_from_field: '字段拆分为条目',
+                update_entry: '更新条目'
+            };
+            return labels[type] || type || '操作';
+        }
+
+        function aiActionTitle(action) {
+            if (!action) return '操作计划';
+            if (action.type === 'create_group') {
+                return `${aiActionTypeLabel(action.type)}：${action.group || ''}`;
+            }
+            if (action.type === 'create_entry_from_field') {
+                return `${aiActionTypeLabel(action.type)}：${action.title || action.field_name || ''}`;
+            }
+            if (action.type === 'update_entry') {
+                return `${aiActionTypeLabel(action.type)}：${action.title || action.entry_id || ''}`;
+            }
+            return `${aiActionTypeLabel(action.type)}：${action.title || ''}`;
+        }
+
+        async function previewAiActions() {
+            const instruction = aiActionInstruction.value.trim();
+            if (!instruction) {
+                aiActionError.value = '请输入希望 AI 执行的整理指令。';
+                return;
+            }
+            if (!aiStatus.value?.configured) {
+                aiActionError.value = 'AI 未配置，请先到设置页填写接入信息。';
+                return;
+            }
+            aiOrganizing.value = true;
+            aiActionError.value = '';
+            aiActionResult.value = null;
+            try {
+                const result = await api.post('/ai/actions/preview', {
+                    instruction,
+                    filters: currentAiOrganizeFilters()
+                });
+                aiActionResult.value = result.data;
+            } catch (error) {
+                aiActionError.value = error.message || 'AI 操作计划生成失败';
+                showToast(aiActionError.value, 'warning');
+            } finally {
+                aiOrganizing.value = false;
+            }
+        }
+
+        async function applyAiActions() {
+            const actions = (aiActionResult.value?.actions || []).filter(action => action.selected);
+            if (actions.length === 0) {
+                showToast('请选择要应用的操作计划', 'warning');
+                return;
+            }
+            aiOrganizing.value = true;
+            aiActionError.value = '';
+            try {
+                const result = await api.post('/ai/actions/apply', { actions });
+                showToast(result.message || 'AI 操作计划已应用', 'success');
+                aiActionResult.value = null;
+                await Promise.all([loadEntries(currentPage.value), loadTags(), loadGroups()]);
+            } catch (error) {
+                aiActionError.value = error.message || '应用 AI 操作计划失败';
+                showToast(aiActionError.value, 'error');
+            } finally {
+                aiOrganizing.value = false;
+            }
         }
 
         async function openAiSettingsFromParse() {
@@ -3016,8 +3143,14 @@ const app = createApp({
             aiOrganizeResult,
             aiOrganizeMode,
             aiOrganizeOptions,
+            aiOrganizePrompts,
+            currentAiOrganizePrompt,
+            aiActionInstruction,
+            aiActionResult,
+            aiActionError,
             isAiTagGovernanceMode,
             aiOrganizeSummary,
+            aiActionSummary,
             aiSoftInputChars,
             aiMaxInputChars,
             aiTextLength,
@@ -3027,7 +3160,9 @@ const app = createApp({
             selectedAiEntryCount,
             selectedAiOrganizeCount,
             selectedAiOrganizeChangeCount,
+            selectedAiActionCount,
             canPreviewAiOrganize,
+            canPreviewAiActions,
             lastAiParseText,
             settingsForm,
             activeSettingsTab,
@@ -3154,15 +3289,20 @@ const app = createApp({
             manualEntryFromAi,
             clearAiParse,
             clearAiOrganize,
+            clearAiActions,
             setAiOrganizeMode,
             openAiSettingsFromParse,
             parseAiText,
             applyAiResult,
             previewAiOrganize,
             applyAiOrganize,
+            previewAiActions,
+            applyAiActions,
             removeAiOrganizeItem,
             aiTagActionLabel,
             aiTagActionTitle,
+            aiActionTypeLabel,
+            aiActionTitle,
             toggleAiEntrySelection,
             addAiEntryField,
             removeAiEntryField,

@@ -1132,7 +1132,8 @@ POST /ai/organize/preview
     "sortOrder": "desc"
   },
   "organize_tags": true,
-  "organize_groups": false
+  "organize_groups": false,
+  "user_prompt": "本次优先保留现有标签，只补充缺失标签"
 }
 ```
 
@@ -1239,6 +1240,15 @@ POST /ai/organize/apply
 POST /ai/tags/preview
 ```
 
+**请求体：**
+
+```json
+{
+  "filters": {},
+  "user_prompt": "本次优先合并语义重复标签，不要删除高频标签"
+}
+```
+
 **响应：**
 
 ```json
@@ -1310,6 +1320,119 @@ POST /ai/tags/apply
   "message": "已应用 1 条标签管理建议"
 }
 ```
+
+### 7.9 生成 AI 交互操作计划
+
+**根据用户自然语言指令生成结构化操作计划。该接口只返回计划，不写入 vault。**
+
+后端不会向 AI 发送字段值，只发送条目标题、网址、标签、密码组、字段名、字段索引、字段隐藏/可复制状态和备注。AI 返回的危险动作会被过滤；字段拆分时真实字段值只在 `/ai/actions/apply` 中由后端本地复制。
+
+```
+POST /ai/actions/preview
+```
+
+**请求体：**
+
+```json
+{
+  "instruction": "创建 demo-service 密码组，将 demo.example 条目的三个字段独立作为条目，从属于该密码组",
+  "filters": {
+    "search": "demo-service",
+    "searchScopes": ["title"]
+  }
+}
+```
+
+**响应：**
+
+```json
+{
+  "success": true,
+  "data": {
+    "entry_count": 1,
+    "summary": {
+      "total_actions": 4,
+      "create_group": 1,
+      "create_entry": 0,
+      "create_entry_from_field": 3,
+      "update_entry": 0
+    },
+    "actions": [
+      {
+        "type": "create_group",
+        "selected": true,
+        "group": "demo-service",
+        "description": "demo.example 相关凭据",
+        "reason": "用户要求创建独立密码组"
+      },
+      {
+        "type": "create_entry_from_field",
+        "selected": true,
+        "source_entry_id": "uuid",
+        "field_index": 0,
+        "field_name": "账号",
+        "title": "demo-service 账号",
+        "groups": ["demo-service"],
+        "tags": ["demo-service"],
+        "reason": "把字段拆成独立条目"
+      }
+    ],
+    "warnings": [],
+    "privacy_note": "本次 AI 交互不会发送任何字段值，字段拆分由后端本地复制真实值。"
+  }
+}
+```
+
+允许动作：`create_group`、`create_entry`、`create_entry_from_field`、`update_entry`。不允许删除条目、删除字段或覆盖字段值。
+
+**错误情况：**
+
+- 401: 未解锁
+- 413: 当前筛选结果超过 100 条
+- 422: 指令为空或当前筛选范围没有可分析条目
+- 502: AI 服务未配置或服务不可用
+
+### 7.10 应用 AI 交互操作计划
+
+```
+POST /ai/actions/apply
+```
+
+**请求体：**
+
+```json
+{
+  "actions": [
+    {
+      "type": "create_entry_from_field",
+      "selected": true,
+      "source_entry_id": "uuid",
+      "field_index": 0,
+      "field_name": "账号",
+      "title": "demo-service 账号",
+      "groups": ["demo-service"],
+      "tags": ["demo-service"]
+    }
+  ]
+}
+```
+
+**响应：**
+
+```json
+{
+  "success": true,
+  "data": {
+    "applied_count": 1,
+    "created_entries": 1,
+    "created_groups": 0,
+    "updated_entries": 0
+  },
+  "message": "已应用 1 项 AI 操作计划"
+}
+```
+
+应用前后端会重新校验来源条目、字段索引和字段名，任何选中动作无效时返回 `422` 且不写入，避免计划过期导致复制错误。
 
 ## 8. 导入导出模块
 
