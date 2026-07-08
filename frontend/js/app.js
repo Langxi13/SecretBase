@@ -53,6 +53,7 @@ const app = createApp({
         const showChangePassword = ref(false);
         const showTrash = ref(false);
         const showTagManager = ref(false);
+        const showGroupModal = ref(false);
         const showTagBrowser = ref(false);
         const showConfirm = ref(false);
         const showTools = ref(false);
@@ -188,6 +189,10 @@ const app = createApp({
             targetTag: ''
         });
         const tagMergeSourceList = ref([]);
+        const groupForm = reactive({
+            name: '',
+            description: ''
+        });
 
         // 修改密码
         const passwordForm = reactive({
@@ -683,6 +688,7 @@ const app = createApp({
             showSettings.value = false;
             showTrash.value = false;
             showTagManager.value = false;
+            showGroupModal.value = false;
             showTagBrowser.value = false;
             showChangePassword.value = false;
             showBackupCenter.value = false;
@@ -750,6 +756,34 @@ const app = createApp({
             resetAdvancedFilterForm();
             selectedEntryIds.value = [];
             await loadGroups();
+        }
+
+        function openCreateGroupModal() {
+            groupForm.name = '';
+            groupForm.description = '';
+            showGroupModal.value = true;
+        }
+
+        function closeGroupModal() {
+            showGroupModal.value = false;
+            groupForm.name = '';
+            groupForm.description = '';
+        }
+
+        async function saveGroup() {
+            const name = groupForm.name.trim();
+            if (!name) {
+                showToast('请输入密码组名称', 'error');
+                return;
+            }
+            const result = await store.createGroup({
+                name,
+                description: groupForm.description.trim()
+            });
+            if (result) {
+                closeGroupModal();
+                await loadGroups();
+            }
         }
 
         async function filterByGroup(groupName) {
@@ -2531,6 +2565,7 @@ const app = createApp({
             listContextNotice,
             showTagDropdown,
             showTagBrowser,
+            showGroupModal,
             tagBrowserQuery,
             tagBrowserSort,
             tagBrowserSortOptions,
@@ -2611,6 +2646,7 @@ const app = createApp({
             defaultTimeRange,
             tagMergeForm,
             tagMergeSourceList,
+            groupForm,
             passwordForm,
             trashItems,
             trashPage,
@@ -2643,6 +2679,9 @@ const app = createApp({
             toggleSearchScope,
             filterByTag,
             showGroupMode,
+            openCreateGroupModal,
+            closeGroupModal,
+            saveGroup,
             filterByGroup,
             openTagBrowser,
             closeTagBrowser,

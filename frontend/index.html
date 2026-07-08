@@ -7,16 +7,16 @@
     
     <!-- Vue 3 CDN (Production) -->
     <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
-    <script src="/secretbase-runtime-config.js?v=20260708-ui-v32"></script>
+    <script src="/secretbase-runtime-config.js?v=20260708-ui-v33"></script>
     
     <!-- 基础样式 -->
-    <link rel="stylesheet" href="css/style.css?v=20260708-ui-v32">
-    <link rel="stylesheet" href="css/components.css?v=20260708-ui-v32">
+    <link rel="stylesheet" href="css/style.css?v=20260708-ui-v33">
+    <link rel="stylesheet" href="css/components.css?v=20260708-ui-v33">
     
     <!-- 主题样式 -->
-    <link rel="stylesheet" href="css/themes/variables.css?v=20260708-ui-v32">
-    <link rel="stylesheet" href="css/themes/dark.css?v=20260708-ui-v32">
-    <link rel="stylesheet" href="css/themes/light.css?v=20260708-ui-v32">
+    <link rel="stylesheet" href="css/themes/variables.css?v=20260708-ui-v33">
+    <link rel="stylesheet" href="css/themes/dark.css?v=20260708-ui-v33">
+    <link rel="stylesheet" href="css/themes/light.css?v=20260708-ui-v33">
     
     <!-- Favicon -->
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🔐</text></svg>">
@@ -333,9 +333,9 @@
                     <div class="group-mode-header">
                         <div>
                             <h2>密码组</h2>
-                            <p>像相册一样整理密码。点击任一密码组后，会切换到该组筛选后的条目列表。</p>
+                            <p>管理密码组，点击进入查看条目。</p>
                         </div>
-                        <button class="btn-primary" @click="openCreateModal">+ 新建条目</button>
+                        <button class="btn-primary" @click="openCreateGroupModal">+ 新建密码组</button>
                     </div>
                     <div v-if="groups.length === 0" class="empty-state group-empty-state">
                         <div class="empty-icon">🗂️</div>
@@ -767,6 +767,30 @@
                     <button class="btn-primary" @click="saveEntry" :disabled="!entryForm.title">
                         {{ showEditModal ? '保存' : '创建' }}
                     </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 新建密码组弹窗 -->
+        <div v-if="showGroupModal" class="modal-overlay">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2>新建密码组</h2>
+                    <button class="modal-close" @click="closeGroupModal">✕</button>
+                </div>
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label>名称 *</label>
+                        <input type="text" v-model="groupForm.name" placeholder="例如：工作账号" @keydown.enter.prevent="saveGroup">
+                    </div>
+                    <div class="form-group">
+                        <label>简介</label>
+                        <textarea v-model="groupForm.description" placeholder="简单描述这个密码组" rows="3"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn-secondary" @click="closeGroupModal">取消</button>
+                    <button class="btn-primary" @click="saveGroup" :disabled="!groupForm.name.trim()">创建</button>
                 </div>
             </div>
         </div>
@@ -1554,9 +1578,9 @@
     </div>
     
     <!-- JS 模块 -->
-    <script src="js/api.js?v=20260708-ui-v32"></script>
-    <script src="js/utils.js?v=20260708-ui-v32"></script>
-    <script src="js/store.js?v=20260708-ui-v32"></script>
-    <script src="js/app.js?v=20260708-ui-v32"></script>
+    <script src="js/api.js?v=20260708-ui-v33"></script>
+    <script src="js/utils.js?v=20260708-ui-v33"></script>
+    <script src="js/store.js?v=20260708-ui-v33"></script>
+    <script src="js/app.js?v=20260708-ui-v33"></script>
 </body>
 </html>
