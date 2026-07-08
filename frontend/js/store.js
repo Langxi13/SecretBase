@@ -414,6 +414,19 @@ class Store {
         }
     }
 
+    async batchDeleteTags(tagNames) {
+        try {
+            const result = await api.post('/tags/batch-delete', { names: tagNames });
+            showToast(result.message || '标签已批量删除', 'success');
+            await Promise.all([this.loadTags(), this.loadEntries(this.state.pagination.page)]);
+            return result.data;
+        } catch (error) {
+            console.error('批量删除标签失败:', error);
+            showToast(error.message || '批量删除标签失败', 'error');
+            return null;
+        }
+    }
+
     /**
      * 加载密码组
      */

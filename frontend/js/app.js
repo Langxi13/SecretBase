@@ -53,6 +53,7 @@ const app = createApp({
         const showChangePassword = ref(false);
         const showTrash = ref(false);
         const showTagManager = ref(false);
+        const showTagEditorModal = ref(false);
         const showGroupModal = ref(false);
         const showTagBrowser = ref(false);
         const showConfirm = ref(false);
@@ -198,6 +199,9 @@ const app = createApp({
             targetTag: ''
         });
         const tagMergeSourceList = ref([]);
+        const tagManagerPage = ref(1);
+        const tagManagerPageSize = 8;
+        const selectedManagedTagNames = ref([]);
         const tagEditorForm = reactive({
             mode: 'create',
             originalName: '',
@@ -401,6 +405,18 @@ const app = createApp({
             const query = tagBrowserQuery.value.trim().toLowerCase();
             if (!query) return sortedTagBrowserTags.value;
             return sortedTagBrowserTags.value.filter(tag => String(tag.name || '').toLowerCase().includes(query));
+        });
+
+        const tagManagerTotalPages = computed(() => Math.max(1, Math.ceil(tags.value.length / tagManagerPageSize)));
+
+        const paginatedManagedTags = computed(() => {
+            const start = (tagManagerPage.value - 1) * tagManagerPageSize;
+            return sortedTagBrowserTags.value.slice(start, start + tagManagerPageSize);
+        });
+
+        const allManagedPageTagsSelected = computed(() => {
+            const pageTags = paginatedManagedTags.value;
+            return pageTags.length > 0 && pageTags.every(tag => selectedManagedTagNames.value.includes(tag.name));
         });
 
         const activeAdvancedFilterChips = computed(() => {
@@ -783,6 +799,7 @@ const app = createApp({
             showSettings.value = false;
             showTrash.value = false;
             showTagManager.value = false;
+            showTagEditorModal.value = false;
             showGroupModal.value = false;
             showTagBrowser.value = false;
             showChangePassword.value = false;
@@ -2165,22 +2182,13 @@ const app = createApp({
             });
         }
 
-        // 重命名标签
-        function renameTag(tag) {
-            const newName = prompt('请输入新标签名:', tag.name);
-            if (newName && newName !== tag.name) {
-                store.updateTag(tag.name, {
-                    name: newName,
-                    description: tag.description || '',
-                    color: tag.color
-                });
-            }
-        }
-
         // 删除标签
         function deleteTag(tag) {
             showConfirmDialog('删除标签', `确认删除标签 "${tag.name}"？`, async () => {
-                await store.deleteTag(tag.name);
+                const deleted = await store.deleteTag(tag.name);
+                if (deleted) {
+                    selectedManagedTagNames.value = selectedManagedTagNames.value.filter(name => name !== tag.name);
+                }
             });
         }
 
@@ -2198,10 +2206,26 @@ const app = createApp({
             tagEditorForm.name = tag.name;
             tagEditorForm.description = tag.description || '';
             tagEditorForm.color = tag.color || '#64748b';
+            showTagEditorModal.value = true;
         }
 
         function cancelManagedTagEdit() {
+            closeTagEditorModal();
+        }
+
+        function openCreateTagModal() {
             resetTagEditorForm();
+            showTagEditorModal.value = true;
+        }
+
+        function closeTagEditorModal() {
+            showTagEditorModal.value = false;
+            resetTagEditorForm();
+        }
+
+        function closeTagManager() {
+            showTagManager.value = false;
+            closeTagEditorModal();
         }
 
         async function createTagFromManager() {
@@ -2216,7 +2240,7 @@ const app = createApp({
                 color: tagEditorForm.color
             });
             if (created) {
-                resetTagEditorForm();
+                closeTagEditorModal();
             }
         }
 
@@ -2236,8 +2260,51 @@ const app = createApp({
                 color: tagEditorForm.color
             });
             if (updated) {
-                resetTagEditorForm();
+                closeTagEditorModal();
             }
+        }
+
+        function isManagedTagSelected(tagName) {
+            return selectedManagedTagNames.value.includes(tagName);
+        }
+
+        function toggleManagedTagSelection(tagName) {
+            if (selectedManagedTagNames.value.includes(tagName)) {
+                selectedManagedTagNames.value = selectedManagedTagNames.value.filter(name => name !== tagName);
+                return;
+            }
+            selectedManagedTagNames.value = [...selectedManagedTagNames.value, tagName];
+        }
+
+        function toggleManagedTagPageSelection() {
+            const pageNames = paginatedManagedTags.value.map(tag => tag.name);
+            if (allManagedPageTagsSelected.value) {
+                selectedManagedTagNames.value = selectedManagedTagNames.value.filter(name => !pageNames.includes(name));
+                return;
+            }
+            const selected = new Set(selectedManagedTagNames.value);
+            pageNames.forEach(name => selected.add(name));
+            selectedManagedTagNames.value = Array.from(selected);
+        }
+
+        function goToTagManagerPage(page) {
+            const target = Math.min(Math.max(Number(page) || 1, 1), tagManagerTotalPages.value);
+            tagManagerPage.value = target;
+        }
+
+        async function batchDeleteManagedTags() {
+            const names = [...selectedManagedTagNames.value];
+            if (names.length === 0) {
+                showToast('请选择要删除的标签', 'warning');
+                return;
+            }
+            showConfirmDialog('批量删除标签', `确认删除已选 ${names.length} 个标签？这些标签会从相关条目中移除。`, async () => {
+                const result = await store.batchDeleteTags(names);
+                if (result) {
+                    selectedManagedTagNames.value = [];
+                    goToTagManagerPage(tagManagerPage.value);
+                }
+            });
         }
 
         function parseTagMergeSourceText(text) {
@@ -2788,6 +2855,14 @@ const app = createApp({
             if (val) loadBackups();
         });
 
+        watch(tags, () => {
+            if (tagManagerPage.value > tagManagerTotalPages.value) {
+                tagManagerPage.value = tagManagerTotalPages.value;
+            }
+            const validNames = new Set(tags.value.map(tag => tag.name));
+            selectedManagedTagNames.value = selectedManagedTagNames.value.filter(name => validNames.has(name));
+        });
+
         return {
             // 状态
             loading,
@@ -2828,6 +2903,7 @@ const app = createApp({
             showChangePassword,
             showTrash,
             showTagManager,
+            showTagEditorModal,
             showConfirm,
             showTools,
             showBackupCenter,
@@ -2909,6 +2985,11 @@ const app = createApp({
             defaultTimeRange,
             tagMergeForm,
             tagMergeSourceList,
+            tagManagerPage,
+            tagManagerTotalPages,
+            paginatedManagedTags,
+            allManagedPageTagsSelected,
+            selectedManagedTagNames,
             tagEditorForm,
             groupForm,
             passwordForm,
@@ -3033,12 +3114,19 @@ const app = createApp({
             emptyTrashConfirm,
             loadTrash,
             goToTrashPage,
-            renameTag,
             deleteTag,
+            closeTagManager,
             startEditManagedTag,
             cancelManagedTagEdit,
+            openCreateTagModal,
+            closeTagEditorModal,
             createTagFromManager,
             saveManagedTag,
+            isManagedTagSelected,
+            toggleManagedTagSelection,
+            toggleManagedTagPageSelection,
+            goToTagManagerPage,
+            batchDeleteManagedTags,
             mergeTags,
             commitTagMergeSourceTags,
             removeTagMergeSourceTag,

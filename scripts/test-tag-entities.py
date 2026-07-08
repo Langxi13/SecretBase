@@ -104,6 +104,34 @@ def main() -> None:
         final_detail = expect_success(client.get(f"/entries/{entry['id']}", headers=headers), "entry after tag delete")
         assert final_detail["tags"] == []
 
+        batch_entry = expect_success(
+            client.post(
+                "/entries",
+                json={
+                    "title": "批量标签条目",
+                    "url": "https://batch-tags.example.test",
+                    "tags": ["临时标签A", "临时标签B", "保留标签"],
+                    "fields": [{"name": "账号", "value": "batch@example.test", "copyable": True, "hidden": False}],
+                    "remarks": "",
+                },
+                headers=headers,
+            ),
+            "create batch tagged entry",
+        )
+        batch_deleted = expect_success(
+            client.post(
+                "/tags/batch-delete",
+                json={"names": ["临时标签A", "临时标签B", "不存在标签", "临时标签A"]},
+                headers=headers,
+            ),
+            "batch delete tags",
+        )
+        assert batch_deleted["deleted_tags"] == ["临时标签A", "临时标签B"]
+        assert batch_deleted["missing_tags"] == ["不存在标签"]
+        assert batch_deleted["affected_count"] == 1
+        batch_detail = expect_success(client.get(f"/entries/{batch_entry['id']}", headers=headers), "entry after batch tag delete")
+        assert batch_detail["tags"] == ["保留标签"]
+
         expect_success(
             client.post("/tags", json={"name": "空标签", "description": "", "color": "#64748b"}, headers=headers),
             "create standalone tag",

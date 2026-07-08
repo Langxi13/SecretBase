@@ -7,16 +7,16 @@
     
     <!-- Vue 3 CDN (Production) -->
     <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
-    <script src="/secretbase-runtime-config.js?v=20260708-ui-v41"></script>
+    <script src="/secretbase-runtime-config.js?v=20260708-ui-v42"></script>
     
     <!-- 基础样式 -->
-    <link rel="stylesheet" href="css/style.css?v=20260708-ui-v41">
-    <link rel="stylesheet" href="css/components.css?v=20260708-ui-v41">
+    <link rel="stylesheet" href="css/style.css?v=20260708-ui-v42">
+    <link rel="stylesheet" href="css/components.css?v=20260708-ui-v42">
     
     <!-- 主题样式 -->
-    <link rel="stylesheet" href="css/themes/variables.css?v=20260708-ui-v41">
-    <link rel="stylesheet" href="css/themes/dark.css?v=20260708-ui-v41">
-    <link rel="stylesheet" href="css/themes/light.css?v=20260708-ui-v41">
+    <link rel="stylesheet" href="css/themes/variables.css?v=20260708-ui-v42">
+    <link rel="stylesheet" href="css/themes/dark.css?v=20260708-ui-v42">
+    <link rel="stylesheet" href="css/themes/light.css?v=20260708-ui-v42">
     
     <!-- Favicon -->
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🔐</text></svg>">
@@ -1477,36 +1477,36 @@
             <div class="modal-content tag-manager-modal">
                 <div class="modal-header">
                     <h2>🏷️ 标签管理</h2>
-                    <button class="modal-close" @click="showTagManager = false">✕</button>
+                    <button class="modal-close" @click="closeTagManager">✕</button>
                 </div>
                 <div class="modal-body">
-                    <div class="tag-merge-panel">
-                        <h3>{{ tagEditorForm.mode === 'edit' ? '编辑标签' : '新建标签' }}</h3>
-                        <div class="tag-edit-grid">
-                            <label>
-                                <span>标签名称</span>
-                                <input type="text" v-model="tagEditorForm.name" placeholder="例如：云服务" @keydown.enter.prevent="saveManagedTag">
-                            </label>
-                            <label>
-                                <span>标签简介</span>
-                                <input type="text" v-model="tagEditorForm.description" placeholder="简要说明适用范围" @keydown.enter.prevent="saveManagedTag">
-                            </label>
-                            <label>
-                                <span>标签颜色</span>
-                                <input type="color" v-model="tagEditorForm.color">
-                            </label>
+                    <div class="tag-manager-toolbar">
+                        <div class="tag-manager-summary">
+                            <strong>标签列表</strong>
+                            <span>{{ tags.length }} 个标签 · 第 {{ tagManagerPage }} / {{ tagManagerTotalPages }} 页</span>
                         </div>
-                        <div class="tag-editor-actions">
-                            <button class="btn-primary" v-if="tagEditorForm.mode === 'create'" @click="createTagFromManager" :disabled="!tagEditorForm.name.trim()">新建标签</button>
-                            <button class="btn-primary" v-else @click="saveManagedTag" :disabled="!tagEditorForm.name.trim()">保存标签</button>
-                            <button class="btn-secondary" v-if="tagEditorForm.mode === 'edit'" @click="cancelManagedTagEdit">取消编辑</button>
+                        <div class="tag-manager-actions">
+                            <button class="btn-secondary" @click="openCreateTagModal">新建标签</button>
+                            <button class="btn-danger" @click="batchDeleteManagedTags" :disabled="selectedManagedTagNames.length === 0">
+                                批量删除（{{ selectedManagedTagNames.length }}）
+                            </button>
                         </div>
                     </div>
                     <div v-if="tags.length === 0" class="empty-state">
                         <p>暂无标签</p>
                     </div>
-                    <div v-else>
-                        <div v-for="tag in tags" :key="tag.name" class="tag-item">
+                    <div v-else class="tag-manager-list">
+                        <div class="tag-manager-list-head">
+                            <label class="tag-select-control">
+                                <input type="checkbox" :checked="allManagedPageTagsSelected" @change="toggleManagedTagPageSelection">
+                                <span>选择当前页</span>
+                            </label>
+                            <span>{{ paginatedManagedTags.length }} / {{ tags.length }}</span>
+                        </div>
+                        <div v-for="tag in paginatedManagedTags" :key="tag.name" class="tag-item">
+                            <label class="tag-select-box" :aria-label="`选择标签 ${tag.name}`">
+                                <input type="checkbox" :checked="isManagedTagSelected(tag.name)" @change="toggleManagedTagSelection(tag.name)">
+                            </label>
                             <span class="tag-dot" :style="{ backgroundColor: tag.color }"></span>
                             <div class="tag-main">
                                 <span class="tag-name">{{ tag.name }}</span>
@@ -1515,6 +1515,11 @@
                             <span class="tag-count">{{ tag.count }} 个条目</span>
                             <button class="btn-small" @click="startEditManagedTag(tag)">编辑</button>
                             <button class="btn-small btn-danger" @click="deleteTag(tag)">删除</button>
+                        </div>
+                        <div class="tag-manager-pagination">
+                            <button class="btn-secondary" :disabled="tagManagerPage <= 1" @click="goToTagManagerPage(tagManagerPage - 1)">上一页</button>
+                            <span class="page-info">{{ tagManagerPage }} / {{ tagManagerTotalPages }}</span>
+                            <button class="btn-secondary" :disabled="tagManagerPage >= tagManagerTotalPages" @click="goToTagManagerPage(tagManagerPage + 1)">下一页</button>
                         </div>
                     </div>
                     <div class="tag-merge-panel">
@@ -1547,6 +1552,37 @@
                             合并标签
                         </button>
                     </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 标签新建/编辑弹窗 -->
+        <div v-if="showTagEditorModal" class="modal-overlay">
+            <div class="modal-content tag-editor-modal">
+                <div class="modal-header">
+                    <h2>{{ tagEditorForm.mode === 'edit' ? '编辑标签' : '新建标签' }}</h2>
+                    <button class="modal-close" @click="closeTagEditorModal">✕</button>
+                </div>
+                <div class="modal-body">
+                    <div class="tag-edit-grid">
+                        <label>
+                            <span>标签名称</span>
+                            <input type="text" v-model="tagEditorForm.name" placeholder="例如：云服务" @keydown.enter.prevent="saveManagedTag">
+                        </label>
+                        <label>
+                            <span>标签简介</span>
+                            <input type="text" v-model="tagEditorForm.description" placeholder="简要说明适用范围" @keydown.enter.prevent="saveManagedTag">
+                        </label>
+                        <label>
+                            <span>标签颜色</span>
+                            <input type="color" v-model="tagEditorForm.color">
+                        </label>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn-secondary" @click="closeTagEditorModal">取消</button>
+                    <button class="btn-primary" v-if="tagEditorForm.mode === 'create'" @click="createTagFromManager" :disabled="!tagEditorForm.name.trim()">新建</button>
+                    <button class="btn-primary" v-else @click="saveManagedTag" :disabled="!tagEditorForm.name.trim()">保存</button>
                 </div>
             </div>
         </div>
@@ -1721,9 +1757,9 @@
     </div>
     
     <!-- JS 模块 -->
-    <script src="js/api.js?v=20260708-ui-v41"></script>
-    <script src="js/utils.js?v=20260708-ui-v41"></script>
-    <script src="js/store.js?v=20260708-ui-v41"></script>
-    <script src="js/app.js?v=20260708-ui-v41"></script>
+    <script src="js/api.js?v=20260708-ui-v42"></script>
+    <script src="js/utils.js?v=20260708-ui-v42"></script>
+    <script src="js/store.js?v=20260708-ui-v42"></script>
+    <script src="js/app.js?v=20260708-ui-v42"></script>
 </body>
 </html>

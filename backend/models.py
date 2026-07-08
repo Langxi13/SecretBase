@@ -155,6 +155,24 @@ class BatchTagRequest(BaseModel):
         return list(set(tag.strip() for tag in v if tag.strip()))
 
 
+class TagBatchDeleteRequest(BaseModel):
+    """批量删除标签请求"""
+    names: List[str] = Field(..., min_items=1)
+
+    @validator('names')
+    def validate_names(cls, v):
+        cleaned = []
+        for name in v:
+            value = str(name or "").strip()
+            if not value:
+                raise ValueError('标签名称不能为空')
+            if len(value) > 50:
+                raise ValueError('标签不能超过 50 个字符')
+            if value not in cleaned:
+                cleaned.append(value)
+        return cleaned
+
+
 class BatchStarRequest(BaseModel):
     """批量星标请求"""
     ids: List[str] = Field(..., min_items=1)

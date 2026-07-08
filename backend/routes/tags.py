@@ -1,7 +1,7 @@
 import logging
 from datetime import datetime
 from fastapi import APIRouter, HTTPException
-from models import TagRequest, TagRenameRequest, TagMergeRequest
+from models import TagRequest, TagRenameRequest, TagMergeRequest, TagBatchDeleteRequest
 from storage import is_unlocked, get_vault_data, save_vault_data
 from tag_utils import (
     ensure_tag_meta,
@@ -94,6 +94,56 @@ async def rename_tag(tag_name: str, request: TagRenameRequest):
             "affected_count": affected_count
         },
         "message": "标签已更新"
+    }
+
+
+@router.post("/batch-delete")
+async def batch_delete_tags(request: TagBatchDeleteRequest):
+    """批量删除标签"""
+    check_unlocked()
+    names = [normalize_tag_name(name) for name in request.names if normalize_tag_name(name)]
+    if not names:
+        raise HTTPException(status_code=422, detail="标签名称不能为空")
+
+    vault = get_vault_data()
+    tags_meta = ensure_tags_meta(vault)
+    deleted_tags = []
+    missing_tags = []
+    affected_entry_ids = set()
+
+    for name in names:
+        before_entry_ids = {
+            entry.id
+            for entry in vault.entries
+            if not entry.deleted and name in (entry.tags or [])
+        }
+        entry_affected = remove_tag_from_entries(vault, name)
+        meta_removed = name in tags_meta
+        if meta_removed:
+            tags_meta.pop(name, None)
+
+        if entry_affected == 0 and not meta_removed:
+            missing_tags.append(name)
+            continue
+
+        deleted_tags.append(name)
+        affected_entry_ids.update(before_entry_ids)
+
+    if not deleted_tags:
+        raise HTTPException(status_code=404, detail="标签不存在")
+
+    save_vault_data(vault)
+    affected_count = len(affected_entry_ids)
+
+    logger.info(f"批量删除标签: {deleted_tags}")
+    return {
+        "success": True,
+        "data": {
+            "deleted_tags": deleted_tags,
+            "missing_tags": missing_tags,
+            "affected_count": affected_count
+        },
+        "message": f"已删除 {len(deleted_tags)} 个标签，影响 {affected_count} 个条目"
     }
 
 

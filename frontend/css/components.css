@@ -1491,9 +1491,73 @@
 }
 
 /* 标签管理条目 */
+.tag-manager-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 14px;
+    margin-bottom: 14px;
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius);
+    background: var(--bg-secondary);
+}
+
+.tag-manager-summary {
+    display: grid;
+    gap: 4px;
+    min-width: 0;
+}
+
+.tag-manager-summary strong {
+    color: var(--text-primary);
+    font-size: var(--font-size-md);
+}
+
+.tag-manager-summary span,
+.tag-manager-list-head span {
+    color: var(--text-secondary);
+    font-size: var(--font-size-sm);
+}
+
+.tag-manager-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+}
+
+.tag-manager-list {
+    display: grid;
+    gap: 8px;
+}
+
+.tag-manager-list-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 0 2px 4px;
+}
+
+.tag-select-control,
+.tag-select-box {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    color: var(--text-secondary);
+    font-size: var(--font-size-sm);
+}
+
+.tag-select-box {
+    width: 24px;
+}
+
 .tag-item {
     display: grid;
-    grid-template-columns: 12px minmax(160px, 1fr) auto auto auto;
+    grid-template-columns: 24px 12px minmax(160px, 1fr) auto auto auto;
     align-items: center;
     gap: 12px;
     padding: 12px;
@@ -1562,6 +1626,19 @@
     margin-top: 12px;
 }
 
+.tag-manager-pagination {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    padding-top: 8px;
+    margin-top: 4px;
+}
+
+.tag-editor-modal {
+    max-width: min(720px, calc(100vw - 48px));
+}
+
 .tag-merge-panel {
     margin-top: 24px;
     padding: 16px;
@@ -1595,13 +1672,21 @@
     }
 
     .tag-item {
-        grid-template-columns: 12px minmax(0, 1fr);
+        grid-template-columns: 24px 12px minmax(0, 1fr);
     }
 
     .tag-item .tag-count,
     .tag-item .btn-small {
-        grid-column: 2;
+        grid-column: 3;
         justify-self: stretch;
+    }
+
+    .tag-manager-toolbar,
+    .tag-manager-list-head,
+    .tag-manager-actions,
+    .tag-manager-pagination {
+        align-items: stretch;
+        flex-direction: column;
     }
 
     .tag-edit-grid {
@@ -2434,5 +2519,33 @@ input[type="checkbox"] {
 
     .tag-browser-modal {
         border-radius: 0;
+    }
+
+    .tag-manager-toolbar,
+    .tag-manager-list-head,
+    .tag-manager-actions,
+    .tag-manager-pagination {
+        align-items: stretch;
+        flex-direction: column;
+    }
+
+    .tag-manager-actions .btn-secondary,
+    .tag-manager-actions .btn-danger,
+    .tag-manager-pagination .btn-secondary {
+        width: 100%;
+    }
+
+    .tag-manager-list .tag-item {
+        display: grid;
+        grid-template-columns: 24px 12px minmax(0, 1fr);
+        align-items: center;
+        flex-direction: initial;
+    }
+
+    .tag-manager-list .tag-item .tag-count,
+    .tag-manager-list .tag-item .btn-small {
+        grid-column: 3;
+        justify-self: stretch;
+        width: 100%;
     }
 }
