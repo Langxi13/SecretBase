@@ -7,16 +7,16 @@
     
     <!-- Vue 3 CDN (Production) -->
     <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
-    <script src="/secretbase-runtime-config.js?v=20260708-ui-v35"></script>
+    <script src="/secretbase-runtime-config.js?v=20260708-ui-v36"></script>
     
     <!-- 基础样式 -->
-    <link rel="stylesheet" href="css/style.css?v=20260708-ui-v35">
-    <link rel="stylesheet" href="css/components.css?v=20260708-ui-v35">
+    <link rel="stylesheet" href="css/style.css?v=20260708-ui-v36">
+    <link rel="stylesheet" href="css/components.css?v=20260708-ui-v36">
     
     <!-- 主题样式 -->
-    <link rel="stylesheet" href="css/themes/variables.css?v=20260708-ui-v35">
-    <link rel="stylesheet" href="css/themes/dark.css?v=20260708-ui-v35">
-    <link rel="stylesheet" href="css/themes/light.css?v=20260708-ui-v35">
+    <link rel="stylesheet" href="css/themes/variables.css?v=20260708-ui-v36">
+    <link rel="stylesheet" href="css/themes/dark.css?v=20260708-ui-v36">
+    <link rel="stylesheet" href="css/themes/light.css?v=20260708-ui-v36">
     
     <!-- Favicon -->
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🔐</text></svg>">
@@ -595,7 +595,7 @@
 
         <!-- 条目详情弹窗 -->
         <div v-if="selectedEntry" class="modal-overlay">
-            <div class="modal-content">
+            <div class="modal-content entry-detail-modal">
                 <div class="modal-header">
                     <h2>{{ selectedEntry.title }}</h2>
                     <button class="modal-close" @click="closeEntryDetail">✕</button>
@@ -649,7 +649,7 @@
         
         <!-- 创建/编辑条目弹窗 -->
         <div v-if="showCreateModal || showEditModal" class="modal-overlay">
-            <div class="modal-content">
+            <div class="modal-content entry-editor-modal">
                 <div class="modal-header">
                     <h2>{{ showEditModal ? '编辑条目' : '新建条目' }}</h2>
                     <button class="modal-close" @click="closeEntryModal">✕</button>
@@ -797,7 +797,7 @@
         
         <!-- AI 智能录入弹窗 -->
         <div v-if="showAiParse" class="modal-overlay">
-            <div class="modal-content">
+            <div class="modal-content ai-assistant-modal">
                 <div class="modal-header">
                     <h2>🤖 AI 助手</h2>
                     <button class="modal-close" @click="showAiParse = false">✕</button>
@@ -1403,7 +1403,7 @@
         
         <!-- 回收站弹窗 -->
         <div v-if="showTrash" class="modal-overlay">
-            <div class="modal-content">
+            <div class="modal-content trash-modal">
                 <div class="modal-header">
                     <h2>🗑️ 回收站</h2>
                     <button class="modal-close" @click="showTrash = false">✕</button>
@@ -1658,9 +1658,9 @@
     </div>
     
     <!-- JS 模块 -->
-    <script src="js/api.js?v=20260708-ui-v35"></script>
-    <script src="js/utils.js?v=20260708-ui-v35"></script>
-    <script src="js/store.js?v=20260708-ui-v35"></script>
-    <script src="js/app.js?v=20260708-ui-v35"></script>
+    <script src="js/api.js?v=20260708-ui-v36"></script>
+    <script src="js/utils.js?v=20260708-ui-v36"></script>
+    <script src="js/store.js?v=20260708-ui-v36"></script>
+    <script src="js/app.js?v=20260708-ui-v36"></script>
 </body>
 </html>

@@ -2260,6 +2260,19 @@ input[type="checkbox"] {
         max-width: min(960px, calc(100vw - 72px));
     }
 
+    .entry-editor-modal,
+    .ai-assistant-modal {
+        max-width: min(1040px, calc(100vw - 72px));
+    }
+
+    .entry-detail-modal {
+        max-width: min(920px, calc(100vw - 72px));
+    }
+
+    .trash-modal {
+        max-width: min(860px, calc(100vw - 72px));
+    }
+
     .backup-list {
         grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
     }
