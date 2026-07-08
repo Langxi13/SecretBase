@@ -274,6 +274,58 @@ const app = createApp({
 
         const isAiTagGovernanceMode = computed(() => aiOrganizeMode.value === 'tag-governance');
 
+        const aiOrganizeSummary = computed(() => {
+            const suggestions = (aiOrganizeResult.value?.suggestions || []).filter(item => item.selected);
+            if (isAiTagGovernanceMode.value) {
+                const affectedEntries = new Set();
+                const summary = {
+                    affected_entries: 0,
+                    total_actions: suggestions.length,
+                    create_tag: 0,
+                    update_tag: 0,
+                    delete_tag: 0,
+                    merge_tags: 0,
+                    replace_tag: 0,
+                    assign_tag: 0
+                };
+                suggestions.forEach(item => {
+                    (item.entry_ids || []).forEach(entryId => affectedEntries.add(entryId));
+                    if (Object.prototype.hasOwnProperty.call(summary, item.action)) {
+                        summary[item.action] += 1;
+                    }
+                });
+                summary.affected_entries = affectedEntries.size;
+                return summary;
+            }
+
+            const existingGroupNames = new Set(groups.value.map(group => group.name));
+            const uniqueAddGroups = new Set();
+            let addGroupAssignments = 0;
+            const summary = {
+                affected_entries: suggestions.length,
+                add_tags: 0,
+                remove_tags: 0,
+                add_groups: 0,
+                add_group_assignments: 0,
+                assigned_groups: 0,
+                remove_groups: 0
+            };
+            suggestions.forEach(item => {
+                summary.add_tags += (item.add_tags || []).length;
+                summary.remove_tags += (item.remove_tags || []).length;
+                summary.remove_groups += (item.remove_groups || []).length;
+                (item.add_groups || []).forEach(group => {
+                    uniqueAddGroups.add(group);
+                    addGroupAssignments += 1;
+                });
+            });
+            const uniqueNewGroups = [...uniqueAddGroups].filter(group => !existingGroupNames.has(group));
+            summary.add_groups = uniqueNewGroups.length;
+            summary.add_group_assignments = addGroupAssignments;
+            summary.assigned_groups = uniqueAddGroups.size;
+            return summary;
+        });
+
         const selectedAiOrganizeChangeCount = computed(() => {
             return (aiOrganizeResult.value?.suggestions || [])
                 .filter(item => item.selected)
@@ -2828,6 +2880,7 @@ const app = createApp({
             aiOrganizeMode,
             aiOrganizeOptions,
             isAiTagGovernanceMode,
+            aiOrganizeSummary,
             aiSoftInputChars,
             aiMaxInputChars,
             aiTextLength,
