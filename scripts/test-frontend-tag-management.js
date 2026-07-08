@@ -78,13 +78,18 @@ assertMatches(
 );
 assertMatches(
     componentsCss,
-    /\.tag-manager-modal \.modal-body[\s\S]*overflow:\s*hidden/,
-    '标签管理弹窗主体应避免内部纵向滚动'
+    /\.tag-manager-list\s*\{[^}]*overflow-y:\s*auto/,
+    '标签管理选择 20/50 每页时，列表区域必须可滚动访问全部标签，不能隐藏超出项'
 );
 assertMatches(
     componentsCss,
     /\.tag-browser-pagination[\s\S]*justify-content:\s*center/,
     '更多标签分页控件应在底部居中'
+);
+assertMatches(
+    componentsCss,
+    /\.tag-browser-list\s*\{[^}]*overflow-y:\s*auto/,
+    '更多标签选择 20/50 每页时，列表区域必须可滚动访问全部标签，不能隐藏超出项'
 );
 assertMatches(
     componentsCss,

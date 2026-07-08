@@ -1524,6 +1524,7 @@
 
 .tag-manager-panel {
     min-height: 0;
+    flex: 1 1 auto;
 }
 
 .tag-manager-list-panel {
@@ -1592,6 +1593,8 @@
     display: grid;
     gap: 8px;
     min-height: 0;
+    overflow-y: auto;
+    padding-right: 4px;
 }
 
 .tag-manager-list-head {
@@ -1938,7 +1941,8 @@ input[type="checkbox"] {
     grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
     gap: 10px;
     min-height: 0;
-    overflow: hidden;
+    overflow-y: auto;
+    padding-right: 4px;
 }
 
 .tag-browser-item {
