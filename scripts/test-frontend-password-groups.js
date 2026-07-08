@@ -51,12 +51,13 @@ assertIncludes(indexHtml, '@click="filterByGroup(group.name)"', '点击密码组
 assertIncludes(indexHtml, '@click="openCreateGroupModal"', '密码组模式主按钮必须打开新建密码组');
 assertIncludes(indexHtml, '+ 新建密码组', '密码组模式主按钮必须显示新建密码组');
 assertIncludes(indexHtml, 'active-group-toolbar', '进入具体密码组后必须展示密码组操作条');
-assertIncludes(indexHtml, '@click="openCreateEntryForActiveGroup"', '具体密码组页必须提供新建条目操作');
+assertNotIncludes(indexHtml, '<button class="btn-primary" @click="openCreateEntryForActiveGroup">+ 新建条目</button>', '具体密码组操作条不应再出现额外的新建条目按钮');
 assertIncludes(indexHtml, '@click="openGroupEntryPicker"', '具体密码组页必须提供选择条目操作');
+assertIncludes(indexHtml, '选择已有条目', '具体密码组页选择按钮必须明确为选择已有条目');
 assertIncludes(indexHtml, 'showGroupEntryPicker', '必须提供选择条目加入密码组弹窗');
 assertIncludes(indexHtml, '加入当前密码组', '选择条目弹窗必须明确加入当前密码组');
-assertIncludes(indexHtml, '?v=20260708-ui-v47', '前端资源版本必须随密码组详情页交互更新，避免浏览器继续使用旧 JS');
-assertNotIncludes(indexHtml, '?v=20260708-ui-v46', '不能继续引用旧资源版本，否则选择条目按钮可能绑定旧 JS');
+assertIncludes(indexHtml, '?v=20260708-ui-v48', '前端资源版本必须随密码组详情页交互更新，避免浏览器继续使用旧 JS');
+assertNotIncludes(indexHtml, '?v=20260708-ui-v47', '不能继续引用旧资源版本，否则具体密码组页 UI 可能继续显示旧按钮');
 assertNotIncludes(indexHtml, 'activeGroup?.description', '模板中避免使用可选链，提升 Vue CDN 模板兼容性');
 assertNotIncludes(indexHtml, '像相册一样整理密码', '密码组模式说明文案必须保持简短');
 assertIncludes(appJs, 'function openCreateGroupModal', '必须提供新建密码组弹窗入口');
