@@ -7,16 +7,16 @@
     
     <!-- Vue 3 CDN (Production) -->
     <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
-    <script src="/secretbase-runtime-config.js?v=20260708-ui-v46"></script>
+    <script src="/secretbase-runtime-config.js?v=20260708-ui-v47"></script>
     
     <!-- 基础样式 -->
-    <link rel="stylesheet" href="css/style.css?v=20260708-ui-v46">
-    <link rel="stylesheet" href="css/components.css?v=20260708-ui-v46">
+    <link rel="stylesheet" href="css/style.css?v=20260708-ui-v47">
+    <link rel="stylesheet" href="css/components.css?v=20260708-ui-v47">
     
     <!-- 主题样式 -->
-    <link rel="stylesheet" href="css/themes/variables.css?v=20260708-ui-v46">
-    <link rel="stylesheet" href="css/themes/dark.css?v=20260708-ui-v46">
-    <link rel="stylesheet" href="css/themes/light.css?v=20260708-ui-v46">
+    <link rel="stylesheet" href="css/themes/variables.css?v=20260708-ui-v47">
+    <link rel="stylesheet" href="css/themes/dark.css?v=20260708-ui-v47">
+    <link rel="stylesheet" href="css/themes/light.css?v=20260708-ui-v47">
     
     <!-- Favicon -->
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🔐</text></svg>">
@@ -366,7 +366,7 @@
                 <section v-if="filter === 'group' && activeGroupName" class="active-group-toolbar">
                     <div>
                         <h2>{{ activeGroupName }}</h2>
-                        <p>{{ activeGroup?.description || '当前密码组' }} · {{ totalEntries }} 个条目</p>
+                        <p>{{ (activeGroup && activeGroup.description) || '当前密码组' }} · {{ totalEntries }} 个条目</p>
                     </div>
                     <div class="active-group-actions">
                         <button class="btn-primary" @click="openCreateEntryForActiveGroup">+ 新建条目</button>
@@ -1938,9 +1938,9 @@
     </div>
     
     <!-- JS 模块 -->
-    <script src="js/api.js?v=20260708-ui-v46"></script>
-    <script src="js/utils.js?v=20260708-ui-v46"></script>
-    <script src="js/store.js?v=20260708-ui-v46"></script>
-    <script src="js/app.js?v=20260708-ui-v46"></script>
+    <script src="js/api.js?v=20260708-ui-v47"></script>
+    <script src="js/utils.js?v=20260708-ui-v47"></script>
+    <script src="js/store.js?v=20260708-ui-v47"></script>
+    <script src="js/app.js?v=20260708-ui-v47"></script>
 </body>
 </html>
