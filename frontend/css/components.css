@@ -186,6 +186,17 @@
     line-height: 1;
 }
 
+.fields-editor .field-item .compact-check-option {
+    flex: 0 0 auto;
+    height: 26px;
+    min-height: 26px;
+    padding: 0 8px;
+    border-radius: 7px;
+    font-size: var(--font-size-xs);
+    font-weight: 500;
+    line-height: 1;
+}
+
 .compact-check-option input[type="checkbox"],
 .fields-editor .field-item .compact-check-option input[type="checkbox"],
 .ai-field-row .compact-check-option input[type="checkbox"] {
@@ -196,6 +207,12 @@
     margin: 0;
     padding: 0;
     accent-color: var(--color-primary);
+}
+
+.fields-editor .field-item .compact-check-option input[type="checkbox"] {
+    width: 13px;
+    height: 13px;
+    min-width: 13px;
 }
 
 .compact-check-option:has(input:checked) {

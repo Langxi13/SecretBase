@@ -57,4 +57,10 @@ assertMatches(
     '紧凑勾选框必须限制为 14px'
 );
 
+assertMatches(
+    componentsCss,
+    /\.fields-editor\s+\.field-item\s+\.compact-check-option[\s\S]*?height:\s*26px[\s\S]*?padding:\s*0\s+8px[\s\S]*?font-size:\s*var\(--font-size-xs\)/,
+    '编辑器字段的可复制/隐藏选项必须使用 26px 紧凑高度'
+);
+
 console.log('PASS frontend password groups');
