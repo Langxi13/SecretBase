@@ -354,6 +354,20 @@ class Store {
         }
     }
 
+    async assignEntriesToGroup(groupName, ids) {
+        try {
+            const result = await api.post(`/groups/${encodeURIComponent(groupName)}/entries`, { ids });
+            showToast(result.message || '已加入密码组', 'success');
+            await this.loadEntries(this.state.pagination.page);
+            await this.loadGroups();
+            return result.data;
+        } catch (error) {
+            console.error('批量加入密码组失败:', error);
+            showToast(error.message || '批量加入密码组失败', 'error');
+            return null;
+        }
+    }
+
     /**
      * 切换星标
      */

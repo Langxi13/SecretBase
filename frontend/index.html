@@ -363,18 +363,29 @@
                     </div>
                 </section>
 
+                <section v-if="filter === 'group' && activeGroupName" class="active-group-toolbar">
+                    <div>
+                        <h2>{{ activeGroupName }}</h2>
+                        <p>{{ activeGroup?.description || '当前密码组' }} · {{ totalEntries }} 个条目</p>
+                    </div>
+                    <div class="active-group-actions">
+                        <button class="btn-primary" @click="openCreateEntryForActiveGroup">+ 新建条目</button>
+                        <button class="btn-secondary" @click="openGroupEntryPicker">选择条目</button>
+                    </div>
+                </section>
+
                 <!-- 空状态 -->
-                <div v-else-if="entries.length === 0 && !loading" class="empty-state">
+                <div v-if="filter !== 'groups' && entries.length === 0 && !loading" class="empty-state">
                     <div class="empty-icon">📭</div>
                     <h3>还没有条目</h3>
                     <p>点击下方按钮新建条目</p>
-                    <button class="btn-primary" @click="showCreateModal = true">
+                    <button class="btn-primary" @click="filter === 'group' ? openCreateEntryForActiveGroup() : openCreateModal()">
                         + 新建条目
                     </button>
                 </div>
                 
                 <!-- 条目列表 -->
-                <div v-else class="entries-grid">
+                <div v-if="filter !== 'groups' && (entries.length > 0 || loading)" class="entries-grid">
                     <div 
                         v-for="entry in entries" 
                         :key="entry.id"
@@ -791,6 +802,59 @@
                 <div class="modal-footer">
                     <button class="btn-secondary" @click="closeGroupModal">取消</button>
                     <button class="btn-primary" @click="saveGroup" :disabled="!groupForm.name.trim()">创建</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 选择条目加入密码组弹窗 -->
+        <div v-if="showGroupEntryPicker" class="modal-overlay">
+            <div class="modal-content group-entry-picker-modal">
+                <div class="modal-header">
+                    <div>
+                        <h2>选择条目</h2>
+                        <p>加入当前密码组：{{ activeGroupName }}</p>
+                    </div>
+                    <button class="modal-close" @click="closeGroupEntryPicker">✕</button>
+                </div>
+                <div class="modal-body">
+                    <div class="group-entry-picker-toolbar">
+                        <input
+                            type="text"
+                            v-model="groupPickerQuery"
+                            placeholder="搜索标题、网址、标签或已有密码组"
+                        >
+                        <button class="btn-secondary" @click="toggleAllGroupPickerEntries" :disabled="availableGroupPickerEntries.length === 0">
+                            {{ allGroupPickerEntriesSelected ? '取消全选' : '全选可见' }}
+                        </button>
+                    </div>
+                    <div v-if="groupPickerLoading" class="loading-state">正在加载条目...</div>
+                    <div v-else-if="availableGroupPickerEntries.length === 0" class="empty-state compact-empty">
+                        <h3>没有可加入的条目</h3>
+                        <p>当前可见条目都已经属于该密码组，或没有匹配搜索条件。</p>
+                    </div>
+                    <div v-else class="group-entry-picker-list">
+                        <label
+                            v-for="entry in availableGroupPickerEntries"
+                            :key="entry.id"
+                            class="group-entry-picker-row"
+                        >
+                            <input
+                                type="checkbox"
+                                :checked="groupPickerSelectedIds.includes(entry.id)"
+                                @change="toggleGroupPickerEntry(entry.id)"
+                            >
+                            <span>
+                                <strong>{{ entry.title }}</strong>
+                                <small>{{ entry.url || (entry.tags || []).join('、') || '无网址' }}</small>
+                            </span>
+                        </label>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn-secondary" @click="closeGroupEntryPicker">取消</button>
+                    <button class="btn-primary" @click="assignSelectedEntriesToActiveGroup" :disabled="groupPickerSelectedIds.length === 0">
+                        加入当前密码组（{{ groupPickerSelectedIds.length }} 条）
+                    </button>
                 </div>
             </div>
         </div>

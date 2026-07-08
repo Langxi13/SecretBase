@@ -2,7 +2,7 @@ import logging
 from datetime import datetime
 from fastapi import APIRouter, HTTPException
 
-from models import GroupRequest
+from models import BatchRequest, GroupRequest
 from storage import is_unlocked, get_vault_data, save_vault_data
 from utils import get_tag_color
 
@@ -88,6 +88,77 @@ async def create_group(request: GroupRequest):
     save_vault_data(vault)
     logger.info(f"创建密码组: {name}")
     return {"success": True, "data": {"name": name}, "message": "密码组已创建"}
+
+
+@router.post("/{group_name}/entries")
+async def assign_entries_to_group(group_name: str, request: BatchRequest):
+    """批量将现有条目加入指定密码组。"""
+    check_unlocked()
+    name = normalize_group_name(group_name)
+    if not name:
+        raise HTTPException(status_code=422, detail="密码组名称不能为空")
+
+    vault = get_vault_data()
+    exists = name in (vault.groups_meta or {}) or any(
+        name in (getattr(entry, "groups", []) or [])
+        for entry in vault.entries
+        if not entry.deleted
+    )
+    if not exists:
+        raise HTTPException(status_code=404, detail="密码组不存在")
+
+    requested_ids = set(request.ids)
+    updated_count = 0
+    skipped_count = 0
+    missing_count = 0
+    now = datetime.now().isoformat()
+
+    entries_by_id = {
+        entry.id: entry
+        for entry in vault.entries
+        if not entry.deleted
+    }
+    for entry_id in requested_ids:
+        entry = entries_by_id.get(entry_id)
+        if not entry:
+            missing_count += 1
+            continue
+        groups = list(getattr(entry, "groups", []) or [])
+        if name in groups:
+            skipped_count += 1
+            continue
+        groups.append(name)
+        entry.groups = groups
+        entry.updated_at = now
+        updated_count += 1
+
+    if not isinstance(vault.groups_meta, dict):
+        vault.groups_meta = {}
+    meta_changed = False
+    if name not in vault.groups_meta:
+        vault.groups_meta[name] = {
+            "description": "",
+            "created_at": now,
+            "updated_at": now,
+        }
+        meta_changed = True
+    elif updated_count > 0:
+        vault.groups_meta[name]["updated_at"] = now
+        meta_changed = True
+
+    if updated_count > 0 or meta_changed:
+        save_vault_data(vault)
+
+    logger.info(f"批量加入密码组 {name}: updated={updated_count}, skipped={skipped_count}, missing={missing_count}")
+    return {
+        "success": True,
+        "data": {
+            "updated_count": updated_count,
+            "skipped_count": skipped_count,
+            "missing_count": missing_count,
+        },
+        "message": f"已将 {updated_count} 个条目加入「{name}」"
+    }
 
 
 @router.put("/{group_name}")

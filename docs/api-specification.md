@@ -915,6 +915,43 @@ DELETE /groups/{group_name}
 
 - 404: 密码组不存在
 
+### 6A.5 批量将条目加入密码组
+
+**将现有条目批量加入指定密码组；不会删除条目，也不会移除条目已有密码组。**
+
+```
+POST /groups/{group_name}/entries
+```
+
+**请求体：**
+
+```json
+{
+  "ids": ["entry-uuid-1", "entry-uuid-2"]
+}
+```
+
+**响应：**
+
+```json
+{
+  "success": true,
+  "data": {
+    "updated_count": 1,
+    "skipped_count": 1,
+    "missing_count": 0
+  },
+  "message": "已将 1 个条目加入「工作账号」"
+}
+```
+
+`updated_count` 表示本次新增归属的条目数量；`skipped_count` 表示已经属于该密码组的条目数量；`missing_count` 表示请求中不存在或已删除的条目数量。
+
+**错误情况：**
+
+- 404: 密码组不存在
+- 422: 密码组名称为空或 ids 为空
+
 ## 7. AI 智能录入模块
 
 阶段：V1.1/V1.2。若未配置 AI API Key，前端必须允许用户继续手动录入，不能阻塞核心功能。AI 接入由用户在解锁后进入设置页配置 Base URL、API Key，并实时拉取模型列表选择模型。

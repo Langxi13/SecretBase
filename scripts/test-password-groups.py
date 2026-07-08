@@ -61,6 +61,21 @@ def main() -> None:
             ),
             "create second entry",
         )
+        outside = expect_success(
+            client.post(
+                "/entries",
+                json={
+                    "title": "代码仓库",
+                    "url": "",
+                    "groups": ["开发资源"],
+                    "tags": ["代码"],
+                    "fields": [{"name": "用户名", "value": "developer", "copyable": True, "hidden": False}],
+                    "remarks": "",
+                },
+                headers=headers,
+            ),
+            "create outside entry",
+        )
 
         expect_success(
             client.post("/groups", json={"name": "工作账号", "description": "公司系统、云平台、协作工具"}, headers=headers),
@@ -78,6 +93,22 @@ def main() -> None:
         assert filtered_ids == {first["id"], second["id"]}
         assert all("工作账号" in entry["groups"] for entry in filtered["items"])
 
+        assign_result = expect_success(
+            client.post(
+                "/groups/工作账号/entries",
+                json={"ids": [outside["id"], first["id"]]},
+                headers=headers,
+            ),
+            "assign entries to group",
+        )
+        assert assign_result["updated_count"] == 1
+        assert assign_result["skipped_count"] == 1
+
+        outside_detail = expect_success(client.get(f"/entries/{outside['id']}", headers=headers), "outside detail after assign")
+        assert set(outside_detail["groups"]) == {"开发资源", "工作账号"}
+        filtered_after_assign = expect_success(client.get("/entries?group=工作账号&page_size=10", headers=headers), "filter group after assign")
+        assert filtered_after_assign["pagination"]["total"] == 3
+
         expect_success(
             client.put("/groups/工作账号", json={"name": "工作", "description": "工作相关密码"}, headers=headers),
             "rename group",
@@ -87,7 +118,7 @@ def main() -> None:
         assert not any(group["name"] == "工作账号" for group in renamed)
 
         filtered_after_rename = expect_success(client.get("/entries?group=工作&page_size=10", headers=headers), "filter renamed group")
-        assert filtered_after_rename["pagination"]["total"] == 2
+        assert filtered_after_rename["pagination"]["total"] == 3
 
         expect_success(client.delete("/groups/工作", headers=headers), "delete group")
         filtered_after_delete = expect_success(client.get("/entries?group=工作&page_size=10", headers=headers), "filter deleted group")

@@ -59,6 +59,7 @@ const app = createApp({
         const showTagEditorModal = ref(false);
         const showGroupModal = ref(false);
         const showTagBrowser = ref(false);
+        const showGroupEntryPicker = ref(false);
         const showConfirm = ref(false);
         const showTools = ref(false);
         const showBackupCenter = ref(false);
@@ -68,6 +69,10 @@ const app = createApp({
         const copyMenuEntryId = ref(null);
         const selectedEntryIds = ref([]);
         const batchTagName = ref('');
+        const groupPickerEntries = ref([]);
+        const groupPickerSelectedIds = ref([]);
+        const groupPickerQuery = ref('');
+        const groupPickerLoading = ref(false);
         const importConflictMessage = ref('');
         const showOnboarding = ref(false);
         const importingSamples = ref(false);
@@ -532,8 +537,43 @@ const app = createApp({
 
         const hasActiveListState = computed(() => activeListStateItems.value.length > 0);
 
+        const activeGroup = computed(() => {
+            if (!activeGroupName.value) return null;
+            return groups.value.find(group => group.name === activeGroupName.value) || {
+                name: activeGroupName.value,
+                description: '',
+                count: totalEntries.value
+            };
+        });
+
         const allCurrentPageSelected = computed(() => {
             return entries.value.length > 0 && entries.value.every(entry => selectedEntryIds.value.includes(entry.id));
+        });
+
+        const availableGroupPickerEntries = computed(() => {
+            const groupName = activeGroupName.value;
+            const query = groupPickerQuery.value.trim().toLowerCase();
+            return groupPickerEntries.value.filter(entry => {
+                if (!groupName || (entry.groups || []).includes(groupName)) {
+                    return false;
+                }
+                if (!query) {
+                    return true;
+                }
+                const haystack = [
+                    entry.title,
+                    entry.url || '',
+                    ...(entry.tags || []),
+                    ...(entry.groups || []),
+                    entry.remarks || ''
+                ].join(' ').toLowerCase();
+                return haystack.includes(query);
+            });
+        });
+
+        const allGroupPickerEntriesSelected = computed(() => {
+            const ids = availableGroupPickerEntries.value.map(entry => entry.id);
+            return ids.length > 0 && ids.every(id => groupPickerSelectedIds.value.includes(id));
         });
 
         const backupBusy = computed(() => (
@@ -991,6 +1031,70 @@ const app = createApp({
             activeGroupName.value = normalized;
             selectedEntryIds.value = [];
             await loadEntries(1);
+        }
+
+        function openCreateEntryForActiveGroup() {
+            if (!activeGroupName.value) return;
+            resetEntryForm();
+            entryForm.groups = [activeGroupName.value];
+            showCreateModal.value = true;
+        }
+
+        async function openGroupEntryPicker() {
+            if (!activeGroupName.value) return;
+            showGroupEntryPicker.value = true;
+            groupPickerQuery.value = '';
+            groupPickerSelectedIds.value = [];
+            groupPickerLoading.value = true;
+            try {
+                const params = new URLSearchParams({
+                    page: '1',
+                    page_size: '1000',
+                    sort_by: 'title',
+                    sort_order: 'asc'
+                });
+                const result = await api.get(`/entries?${params}`);
+                groupPickerEntries.value = result.data?.items || [];
+            } catch (error) {
+                groupPickerEntries.value = [];
+                showToast(error.message || '加载可选条目失败', 'error');
+            } finally {
+                groupPickerLoading.value = false;
+            }
+        }
+
+        function closeGroupEntryPicker() {
+            showGroupEntryPicker.value = false;
+            groupPickerEntries.value = [];
+            groupPickerSelectedIds.value = [];
+            groupPickerQuery.value = '';
+        }
+
+        function toggleGroupPickerEntry(entryId) {
+            if (groupPickerSelectedIds.value.includes(entryId)) {
+                groupPickerSelectedIds.value = groupPickerSelectedIds.value.filter(id => id !== entryId);
+            } else {
+                groupPickerSelectedIds.value = [...groupPickerSelectedIds.value, entryId];
+            }
+        }
+
+        function toggleAllGroupPickerEntries() {
+            const ids = availableGroupPickerEntries.value.map(entry => entry.id);
+            if (ids.length === 0) return;
+            if (allGroupPickerEntriesSelected.value) {
+                groupPickerSelectedIds.value = groupPickerSelectedIds.value.filter(id => !ids.includes(id));
+            } else {
+                groupPickerSelectedIds.value = Array.from(new Set([...groupPickerSelectedIds.value, ...ids]));
+            }
+        }
+
+        async function assignSelectedEntriesToActiveGroup() {
+            if (!activeGroupName.value || groupPickerSelectedIds.value.length === 0) return;
+            const result = await store.assignEntriesToGroup(activeGroupName.value, groupPickerSelectedIds.value);
+            if (result) {
+                closeGroupEntryPicker();
+                await Promise.all([loadEntries(currentPage.value), loadGroups()]);
+            }
         }
 
         function openTagBrowser() {
@@ -3075,6 +3179,7 @@ const app = createApp({
             listContextNotice,
             showTagDropdown,
             showTagBrowser,
+            showGroupEntryPicker,
             showGroupModal,
             tagBrowserQuery,
             tagBrowserSort,
@@ -3101,6 +3206,10 @@ const app = createApp({
             copyMenuEntryId,
             selectedEntryIds,
             batchTagName,
+            groupPickerEntries,
+            groupPickerSelectedIds,
+            groupPickerQuery,
+            groupPickerLoading,
             importConflictMessage,
             showOnboarding,
             importingSamples,
@@ -3208,7 +3317,10 @@ const app = createApp({
             activeAdvancedFilterChips,
             activeListStateItems,
             hasActiveListState,
+            activeGroup,
             allCurrentPageSelected,
+            availableGroupPickerEntries,
+            allGroupPickerEntriesSelected,
             backupBusy,
             backupSummary,
             backupGroups,
@@ -3226,6 +3338,12 @@ const app = createApp({
             closeGroupModal,
             saveGroup,
             filterByGroup,
+            openCreateEntryForActiveGroup,
+            openGroupEntryPicker,
+            closeGroupEntryPicker,
+            toggleGroupPickerEntry,
+            toggleAllGroupPickerEntries,
+            assignSelectedEntriesToActiveGroup,
             openTagBrowser,
             closeTagBrowser,
             goToTagBrowserPage,
