@@ -85,6 +85,40 @@ def main() -> None:
             "api_key_mask": "tes...key",
         }
 
+        duplicate_group_summary = ai_routes._organize_summary(
+            [
+                {
+                    "entry_id": f"entry-{index}",
+                    "selected": True,
+                    "add_tags": [],
+                    "remove_tags": [],
+                    "add_groups": ["工作账号"],
+                    "remove_groups": [],
+                }
+                for index in range(31)
+            ],
+            existing_groups=[],
+        )
+        assert duplicate_group_summary["add_groups"] == 1
+        assert duplicate_group_summary["add_group_assignments"] == 31
+
+        existing_group_summary = ai_routes._organize_summary(
+            [
+                {
+                    "entry_id": f"entry-{index}",
+                    "selected": True,
+                    "add_tags": [],
+                    "remove_tags": [],
+                    "add_groups": ["工作账号"],
+                    "remove_groups": [],
+                }
+                for index in range(31)
+            ],
+            existing_groups=["工作账号"],
+        )
+        assert existing_group_summary["add_groups"] == 0
+        assert existing_group_summary["add_group_assignments"] == 31
+
         client = TestClient(app)
         password = "SecretBase-Test-123456!"
         init_data = expect_success(client.post("/auth/init", json={"password": password}), "init")

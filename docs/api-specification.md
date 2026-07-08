@@ -1113,6 +1113,8 @@ POST /ai/organize/preview
       "add_tags": 2,
       "remove_tags": 1,
       "add_groups": 1,
+      "add_group_assignments": 1,
+      "assigned_groups": 1,
       "remove_groups": 0
     },
     "suggestions": [
@@ -1137,6 +1139,8 @@ POST /ai/organize/preview
   }
 }
 ```
+
+`summary.add_groups` 表示本次建议中需要新建的唯一密码组数量；`summary.add_group_assignments` 表示条目加入密码组的分配次数；`summary.assigned_groups` 表示本次涉及加入的唯一密码组数量。
 
 **错误情况：**
 
