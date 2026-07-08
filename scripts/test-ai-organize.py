@@ -16,6 +16,11 @@ def expect_success(response, label: str):
     return payload["data"]
 
 
+def expect_error(response, status_code: int, label: str):
+    assert response.status_code == status_code, f"{label}: {response.status_code} {response.text}"
+    return response.json()
+
+
 def main() -> None:
     with tempfile.TemporaryDirectory() as tmpdir:
         os.environ["DATA_DIR"] = tmpdir
@@ -137,7 +142,7 @@ def main() -> None:
             "create router entry",
         )
 
-        preview = expect_success(
+        mixed_mode_error = expect_error(
             client.post(
                 "/ai/organize/preview",
                 json={
@@ -147,20 +152,35 @@ def main() -> None:
                 },
                 headers=headers,
             ),
-            "organize preview",
+            422,
+            "organize preview mixed mode",
+        )
+        assert "分开整理" in mixed_mode_error["message"]
+
+        preview = expect_success(
+            client.post(
+                "/ai/organize/preview",
+                json={
+                    "filters": {"tag": "待整理"},
+                    "organize_tags": True,
+                    "organize_groups": False,
+                },
+                headers=headers,
+            ),
+            "organize preview tag mode",
         )
         assert preview["entry_count"] == 1
         assert preview["summary"]["affected_entries"] == 1
         assert preview["summary"]["add_tags"] == 2
         assert preview["summary"]["remove_tags"] == 1
-        assert preview["summary"]["add_groups"] == 1
+        assert preview["summary"]["add_groups"] == 0
         suggestion = preview["suggestions"][0]
         assert suggestion["entry_id"] == created["id"]
         assert suggestion["selected"] is True
         assert suggestion["add_tags"] == ["邮箱", "工作"]
         assert suggestion["remove_tags"] == ["待整理"]
-        assert suggestion["add_groups"] == ["工作账号"]
-        assert suggestion["remove_groups"] == ["旧分组"]
+        assert suggestion["add_groups"] == []
+        assert suggestion["remove_groups"] == []
         assert suggestion["reason"]
 
         tag_only_preview = expect_success(
@@ -247,10 +267,21 @@ def main() -> None:
                 json={"suggestions": preview["suggestions"]},
                 headers=headers,
             ),
-            "organize apply",
+            "organize apply tags",
         )
         assert apply_result["updated_count"] == 1
-        assert apply_result["created_groups"] == ["工作账号"]
+        assert apply_result["created_groups"] == []
+
+        apply_group_result = expect_success(
+            client.post(
+                "/ai/organize/apply",
+                json={"suggestions": group_only_preview["suggestions"]},
+                headers=headers,
+            ),
+            "organize apply groups",
+        )
+        assert apply_group_result["updated_count"] == 1
+        assert apply_group_result["created_groups"] == ["工作账号"]
 
         detail = expect_success(client.get(f"/entries/{created['id']}", headers=headers), "entry detail")
         assert set(detail["tags"]) == {"邮箱", "工作"}

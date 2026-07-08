@@ -145,7 +145,7 @@ const app = createApp({
         const aiOrganizeResult = ref(null);
         const aiOrganizeOptions = reactive({
             organizeTags: true,
-            organizeGroups: true
+            organizeGroups: false
         });
         const aiCooldownUntil = ref(0);
         const aiNow = ref(Date.now());
@@ -1570,6 +1570,13 @@ const app = createApp({
             aiOrganizeError.value = '';
         }
 
+        function setAiOrganizeMode(mode) {
+            const organizeGroups = mode === 'groups';
+            aiOrganizeOptions.organizeTags = !organizeGroups;
+            aiOrganizeOptions.organizeGroups = organizeGroups;
+            clearAiOrganize();
+        }
+
         function currentAiOrganizeFilters() {
             return {
                 ...store.state.filters,
@@ -2857,6 +2864,7 @@ const app = createApp({
             manualEntryFromAi,
             clearAiParse,
             clearAiOrganize,
+            setAiOrganizeMode,
             openAiSettingsFromParse,
             parseAiText,
             applyAiResult,

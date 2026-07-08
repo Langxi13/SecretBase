@@ -198,7 +198,7 @@ class AiOrganizePreviewRequest(BaseModel):
     """AI 整理预览请求"""
     filters: dict = Field(default_factory=dict)
     organize_tags: bool = True
-    organize_groups: bool = True
+    organize_groups: bool = False
 
 
 class AiOrganizeSuggestion(BaseModel):

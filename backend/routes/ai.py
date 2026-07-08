@@ -833,6 +833,8 @@ async def ai_organize_preview(request: AiOrganizePreviewRequest):
         raise HTTPException(status_code=401, detail="请先解锁")
     if not request.organize_tags and not request.organize_groups:
         raise HTTPException(status_code=422, detail="请至少选择整理标签或密码组")
+    if request.organize_tags and request.organize_groups:
+        raise HTTPException(status_code=422, detail="标签和密码组请分开整理，避免建议冲突")
 
     ai_config = _load_ai_config()
     if not ai_config:

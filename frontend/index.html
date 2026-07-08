@@ -7,16 +7,16 @@
     
     <!-- Vue 3 CDN (Production) -->
     <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
-    <script src="/secretbase-runtime-config.js?v=20260708-ui-v37"></script>
+    <script src="/secretbase-runtime-config.js?v=20260708-ui-v38"></script>
     
     <!-- 基础样式 -->
-    <link rel="stylesheet" href="css/style.css?v=20260708-ui-v37">
-    <link rel="stylesheet" href="css/components.css?v=20260708-ui-v37">
+    <link rel="stylesheet" href="css/style.css?v=20260708-ui-v38">
+    <link rel="stylesheet" href="css/components.css?v=20260708-ui-v38">
     
     <!-- 主题样式 -->
-    <link rel="stylesheet" href="css/themes/variables.css?v=20260708-ui-v37">
-    <link rel="stylesheet" href="css/themes/dark.css?v=20260708-ui-v37">
-    <link rel="stylesheet" href="css/themes/light.css?v=20260708-ui-v37">
+    <link rel="stylesheet" href="css/themes/variables.css?v=20260708-ui-v38">
+    <link rel="stylesheet" href="css/themes/dark.css?v=20260708-ui-v38">
+    <link rel="stylesheet" href="css/themes/light.css?v=20260708-ui-v38">
     
     <!-- Favicon -->
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🔐</text></svg>">
@@ -874,11 +874,23 @@
                     </div>
                     <div v-else class="ai-organize-panel">
                         <div class="info-panel">
-                            整理当前筛选全部条目，最多 100 条；不会发送字段值，只发送标题、网址、字段名、标签和密码组。
+                            整理当前筛选全部条目，最多 100 条；不会发送字段值。标签和密码组分开整理，避免建议冲突。
                         </div>
-                        <div class="ai-organize-options">
-                            <label class="checkbox-label compact-check-option"><input type="checkbox" v-model="aiOrganizeOptions.organizeTags"> 整理标签</label>
-                            <label class="checkbox-label compact-check-option"><input type="checkbox" v-model="aiOrganizeOptions.organizeGroups"> 整理密码组</label>
+                        <div class="ai-mode-tabs ai-organize-mode-tabs" role="tablist" aria-label="AI 整理模式">
+                            <button
+                                class="ai-mode-tab"
+                                :class="{ active: aiOrganizeOptions.organizeTags }"
+                                @click="setAiOrganizeMode('tags')"
+                            >
+                                整理标签
+                            </button>
+                            <button
+                                class="ai-mode-tab"
+                                :class="{ active: aiOrganizeOptions.organizeGroups }"
+                                @click="setAiOrganizeMode('groups')"
+                            >
+                                整理密码组
+                            </button>
                         </div>
                         <div v-if="aiOrganizeError" class="warning-panel ai-failure-panel">
                             <strong>AI 整理未完成</strong>
@@ -1658,9 +1670,9 @@
     </div>
     
     <!-- JS 模块 -->
-    <script src="js/api.js?v=20260708-ui-v37"></script>
-    <script src="js/utils.js?v=20260708-ui-v37"></script>
-    <script src="js/store.js?v=20260708-ui-v37"></script>
-    <script src="js/app.js?v=20260708-ui-v37"></script>
+    <script src="js/api.js?v=20260708-ui-v38"></script>
+    <script src="js/utils.js?v=20260708-ui-v38"></script>
+    <script src="js/store.js?v=20260708-ui-v38"></script>
+    <script src="js/app.js?v=20260708-ui-v38"></script>
 </body>
 </html>
