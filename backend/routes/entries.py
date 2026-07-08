@@ -6,6 +6,7 @@ from storage import (
     is_unlocked, get_vault_data, save_vault_data,
     get_entry, add_entry, update_entry, delete_entry
 )
+from tag_utils import ensure_entry_tags_meta
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -289,6 +290,7 @@ async def batch_update_tags(request: BatchTagRequest):
             for tag in request.add_tags:
                 if tag not in entry.tags:
                     entry.tags.append(tag)
+            ensure_entry_tags_meta(vault, entry.tags)
             for tag in request.remove_tags:
                 if tag in entry.tags:
                     entry.tags.remove(tag)

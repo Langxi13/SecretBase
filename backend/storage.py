@@ -20,6 +20,7 @@ from crypto import (
     parse_vault_header,
 )
 from models import VaultData, Entry, EntryCreate, EntryUpdate, Settings
+from tag_utils import ensure_entry_tags_meta
 
 logger = logging.getLogger(__name__)
 
@@ -632,6 +633,7 @@ def add_entry(entry_data: EntryCreate) -> Entry:
     )
     
     vault.entries.append(entry)
+    ensure_entry_tags_meta(vault, entry.tags)
     save_vault_data(vault)
     
     return entry
@@ -651,6 +653,7 @@ def update_entry(entry_id: str, entry_data: EntryUpdate) -> Optional[Entry]:
                 entry.starred = entry_data.starred
             if entry_data.tags is not None:
                 entry.tags = entry_data.tags
+                ensure_entry_tags_meta(vault, entry.tags)
             if entry_data.groups is not None:
                 entry.groups = entry_data.groups
             if entry_data.fields is not None:

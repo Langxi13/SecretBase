@@ -1,8 +1,17 @@
 import logging
+from datetime import datetime
 from fastapi import APIRouter, HTTPException
-from models import TagRenameRequest, TagMergeRequest
+from models import TagRequest, TagRenameRequest, TagMergeRequest
 from storage import is_unlocked, get_vault_data, save_vault_data
-from utils import get_tag_color
+from tag_utils import (
+    ensure_tag_meta,
+    ensure_tags_meta,
+    list_tag_entities,
+    normalize_tag_name,
+    remove_tag_from_entries,
+    rename_tag_everywhere,
+    tag_exists,
+)
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -18,78 +27,73 @@ def check_unlocked():
 async def get_tags():
     """获取所有标签"""
     check_unlocked()
-    
     vault = get_vault_data()
-    
-    # 统计标签
-    tags_count: dict[str, int] = {}
-    for entry in vault.entries:
-        if not entry.deleted:
-            for tag in entry.tags:
-                tags_count[tag] = tags_count.get(tag, 0) + 1
-    
-    # 构建响应
-    tags = []
-    for name, count in tags_count.items():
-        tags.append({
-            "name": name,
-            "color": get_tag_color(name),
-            "count": count
-        })
-    
-    # 默认优先展示覆盖条目最多的标签，数量相同再按名称稳定排序。
-    tags.sort(key=lambda t: (-t["count"], t["name"]))
-    
     return {
         "success": True,
-        "data": {"tags": tags}
+        "data": {"tags": list_tag_entities(vault)}
+    }
+
+
+@router.post("")
+async def create_tag(request: TagRequest):
+    """创建空标签实体"""
+    check_unlocked()
+    name = normalize_tag_name(request.name or request.new_name or "")
+    if not name:
+        raise HTTPException(status_code=422, detail="标签名称不能为空")
+
+    vault = get_vault_data()
+    if tag_exists(vault, name):
+        raise HTTPException(status_code=409, detail="标签已存在")
+
+    ensure_tag_meta(vault, name, request.description, request.color)
+    save_vault_data(vault)
+    logger.info(f"创建标签: {name}")
+    return {
+        "success": True,
+        "data": {"name": name},
+        "message": "标签已创建"
     }
 
 
 @router.put("/{tag_name}")
 async def rename_tag(tag_name: str, request: TagRenameRequest):
-    """重命名标签"""
+    """重命名标签或更新标签元数据"""
     check_unlocked()
-    
+    old_name = normalize_tag_name(tag_name)
+    new_name = normalize_tag_name(request.name or request.new_name or old_name)
+    if not old_name or not new_name:
+        raise HTTPException(status_code=422, detail="标签名称不能为空")
+
     vault = get_vault_data()
-    
-    # 检查标签是否存在
-    exists = any(
-        tag_name in entry.tags
-        for entry in vault.entries
-        if not entry.deleted
-    )
-    if not exists:
+    if not tag_exists(vault, old_name):
         raise HTTPException(status_code=404, detail="标签不存在")
-    
-    # 检查新标签名是否已存在
-    new_name_exists = any(
-        request.new_name in entry.tags
-        for entry in vault.entries
-        if not entry.deleted
-    )
-    if new_name_exists:
+
+    if new_name != old_name and tag_exists(vault, new_name):
         raise HTTPException(status_code=409, detail="新标签名已存在")
-    
-    # 重命名
-    affected_count = 0
-    for entry in vault.entries:
-        if not entry.deleted and tag_name in entry.tags:
-            entry.tags = [request.new_name if t == tag_name else t for t in entry.tags]
-            affected_count += 1
-    
+
+    tags_meta = ensure_tags_meta(vault)
+    meta = tags_meta.pop(old_name, {}) if new_name != old_name else tags_meta.get(old_name, {})
+    if not isinstance(meta, dict):
+        meta = {}
+    meta["description"] = request.description.strip()
+    meta["color"] = request.color or meta.get("color")
+    meta["updated_at"] = datetime.now().isoformat()
+    meta.setdefault("created_at", datetime.now().isoformat())
+
+    affected_count = rename_tag_everywhere(vault, old_name, new_name) if new_name != old_name else 0
+    ensure_tag_meta(vault, new_name, meta.get("description", ""), meta.get("color"))
     save_vault_data(vault)
-    
-    logger.info(f"重命名标签: {tag_name} -> {request.new_name}")
-    
+
+    logger.info(f"更新标签: {old_name} -> {new_name}")
     return {
         "success": True,
         "data": {
-            "old_name": tag_name,
-            "new_name": request.new_name,
+            "old_name": old_name,
+            "new_name": new_name,
             "affected_count": affected_count
         },
-        "message": "标签已重命名"
+        "message": "标签已更新"
     }
 
 
@@ -97,23 +101,22 @@ async def rename_tag(tag_name: str, request: TagRenameRequest):
 async def delete_tag(tag_name: str):
     """删除标签"""
     check_unlocked()
-    
+    name = normalize_tag_name(tag_name)
+    if not name:
+        raise HTTPException(status_code=422, detail="标签名称不能为空")
+
     vault = get_vault_data()
-    
-    # 从所有条目中移除
-    affected_count = 0
-    for entry in vault.entries:
-        if not entry.deleted and tag_name in entry.tags:
-            entry.tags.remove(tag_name)
-            affected_count += 1
-    
-    if affected_count == 0:
+    affected_count = remove_tag_from_entries(vault, name)
+    meta_removed = False
+    if name in ensure_tags_meta(vault):
+        vault.tags_meta.pop(name, None)
+        meta_removed = True
+
+    if affected_count == 0 and not meta_removed:
         raise HTTPException(status_code=404, detail="标签不存在")
-    
+
     save_vault_data(vault)
-    
-    logger.info(f"删除标签: {tag_name}")
-    
+    logger.info(f"删除标签: {name}")
     return {
         "success": True,
         "data": {"affected_count": affected_count},
@@ -125,39 +128,38 @@ async def delete_tag(tag_name: str):
 async def merge_tags(request: TagMergeRequest):
     """合并标签"""
     check_unlocked()
-    
     vault = get_vault_data()
-    
-    # 检查源标签是否存在
-    existing_tags = set()
-    for entry in vault.entries:
-        if not entry.deleted:
-            existing_tags.update(entry.tags)
-    
-    for tag in request.source_tags:
-        if tag not in existing_tags:
+    source_tags = [normalize_tag_name(tag) for tag in request.source_tags if normalize_tag_name(tag)]
+    target_tag = normalize_tag_name(request.target_tag)
+    if not source_tags or not target_tag:
+        raise HTTPException(status_code=422, detail="标签名称不能为空")
+
+    for tag in source_tags:
+        if not tag_exists(vault, tag):
             raise HTTPException(status_code=404, detail=f"标签不存在: {tag}")
-    
-    # 合并
+
     affected_entries = 0
     for entry in vault.entries:
         if not entry.deleted:
-            has_source = any(tag in entry.tags for tag in request.source_tags)
+            has_source = any(tag in entry.tags for tag in source_tags)
             if has_source:
-                entry.tags = [t for t in entry.tags if t not in request.source_tags]
-                if request.target_tag not in entry.tags:
-                    entry.tags.append(request.target_tag)
+                entry.tags = [tag for tag in entry.tags if tag not in source_tags]
+                if target_tag not in entry.tags:
+                    entry.tags.append(target_tag)
                 affected_entries += 1
-    
+
+    tags_meta = ensure_tags_meta(vault)
+    for tag in source_tags:
+        tags_meta.pop(tag, None)
+    ensure_tag_meta(vault, target_tag, request.description, request.color)
     save_vault_data(vault)
-    
-    logger.info(f"合并标签: {request.source_tags} -> {request.target_tag}")
-    
+
+    logger.info(f"合并标签: {source_tags} -> {target_tag}")
     return {
         "success": True,
         "data": {
-            "merged_count": len(request.source_tags),
+            "merged_count": len(source_tags),
             "affected_entries": affected_entries
         },
-        "message": f"已将 {len(request.source_tags)} 个标签合并，影响 {affected_entries} 个条目"
+        "message": f"已将 {len(source_tags)} 个标签合并，影响 {affected_entries} 个条目"
     }

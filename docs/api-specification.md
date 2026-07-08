@@ -624,20 +624,49 @@ GET /tags
     "tags": [
       {
         "name": "示例云",
+        "description": "云平台和控制台账号",
         "color": "#ff6600",
-        "count": 3
+        "count": 3,
+        "created_at": "2026-07-08T10:00:00",
+        "updated_at": "2026-07-08T10:00:00"
       },
       {
         "name": "服务器",
+        "description": "",
         "color": "#0066ff",
-        "count": 5
+        "count": 5,
+        "created_at": "",
+        "updated_at": ""
       }
     ]
   }
 }
 ```
 
-### 6.2 重命名标签
+标签是独立实体，可以没有绑定条目。`GET /tags` 返回 `tags_meta` 中的空标签，也返回历史条目中存在但缺少元数据的标签。
+
+### 6.2 创建标签
+
+```
+POST /tags
+```
+
+**请求体：**
+
+```json
+{
+  "name": "云服务",
+  "description": "云平台和控制台账号",
+  "color": "#2563eb"
+}
+```
+
+**错误情况：**
+
+- 409: 标签已存在
+- 422: 标签名或颜色无效
+
+### 6.3 更新标签
 
 ```
 PUT /tags/{name}
@@ -647,7 +676,9 @@ PUT /tags/{name}
 
 ```json
 {
-  "new_name": "新标签名"
+  "name": "新标签名",
+  "description": "标签简介",
+  "color": "#16a34a"
 }
 ```
 
@@ -661,7 +692,7 @@ PUT /tags/{name}
     "new_name": "新标签名",
     "affected_count": 3
   },
-  "message": "标签已重命名"
+  "message": "标签已更新"
 }
 ```
 
@@ -670,9 +701,9 @@ PUT /tags/{name}
 - 404: 标签不存在
 - 409: 新标签名已存在
 
-### 6.3 删除标签
+### 6.4 删除标签
 
-**从所有条目中移除该标签。**
+**删除标签实体，并从所有条目中移除该标签。空标签也可以删除。**
 
 ```
 DELETE /tags/{name}
@@ -694,9 +725,9 @@ DELETE /tags/{name}
 
 - 404: 标签不存在
 
-### 6.4 合并标签
+### 6.5 合并标签
 
-**将多个标签合并为一个。**
+**将多个标签合并为一个，并维护目标标签的简介和颜色。**
 
 ```
 POST /tags/merge
@@ -707,7 +738,9 @@ POST /tags/merge
 ```json
 {
   "source_tags": ["标签A", "标签B"],
-  "target_tag": "合并后的标签"
+  "target_tag": "合并后的标签",
+  "description": "合并后的标签简介",
+  "color": "#f97316"
 }
 ```
 
@@ -1158,6 +1191,86 @@ POST /ai/organize/apply
 
 - 401: 未解锁
 - 422: 建议列表为空或字段格式无效
+
+### 7.7 生成 AI 标签系统管理建议
+
+**面向标签体系本身生成治理建议。该接口独立于条目标签整理和密码组整理，默认分析当前密码库未删除条目，最多 100 条。不会向 AI 发送字段值。**
+
+```
+POST /ai/tags/preview
+```
+
+**响应：**
+
+```json
+{
+  "success": true,
+  "data": {
+    "entry_count": 2,
+    "summary": {
+      "total_actions": 3,
+      "affected_entries": 1,
+      "create_tag": 1,
+      "update_tag": 1,
+      "delete_tag": 0,
+      "merge_tags": 1,
+      "replace_tag": 0,
+      "assign_tag": 0
+    },
+    "suggestions": [
+      {
+        "action": "merge_tags",
+        "selected": true,
+        "source_tags": ["git", "代码"],
+        "target_tag": "代码仓库",
+        "description": "代码托管和版本管理账号",
+        "color": "#0891b2",
+        "entry_ids": [],
+        "reason": "两个标签语义高度相近"
+      }
+    ],
+    "warnings": [],
+    "privacy_note": "本次标签系统管理不会发送任何字段值。"
+  }
+}
+```
+
+支持动作：`create_tag`、`update_tag`、`delete_tag`、`merge_tags`、`replace_tag`、`assign_tag`。所有建议都必须由用户确认后再应用。
+
+### 7.8 应用 AI 标签系统管理建议
+
+```
+POST /ai/tags/apply
+```
+
+**请求体：**
+
+```json
+{
+  "suggestions": [
+    {
+      "action": "assign_tag",
+      "selected": true,
+      "tag": "邮箱",
+      "entry_ids": ["uuid"],
+      "reason": "标题显示这是邮箱条目"
+    }
+  ]
+}
+```
+
+**响应：**
+
+```json
+{
+  "success": true,
+  "data": {
+    "applied_count": 1,
+    "updated_entries": 1
+  },
+  "message": "已应用 1 条标签管理建议"
+}
+```
 
 ## 8. 导入导出模块
 

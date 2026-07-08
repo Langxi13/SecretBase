@@ -1492,14 +1492,14 @@
 
 /* 标签管理条目 */
 .tag-item {
-    display: flex;
+    display: grid;
+    grid-template-columns: 12px minmax(160px, 1fr) auto auto auto;
     align-items: center;
     gap: 12px;
     padding: 12px;
     border: 1px solid var(--border-color);
     border-radius: var(--border-radius);
     margin-bottom: 8px;
-    flex-wrap: wrap;
 }
 
 .tag-item .tag-dot {
@@ -1509,14 +1509,57 @@
     flex-shrink: 0;
 }
 
+.tag-main {
+    min-width: 0;
+    display: grid;
+    gap: 3px;
+}
+
 .tag-item .tag-name {
     font-weight: 500;
-    flex: 1;
+    overflow-wrap: anywhere;
+}
+
+.tag-item .tag-description {
+    color: var(--text-secondary);
+    font-size: var(--font-size-xs);
+    overflow-wrap: anywhere;
 }
 
 .tag-item .tag-count {
     font-size: var(--font-size-sm);
     color: var(--text-secondary);
+    white-space: nowrap;
+}
+
+.tag-edit-grid {
+    display: grid;
+    grid-template-columns: minmax(120px, 1fr) minmax(160px, 2fr) minmax(96px, auto);
+    gap: 10px;
+    align-items: end;
+}
+
+.tag-edit-grid label {
+    display: grid;
+    gap: 6px;
+    min-width: 0;
+}
+
+.tag-edit-grid span {
+    color: var(--text-secondary);
+    font-size: var(--font-size-xs);
+}
+
+.tag-edit-grid input[type="color"] {
+    min-height: 38px;
+    padding: 4px;
+}
+
+.tag-editor-actions {
+    display: flex;
+    gap: 8px;
+    justify-content: flex-end;
+    margin-top: 12px;
 }
 
 .tag-merge-panel {
@@ -1551,8 +1594,18 @@
         flex: 1 1 calc(50% - 8px);
     }
 
-    .tag-item .tag-name {
-        flex-basis: calc(100% - 24px);
+    .tag-item {
+        grid-template-columns: 12px minmax(0, 1fr);
+    }
+
+    .tag-item .tag-count,
+    .tag-item .btn-small {
+        grid-column: 2;
+        justify-self: stretch;
+    }
+
+    .tag-edit-grid {
+        grid-template-columns: 1fr;
     }
 }
 

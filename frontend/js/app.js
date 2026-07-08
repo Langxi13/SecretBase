@@ -143,6 +143,7 @@ const app = createApp({
         const aiOrganizing = ref(false);
         const aiOrganizeError = ref('');
         const aiOrganizeResult = ref(null);
+        const aiOrganizeMode = ref('tags');
         const aiOrganizeOptions = reactive({
             organizeTags: true,
             organizeGroups: false
@@ -197,6 +198,13 @@ const app = createApp({
             targetTag: ''
         });
         const tagMergeSourceList = ref([]);
+        const tagEditorForm = reactive({
+            mode: 'create',
+            originalName: '',
+            name: '',
+            description: '',
+            color: '#64748b'
+        });
         const groupForm = reactive({
             name: '',
             description: ''
@@ -264,10 +272,15 @@ const app = createApp({
             return aiOrganizeResult.value?.suggestions?.filter(item => item.selected).length || 0;
         });
 
+        const isAiTagGovernanceMode = computed(() => aiOrganizeMode.value === 'tag-governance');
+
         const selectedAiOrganizeChangeCount = computed(() => {
             return (aiOrganizeResult.value?.suggestions || [])
                 .filter(item => item.selected)
                 .reduce((total, item) => {
+                    if (isAiTagGovernanceMode.value) {
+                        return total + (item.action ? 1 : 0);
+                    }
                     return total
                         + (item.add_tags || []).length
                         + (item.remove_tags || []).length
@@ -279,7 +292,7 @@ const app = createApp({
         const canPreviewAiOrganize = computed(() => {
             return Boolean(aiStatus.value?.configured)
                 && !aiOrganizing.value
-                && (aiOrganizeOptions.organizeTags || aiOrganizeOptions.organizeGroups);
+                && (isAiTagGovernanceMode.value || aiOrganizeOptions.organizeTags || aiOrganizeOptions.organizeGroups);
         });
 
         const selectedImportPreviewCount = computed(() => importPreviewSelectedIds.value.length);
@@ -1571,8 +1584,10 @@ const app = createApp({
         }
 
         function setAiOrganizeMode(mode) {
+            aiOrganizeMode.value = mode;
             const organizeGroups = mode === 'groups';
-            aiOrganizeOptions.organizeTags = !organizeGroups;
+            const organizeTags = mode === 'tags';
+            aiOrganizeOptions.organizeTags = organizeTags;
             aiOrganizeOptions.organizeGroups = organizeGroups;
             clearAiOrganize();
         }
@@ -1598,11 +1613,13 @@ const app = createApp({
             aiOrganizeError.value = '';
             aiOrganizeResult.value = null;
             try {
-                const result = await api.post('/ai/organize/preview', {
-                    filters: currentAiOrganizeFilters(),
-                    organize_tags: aiOrganizeOptions.organizeTags,
-                    organize_groups: aiOrganizeOptions.organizeGroups
-                });
+                const result = isAiTagGovernanceMode.value
+                    ? await api.post('/ai/tags/preview', {})
+                    : await api.post('/ai/organize/preview', {
+                        filters: currentAiOrganizeFilters(),
+                        organize_tags: aiOrganizeOptions.organizeTags,
+                        organize_groups: aiOrganizeOptions.organizeGroups
+                    });
                 aiOrganizeResult.value = result.data;
             } catch (error) {
                 aiOrganizeError.value = error.message || 'AI 整理建议生成失败';
@@ -1626,7 +1643,9 @@ const app = createApp({
             aiOrganizing.value = true;
             aiOrganizeError.value = '';
             try {
-                const result = await api.post('/ai/organize/apply', { suggestions });
+                const result = isAiTagGovernanceMode.value
+                    ? await api.post('/ai/tags/apply', { suggestions })
+                    : await api.post('/ai/organize/apply', { suggestions });
                 showToast(result.message || 'AI 整理已应用', 'success');
                 aiOrganizeResult.value = null;
                 await Promise.all([loadEntries(currentPage.value), loadTags(), loadGroups()]);
@@ -1636,6 +1655,29 @@ const app = createApp({
             } finally {
                 aiOrganizing.value = false;
             }
+        }
+
+        function aiTagActionLabel(action) {
+            const labels = {
+                create_tag: '新建标签',
+                update_tag: '更新标签',
+                delete_tag: '删除标签',
+                merge_tags: '合并标签',
+                replace_tag: '替换标签',
+                assign_tag: '分配标签'
+            };
+            return labels[action] || action || '标签建议';
+        }
+
+        function aiTagActionTitle(suggestion) {
+            if (!suggestion) return '标签建议';
+            if (suggestion.action === 'merge_tags') {
+                return `${aiTagActionLabel(suggestion.action)}：${(suggestion.source_tags || []).join('、')} → ${suggestion.target_tag || ''}`;
+            }
+            if (suggestion.action === 'update_tag' || suggestion.action === 'replace_tag') {
+                return `${aiTagActionLabel(suggestion.action)}：${suggestion.tag || ''} → ${suggestion.new_tag || ''}`;
+            }
+            return `${aiTagActionLabel(suggestion.action)}：${suggestion.tag || suggestion.target_tag || ''}`;
         }
 
         async function openAiSettingsFromParse() {
@@ -2075,12 +2117,10 @@ const app = createApp({
         function renameTag(tag) {
             const newName = prompt('请输入新标签名:', tag.name);
             if (newName && newName !== tag.name) {
-                api.put(`/tags/${encodeURIComponent(tag.name)}`, { new_name: newName }).then(async () => {
-                    showToast('标签已重命名', 'success');
-                    await loadTags();
-                    await loadEntries();
-                }).catch(error => {
-                    showToast('重命名失败: ' + (error.message || ''), 'error');
+                store.updateTag(tag.name, {
+                    name: newName,
+                    description: tag.description || '',
+                    color: tag.color
                 });
             }
         }
@@ -2088,15 +2128,64 @@ const app = createApp({
         // 删除标签
         function deleteTag(tag) {
             showConfirmDialog('删除标签', `确认删除标签 "${tag.name}"？`, async () => {
-                try {
-                    await api.delete(`/tags/${encodeURIComponent(tag.name)}`);
-                    showToast('标签已删除', 'success');
-                    await loadTags();
-                    await loadEntries();
-                } catch (error) {
-                    showToast('删除失败', 'error');
-                }
+                await store.deleteTag(tag.name);
             });
+        }
+
+        function resetTagEditorForm() {
+            tagEditorForm.mode = 'create';
+            tagEditorForm.originalName = '';
+            tagEditorForm.name = '';
+            tagEditorForm.description = '';
+            tagEditorForm.color = '#64748b';
+        }
+
+        function startEditManagedTag(tag) {
+            tagEditorForm.mode = 'edit';
+            tagEditorForm.originalName = tag.name;
+            tagEditorForm.name = tag.name;
+            tagEditorForm.description = tag.description || '';
+            tagEditorForm.color = tag.color || '#64748b';
+        }
+
+        function cancelManagedTagEdit() {
+            resetTagEditorForm();
+        }
+
+        async function createTagFromManager() {
+            const name = tagEditorForm.name.trim();
+            if (!name) {
+                showToast('请输入标签名称', 'warning');
+                return;
+            }
+            const created = await store.createTag({
+                name,
+                description: tagEditorForm.description.trim(),
+                color: tagEditorForm.color
+            });
+            if (created) {
+                resetTagEditorForm();
+            }
+        }
+
+        async function saveManagedTag() {
+            if (tagEditorForm.mode !== 'edit') {
+                await createTagFromManager();
+                return;
+            }
+            const name = tagEditorForm.name.trim();
+            if (!name) {
+                showToast('请输入标签名称', 'warning');
+                return;
+            }
+            const updated = await store.updateTag(tagEditorForm.originalName, {
+                name,
+                description: tagEditorForm.description.trim(),
+                color: tagEditorForm.color
+            });
+            if (updated) {
+                resetTagEditorForm();
+            }
         }
 
         function parseTagMergeSourceText(text) {
@@ -2736,7 +2825,9 @@ const app = createApp({
             aiOrganizing,
             aiOrganizeError,
             aiOrganizeResult,
+            aiOrganizeMode,
             aiOrganizeOptions,
+            isAiTagGovernanceMode,
             aiSoftInputChars,
             aiMaxInputChars,
             aiTextLength,
@@ -2765,6 +2856,7 @@ const app = createApp({
             defaultTimeRange,
             tagMergeForm,
             tagMergeSourceList,
+            tagEditorForm,
             groupForm,
             passwordForm,
             trashItems,
@@ -2871,6 +2963,8 @@ const app = createApp({
             previewAiOrganize,
             applyAiOrganize,
             removeAiOrganizeItem,
+            aiTagActionLabel,
+            aiTagActionTitle,
             toggleAiEntrySelection,
             addAiEntryField,
             removeAiEntryField,
@@ -2888,6 +2982,10 @@ const app = createApp({
             goToTrashPage,
             renameTag,
             deleteTag,
+            startEditManagedTag,
+            cancelManagedTagEdit,
+            createTagFromManager,
+            saveManagedTag,
             mergeTags,
             commitTagMergeSourceTags,
             removeTagMergeSourceTag,

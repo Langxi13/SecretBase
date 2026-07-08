@@ -375,6 +375,45 @@ class Store {
         }
     }
 
+    async createTag(tagData) {
+        try {
+            const result = await api.post('/tags', tagData);
+            showToast(result.message || '标签已创建', 'success');
+            await this.loadTags();
+            return result.data;
+        } catch (error) {
+            console.error('创建标签失败:', error);
+            showToast(error.message || '创建标签失败', 'error');
+            return null;
+        }
+    }
+
+    async updateTag(tagName, tagData) {
+        try {
+            const result = await api.put(`/tags/${encodeURIComponent(tagName)}`, tagData);
+            showToast(result.message || '标签已更新', 'success');
+            await Promise.all([this.loadTags(), this.loadEntries(this.state.pagination.page)]);
+            return result.data;
+        } catch (error) {
+            console.error('更新标签失败:', error);
+            showToast(error.message || '更新标签失败', 'error');
+            return null;
+        }
+    }
+
+    async deleteTag(tagName) {
+        try {
+            const result = await api.delete(`/tags/${encodeURIComponent(tagName)}`);
+            showToast(result.message || '标签已删除', 'success');
+            await Promise.all([this.loadTags(), this.loadEntries(this.state.pagination.page)]);
+            return result.data;
+        } catch (error) {
+            console.error('删除标签失败:', error);
+            showToast(error.message || '删除标签失败', 'error');
+            return null;
+        }
+    }
+
     /**
      * 加载密码组
      */

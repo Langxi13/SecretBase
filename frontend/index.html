@@ -7,16 +7,16 @@
     
     <!-- Vue 3 CDN (Production) -->
     <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
-    <script src="/secretbase-runtime-config.js?v=20260708-ui-v38"></script>
+    <script src="/secretbase-runtime-config.js?v=20260708-ui-v39"></script>
     
     <!-- 基础样式 -->
-    <link rel="stylesheet" href="css/style.css?v=20260708-ui-v38">
-    <link rel="stylesheet" href="css/components.css?v=20260708-ui-v38">
+    <link rel="stylesheet" href="css/style.css?v=20260708-ui-v39">
+    <link rel="stylesheet" href="css/components.css?v=20260708-ui-v39">
     
     <!-- 主题样式 -->
-    <link rel="stylesheet" href="css/themes/variables.css?v=20260708-ui-v38">
-    <link rel="stylesheet" href="css/themes/dark.css?v=20260708-ui-v38">
-    <link rel="stylesheet" href="css/themes/light.css?v=20260708-ui-v38">
+    <link rel="stylesheet" href="css/themes/variables.css?v=20260708-ui-v39">
+    <link rel="stylesheet" href="css/themes/dark.css?v=20260708-ui-v39">
+    <link rel="stylesheet" href="css/themes/light.css?v=20260708-ui-v39">
     
     <!-- Favicon -->
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🔐</text></svg>">
@@ -879,17 +879,24 @@
                         <div class="ai-mode-tabs ai-organize-mode-tabs" role="tablist" aria-label="AI 整理模式">
                             <button
                                 class="ai-mode-tab"
-                                :class="{ active: aiOrganizeOptions.organizeTags }"
+                                :class="{ active: aiOrganizeMode === 'tags' }"
                                 @click="setAiOrganizeMode('tags')"
                             >
-                                整理标签
+                                条目标签整理
                             </button>
                             <button
                                 class="ai-mode-tab"
-                                :class="{ active: aiOrganizeOptions.organizeGroups }"
+                                :class="{ active: aiOrganizeMode === 'groups' }"
                                 @click="setAiOrganizeMode('groups')"
                             >
-                                整理密码组
+                                密码组整理
+                            </button>
+                            <button
+                                class="ai-mode-tab"
+                                :class="{ active: aiOrganizeMode === 'tag-governance' }"
+                                @click="setAiOrganizeMode('tag-governance')"
+                            >
+                                标签系统管理
                             </button>
                         </div>
                         <div v-if="aiOrganizeError" class="warning-panel ai-failure-panel">
@@ -901,10 +908,18 @@
                             <div class="ai-organize-summary">
                                 <div><strong>{{ aiOrganizeResult.entry_count }}</strong><span>范围条目</span></div>
                                 <div><strong>{{ aiOrganizeResult.summary.affected_entries }}</strong><span>影响条目</span></div>
-                                <div><strong>{{ aiOrganizeResult.summary.add_tags }}</strong><span>新增标签</span></div>
-                                <div><strong>{{ aiOrganizeResult.summary.remove_tags }}</strong><span>移除标签</span></div>
-                                <div><strong>{{ aiOrganizeResult.summary.add_groups }}</strong><span>新增密码组</span></div>
-                                <div><strong>{{ aiOrganizeResult.summary.remove_groups }}</strong><span>移除密码组</span></div>
+                                <template v-if="isAiTagGovernanceMode">
+                                    <div><strong>{{ aiOrganizeResult.summary.total_actions }}</strong><span>建议动作</span></div>
+                                    <div><strong>{{ aiOrganizeResult.summary.create_tag }}</strong><span>新建标签</span></div>
+                                    <div><strong>{{ aiOrganizeResult.summary.merge_tags }}</strong><span>合并标签</span></div>
+                                    <div><strong>{{ aiOrganizeResult.summary.delete_tag }}</strong><span>删除标签</span></div>
+                                </template>
+                                <template v-else>
+                                    <div><strong>{{ aiOrganizeResult.summary.add_tags }}</strong><span>新增标签</span></div>
+                                    <div><strong>{{ aiOrganizeResult.summary.remove_tags }}</strong><span>移除标签</span></div>
+                                    <div><strong>{{ aiOrganizeResult.summary.add_groups }}</strong><span>新增密码组</span></div>
+                                    <div><strong>{{ aiOrganizeResult.summary.remove_groups }}</strong><span>移除密码组</span></div>
+                                </template>
                             </div>
                             <p class="info-message">{{ aiOrganizeResult.privacy_note }}</p>
                             <div v-if="aiOrganizeResult.warnings && aiOrganizeResult.warnings.length > 0" class="warning-panel">
@@ -912,38 +927,48 @@
                             </div>
                             <h4>逐条建议</h4>
                             <details
-                                v-for="suggestion in aiOrganizeResult.suggestions"
-                                :key="suggestion.entry_id"
+                                v-for="(suggestion, index) in aiOrganizeResult.suggestions"
+                                :key="suggestion.entry_id || suggestion.action + '-' + index"
                                 class="ai-parse-entry ai-organize-entry"
                                 open
                             >
                                 <summary>
                                     <label class="checkbox-label ai-entry-select ai-organize-select" @click.stop>
                                         <input type="checkbox" v-model="suggestion.selected">
-                                        <span class="ai-organize-title">{{ suggestion.entry_title || suggestion.entry_id }}</span>
+                                        <span class="ai-organize-title">{{ isAiTagGovernanceMode ? aiTagActionTitle(suggestion) : (suggestion.entry_title || suggestion.entry_id) }}</span>
                                     </label>
                                 </summary>
                                 <p v-if="suggestion.reason" class="muted-text">{{ suggestion.reason }}</p>
-                                <div class="ai-organize-current">
+                                <div v-if="!isAiTagGovernanceMode" class="ai-organize-current">
                                     <span>当前标签：{{ (suggestion.current_tags || []).join('、') || '无' }}</span>
                                     <span>当前密码组：{{ (suggestion.current_groups || []).join('、') || '无' }}</span>
                                 </div>
-                                <div class="ai-organize-chip-row">
+                                <div v-if="isAiTagGovernanceMode" class="ai-organize-chip-row">
+                                    <strong>动作</strong>
+                                    <span class="tag">{{ aiTagActionLabel(suggestion.action) }}</span>
+                                    <span v-if="suggestion.description" class="group-chip">{{ suggestion.description }}</span>
+                                    <span v-if="suggestion.color" class="tag" :style="{ borderColor: suggestion.color }">{{ suggestion.color }}</span>
+                                </div>
+                                <div v-if="isAiTagGovernanceMode && suggestion.entry_ids && suggestion.entry_ids.length" class="ai-organize-chip-row">
+                                    <strong>条目</strong>
+                                    <span class="group-chip">{{ suggestion.entry_ids.length }} 个条目</span>
+                                </div>
+                                <div v-if="!isAiTagGovernanceMode" class="ai-organize-chip-row">
                                     <strong>新增标签</strong>
                                     <span v-for="tag in suggestion.add_tags" :key="'add-tag-' + tag" class="tag">{{ tag }} <button @click="removeAiOrganizeItem(suggestion, 'add_tags', tag)">✕</button></span>
                                     <em v-if="!suggestion.add_tags || suggestion.add_tags.length === 0">无</em>
                                 </div>
-                                <div class="ai-organize-chip-row">
+                                <div v-if="!isAiTagGovernanceMode" class="ai-organize-chip-row">
                                     <strong>移除标签</strong>
                                     <span v-for="tag in suggestion.remove_tags" :key="'remove-tag-' + tag" class="tag remove-chip">{{ tag }} <button @click="removeAiOrganizeItem(suggestion, 'remove_tags', tag)">✕</button></span>
                                     <em v-if="!suggestion.remove_tags || suggestion.remove_tags.length === 0">无</em>
                                 </div>
-                                <div class="ai-organize-chip-row">
+                                <div v-if="!isAiTagGovernanceMode" class="ai-organize-chip-row">
                                     <strong>新增密码组</strong>
                                     <span v-for="group in suggestion.add_groups" :key="'add-group-' + group" class="group-chip">{{ group }} <button @click="removeAiOrganizeItem(suggestion, 'add_groups', group)">✕</button></span>
                                     <em v-if="!suggestion.add_groups || suggestion.add_groups.length === 0">无</em>
                                 </div>
-                                <div class="ai-organize-chip-row">
+                                <div v-if="!isAiTagGovernanceMode" class="ai-organize-chip-row">
                                     <strong>移除密码组</strong>
                                     <span v-for="group in suggestion.remove_groups" :key="'remove-group-' + group" class="group-chip remove-chip">{{ group }} <button @click="removeAiOrganizeItem(suggestion, 'remove_groups', group)">✕</button></span>
                                     <em v-if="!suggestion.remove_groups || suggestion.remove_groups.length === 0">无</em>
@@ -1454,15 +1479,40 @@
                     <button class="modal-close" @click="showTagManager = false">✕</button>
                 </div>
                 <div class="modal-body">
+                    <div class="tag-merge-panel">
+                        <h3>{{ tagEditorForm.mode === 'edit' ? '编辑标签' : '新建标签' }}</h3>
+                        <div class="tag-edit-grid">
+                            <label>
+                                <span>标签名称</span>
+                                <input type="text" v-model="tagEditorForm.name" placeholder="例如：云服务" @keydown.enter.prevent="saveManagedTag">
+                            </label>
+                            <label>
+                                <span>标签简介</span>
+                                <input type="text" v-model="tagEditorForm.description" placeholder="简要说明适用范围" @keydown.enter.prevent="saveManagedTag">
+                            </label>
+                            <label>
+                                <span>标签颜色</span>
+                                <input type="color" v-model="tagEditorForm.color">
+                            </label>
+                        </div>
+                        <div class="tag-editor-actions">
+                            <button class="btn-primary" v-if="tagEditorForm.mode === 'create'" @click="createTagFromManager" :disabled="!tagEditorForm.name.trim()">新建标签</button>
+                            <button class="btn-primary" v-else @click="saveManagedTag" :disabled="!tagEditorForm.name.trim()">保存标签</button>
+                            <button class="btn-secondary" v-if="tagEditorForm.mode === 'edit'" @click="cancelManagedTagEdit">取消编辑</button>
+                        </div>
+                    </div>
                     <div v-if="tags.length === 0" class="empty-state">
                         <p>暂无标签</p>
                     </div>
                     <div v-else>
                         <div v-for="tag in tags" :key="tag.name" class="tag-item">
                             <span class="tag-dot" :style="{ backgroundColor: tag.color }"></span>
-                            <span class="tag-name">{{ tag.name }}</span>
+                            <div class="tag-main">
+                                <span class="tag-name">{{ tag.name }}</span>
+                                <span class="tag-description">{{ tag.description || '暂无简介' }}</span>
+                            </div>
                             <span class="tag-count">{{ tag.count }} 个条目</span>
-                            <button class="btn-small" @click="renameTag(tag)">重命名</button>
+                            <button class="btn-small" @click="startEditManagedTag(tag)">编辑</button>
                             <button class="btn-small btn-danger" @click="deleteTag(tag)">删除</button>
                         </div>
                     </div>
@@ -1670,9 +1720,9 @@
     </div>
     
     <!-- JS 模块 -->
-    <script src="js/api.js?v=20260708-ui-v38"></script>
-    <script src="js/utils.js?v=20260708-ui-v38"></script>
-    <script src="js/store.js?v=20260708-ui-v38"></script>
-    <script src="js/app.js?v=20260708-ui-v38"></script>
+    <script src="js/api.js?v=20260708-ui-v39"></script>
+    <script src="js/utils.js?v=20260708-ui-v39"></script>
+    <script src="js/store.js?v=20260708-ui-v39"></script>
+    <script src="js/app.js?v=20260708-ui-v39"></script>
 </body>
 </html>

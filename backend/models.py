@@ -174,13 +174,26 @@ class ChangePasswordRequest(BaseModel):
 
 class TagRenameRequest(BaseModel):
     """标签重命名请求"""
-    new_name: str = Field(..., min_length=1, max_length=50)
+    name: Optional[str] = Field(default=None, min_length=1, max_length=50)
+    new_name: Optional[str] = Field(default=None, min_length=1, max_length=50)
+    description: str = Field(default="", max_length=300)
+    color: Optional[str] = Field(default=None, pattern=r"^#[0-9a-fA-F]{6}$")
+
+
+class TagRequest(BaseModel):
+    """标签创建/更新请求"""
+    name: Optional[str] = Field(default=None, min_length=1, max_length=50)
+    new_name: Optional[str] = Field(default=None, min_length=1, max_length=50)
+    description: str = Field(default="", max_length=300)
+    color: Optional[str] = Field(default=None, pattern=r"^#[0-9a-fA-F]{6}$")
 
 
 class TagMergeRequest(BaseModel):
     """标签合并请求"""
     source_tags: List[str] = Field(..., min_items=1)
     target_tag: str = Field(..., min_length=1, max_length=50)
+    description: str = Field(default="", max_length=300)
+    color: Optional[str] = Field(default=None, pattern=r"^#[0-9a-fA-F]{6}$")
 
 
 class GroupRequest(BaseModel):
@@ -230,6 +243,48 @@ class AiOrganizeSuggestion(BaseModel):
 class AiOrganizeApplyRequest(BaseModel):
     """应用 AI 整理建议请求"""
     suggestions: List[AiOrganizeSuggestion] = Field(..., min_items=1)
+
+
+class AiTagGovernancePreviewRequest(BaseModel):
+    """AI 标签系统管理预览请求"""
+    filters: dict = Field(default_factory=dict)
+
+
+class AiTagGovernanceSuggestion(BaseModel):
+    """AI 标签系统管理建议"""
+    action: str = Field(..., pattern="^(create_tag|update_tag|delete_tag|merge_tags|replace_tag|assign_tag)$")
+    selected: bool = True
+    tag: Optional[str] = Field(default=None, max_length=50)
+    new_tag: Optional[str] = Field(default=None, max_length=50)
+    source_tags: List[str] = Field(default_factory=list)
+    target_tag: Optional[str] = Field(default=None, max_length=50)
+    entry_ids: List[str] = Field(default_factory=list)
+    description: str = Field(default="", max_length=300)
+    color: Optional[str] = Field(default=None, pattern=r"^#[0-9a-fA-F]{6}$")
+    reason: str = Field(default="", max_length=500)
+
+    @validator('tag', 'new_tag', 'target_tag')
+    def validate_optional_name(cls, v):
+        if v is None:
+            return v
+        cleaned = str(v).strip()
+        return cleaned or None
+
+    @validator('source_tags', 'entry_ids')
+    def validate_name_lists(cls, v):
+        cleaned = []
+        seen = set()
+        for item in v:
+            name = str(item or "").strip()
+            if name and name not in seen:
+                seen.add(name)
+                cleaned.append(name)
+        return cleaned
+
+
+class AiTagGovernanceApplyRequest(BaseModel):
+    """应用 AI 标签系统管理建议请求"""
+    suggestions: List[AiTagGovernanceSuggestion] = Field(..., min_items=1)
 
 
 class ImportConflictRequest(BaseModel):

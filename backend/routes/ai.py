@@ -8,10 +8,25 @@ from pathlib import Path
 from datetime import datetime
 import httpx
 from fastapi import APIRouter, HTTPException
-from models import AiOrganizeApplyRequest, AiOrganizePreviewRequest, AiOrganizeSuggestion, AiParseRequest
+from models import (
+    AiOrganizeApplyRequest,
+    AiOrganizePreviewRequest,
+    AiParseRequest,
+    AiTagGovernanceApplyRequest,
+    AiTagGovernancePreviewRequest,
+)
 from config import SECURE_SETTINGS_FILE
 from crypto import decrypt_vault_with_key, encrypt_vault_with_key, parse_vault_header
 from storage import derive_unlocked_purpose_key, get_vault_data, is_unlocked, save_vault_data
+from tag_utils import (
+    TAG_COLOR_PATTERN,
+    ensure_entry_tags_meta,
+    ensure_tag_meta,
+    list_tag_entities,
+    normalize_tag_name,
+    remove_tag_from_entries,
+    rename_tag_everywhere,
+)
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -97,6 +112,46 @@ ORGANIZE_SYSTEM_PROMPT = """你是 SecretBase 的密码库整理助手。你的�
 8. group_descriptions 只为新密码组提供一句中文简介。
 9. 不要依赖字段值；输入不会提供字段值。
 10. 不要输出 null；没有建议时用空数组或空字符串。"""
+
+TAG_GOVERNANCE_SYSTEM_PROMPT = """你是 SecretBase 的标签系统管理助手。你的任务是从整个密码库的条目标题、网址、字段名、已有标签、密码组和备注中，建议如何治理标签体系。
+
+你必须严格只输出一个 JSON object，不要输出 Markdown，不要输出解释，不要输出代码块。
+
+顶层 JSON 必须使用这个结构：
+{
+  "suggestions": [
+    {
+      "action": "create_tag|update_tag|delete_tag|merge_tags|replace_tag|assign_tag",
+      "tag": "标签名",
+      "new_tag": "新标签名",
+      "source_tags": ["源标签"],
+      "target_tag": "目标标签",
+      "entry_ids": ["条目ID"],
+      "description": "标签简介",
+      "color": "#2563eb",
+      "reason": "简短原因"
+    }
+  ],
+  "warnings": []
+}
+
+动作语义：
+1. create_tag：创建新标签，可用 entry_ids 建议分配给部分条目。
+2. update_tag：修改标签名称、简介或颜色；原标签放 tag，新名称放 new_tag。
+3. delete_tag：删除无价值标签，并从条目移除。
+4. merge_tags：把 source_tags 合并到 target_tag。
+5. replace_tag：仅在 entry_ids 指定条目中把 tag 替换为 new_tag。
+6. assign_tag：把 tag 分配给 entry_ids 指定条目。
+
+规则：
+1. 只能使用输入中出现的 entry_id，不要编造条目。
+2. 可以建议新增、修改、删除、替换、合并和分配标签，但必须保守。
+3. 不要建议同时把同一标签删除又分配；冲突时优先返回更少动作。
+4. 标签名称必须简短，单个名称不超过 50 个字符。
+5. 标签简介使用一句中文说明，最多 300 字。
+6. color 必须是 #RRGGBB；无法确定时可省略。
+7. 不要依赖字段值；输入不会提供字段值。
+8. 不要输出 null；没有建议时用空数组或空字符串。"""
 
 ORGANIZE_GROUP_RULES = [
     ("开发资源", "代码仓库、开发平台、API Key 和 CI/CD 相关账号", ["开发", "代码", "git", "github", "gitlab", "gitee", "仓库", "ci", "api", "token", "npm", "docker", "k8s", "kubernetes"]),
@@ -718,6 +773,115 @@ def _organize_summary(suggestions: list[dict]) -> dict:
     }
 
 
+def _entry_for_ai_tag_governance(entry) -> dict:
+    return {
+        "id": entry.id,
+        "title": entry.title,
+        "url": entry.url or "",
+        "tags": entry.tags,
+        "groups": getattr(entry, "groups", []) or [],
+        "field_names": [field.name for field in entry.fields],
+        "remarks": entry.remarks or "",
+        "starred": entry.starred,
+    }
+
+
+def _clean_color(value) -> str | None:
+    color = _clean_text(value, 20)
+    return color.lower() if TAG_COLOR_PATTERN.match(color) else None
+
+
+def _normalize_tag_governance_suggestion(item, valid_entry_ids: set[str]) -> dict | None:
+    if not isinstance(item, dict):
+        return None
+    action = _clean_text(item.get("action"), 30)
+    if action not in {"create_tag", "update_tag", "delete_tag", "merge_tags", "replace_tag", "assign_tag"}:
+        return None
+
+    raw_entry_ids = item.get("entry_ids") or item.get("entries") or []
+    if isinstance(raw_entry_ids, str):
+        raw_entry_ids = [part.strip() for part in raw_entry_ids.split(",") if part.strip()]
+    entry_ids = []
+    if isinstance(raw_entry_ids, list):
+        for entry_id in raw_entry_ids:
+            cleaned = _clean_text(entry_id, 100)
+            if cleaned in valid_entry_ids and cleaned not in entry_ids:
+                entry_ids.append(cleaned)
+
+    return {
+        "action": action,
+        "selected": True,
+        "tag": normalize_tag_name(item.get("tag") or item.get("old_tag") or item.get("old_name")) or None,
+        "new_tag": normalize_tag_name(item.get("new_tag") or item.get("new_name")) or None,
+        "source_tags": _clean_name_list(item.get("source_tags") or item.get("sources")),
+        "target_tag": normalize_tag_name(item.get("target_tag") or item.get("target")) or None,
+        "entry_ids": entry_ids,
+        "description": _clean_text(item.get("description"), 300),
+        "color": _clean_color(item.get("color")),
+        "reason": _clean_text(item.get("reason") or item.get("explanation"), 500),
+    }
+
+
+def _normalize_tag_governance_payload(payload, valid_entry_ids: set[str]) -> tuple[list[dict], list[str]]:
+    if isinstance(payload, list):
+        raw_suggestions = payload
+        raw_warnings = []
+    elif isinstance(payload, dict):
+        raw_suggestions = payload.get("suggestions") or payload.get("items") or payload.get("data") or []
+        raw_warnings = payload.get("warnings") or []
+    else:
+        raw_suggestions = []
+        raw_warnings = []
+
+    suggestions = []
+    if isinstance(raw_suggestions, list):
+        for item in raw_suggestions:
+            suggestion = _normalize_tag_governance_suggestion(item, valid_entry_ids)
+            if suggestion:
+                suggestions.append(suggestion)
+
+    warnings = [_clean_text(warning, 200) for warning in raw_warnings if _clean_text(warning, 200)] if isinstance(raw_warnings, list) else []
+    return suggestions, list(dict.fromkeys(warnings))
+
+
+def _tag_governance_summary(suggestions: list[dict]) -> dict:
+    selected = [item for item in suggestions if item.get("selected", True)]
+    affected_entries = {
+        entry_id
+        for item in selected
+        for entry_id in (item.get("entry_ids") or [])
+    }
+    summary = {
+        "total_actions": len(selected),
+        "affected_entries": len(affected_entries),
+    }
+    for action in ("create_tag", "update_tag", "delete_tag", "merge_tags", "replace_tag", "assign_tag"):
+        summary[action] = sum(1 for item in selected if item.get("action") == action)
+    return summary
+
+
+def _add_tag_to_entry(entry, tag: str) -> bool:
+    if not tag or tag in (entry.tags or []):
+        return False
+    entry.tags.append(tag)
+    return True
+
+
+def _replace_tag_in_entry(entry, old_tag: str, new_tag: str) -> bool:
+    if old_tag not in (entry.tags or []):
+        return False
+    changed = False
+    tags = []
+    for tag in entry.tags:
+        replacement = new_tag if tag == old_tag else tag
+        if replacement not in tags:
+            tags.append(replacement)
+        if replacement != tag:
+            changed = True
+    entry.tags = tags
+    return changed
+
+
 def _quality_warnings(entries, source_text: str) -> list[str]:
     warnings = []
     if len(source_text) > 3000:
@@ -953,6 +1117,7 @@ async def ai_organize_apply(request: AiOrganizeApplyRequest):
         for tag in suggestion.add_tags:
             if tag not in tags:
                 tags.append(tag)
+        ensure_entry_tags_meta(vault, tags)
 
         groups = [group for group in original_groups if group not in suggestion.remove_groups]
         for group in suggestion.add_groups:
@@ -989,6 +1154,197 @@ async def ai_organize_apply(request: AiOrganizeApplyRequest):
             "created_groups": sorted(set(created_groups)),
         },
         "message": f"已整理 {updated_count} 个条目"
+    }
+
+
+@router.post("/tags/preview")
+async def ai_tag_governance_preview(request: AiTagGovernancePreviewRequest):
+    """AI 生成全局标签系统管理建议，不直接写入。"""
+    if not is_unlocked():
+        raise HTTPException(status_code=401, detail="请先解锁")
+
+    vault = get_vault_data()
+    entries = _filter_entries_for_organize(vault, request.filters)
+    if not entries:
+        raise HTTPException(status_code=422, detail="当前密码库没有可分析条目")
+    if len(entries) > AI_ORGANIZE_MAX_ENTRIES:
+        raise HTTPException(status_code=413, detail=f"AI 标签系统管理最多支持 {AI_ORGANIZE_MAX_ENTRIES} 条，请先缩小范围")
+
+    ai_config = _load_ai_config()
+    if not ai_config:
+        raise HTTPException(status_code=502, detail="AI 服务未配置")
+
+    user_payload = {
+        "existing_tags": list_tag_entities(vault),
+        "existing_groups": sorted({
+            group
+            for entry in vault.entries
+            if not entry.deleted
+            for group in (getattr(entry, "groups", []) or [])
+        } | set((vault.groups_meta or {}).keys())),
+        "entries": [_entry_for_ai_tag_governance(entry) for entry in entries],
+        "privacy_note": "字段值不会发送给 AI，只有字段名和条目结构信息。",
+    }
+
+    try:
+        content = await _request_chat_completion(
+            ai_config["base_url"],
+            ai_config["api_key"],
+            ai_config["model"],
+            [
+                {"role": "system", "content": TAG_GOVERNANCE_SYSTEM_PROMPT},
+                {"role": "user", "content": json.dumps(user_payload, ensure_ascii=False)}
+            ],
+            4000,
+        )
+        payload = _extract_json_content(content)
+        suggestions, warnings = _normalize_tag_governance_payload(payload, {entry.id for entry in entries})
+    except HTTPException:
+        raise
+    except json.JSONDecodeError as e:
+        logger.error(f"AI 标签系统管理返回的 JSON 解析失败: {e}")
+        raise HTTPException(status_code=422, detail="AI 返回格式错误")
+    except Exception as e:
+        logger.error(f"AI 标签系统管理失败: {e}")
+        raise HTTPException(status_code=502, detail="AI 服务调用失败")
+
+    return {
+        "success": True,
+        "data": {
+            "entry_count": len(entries),
+            "suggestions": suggestions,
+            "summary": _tag_governance_summary(suggestions),
+            "warnings": warnings,
+            "privacy_note": "本次标签系统管理不会发送任何字段值。",
+        }
+    }
+
+
+@router.post("/tags/apply")
+async def ai_tag_governance_apply(request: AiTagGovernanceApplyRequest):
+    """应用用户确认后的 AI 标签系统管理建议。"""
+    if not is_unlocked():
+        raise HTTPException(status_code=401, detail="请先解锁")
+
+    vault = get_vault_data()
+    entries_by_id = {entry.id: entry for entry in vault.entries if not entry.deleted}
+    updated_entry_ids: set[str] = set()
+    applied_count = 0
+    now = datetime.now().isoformat()
+
+    def mark_updated(entry):
+        entry.updated_at = now
+        updated_entry_ids.add(entry.id)
+
+    for suggestion in request.suggestions:
+        if not suggestion.selected:
+            continue
+
+        action = suggestion.action
+        tag = normalize_tag_name(suggestion.tag or "")
+        new_tag = normalize_tag_name(suggestion.new_tag or "")
+        target_tag = normalize_tag_name(suggestion.target_tag or "")
+        source_tags = [normalize_tag_name(item) for item in suggestion.source_tags if normalize_tag_name(item)]
+        entry_ids = [entry_id for entry_id in suggestion.entry_ids if entry_id in entries_by_id]
+        changed = False
+
+        if action == "create_tag":
+            if not tag:
+                continue
+            ensure_tag_meta(vault, tag, suggestion.description, suggestion.color)
+            for entry_id in entry_ids:
+                entry = entries_by_id[entry_id]
+                if _add_tag_to_entry(entry, tag):
+                    mark_updated(entry)
+                    changed = True
+            changed = True
+
+        elif action == "update_tag":
+            if not tag:
+                continue
+            destination = new_tag or tag
+            description = suggestion.description
+            if destination != tag:
+                rename_tag_everywhere(vault, tag, destination)
+                if isinstance(vault.tags_meta, dict):
+                    old_meta = vault.tags_meta.pop(tag, {})
+                    if isinstance(old_meta, dict) and not description:
+                        description = str(old_meta.get("description", ""))
+                for entry in vault.entries:
+                    if not entry.deleted and destination in (entry.tags or []):
+                        mark_updated(entry)
+                changed = True
+            ensure_tag_meta(vault, destination, description, suggestion.color)
+            changed = True
+
+        elif action == "delete_tag":
+            if not tag:
+                continue
+            affected = 0
+            for entry in vault.entries:
+                if not entry.deleted and tag in (entry.tags or []):
+                    entry.tags = [item for item in entry.tags if item != tag]
+                    mark_updated(entry)
+                    affected += 1
+            if isinstance(vault.tags_meta, dict) and tag in vault.tags_meta:
+                vault.tags_meta.pop(tag, None)
+                changed = True
+            changed = changed or affected > 0
+
+        elif action == "merge_tags":
+            if not source_tags or not target_tag:
+                continue
+            ensure_tag_meta(vault, target_tag, suggestion.description, suggestion.color)
+            for entry in vault.entries:
+                if entry.deleted:
+                    continue
+                if any(source in (entry.tags or []) for source in source_tags):
+                    entry.tags = [item for item in entry.tags if item not in source_tags]
+                    _add_tag_to_entry(entry, target_tag)
+                    mark_updated(entry)
+                    changed = True
+            if isinstance(vault.tags_meta, dict):
+                for source in source_tags:
+                    if source in vault.tags_meta:
+                        vault.tags_meta.pop(source, None)
+                        changed = True
+
+        elif action == "replace_tag":
+            if not tag or not new_tag:
+                continue
+            ensure_tag_meta(vault, new_tag, suggestion.description, suggestion.color)
+            target_entries = [entries_by_id[entry_id] for entry_id in entry_ids] if entry_ids else list(entries_by_id.values())
+            for entry in target_entries:
+                if _replace_tag_in_entry(entry, tag, new_tag):
+                    mark_updated(entry)
+                    changed = True
+
+        elif action == "assign_tag":
+            if not tag or not entry_ids:
+                continue
+            ensure_tag_meta(vault, tag, suggestion.description, suggestion.color)
+            for entry_id in entry_ids:
+                entry = entries_by_id[entry_id]
+                if _add_tag_to_entry(entry, tag):
+                    mark_updated(entry)
+                    changed = True
+
+        if changed:
+            applied_count += 1
+
+    if applied_count > 0:
+        for entry in vault.entries:
+            if not entry.deleted:
+                ensure_entry_tags_meta(vault, entry.tags)
+        save_vault_data(vault)
+
+    return {
+        "success": True,
+        "data": {
+            "applied_count": applied_count,
+            "updated_entries": len(updated_entry_ids),
+        },
+        "message": f"已应用 {applied_count} 条标签管理建议"
     }
 
 
