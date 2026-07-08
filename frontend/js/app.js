@@ -43,7 +43,8 @@ const app = createApp({
         const tagBrowserQuery = ref('');
         const tagBrowserSort = ref('count_desc');
         const tagBrowserPage = ref(1);
-        const tagBrowserPageSize = 6;
+        const tagPageSizeOptions = [5, 10, 20, 50];
+        const tagBrowserPageSize = ref(5);
         const advancedTagDraft = ref('');
         const advancedTagList = ref([]);
 
@@ -203,7 +204,7 @@ const app = createApp({
         const tagMergeSourceList = ref([]);
         const tagManagerPanel = ref('list');
         const tagManagerPage = ref(1);
-        const tagManagerPageSize = 6;
+        const tagManagerPageSize = ref(5);
         const selectedManagedTagNames = ref([]);
         const tagEditorForm = reactive({
             mode: 'create',
@@ -410,18 +411,18 @@ const app = createApp({
             return sortedTagBrowserTags.value.filter(tag => String(tag.name || '').toLowerCase().includes(query));
         });
 
-        const tagBrowserTotalPages = computed(() => Math.max(1, Math.ceil(filteredTagBrowserTags.value.length / tagBrowserPageSize)));
+        const tagBrowserTotalPages = computed(() => Math.max(1, Math.ceil(filteredTagBrowserTags.value.length / tagBrowserPageSize.value)));
 
         const paginatedTagBrowserTags = computed(() => {
-            const start = (tagBrowserPage.value - 1) * tagBrowserPageSize;
-            return filteredTagBrowserTags.value.slice(start, start + tagBrowserPageSize);
+            const start = (tagBrowserPage.value - 1) * tagBrowserPageSize.value;
+            return filteredTagBrowserTags.value.slice(start, start + tagBrowserPageSize.value);
         });
 
-        const tagManagerTotalPages = computed(() => Math.max(1, Math.ceil(tags.value.length / tagManagerPageSize)));
+        const tagManagerTotalPages = computed(() => Math.max(1, Math.ceil(tags.value.length / tagManagerPageSize.value)));
 
         const paginatedManagedTags = computed(() => {
-            const start = (tagManagerPage.value - 1) * tagManagerPageSize;
-            return sortedTagBrowserTags.value.slice(start, start + tagManagerPageSize);
+            const start = (tagManagerPage.value - 1) * tagManagerPageSize.value;
+            return sortedTagBrowserTags.value.slice(start, start + tagManagerPageSize.value);
         });
 
         const allManagedPageTagsSelected = computed(() => {
@@ -2887,6 +2888,14 @@ const app = createApp({
             tagBrowserPage.value = 1;
         });
 
+        watch(tagBrowserPageSize, () => {
+            tagBrowserPage.value = 1;
+        });
+
+        watch(tagManagerPageSize, () => {
+            tagManagerPage.value = 1;
+        });
+
         return {
             // 状态
             loading,
@@ -2920,8 +2929,10 @@ const app = createApp({
             tagBrowserQuery,
             tagBrowserSort,
             tagBrowserPage,
+            tagBrowserPageSize,
             tagBrowserTotalPages,
             paginatedTagBrowserTags,
+            tagPageSizeOptions,
             tagBrowserSortOptions,
             showCreateModal,
             showEditModal,
@@ -3014,6 +3025,7 @@ const app = createApp({
             tagMergeSourceList,
             tagManagerPanel,
             tagManagerPage,
+            tagManagerPageSize,
             tagManagerTotalPages,
             paginatedManagedTags,
             allManagedPageTagsSelected,

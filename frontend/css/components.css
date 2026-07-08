@@ -1568,6 +1568,26 @@
     justify-content: flex-end;
 }
 
+.tag-page-size-control {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-height: var(--control-height);
+    color: var(--text-secondary);
+    font-size: var(--font-size-sm);
+    white-space: nowrap;
+}
+
+.tag-page-size-control select {
+    min-width: 68px;
+    min-height: 34px;
+    padding: 0 28px 0 10px;
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius);
+    background: var(--bg-card);
+    color: var(--text-primary);
+}
+
 .tag-manager-list {
     display: grid;
     gap: 8px;
@@ -2589,7 +2609,9 @@ input[type="checkbox"] {
 
     .tag-manager-actions .btn-secondary,
     .tag-manager-actions .btn-danger,
-    .tag-manager-pagination .btn-secondary {
+    .tag-manager-pagination .btn-secondary,
+    .tag-page-size-control,
+    .tag-page-size-control select {
         width: 100%;
     }
 
