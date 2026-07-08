@@ -133,12 +133,20 @@ const app = createApp({
         ];
 
         // AI 解析
+        const aiMode = ref('parse');
         const aiText = ref('');
         const aiResult = ref(null);
         const aiParsing = ref(false);
         const aiStatus = ref(null);
         const aiStatusError = ref('');
         const aiFailureMessage = ref('');
+        const aiOrganizing = ref(false);
+        const aiOrganizeError = ref('');
+        const aiOrganizeResult = ref(null);
+        const aiOrganizeOptions = reactive({
+            organizeTags: true,
+            organizeGroups: true
+        });
         const aiCooldownUntil = ref(0);
         const aiNow = ref(Date.now());
         const lastAiParseText = ref('');
@@ -250,6 +258,28 @@ const app = createApp({
 
         const selectedAiEntryCount = computed(() => {
             return aiResult.value?.entries?.filter(entry => entry.selected).length || 0;
+        });
+
+        const selectedAiOrganizeCount = computed(() => {
+            return aiOrganizeResult.value?.suggestions?.filter(item => item.selected).length || 0;
+        });
+
+        const selectedAiOrganizeChangeCount = computed(() => {
+            return (aiOrganizeResult.value?.suggestions || [])
+                .filter(item => item.selected)
+                .reduce((total, item) => {
+                    return total
+                        + (item.add_tags || []).length
+                        + (item.remove_tags || []).length
+                        + (item.add_groups || []).length
+                        + (item.remove_groups || []).length;
+                }, 0);
+        });
+
+        const canPreviewAiOrganize = computed(() => {
+            return Boolean(aiStatus.value?.configured)
+                && !aiOrganizing.value
+                && (aiOrganizeOptions.organizeTags || aiOrganizeOptions.organizeGroups);
         });
 
         const selectedImportPreviewCount = computed(() => importPreviewSelectedIds.value.length);
@@ -1495,9 +1525,11 @@ const app = createApp({
         // AI 解析
         async function openAiParse() {
             showAiParse.value = true;
+            aiMode.value = 'parse';
             aiStatus.value = null;
             aiStatusError.value = '';
             aiFailureMessage.value = '';
+            aiOrganizeError.value = '';
             try {
                 const result = await api.get('/ai/status');
                 aiStatus.value = result.data;
@@ -1525,6 +1557,78 @@ const app = createApp({
             lastAiParseText.value = '';
             aiCooldownUntil.value = 0;
             aiNow.value = Date.now();
+        }
+
+        function setAiMode(mode) {
+            aiMode.value = mode;
+            aiFailureMessage.value = '';
+            aiOrganizeError.value = '';
+        }
+
+        function clearAiOrganize() {
+            aiOrganizeResult.value = null;
+            aiOrganizeError.value = '';
+        }
+
+        function currentAiOrganizeFilters() {
+            return {
+                ...store.state.filters,
+                search: searchQuery.value,
+                searchScopes: [...selectedSearchScopes.value],
+                sortBy: sortBy.value,
+                sortOrder: sortOrder.value
+            };
+        }
+
+        async function previewAiOrganize() {
+            if (!canPreviewAiOrganize.value) {
+                if (!aiStatus.value?.configured) {
+                    aiOrganizeError.value = 'AI 未配置，请先到设置页填写接入信息。';
+                }
+                return;
+            }
+            aiOrganizing.value = true;
+            aiOrganizeError.value = '';
+            aiOrganizeResult.value = null;
+            try {
+                const result = await api.post('/ai/organize/preview', {
+                    filters: currentAiOrganizeFilters(),
+                    organize_tags: aiOrganizeOptions.organizeTags,
+                    organize_groups: aiOrganizeOptions.organizeGroups
+                });
+                aiOrganizeResult.value = result.data;
+            } catch (error) {
+                aiOrganizeError.value = error.message || 'AI 整理建议生成失败';
+                showToast(aiOrganizeError.value, 'warning');
+            } finally {
+                aiOrganizing.value = false;
+            }
+        }
+
+        function removeAiOrganizeItem(suggestion, key, value) {
+            if (!Array.isArray(suggestion[key])) return;
+            suggestion[key] = suggestion[key].filter(item => item !== value);
+        }
+
+        async function applyAiOrganize() {
+            const suggestions = (aiOrganizeResult.value?.suggestions || []).filter(item => item.selected);
+            if (suggestions.length === 0) {
+                showToast('请选择要应用的整理建议', 'warning');
+                return;
+            }
+            aiOrganizing.value = true;
+            aiOrganizeError.value = '';
+            try {
+                const result = await api.post('/ai/organize/apply', { suggestions });
+                showToast(result.message || 'AI 整理已应用', 'success');
+                aiOrganizeResult.value = null;
+                await Promise.all([loadEntries(currentPage.value), loadTags(), loadGroups()]);
+            } catch (error) {
+                aiOrganizeError.value = error.message || '应用 AI 整理失败';
+                showToast(aiOrganizeError.value, 'error');
+            } finally {
+                aiOrganizing.value = false;
+            }
         }
 
         async function openAiSettingsFromParse() {
@@ -2615,12 +2719,17 @@ const app = createApp({
             tagInput,
             selectedTemplate,
             entryTemplates,
+            aiMode,
             aiText,
             aiResult,
             aiParsing,
             aiStatus,
             aiStatusError,
             aiFailureMessage,
+            aiOrganizing,
+            aiOrganizeError,
+            aiOrganizeResult,
+            aiOrganizeOptions,
             aiSoftInputChars,
             aiMaxInputChars,
             aiTextLength,
@@ -2628,6 +2737,9 @@ const app = createApp({
             aiCooldownSeconds,
             canParseAi,
             selectedAiEntryCount,
+            selectedAiOrganizeCount,
+            selectedAiOrganizeChangeCount,
+            canPreviewAiOrganize,
             lastAiParseText,
             settingsForm,
             activeSettingsTab,
@@ -2741,11 +2853,16 @@ const app = createApp({
             isFieldRevealed,
             toggleFieldReveal,
             openAiParse,
+            setAiMode,
             manualEntryFromAi,
             clearAiParse,
+            clearAiOrganize,
             openAiSettingsFromParse,
             parseAiText,
             applyAiResult,
+            previewAiOrganize,
+            applyAiOrganize,
+            removeAiOrganizeItem,
             toggleAiEntrySelection,
             addAiEntryField,
             removeAiEntryField,

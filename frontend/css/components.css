@@ -443,6 +443,29 @@
 }
 
 /* AI 解析弹窗 */
+.ai-mode-tabs {
+    display: inline-flex;
+    gap: 4px;
+    margin-bottom: 14px;
+    padding: 4px;
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    background: var(--bg-secondary);
+}
+
+.ai-mode-tab {
+    min-height: 32px;
+    padding: 6px 12px;
+    border-radius: 8px;
+    color: var(--text-secondary);
+    font-size: var(--font-size-sm);
+}
+
+.ai-mode-tab.active {
+    background: var(--color-primary);
+    color: var(--text-inverse);
+}
+
 .ai-parse-result {
     margin-top: 16px;
     padding: 16px;
@@ -466,6 +489,86 @@
 .ai-entry-select {
     margin-bottom: 10px;
     font-weight: 600;
+}
+
+.ai-organize-options,
+.ai-organize-chip-row,
+.ai-organize-current {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+}
+
+.ai-organize-options {
+    margin: 12px 0;
+}
+
+.ai-organize-summary {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(92px, 1fr));
+    gap: 10px;
+    margin-bottom: 12px;
+}
+
+.ai-organize-summary div {
+    padding: 10px;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    background: var(--bg-card);
+}
+
+.ai-organize-summary strong,
+.ai-organize-summary span {
+    display: block;
+}
+
+.ai-organize-summary strong {
+    color: var(--text-primary);
+    font-size: var(--font-size-xl);
+}
+
+.ai-organize-summary span,
+.ai-organize-current,
+.ai-organize-chip-row em {
+    color: var(--text-secondary);
+    font-size: var(--font-size-xs);
+}
+
+.ai-organize-entry {
+    padding: 10px 0;
+}
+
+.ai-organize-entry summary {
+    cursor: pointer;
+}
+
+.ai-organize-chip-row {
+    margin-top: 8px;
+}
+
+.ai-organize-chip-row strong {
+    min-width: 76px;
+    color: var(--text-secondary);
+    font-size: var(--font-size-xs);
+}
+
+.ai-organize-chip-row .tag,
+.ai-organize-chip-row .group-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.ai-organize-chip-row .tag button,
+.ai-organize-chip-row .group-chip button {
+    color: inherit;
+    opacity: 0.75;
+}
+
+.remove-chip {
+    border-color: color-mix(in srgb, var(--color-error) 45%, var(--border-color));
+    background: color-mix(in srgb, var(--color-error) 14%, var(--bg-card));
 }
 
 .ai-edit-grid {

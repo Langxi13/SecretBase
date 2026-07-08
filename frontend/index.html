@@ -7,16 +7,16 @@
     
     <!-- Vue 3 CDN (Production) -->
     <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
-    <script src="/secretbase-runtime-config.js?v=20260708-ui-v33"></script>
+    <script src="/secretbase-runtime-config.js?v=20260708-ui-v34"></script>
     
     <!-- 基础样式 -->
-    <link rel="stylesheet" href="css/style.css?v=20260708-ui-v33">
-    <link rel="stylesheet" href="css/components.css?v=20260708-ui-v33">
+    <link rel="stylesheet" href="css/style.css?v=20260708-ui-v34">
+    <link rel="stylesheet" href="css/components.css?v=20260708-ui-v34">
     
     <!-- 主题样式 -->
-    <link rel="stylesheet" href="css/themes/variables.css?v=20260708-ui-v33">
-    <link rel="stylesheet" href="css/themes/dark.css?v=20260708-ui-v33">
-    <link rel="stylesheet" href="css/themes/light.css?v=20260708-ui-v33">
+    <link rel="stylesheet" href="css/themes/variables.css?v=20260708-ui-v34">
+    <link rel="stylesheet" href="css/themes/dark.css?v=20260708-ui-v34">
+    <link rel="stylesheet" href="css/themes/light.css?v=20260708-ui-v34">
     
     <!-- Favicon -->
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🔐</text></svg>">
@@ -799,10 +799,14 @@
         <div v-if="showAiParse" class="modal-overlay">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h2>🤖 AI 智能录入</h2>
+                    <h2>🤖 AI 助手</h2>
                     <button class="modal-close" @click="showAiParse = false">✕</button>
                 </div>
                 <div class="modal-body">
+                    <div class="ai-mode-tabs" role="tablist" aria-label="AI 功能">
+                        <button class="ai-mode-tab" :class="{ active: aiMode === 'parse' }" @click="setAiMode('parse')">智能录入</button>
+                        <button class="ai-mode-tab" :class="{ active: aiMode === 'organize' }" @click="setAiMode('organize')">整理条目</button>
+                    </div>
                     <div v-if="aiStatusError" class="warning-panel">
                         {{ aiStatusError }}
                     </div>
@@ -813,73 +817,149 @@
                     <div v-else-if="aiStatus" class="info-panel">
                         当前模型：{{ aiStatus.model }}
                     </div>
-                    <div class="form-group">
-                        <label>粘贴你的密码信息</label>
-                        <textarea 
-                            v-model="aiText" 
-                            placeholder="例如：示例云 账号:xxx 密码:yyy。也可以一次粘贴多个系统/账号，AI 会尝试拆成多条。"
-                            rows="5"
-                        ></textarea>
-                        <div class="ai-input-meta">
-                            <span :class="{ 'warning-message': aiTextLength > aiSoftInputChars, 'error-message': aiTextLength > aiMaxInputChars }">
-                                {{ aiTextLength }} / {{ aiMaxInputChars }} 字符
-                            </span>
-                            <span v-if="aiInputWarning" class="warning-message">{{ aiInputWarning }}</span>
-                        </div>
-                    </div>
-                    <div v-if="aiResult" class="ai-parse-result">
-                        <h4>解析结果（{{ aiResult.entryCount }} 条）</h4>
-                        <div v-if="aiResult.warnings && aiResult.warnings.length > 0" class="warning-panel ai-quality-warning">
-                            <strong>请重点检查解析结果</strong>
-                            <p v-for="warning in aiResult.warnings" :key="warning">{{ warning }}</p>
-                        </div>
-                        <div v-for="(entry, index) in aiResult.entries" :key="entry.aiKey" class="ai-parse-entry" :class="{ muted: !entry.selected }">
-                            <label class="checkbox-label ai-entry-select">
-                                <input type="checkbox" v-model="entry.selected">
-                                选择第 {{ index + 1 }} 条
-                            </label>
-                            <div class="ai-edit-grid">
-                                <label>标题 <input type="text" v-model="entry.title" placeholder="条目标题"></label>
-                                <label>网址 <input type="text" v-model="entry.url" placeholder="https://example.com"></label>
-                                <label class="full-width">标签 <input type="text" v-model="entry.tagsText" placeholder="多个标签用逗号分隔"></label>
-                                <label class="full-width">备注 <textarea v-model="entry.remarks" rows="2" placeholder="备注"></textarea></label>
+                    <div v-if="aiMode === 'parse'">
+                        <div class="form-group">
+                            <label>粘贴你的密码信息</label>
+                            <textarea
+                                v-model="aiText"
+                                placeholder="例如：示例云 账号:xxx 密码:yyy。也可以一次粘贴多个系统/账号，AI 会尝试拆成多条。"
+                                rows="5"
+                            ></textarea>
+                            <div class="ai-input-meta">
+                                <span :class="{ 'warning-message': aiTextLength > aiSoftInputChars, 'error-message': aiTextLength > aiMaxInputChars }">
+                                    {{ aiTextLength }} / {{ aiMaxInputChars }} 字符
+                                </span>
+                                <span v-if="aiInputWarning" class="warning-message">{{ aiInputWarning }}</span>
                             </div>
-                            <div class="ai-field-editor">
-                                <div v-for="(field, fieldIndex) in entry.fields" :key="fieldIndex" class="ai-field-row">
-                                    <input type="text" v-model="field.name" placeholder="字段名">
-                                    <input type="text" v-model="field.value" placeholder="字段值">
-                                    <label class="checkbox-label compact-check-option"><input type="checkbox" v-model="field.copyable"> 可复制</label>
-                                    <label class="checkbox-label compact-check-option"><input type="checkbox" v-model="field.hidden"> 隐藏</label>
-                                    <button class="remove-btn" @click="removeAiEntryField(entry, fieldIndex)">✕</button>
+                        </div>
+                        <div v-if="aiResult" class="ai-parse-result">
+                            <h4>解析结果（{{ aiResult.entryCount }} 条）</h4>
+                            <div v-if="aiResult.warnings && aiResult.warnings.length > 0" class="warning-panel ai-quality-warning">
+                                <strong>请重点检查解析结果</strong>
+                                <p v-for="warning in aiResult.warnings" :key="warning">{{ warning }}</p>
+                            </div>
+                            <div v-for="(entry, index) in aiResult.entries" :key="entry.aiKey" class="ai-parse-entry" :class="{ muted: !entry.selected }">
+                                <label class="checkbox-label ai-entry-select">
+                                    <input type="checkbox" v-model="entry.selected">
+                                    选择第 {{ index + 1 }} 条
+                                </label>
+                                <div class="ai-edit-grid">
+                                    <label>标题 <input type="text" v-model="entry.title" placeholder="条目标题"></label>
+                                    <label>网址 <input type="text" v-model="entry.url" placeholder="https://example.com"></label>
+                                    <label class="full-width">标签 <input type="text" v-model="entry.tagsText" placeholder="多个标签用逗号分隔"></label>
+                                    <label class="full-width">备注 <textarea v-model="entry.remarks" rows="2" placeholder="备注"></textarea></label>
                                 </div>
-                                <button class="btn-small" @click="addAiEntryField(entry)">+ 添加字段</button>
+                                <div class="ai-field-editor">
+                                    <div v-for="(field, fieldIndex) in entry.fields" :key="fieldIndex" class="ai-field-row">
+                                        <input type="text" v-model="field.name" placeholder="字段名">
+                                        <input type="text" v-model="field.value" placeholder="字段值">
+                                        <label class="checkbox-label compact-check-option"><input type="checkbox" v-model="field.copyable"> 可复制</label>
+                                        <label class="checkbox-label compact-check-option"><input type="checkbox" v-model="field.hidden"> 隐藏</label>
+                                        <button class="remove-btn" @click="removeAiEntryField(entry, fieldIndex)">✕</button>
+                                    </div>
+                                    <button class="btn-small" @click="addAiEntryField(entry)">+ 添加字段</button>
+                                </div>
                             </div>
+                            <p v-if="aiResult.entryCount > 1" class="warning-message">检测到多条信息，将创建已勾选的 {{ selectedAiEntryCount }} 条新条目。</p>
                         </div>
-                        <p v-if="aiResult.entryCount > 1" class="warning-message">检测到多条信息，将创建已勾选的 {{ selectedAiEntryCount }} 条新条目。</p>
+                        <p v-if="aiParsing" class="info-message">正在智能解析，请稍候...</p>
+                        <p v-if="aiText && aiText.trim() === lastAiParseText" class="warning-message">内容未变化，不能重复智能解析。</p>
+                        <p v-if="aiText && aiStatus && !aiStatus.configured" class="warning-message">请先配置 AI 接入信息后再解析。</p>
+                        <p v-if="aiCooldownSeconds > 0" class="warning-message">智能解析冷却中，请等待 {{ aiCooldownSeconds }} 秒。</p>
+                        <div v-if="aiFailureMessage" class="warning-panel ai-failure-panel">
+                            <strong>AI 解析未完成</strong>
+                            <p>{{ aiFailureMessage }}</p>
+                            <button class="btn-small" @click="manualEntryFromAi()">保留原文并转为手动录入</button>
+                        </div>
                     </div>
-                    <p v-if="aiParsing" class="info-message">正在智能解析，请稍候...</p>
-                    <p v-if="aiText && aiText.trim() === lastAiParseText" class="warning-message">内容未变化，不能重复智能解析。</p>
-                    <p v-if="aiText && aiStatus && !aiStatus.configured" class="warning-message">请先配置 AI 接入信息后再解析。</p>
-                    <p v-if="aiCooldownSeconds > 0" class="warning-message">智能解析冷却中，请等待 {{ aiCooldownSeconds }} 秒。</p>
-                    <div v-if="aiFailureMessage" class="warning-panel ai-failure-panel">
-                        <strong>AI 解析未完成</strong>
-                        <p>{{ aiFailureMessage }}</p>
-                        <button class="btn-small" @click="manualEntryFromAi()">保留原文并转为手动录入</button>
+                    <div v-else class="ai-organize-panel">
+                        <div class="info-panel">
+                            整理当前筛选全部条目，最多 100 条；不会发送字段值，只发送标题、网址、字段名、标签和密码组。
+                        </div>
+                        <div class="ai-organize-options">
+                            <label class="checkbox-label compact-check-option"><input type="checkbox" v-model="aiOrganizeOptions.organizeTags"> 整理标签</label>
+                            <label class="checkbox-label compact-check-option"><input type="checkbox" v-model="aiOrganizeOptions.organizeGroups"> 整理密码组</label>
+                        </div>
+                        <div v-if="aiOrganizeError" class="warning-panel ai-failure-panel">
+                            <strong>AI 整理未完成</strong>
+                            <p>{{ aiOrganizeError }}</p>
+                        </div>
+                        <div v-if="aiOrganizeResult" class="ai-parse-result ai-organize-result">
+                            <h4>整体摘要</h4>
+                            <div class="ai-organize-summary">
+                                <div><strong>{{ aiOrganizeResult.entry_count }}</strong><span>范围条目</span></div>
+                                <div><strong>{{ aiOrganizeResult.summary.affected_entries }}</strong><span>影响条目</span></div>
+                                <div><strong>{{ aiOrganizeResult.summary.add_tags }}</strong><span>新增标签</span></div>
+                                <div><strong>{{ aiOrganizeResult.summary.remove_tags }}</strong><span>移除标签</span></div>
+                                <div><strong>{{ aiOrganizeResult.summary.add_groups }}</strong><span>新增密码组</span></div>
+                                <div><strong>{{ aiOrganizeResult.summary.remove_groups }}</strong><span>移除密码组</span></div>
+                            </div>
+                            <p class="info-message">{{ aiOrganizeResult.privacy_note }}</p>
+                            <div v-if="aiOrganizeResult.warnings && aiOrganizeResult.warnings.length > 0" class="warning-panel">
+                                <p v-for="warning in aiOrganizeResult.warnings" :key="warning">{{ warning }}</p>
+                            </div>
+                            <h4>逐条建议</h4>
+                            <details
+                                v-for="suggestion in aiOrganizeResult.suggestions"
+                                :key="suggestion.entry_id"
+                                class="ai-parse-entry ai-organize-entry"
+                                open
+                            >
+                                <summary>
+                                    <label class="checkbox-label ai-entry-select" @click.stop>
+                                        <input type="checkbox" v-model="suggestion.selected">
+                                        {{ suggestion.entry_title || suggestion.entry_id }}
+                                    </label>
+                                </summary>
+                                <p v-if="suggestion.reason" class="muted-text">{{ suggestion.reason }}</p>
+                                <div class="ai-organize-current">
+                                    <span>当前标签：{{ (suggestion.current_tags || []).join('、') || '无' }}</span>
+                                    <span>当前密码组：{{ (suggestion.current_groups || []).join('、') || '无' }}</span>
+                                </div>
+                                <div class="ai-organize-chip-row">
+                                    <strong>新增标签</strong>
+                                    <span v-for="tag in suggestion.add_tags" :key="'add-tag-' + tag" class="tag">{{ tag }} <button @click="removeAiOrganizeItem(suggestion, 'add_tags', tag)">✕</button></span>
+                                    <em v-if="!suggestion.add_tags || suggestion.add_tags.length === 0">无</em>
+                                </div>
+                                <div class="ai-organize-chip-row">
+                                    <strong>移除标签</strong>
+                                    <span v-for="tag in suggestion.remove_tags" :key="'remove-tag-' + tag" class="tag remove-chip">{{ tag }} <button @click="removeAiOrganizeItem(suggestion, 'remove_tags', tag)">✕</button></span>
+                                    <em v-if="!suggestion.remove_tags || suggestion.remove_tags.length === 0">无</em>
+                                </div>
+                                <div class="ai-organize-chip-row">
+                                    <strong>新增密码组</strong>
+                                    <span v-for="group in suggestion.add_groups" :key="'add-group-' + group" class="group-chip">{{ group }} <button @click="removeAiOrganizeItem(suggestion, 'add_groups', group)">✕</button></span>
+                                    <em v-if="!suggestion.add_groups || suggestion.add_groups.length === 0">无</em>
+                                </div>
+                                <div class="ai-organize-chip-row">
+                                    <strong>移除密码组</strong>
+                                    <span v-for="group in suggestion.remove_groups" :key="'remove-group-' + group" class="group-chip remove-chip">{{ group }} <button @click="removeAiOrganizeItem(suggestion, 'remove_groups', group)">✕</button></span>
+                                    <em v-if="!suggestion.remove_groups || suggestion.remove_groups.length === 0">无</em>
+                                </div>
+                            </details>
+                        </div>
                     </div>
                 </div>
                 <div class="modal-footer">
                     <button class="btn-secondary" @click="showAiParse = false">取消</button>
-                    <button class="btn-secondary" @click="clearAiParse" :disabled="!aiText && !aiResult && !aiFailureMessage">
+                    <button v-if="aiMode === 'parse'" class="btn-secondary" @click="clearAiParse" :disabled="!aiText && !aiResult && !aiFailureMessage">
                         清空解析
                     </button>
-                    <button class="btn-secondary" @click="manualEntryFromAi()">
+                    <button v-if="aiMode === 'parse'" class="btn-secondary" @click="manualEntryFromAi()">
                         转为手动录入
                     </button>
-                    <button class="btn-primary" @click="parseAiText" :disabled="!canParseAi">
+                    <button v-if="aiMode === 'parse'" class="btn-primary" @click="parseAiText" :disabled="!canParseAi">
                         {{ aiParsing ? '解析中...' : aiCooldownSeconds > 0 ? `等待 ${aiCooldownSeconds}s` : '✨ 智能解析' }}
                     </button>
-                    <button v-if="aiResult" class="btn-primary" @click="applyAiResult" :disabled="selectedAiEntryCount === 0">
+                    <button v-if="aiMode === 'parse' && aiResult" class="btn-primary" @click="applyAiResult" :disabled="selectedAiEntryCount === 0">
                         {{ selectedAiEntryCount > 1 ? `应用并创建 ${selectedAiEntryCount} 条` : '应用结果' }}
+                    </button>
+                    <button v-if="aiMode === 'organize'" class="btn-secondary" @click="clearAiOrganize" :disabled="!aiOrganizeResult && !aiOrganizeError">清空建议</button>
+                    <button v-if="aiMode === 'organize'" class="btn-primary" @click="previewAiOrganize" :disabled="!canPreviewAiOrganize">
+                        {{ aiOrganizing ? '整理中...' : '生成整理建议' }}
+                    </button>
+                    <button v-if="aiMode === 'organize' && aiOrganizeResult" class="btn-primary" @click="applyAiOrganize" :disabled="selectedAiOrganizeCount === 0 || selectedAiOrganizeChangeCount === 0">
+                        应用整理（{{ selectedAiOrganizeCount }} 条 / {{ selectedAiOrganizeChangeCount }} 项变更）
                     </button>
                 </div>
             </div>
@@ -1578,9 +1658,9 @@
     </div>
     
     <!-- JS 模块 -->
-    <script src="js/api.js?v=20260708-ui-v33"></script>
-    <script src="js/utils.js?v=20260708-ui-v33"></script>
-    <script src="js/store.js?v=20260708-ui-v33"></script>
-    <script src="js/app.js?v=20260708-ui-v33"></script>
+    <script src="js/api.js?v=20260708-ui-v34"></script>
+    <script src="js/utils.js?v=20260708-ui-v34"></script>
+    <script src="js/store.js?v=20260708-ui-v34"></script>
+    <script src="js/app.js?v=20260708-ui-v34"></script>
 </body>
 </html>

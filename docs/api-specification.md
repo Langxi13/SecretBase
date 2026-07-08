@@ -1041,6 +1041,124 @@ POST /ai/parse
 - 422: 无法解析输入文本
 - 429: 5 秒内重复解析，或内容未变化重复解析
 
+### 7.5 生成 AI 整理建议
+
+**基于当前筛选范围，为条目生成标签和密码组整理建议。该接口只返回建议，不写入 vault。**
+
+整理请求不会向 AI 发送字段值；后端只发送条目标题、网址、字段名、现有标签、现有密码组、备注等信息。单次最多整理 100 条，超过后前端应提示缩小筛选范围。
+
+```
+POST /ai/organize/preview
+```
+
+**请求体：**
+
+```json
+{
+  "filters": {
+    "tag": "待整理",
+    "group": "",
+    "search": "",
+    "searchScopes": [],
+    "sortBy": "updated_at",
+    "sortOrder": "desc"
+  },
+  "organize_tags": true,
+  "organize_groups": true
+}
+```
+
+**响应：**
+
+```json
+{
+  "success": true,
+  "data": {
+    "entry_count": 1,
+    "summary": {
+      "affected_entries": 1,
+      "add_tags": 2,
+      "remove_tags": 1,
+      "add_groups": 1,
+      "remove_groups": 0
+    },
+    "suggestions": [
+      {
+        "entry_id": "uuid",
+        "entry_title": "公司邮箱",
+        "selected": true,
+        "current_tags": ["待整理"],
+        "current_groups": [],
+        "add_tags": ["邮箱", "工作"],
+        "remove_tags": ["待整理"],
+        "add_groups": ["工作账号"],
+        "remove_groups": [],
+        "group_descriptions": {
+          "工作账号": "公司邮箱、协作工具和内部系统"
+        },
+        "reason": "标题和字段名显示这是工作邮箱账号"
+      }
+    ],
+    "warnings": [],
+    "privacy_note": "本次整理未向 AI 发送任何字段值。"
+  }
+}
+```
+
+**错误情况：**
+
+- 401: 未解锁
+- 413: 当前筛选结果超过 100 条
+- 422: 没有可整理条目，或未选择整理标签/密码组
+- 502: AI 服务未配置或服务不可用
+
+### 7.6 应用 AI 整理建议
+
+**应用用户确认后的整理建议。该接口必须只接受前端确认后的建议列表，并重新校验条目仍存在且未删除。**
+
+```
+POST /ai/organize/apply
+```
+
+**请求体：**
+
+```json
+{
+  "suggestions": [
+    {
+      "entry_id": "uuid",
+      "selected": true,
+      "add_tags": ["邮箱", "工作"],
+      "remove_tags": ["待整理"],
+      "add_groups": ["工作账号"],
+      "remove_groups": [],
+      "group_descriptions": {
+        "工作账号": "公司邮箱、协作工具和内部系统"
+      },
+      "reason": "标题和字段名显示这是工作邮箱账号"
+    }
+  ]
+}
+```
+
+**响应：**
+
+```json
+{
+  "success": true,
+  "data": {
+    "updated_count": 1,
+    "created_groups": ["工作账号"]
+  },
+  "message": "已整理 1 个条目"
+}
+```
+
+**错误情况：**
+
+- 401: 未解锁
+- 422: 建议列表为空或字段格式无效
+
 ## 8. 导入导出模块
 
 阶段：V1.1。该模块是完整愿景的一部分，但不阻塞 V1 基础可用版发布。

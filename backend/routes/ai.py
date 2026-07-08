@@ -5,17 +5,19 @@ import re
 import time
 import os
 from pathlib import Path
+from datetime import datetime
 import httpx
 from fastapi import APIRouter, HTTPException
-from models import AiParseRequest
+from models import AiOrganizeApplyRequest, AiOrganizePreviewRequest, AiOrganizeSuggestion, AiParseRequest
 from config import SECURE_SETTINGS_FILE
 from crypto import decrypt_vault_with_key, encrypt_vault_with_key, parse_vault_header
-from storage import derive_unlocked_purpose_key, is_unlocked
+from storage import derive_unlocked_purpose_key, get_vault_data, is_unlocked, save_vault_data
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
 AI_PARSE_COOLDOWN_SECONDS = 5
 AI_PARSE_MAX_INPUT_CHARS = 6000
+AI_ORGANIZE_MAX_ENTRIES = 100
 _last_parse_at = 0.0
 _last_parse_text_hash = ""
 AI_SETTINGS_PURPOSE = "ai-settings"
@@ -63,6 +65,36 @@ SYSTEM_PROMPT = """你是 SecretBase 的密码条目解析器。你的任务是�
 
 示例输出：
 {"entries":[{"title":"示例邮箱","url":"","fields":[{"name":"邮箱","value":"demo@example.com","copyable":true,"hidden":false},{"name":"密码","value":"demo-mail-pass","copyable":true,"hidden":true}],"tags":["邮箱","示例"],"remarks":""},{"title":"示例服务器","url":"","fields":[{"name":"IP","value":"192.0.2.10","copyable":true,"hidden":false},{"name":"SSH 端口","value":"2222","copyable":false,"hidden":false},{"name":"密码","value":"demo-server-pass","copyable":true,"hidden":true}],"tags":["服务器","示例"],"remarks":""}]}"""
+
+ORGANIZE_SYSTEM_PROMPT = """你是 SecretBase 的密码库整理助手。你的任务是根据条目标题、网址、字段名、已有标签和已有密码组，建议如何整理标签和密码组。
+
+你必须严格只输出一个 JSON object，不要输出 Markdown，不要输出解释，不要输出代码块。
+
+顶层 JSON 必须使用这个结构：
+{
+  "suggestions": [
+    {
+      "entry_id": "条目ID",
+      "add_tags": ["建议新增标签"],
+      "remove_tags": ["建议移除标签"],
+      "add_groups": ["建议新增密码组"],
+      "remove_groups": ["建议移除密码组"],
+      "group_descriptions": {"密码组名": "简介"},
+      "reason": "简短原因"
+    }
+  ],
+  "warnings": []
+}
+
+规则：
+1. 只能为输入中出现的 entry_id 生成建议，不要编造条目。
+2. 标签用于描述属性和细筛选，例如 邮箱、服务器、生产、开发、学校、工作。
+3. 密码组用于较大的组织集合，例如 工作账号、学校账号、服务器、家庭设备、开发资源。
+4. 可以建议新增和移除标签或密码组，但必须保守，理由不充分时返回空数组。
+5. 标签和密码组名称必须简短，单个名称不超过 50 个字符。
+6. group_descriptions 只为新密码组提供一句中文简介。
+7. 不要依赖字段值；输入不会提供字段值。
+8. 不要输出 null；没有建议时用空数组或空字符串。"""
 
 
 def _extract_json_content(content: str):
@@ -425,6 +457,194 @@ def _normalize_ai_payload(payload):
     return entries
 
 
+def _clean_name_list(raw_items) -> list[str]:
+    if isinstance(raw_items, str):
+        raw_items = re.split(r"[,，;；]+", raw_items)
+    if not isinstance(raw_items, list):
+        raw_items = []
+
+    names = []
+    seen = set()
+    for item in raw_items:
+        name = _clean_text(item, 50)
+        if name and name not in seen:
+            seen.add(name)
+            names.append(name)
+    return names
+
+
+def _normalize_suggestion(item, valid_entry_ids: set[str]) -> dict | None:
+    if not isinstance(item, dict):
+        return None
+    entry_id = _clean_text(item.get("entry_id") or item.get("id"), 100)
+    if entry_id not in valid_entry_ids:
+        return None
+
+    descriptions = item.get("group_descriptions")
+    if not isinstance(descriptions, dict):
+        descriptions = {}
+    cleaned_descriptions = {
+        _clean_text(name, 50): _clean_text(description, 300)
+        for name, description in descriptions.items()
+        if _clean_text(name, 50)
+    }
+
+    return {
+        "entry_id": entry_id,
+        "selected": True,
+        "add_tags": _clean_name_list(item.get("add_tags") or item.get("tags_to_add")),
+        "remove_tags": _clean_name_list(item.get("remove_tags") or item.get("tags_to_remove")),
+        "add_groups": _clean_name_list(item.get("add_groups") or item.get("groups_to_add")),
+        "remove_groups": _clean_name_list(item.get("remove_groups") or item.get("groups_to_remove")),
+        "group_descriptions": cleaned_descriptions,
+        "reason": _clean_text(item.get("reason") or item.get("explanation"), 500),
+    }
+
+
+def _normalize_organize_payload(payload, valid_entry_ids: set[str]) -> tuple[list[dict], list[str]]:
+    if isinstance(payload, list):
+        raw_suggestions = payload
+        raw_warnings = []
+    elif isinstance(payload, dict):
+        raw_suggestions = payload.get("suggestions") or payload.get("items") or payload.get("data") or []
+        raw_warnings = payload.get("warnings") or []
+    else:
+        raw_suggestions = []
+        raw_warnings = []
+
+    if not isinstance(raw_suggestions, list):
+        raw_suggestions = []
+
+    suggestions = []
+    seen = set()
+    for item in raw_suggestions:
+        suggestion = _normalize_suggestion(item, valid_entry_ids)
+        if not suggestion or suggestion["entry_id"] in seen:
+            continue
+        seen.add(suggestion["entry_id"])
+        suggestions.append(suggestion)
+
+    warnings = [_clean_text(warning, 200) for warning in raw_warnings if _clean_text(warning, 200)] if isinstance(raw_warnings, list) else []
+    return suggestions, list(dict.fromkeys(warnings))
+
+
+def _filter_entries_for_organize(vault, filters: dict) -> list:
+    filters = filters if isinstance(filters, dict) else {}
+    entries = [entry for entry in vault.entries if not entry.deleted]
+
+    entry_ids = filters.get("entryIds") or filters.get("entry_ids") or []
+    if isinstance(entry_ids, str):
+        entry_ids = [item.strip() for item in entry_ids.split(",") if item.strip()]
+    if isinstance(entry_ids, list) and entry_ids:
+        allowed_ids = set(str(item) for item in entry_ids)
+        entries = [entry for entry in entries if entry.id in allowed_ids]
+
+    search = str(filters.get("search") or "").strip().lower()
+    search_scopes = filters.get("searchScopes") or filters.get("search_scopes") or []
+    if isinstance(search_scopes, str):
+        search_scopes = [item.strip() for item in search_scopes.split(",") if item.strip()]
+    if search:
+        if not search_scopes:
+            entries = []
+        else:
+            scoped_entries = []
+            for entry in entries:
+                matched = False
+                if "title" in search_scopes and search in entry.title.lower():
+                    matched = True
+                if "url" in search_scopes and search in (entry.url or "").lower():
+                    matched = True
+                if "tags" in search_scopes and any(search in tag.lower() for tag in entry.tags):
+                    matched = True
+                if "field_names" in search_scopes and any(search in field.name.lower() for field in entry.fields):
+                    matched = True
+                if "field_values" in search_scopes and any(search in field.value.lower() for field in entry.fields if not _field_is_hidden_for_organize(field)):
+                    matched = True
+                if "remarks" in search_scopes and search in (entry.remarks or "").lower():
+                    matched = True
+                if matched:
+                    scoped_entries.append(entry)
+            entries = scoped_entries
+
+    tag = str(filters.get("tag") or "").strip()
+    if tag:
+        entries = [entry for entry in entries if tag in entry.tags]
+
+    group = str(filters.get("group") or "").strip()
+    if group:
+        entries = [entry for entry in entries if group in (getattr(entry, "groups", []) or [])]
+
+    required_tags = filters.get("tags") or []
+    if isinstance(required_tags, str):
+        required_tags = [item.strip() for item in required_tags.split(",") if item.strip()]
+    if isinstance(required_tags, list) and required_tags:
+        entries = [entry for entry in entries if all(tag in entry.tags for tag in required_tags)]
+
+    if filters.get("untagged"):
+        entries = [entry for entry in entries if not entry.tags]
+
+    if filters.get("starred"):
+        entries = [entry for entry in entries if entry.starred]
+
+    created_from = str(filters.get("createdFrom") or filters.get("created_from") or "").strip()
+    created_to = str(filters.get("createdTo") or filters.get("created_to") or "").strip()
+    if created_from:
+        entries = [entry for entry in entries if entry.created_at >= created_from]
+    if created_to:
+        entries = [entry for entry in entries if entry.created_at <= created_to]
+
+    has_url = filters.get("hasUrl") if "hasUrl" in filters else filters.get("has_url")
+    if has_url in ("yes", True, "true"):
+        entries = [entry for entry in entries if bool(entry.url)]
+    elif has_url in ("no", False, "false"):
+        entries = [entry for entry in entries if not entry.url]
+
+    has_remarks = filters.get("hasRemarks") if "hasRemarks" in filters else filters.get("has_remarks")
+    if has_remarks in ("yes", True, "true"):
+        entries = [entry for entry in entries if bool(entry.remarks)]
+    elif has_remarks in ("no", False, "false"):
+        entries = [entry for entry in entries if not entry.remarks]
+
+    sort_by = str(filters.get("sortBy") or filters.get("sort_by") or "updated_at")
+    sort_order = str(filters.get("sortOrder") or filters.get("sort_order") or "desc")
+    if sort_by not in {"updated_at", "created_at", "title"}:
+        sort_by = "updated_at"
+    reverse = sort_order != "asc"
+    entries.sort(key=lambda entry: getattr(entry, sort_by, "") or "", reverse=reverse)
+    return entries
+
+
+def _field_is_hidden_for_organize(field) -> bool:
+    hidden = getattr(field, "hidden", None)
+    if hidden is None:
+        return bool(getattr(field, "copyable", False))
+    return bool(hidden)
+
+
+def _entry_for_ai_organize(entry) -> dict:
+    return {
+        "id": entry.id,
+        "title": entry.title,
+        "url": entry.url or "",
+        "tags": entry.tags,
+        "groups": getattr(entry, "groups", []) or [],
+        "field_names": [field.name for field in entry.fields],
+        "remarks": entry.remarks or "",
+        "starred": entry.starred,
+    }
+
+
+def _organize_summary(suggestions: list[dict]) -> dict:
+    selected = [item for item in suggestions if item.get("selected", True)]
+    return {
+        "affected_entries": len(selected),
+        "add_tags": sum(len(item.get("add_tags", [])) for item in selected),
+        "remove_tags": sum(len(item.get("remove_tags", [])) for item in selected),
+        "add_groups": sum(len(item.get("add_groups", [])) for item in selected),
+        "remove_groups": sum(len(item.get("remove_groups", [])) for item in selected),
+    }
+
+
 def _quality_warnings(entries, source_text: str) -> list[str]:
     warnings = []
     if len(source_text) > 3000:
@@ -530,6 +750,162 @@ async def clear_ai_settings():
         "success": True,
         "data": _empty_ai_status(),
         "message": "AI 设置已清除"
+    }
+
+
+@router.post("/organize/preview")
+async def ai_organize_preview(request: AiOrganizePreviewRequest):
+    """AI 生成标签和密码组整理建议，不直接写入。"""
+    if not is_unlocked():
+        raise HTTPException(status_code=401, detail="请先解锁")
+    if not request.organize_tags and not request.organize_groups:
+        raise HTTPException(status_code=422, detail="请至少选择整理标签或密码组")
+
+    ai_config = _load_ai_config()
+    if not ai_config:
+        raise HTTPException(status_code=502, detail="AI 服务未配置")
+
+    vault = get_vault_data()
+    entries = _filter_entries_for_organize(vault, request.filters)
+    if not entries:
+        raise HTTPException(status_code=422, detail="当前筛选范围没有可整理条目")
+    if len(entries) > AI_ORGANIZE_MAX_ENTRIES:
+        raise HTTPException(status_code=413, detail=f"单次 AI 整理最多支持 {AI_ORGANIZE_MAX_ENTRIES} 条，请缩小筛选范围")
+
+    existing_tags = sorted({tag for entry in vault.entries if not entry.deleted for tag in entry.tags})
+    existing_groups = sorted({
+        group
+        for entry in vault.entries
+        if not entry.deleted
+        for group in (getattr(entry, "groups", []) or [])
+    } | set((vault.groups_meta or {}).keys()))
+
+    user_payload = {
+        "organize_tags": request.organize_tags,
+        "organize_groups": request.organize_groups,
+        "existing_tags": existing_tags,
+        "existing_groups": existing_groups,
+        "entries": [_entry_for_ai_organize(entry) for entry in entries],
+        "privacy_note": "字段值不会发送给 AI，只有字段名和条目结构信息。",
+    }
+
+    try:
+        content = await _request_chat_completion(
+            ai_config["base_url"],
+            ai_config["api_key"],
+            ai_config["model"],
+            [
+                {"role": "system", "content": ORGANIZE_SYSTEM_PROMPT},
+                {"role": "user", "content": json.dumps(user_payload, ensure_ascii=False)}
+            ],
+            4000,
+        )
+        payload = _extract_json_content(content)
+        suggestions, warnings = _normalize_organize_payload(payload, {entry.id for entry in entries})
+        entries_by_id = {entry.id: entry for entry in entries}
+        for suggestion in suggestions:
+            if not request.organize_tags:
+                suggestion["add_tags"] = []
+                suggestion["remove_tags"] = []
+            if not request.organize_groups:
+                suggestion["add_groups"] = []
+                suggestion["remove_groups"] = []
+                suggestion["group_descriptions"] = {}
+            entry = entries_by_id[suggestion["entry_id"]]
+            suggestion["entry_title"] = entry.title
+            suggestion["current_tags"] = entry.tags
+            suggestion["current_groups"] = getattr(entry, "groups", []) or []
+    except HTTPException:
+        raise
+    except json.JSONDecodeError as e:
+        logger.error(f"AI 整理返回的 JSON 解析失败: {e}")
+        raise HTTPException(status_code=422, detail="AI 返回格式错误")
+    except Exception as e:
+        logger.error(f"AI 整理失败: {e}")
+        raise HTTPException(status_code=502, detail="AI 服务调用失败")
+
+    return {
+        "success": True,
+        "data": {
+            "entry_count": len(entries),
+            "suggestions": suggestions,
+            "summary": _organize_summary(suggestions),
+            "warnings": warnings,
+            "privacy_note": "本次整理未向 AI 发送任何字段值。",
+        }
+    }
+
+
+@router.post("/organize/apply")
+async def ai_organize_apply(request: AiOrganizeApplyRequest):
+    """应用用户确认后的 AI 整理建议。"""
+    if not is_unlocked():
+        raise HTTPException(status_code=401, detail="请先解锁")
+
+    vault = get_vault_data()
+    entries_by_id = {
+        entry.id: entry
+        for entry in vault.entries
+        if not entry.deleted
+    }
+    if not isinstance(vault.groups_meta, dict):
+        vault.groups_meta = {}
+
+    updated_count = 0
+    created_groups = []
+    now = datetime.now().isoformat()
+
+    for suggestion in request.suggestions:
+        if not suggestion.selected:
+            continue
+        entry = entries_by_id.get(suggestion.entry_id)
+        if not entry:
+            continue
+
+        changed = False
+        original_tags = list(entry.tags)
+        original_groups = list(getattr(entry, "groups", []) or [])
+
+        tags = [tag for tag in original_tags if tag not in suggestion.remove_tags]
+        for tag in suggestion.add_tags:
+            if tag not in tags:
+                tags.append(tag)
+
+        groups = [group for group in original_groups if group not in suggestion.remove_groups]
+        for group in suggestion.add_groups:
+            if group not in groups:
+                groups.append(group)
+            if group not in vault.groups_meta:
+                vault.groups_meta[group] = {
+                    "description": str(suggestion.group_descriptions.get(group, "")).strip(),
+                    "created_at": now,
+                    "updated_at": now,
+                }
+                created_groups.append(group)
+            elif suggestion.group_descriptions.get(group) and not str(vault.groups_meta[group].get("description", "")).strip():
+                vault.groups_meta[group]["description"] = str(suggestion.group_descriptions[group]).strip()
+                vault.groups_meta[group]["updated_at"] = now
+
+        if tags != original_tags:
+            entry.tags = tags
+            changed = True
+        if groups != original_groups:
+            entry.groups = groups
+            changed = True
+        if changed:
+            entry.updated_at = now
+            updated_count += 1
+
+    if updated_count > 0 or created_groups:
+        save_vault_data(vault)
+
+    return {
+        "success": True,
+        "data": {
+            "updated_count": updated_count,
+            "created_groups": sorted(set(created_groups)),
+        },
+        "message": f"已整理 {updated_count} 个条目"
     }
 
 

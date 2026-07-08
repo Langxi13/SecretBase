@@ -194,6 +194,44 @@ class AiParseRequest(BaseModel):
     text: str = Field(..., min_length=1)
 
 
+class AiOrganizePreviewRequest(BaseModel):
+    """AI 整理预览请求"""
+    filters: dict = Field(default_factory=dict)
+    organize_tags: bool = True
+    organize_groups: bool = True
+
+
+class AiOrganizeSuggestion(BaseModel):
+    """AI 整理建议"""
+    entry_id: str = Field(..., min_length=1)
+    selected: bool = True
+    add_tags: List[str] = Field(default_factory=list)
+    remove_tags: List[str] = Field(default_factory=list)
+    add_groups: List[str] = Field(default_factory=list)
+    remove_groups: List[str] = Field(default_factory=list)
+    group_descriptions: dict = Field(default_factory=dict)
+    reason: str = Field(default="", max_length=500)
+
+    @validator('add_tags', 'remove_tags', 'add_groups', 'remove_groups')
+    def validate_names(cls, v):
+        cleaned = []
+        seen = set()
+        for item in v:
+            name = str(item or "").strip()
+            if not name or name in seen:
+                continue
+            if len(name) > 50:
+                raise ValueError('标签或密码组名称不能超过 50 个字符')
+            seen.add(name)
+            cleaned.append(name)
+        return cleaned
+
+
+class AiOrganizeApplyRequest(BaseModel):
+    """应用 AI 整理建议请求"""
+    suggestions: List[AiOrganizeSuggestion] = Field(..., min_items=1)
+
+
 class ImportConflictRequest(BaseModel):
     """导入冲突处理请求"""
     conflict_strategy: str = Field(default="skip", pattern="^(skip|overwrite|ask)$")
