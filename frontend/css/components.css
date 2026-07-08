@@ -344,10 +344,33 @@
 
 .group-entry-picker-toolbar {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
     gap: 10px;
-    align-items: center;
-    margin-bottom: 12px;
+    align-items: end;
+    margin-bottom: 14px;
+}
+
+.filter-select-field {
+    display: grid;
+    gap: 6px;
+    min-width: 0;
+}
+
+.filter-select-field span {
+    color: var(--text-secondary);
+    font-size: var(--font-size-xs);
+    font-weight: 600;
+}
+
+.filter-select-field select {
+    width: 100%;
+    min-width: 0;
+    height: 38px;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    padding: 0 34px 0 10px;
 }
 
 .group-entry-picker-list {
@@ -393,6 +416,20 @@
     margin-top: 3px;
     color: var(--text-secondary);
     font-size: var(--font-size-xs);
+}
+
+.group-entry-picker-pagination {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 10px;
+    margin-top: 14px;
+    color: var(--text-secondary);
+    font-size: var(--font-size-sm);
+}
+
+.group-entry-picker-pagination .btn-secondary {
+    min-width: 82px;
 }
 
 .compact-empty {
@@ -1473,6 +1510,15 @@
 
 /* 响应式 */
 @media (max-width: 767px) {
+    .group-entry-picker-toolbar {
+        grid-template-columns: 1fr;
+        align-items: stretch;
+    }
+
+    .group-entry-picker-pagination {
+        flex-wrap: wrap;
+    }
+
     .modal-content {
         max-height: 100vh;
         border-radius: 0;

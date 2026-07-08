@@ -7,16 +7,16 @@
     
     <!-- Vue 3 CDN (Production) -->
     <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
-    <script src="/secretbase-runtime-config.js?v=20260708-ui-v48"></script>
+    <script src="/secretbase-runtime-config.js?v=20260708-ui-v49"></script>
     
     <!-- 基础样式 -->
-    <link rel="stylesheet" href="css/style.css?v=20260708-ui-v48">
-    <link rel="stylesheet" href="css/components.css?v=20260708-ui-v48">
+    <link rel="stylesheet" href="css/style.css?v=20260708-ui-v49">
+    <link rel="stylesheet" href="css/components.css?v=20260708-ui-v49">
     
     <!-- 主题样式 -->
-    <link rel="stylesheet" href="css/themes/variables.css?v=20260708-ui-v48">
-    <link rel="stylesheet" href="css/themes/dark.css?v=20260708-ui-v48">
-    <link rel="stylesheet" href="css/themes/light.css?v=20260708-ui-v48">
+    <link rel="stylesheet" href="css/themes/variables.css?v=20260708-ui-v49">
+    <link rel="stylesheet" href="css/themes/dark.css?v=20260708-ui-v49">
+    <link rel="stylesheet" href="css/themes/light.css?v=20260708-ui-v49">
     
     <!-- Favicon -->
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🔐</text></svg>">
@@ -817,23 +817,34 @@
                 </div>
                 <div class="modal-body">
                     <div class="group-entry-picker-toolbar">
-                        <input
-                            type="text"
-                            v-model="groupPickerQuery"
-                            placeholder="搜索标题、网址、标签或已有密码组"
-                        >
+                        <label class="filter-select-field">
+                            <span>按标签</span>
+                            <select v-model="groupPickerTagFilter">
+                                <option value="">全部标签</option>
+                                <option v-for="tag in tags" :key="tag.name" :value="tag.name">{{ tag.name }}</option>
+                            </select>
+                        </label>
+                        <label class="filter-select-field">
+                            <span>按密码组</span>
+                            <select v-model="groupPickerGroupFilter">
+                                <option value="">全部密码组</option>
+                                <option v-for="group in selectableGroupPickerGroups" :key="group.name" :value="group.name">
+                                    {{ group.name }}
+                                </option>
+                            </select>
+                        </label>
                         <button class="btn-secondary" @click="toggleAllGroupPickerEntries" :disabled="availableGroupPickerEntries.length === 0">
-                            {{ allGroupPickerEntriesSelected ? '取消全选' : '全选可见' }}
+                            {{ allGroupPickerEntriesSelected ? '取消本页全选' : '全选本页' }}
                         </button>
                     </div>
                     <div v-if="groupPickerLoading" class="loading-state">正在加载条目...</div>
                     <div v-else-if="availableGroupPickerEntries.length === 0" class="empty-state compact-empty">
                         <h3>没有可加入的条目</h3>
-                        <p>当前可见条目都已经属于该密码组，或没有匹配搜索条件。</p>
+                        <p>当前筛选下没有可加入当前密码组的条目。</p>
                     </div>
                     <div v-else class="group-entry-picker-list">
                         <label
-                            v-for="entry in availableGroupPickerEntries"
+                            v-for="entry in paginatedGroupPickerEntries"
                             :key="entry.id"
                             class="group-entry-picker-row"
                         >
@@ -847,6 +858,15 @@
                                 <small>{{ entry.url || (entry.tags || []).join('、') || '无网址' }}</small>
                             </span>
                         </label>
+                    </div>
+                    <div v-if="!groupPickerLoading && availableGroupPickerEntries.length > 0" class="group-entry-picker-pagination">
+                        <button class="btn-secondary" @click="goToGroupPickerPage(groupPickerPage - 1)" :disabled="groupPickerPage <= 1">
+                            上一页
+                        </button>
+                        <span>第 {{ groupPickerPage }} / {{ groupPickerTotalPages }} 页</span>
+                        <button class="btn-secondary" @click="goToGroupPickerPage(groupPickerPage + 1)" :disabled="groupPickerPage >= groupPickerTotalPages">
+                            下一页
+                        </button>
                     </div>
                 </div>
                 <div class="modal-footer">
@@ -1937,9 +1957,9 @@
     </div>
     
     <!-- JS 模块 -->
-    <script src="js/api.js?v=20260708-ui-v48"></script>
-    <script src="js/utils.js?v=20260708-ui-v48"></script>
-    <script src="js/store.js?v=20260708-ui-v48"></script>
-    <script src="js/app.js?v=20260708-ui-v48"></script>
+    <script src="js/api.js?v=20260708-ui-v49"></script>
+    <script src="js/utils.js?v=20260708-ui-v49"></script>
+    <script src="js/store.js?v=20260708-ui-v49"></script>
+    <script src="js/app.js?v=20260708-ui-v49"></script>
 </body>
 </html>

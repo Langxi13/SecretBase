@@ -71,7 +71,10 @@ const app = createApp({
         const batchTagName = ref('');
         const groupPickerEntries = ref([]);
         const groupPickerSelectedIds = ref([]);
-        const groupPickerQuery = ref('');
+        const groupPickerTagFilter = ref('');
+        const groupPickerGroupFilter = ref('');
+        const groupPickerPage = ref(1);
+        const groupPickerPageSize = 10;
         const groupPickerLoading = ref(false);
         const importConflictMessage = ref('');
         const showOnboarding = ref(false);
@@ -552,27 +555,35 @@ const app = createApp({
 
         const availableGroupPickerEntries = computed(() => {
             const groupName = activeGroupName.value;
-            const query = groupPickerQuery.value.trim().toLowerCase();
+            const tagFilter = groupPickerTagFilter.value;
+            const groupFilter = groupPickerGroupFilter.value;
             return groupPickerEntries.value.filter(entry => {
                 if (!groupName || (entry.groups || []).includes(groupName)) {
                     return false;
                 }
-                if (!query) {
-                    return true;
+                if (tagFilter && !(entry.tags || []).includes(tagFilter)) {
+                    return false;
                 }
-                const haystack = [
-                    entry.title,
-                    entry.url || '',
-                    ...(entry.tags || []),
-                    ...(entry.groups || []),
-                    entry.remarks || ''
-                ].join(' ').toLowerCase();
-                return haystack.includes(query);
+                if (groupFilter && !(entry.groups || []).includes(groupFilter)) {
+                    return false;
+                }
+                return true;
             });
         });
 
+        const groupPickerTotalPages = computed(() => Math.max(1, Math.ceil(availableGroupPickerEntries.value.length / groupPickerPageSize)));
+
+        const paginatedGroupPickerEntries = computed(() => {
+            const start = (groupPickerPage.value - 1) * groupPickerPageSize;
+            return availableGroupPickerEntries.value.slice(start, start + groupPickerPageSize);
+        });
+
+        const selectableGroupPickerGroups = computed(() => {
+            return groups.value.filter(group => group.name !== activeGroupName.value);
+        });
+
         const allGroupPickerEntriesSelected = computed(() => {
-            const ids = availableGroupPickerEntries.value.map(entry => entry.id);
+            const ids = paginatedGroupPickerEntries.value.map(entry => entry.id);
             return ids.length > 0 && ids.every(id => groupPickerSelectedIds.value.includes(id));
         });
 
@@ -1043,7 +1054,9 @@ const app = createApp({
         async function openGroupEntryPicker() {
             if (!activeGroupName.value) return;
             showGroupEntryPicker.value = true;
-            groupPickerQuery.value = '';
+            groupPickerTagFilter.value = '';
+            groupPickerGroupFilter.value = '';
+            groupPickerPage.value = 1;
             groupPickerSelectedIds.value = [];
             groupPickerLoading.value = true;
             try {
@@ -1067,7 +1080,14 @@ const app = createApp({
             showGroupEntryPicker.value = false;
             groupPickerEntries.value = [];
             groupPickerSelectedIds.value = [];
-            groupPickerQuery.value = '';
+            groupPickerTagFilter.value = '';
+            groupPickerGroupFilter.value = '';
+            groupPickerPage.value = 1;
+        }
+
+        function goToGroupPickerPage(page) {
+            const target = Math.min(Math.max(Number(page) || 1, 1), groupPickerTotalPages.value);
+            groupPickerPage.value = target;
         }
 
         function toggleGroupPickerEntry(entryId) {
@@ -1079,7 +1099,7 @@ const app = createApp({
         }
 
         function toggleAllGroupPickerEntries() {
-            const ids = availableGroupPickerEntries.value.map(entry => entry.id);
+            const ids = paginatedGroupPickerEntries.value.map(entry => entry.id);
             if (ids.length === 0) return;
             if (allGroupPickerEntriesSelected.value) {
                 groupPickerSelectedIds.value = groupPickerSelectedIds.value.filter(id => !ids.includes(id));
@@ -3140,6 +3160,18 @@ const app = createApp({
             tagBrowserPage.value = 1;
         });
 
+        watch([groupPickerTagFilter, groupPickerGroupFilter], () => {
+            groupPickerPage.value = 1;
+            const visibleIds = new Set(availableGroupPickerEntries.value.map(entry => entry.id));
+            groupPickerSelectedIds.value = groupPickerSelectedIds.value.filter(id => visibleIds.has(id));
+        });
+
+        watch(availableGroupPickerEntries, () => {
+            if (groupPickerPage.value > groupPickerTotalPages.value) {
+                groupPickerPage.value = groupPickerTotalPages.value;
+            }
+        });
+
         watch(tagBrowserPageSize, () => {
             saveTagPageSizePreference('secretbase.tagBrowserPageSize', tagBrowserPageSize.value);
             tagBrowserPage.value = 1;
@@ -3208,7 +3240,10 @@ const app = createApp({
             batchTagName,
             groupPickerEntries,
             groupPickerSelectedIds,
-            groupPickerQuery,
+            groupPickerTagFilter,
+            groupPickerGroupFilter,
+            groupPickerPage,
+            groupPickerPageSize,
             groupPickerLoading,
             importConflictMessage,
             showOnboarding,
@@ -3320,6 +3355,9 @@ const app = createApp({
             activeGroup,
             allCurrentPageSelected,
             availableGroupPickerEntries,
+            groupPickerTotalPages,
+            paginatedGroupPickerEntries,
+            selectableGroupPickerGroups,
             allGroupPickerEntriesSelected,
             backupBusy,
             backupSummary,
@@ -3341,6 +3379,7 @@ const app = createApp({
             openCreateEntryForActiveGroup,
             openGroupEntryPicker,
             closeGroupEntryPicker,
+            goToGroupPickerPage,
             toggleGroupPickerEntry,
             toggleAllGroupPickerEntries,
             assignSelectedEntriesToActiveGroup,
