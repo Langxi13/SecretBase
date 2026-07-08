@@ -767,6 +767,21 @@ img {
     white-space: nowrap;
 }
 
+.field-overflow-hint {
+    border: 1px dashed var(--border-color);
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 30px;
+    margin-top: 6px;
+    padding: 6px 10px;
+    background: color-mix(in srgb, var(--bg-secondary) 72%, transparent);
+    color: var(--text-secondary);
+    font-size: var(--font-size-xs);
+    line-height: 1.35;
+}
+
 .card-actions {
     display: flex;
     gap: 8px;

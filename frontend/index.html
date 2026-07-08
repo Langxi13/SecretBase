@@ -7,16 +7,16 @@
     
     <!-- Vue 3 CDN (Production) -->
     <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
-    <script src="/secretbase-runtime-config.js?v=20260708-ui-v50"></script>
+    <script src="/secretbase-runtime-config.js?v=20260708-ui-v51"></script>
     
     <!-- 基础样式 -->
-    <link rel="stylesheet" href="css/style.css?v=20260708-ui-v50">
-    <link rel="stylesheet" href="css/components.css?v=20260708-ui-v50">
+    <link rel="stylesheet" href="css/style.css?v=20260708-ui-v51">
+    <link rel="stylesheet" href="css/components.css?v=20260708-ui-v51">
     
     <!-- 主题样式 -->
-    <link rel="stylesheet" href="css/themes/variables.css?v=20260708-ui-v50">
-    <link rel="stylesheet" href="css/themes/dark.css?v=20260708-ui-v50">
-    <link rel="stylesheet" href="css/themes/light.css?v=20260708-ui-v50">
+    <link rel="stylesheet" href="css/themes/variables.css?v=20260708-ui-v51">
+    <link rel="stylesheet" href="css/themes/dark.css?v=20260708-ui-v51">
+    <link rel="stylesheet" href="css/themes/light.css?v=20260708-ui-v51">
     
     <!-- Favicon -->
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🔐</text></svg>">
@@ -447,6 +447,9 @@
                             >
                                 <span class="field-name">{{ field.name }}</span>
                                 <span class="field-value">{{ field.masked ? '••••••' : field.value }}</span>
+                            </div>
+                            <div v-if="entry.fields.length > 3" class="field-overflow-hint">
+                                还有 {{ entry.fields.length - 3 }} 个字段，点击查看详情
                             </div>
                         </div>
                         
@@ -1960,9 +1963,9 @@
     </div>
     
     <!-- JS 模块 -->
-    <script src="js/api.js?v=20260708-ui-v50"></script>
-    <script src="js/utils.js?v=20260708-ui-v50"></script>
-    <script src="js/store.js?v=20260708-ui-v50"></script>
-    <script src="js/app.js?v=20260708-ui-v50"></script>
+    <script src="js/api.js?v=20260708-ui-v51"></script>
+    <script src="js/utils.js?v=20260708-ui-v51"></script>
+    <script src="js/store.js?v=20260708-ui-v51"></script>
+    <script src="js/app.js?v=20260708-ui-v51"></script>
 </body>
 </html>
