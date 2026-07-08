@@ -58,6 +58,20 @@ assertIncludes(appJs, 'const tagBrowserPage', '前端必须有更多标签分页
 assertIncludes(appJs, 'const tagBrowserPageSize = ref', '更多标签每页数量必须是可变状态');
 assertIncludes(appJs, 'const paginatedTagBrowserTags', '前端必须计算更多标签当前页数据');
 assertIncludes(appJs, 'const tagPageSizeOptions = [5, 10, 20, 50]', '每页数量选项必须固定为 5、10、20、50');
+assertIncludes(appJs, 'secretbase.tagBrowserPageSize', '更多标签每页数量必须保存到本地偏好');
+assertIncludes(appJs, 'secretbase.tagManagerPageSize', '标签管理每页数量必须保存到本地偏好');
+assertIncludes(appJs, 'function loadTagPageSizePreference', '前端必须从本地偏好恢复标签每页数量');
+assertIncludes(appJs, 'function saveTagPageSizePreference', '前端必须在用户切换每页数量时暂存偏好');
+assertMatches(
+    appJs,
+    /watch\(tagBrowserPageSize[\s\S]*saveTagPageSizePreference\('secretbase\.tagBrowserPageSize'/,
+    '更多标签每页数量变化后必须写入本地偏好'
+);
+assertMatches(
+    appJs,
+    /watch\(tagManagerPageSize[\s\S]*saveTagPageSizePreference\('secretbase\.tagManagerPageSize'/,
+    '标签管理每页数量变化后必须写入本地偏好'
+);
 assertIncludes(appJs, 'async function batchDeleteManagedTags', '前端必须支持批量删除标签');
 assertIncludes(appJs, 'function openCreateTagModal', '前端必须通过按钮打开新建标签弹窗');
 assertIncludes(appJs, 'async function createTagFromManager', '前端必须支持创建空标签实体');

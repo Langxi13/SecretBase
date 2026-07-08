@@ -44,7 +44,7 @@ const app = createApp({
         const tagBrowserSort = ref('count_desc');
         const tagBrowserPage = ref(1);
         const tagPageSizeOptions = [5, 10, 20, 50];
-        const tagBrowserPageSize = ref(5);
+        const tagBrowserPageSize = ref(loadTagPageSizePreference('secretbase.tagBrowserPageSize', 5));
         const advancedTagDraft = ref('');
         const advancedTagList = ref([]);
 
@@ -204,7 +204,7 @@ const app = createApp({
         const tagMergeSourceList = ref([]);
         const tagManagerPanel = ref('list');
         const tagManagerPage = ref(1);
-        const tagManagerPageSize = ref(5);
+        const tagManagerPageSize = ref(loadTagPageSizePreference('secretbase.tagManagerPageSize', 5));
         const selectedManagedTagNames = ref([]);
         const tagEditorForm = reactive({
             mode: 'create',
@@ -429,6 +429,27 @@ const app = createApp({
             const pageTags = paginatedManagedTags.value;
             return pageTags.length > 0 && pageTags.every(tag => selectedManagedTagNames.value.includes(tag.name));
         });
+
+        function normalizeTagPageSize(value, fallback = 5) {
+            const numericValue = Number(value);
+            return tagPageSizeOptions.includes(numericValue) ? numericValue : fallback;
+        }
+
+        function loadTagPageSizePreference(key, fallback = 5) {
+            try {
+                return normalizeTagPageSize(localStorage.getItem(key), fallback);
+            } catch (error) {
+                return fallback;
+            }
+        }
+
+        function saveTagPageSizePreference(key, value) {
+            try {
+                localStorage.setItem(key, String(normalizeTagPageSize(value)));
+            } catch (error) {
+                // 本地偏好保存失败不影响标签功能。
+            }
+        }
 
         const activeAdvancedFilterChips = computed(() => {
             const chips = advancedTagList.value.map(tag => ({
@@ -2889,10 +2910,12 @@ const app = createApp({
         });
 
         watch(tagBrowserPageSize, () => {
+            saveTagPageSizePreference('secretbase.tagBrowserPageSize', tagBrowserPageSize.value);
             tagBrowserPage.value = 1;
         });
 
         watch(tagManagerPageSize, () => {
+            saveTagPageSizePreference('secretbase.tagManagerPageSize', tagManagerPageSize.value);
             tagManagerPage.value = 1;
         });
 
