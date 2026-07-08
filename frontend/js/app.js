@@ -42,6 +42,8 @@ const app = createApp({
         const showTagDropdown = ref(false);
         const tagBrowserQuery = ref('');
         const tagBrowserSort = ref('count_desc');
+        const tagBrowserPage = ref(1);
+        const tagBrowserPageSize = 6;
         const advancedTagDraft = ref('');
         const advancedTagList = ref([]);
 
@@ -199,8 +201,9 @@ const app = createApp({
             targetTag: ''
         });
         const tagMergeSourceList = ref([]);
+        const tagManagerPanel = ref('list');
         const tagManagerPage = ref(1);
-        const tagManagerPageSize = 8;
+        const tagManagerPageSize = 6;
         const selectedManagedTagNames = ref([]);
         const tagEditorForm = reactive({
             mode: 'create',
@@ -405,6 +408,13 @@ const app = createApp({
             const query = tagBrowserQuery.value.trim().toLowerCase();
             if (!query) return sortedTagBrowserTags.value;
             return sortedTagBrowserTags.value.filter(tag => String(tag.name || '').toLowerCase().includes(query));
+        });
+
+        const tagBrowserTotalPages = computed(() => Math.max(1, Math.ceil(filteredTagBrowserTags.value.length / tagBrowserPageSize)));
+
+        const paginatedTagBrowserTags = computed(() => {
+            const start = (tagBrowserPage.value - 1) * tagBrowserPageSize;
+            return filteredTagBrowserTags.value.slice(start, start + tagBrowserPageSize);
         });
 
         const tagManagerTotalPages = computed(() => Math.max(1, Math.ceil(tags.value.length / tagManagerPageSize)));
@@ -919,11 +929,18 @@ const app = createApp({
 
         function openTagBrowser() {
             tagBrowserQuery.value = '';
+            tagBrowserPage.value = 1;
             showTagBrowser.value = true;
         }
 
         function closeTagBrowser() {
             showTagBrowser.value = false;
+            tagBrowserPage.value = 1;
+        }
+
+        function goToTagBrowserPage(page) {
+            const target = Math.min(Math.max(Number(page) || 1, 1), tagBrowserTotalPages.value);
+            tagBrowserPage.value = target;
         }
 
         async function showAllEntries() {
@@ -2859,8 +2876,15 @@ const app = createApp({
             if (tagManagerPage.value > tagManagerTotalPages.value) {
                 tagManagerPage.value = tagManagerTotalPages.value;
             }
+            if (tagBrowserPage.value > tagBrowserTotalPages.value) {
+                tagBrowserPage.value = tagBrowserTotalPages.value;
+            }
             const validNames = new Set(tags.value.map(tag => tag.name));
             selectedManagedTagNames.value = selectedManagedTagNames.value.filter(name => validNames.has(name));
+        });
+
+        watch([tagBrowserQuery, tagBrowserSort], () => {
+            tagBrowserPage.value = 1;
         });
 
         return {
@@ -2895,6 +2919,9 @@ const app = createApp({
             showGroupModal,
             tagBrowserQuery,
             tagBrowserSort,
+            tagBrowserPage,
+            tagBrowserTotalPages,
+            paginatedTagBrowserTags,
             tagBrowserSortOptions,
             showCreateModal,
             showEditModal,
@@ -2985,6 +3012,7 @@ const app = createApp({
             defaultTimeRange,
             tagMergeForm,
             tagMergeSourceList,
+            tagManagerPanel,
             tagManagerPage,
             tagManagerTotalPages,
             paginatedManagedTags,
@@ -3030,6 +3058,7 @@ const app = createApp({
             filterByGroup,
             openTagBrowser,
             closeTagBrowser,
+            goToTagBrowserPage,
             showAllEntries,
             showStarredEntries,
             toggleTheme,
