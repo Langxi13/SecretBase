@@ -1339,6 +1339,15 @@ const app = createApp({
             }
         }
 
+        function createEntryFromCurrentEdit() {
+            if (!showEditModal.value) return;
+            entryForm.id = null;
+            selectedTemplate.value = '';
+            editingEntry.value = null;
+            showEditModal.value = false;
+            showCreateModal.value = true;
+        }
+
         // 重置表单
         function resetEntryForm() {
             entryForm.id = null;
@@ -3399,6 +3408,7 @@ const app = createApp({
             closeEntryDetail,
             openCreateModal,
             editEntry,
+            createEntryFromCurrentEdit,
             closeEntryModal,
             skipOnboarding,
             importSampleData,
