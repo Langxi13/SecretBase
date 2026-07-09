@@ -1477,13 +1477,23 @@ body {
 }
 
 .group-card-date {
+    position: relative;
     grid-column: 1 / -1;
     align-self: end;
     min-height: 28px;
-    padding-right: 112px;
+    padding-right: 142px;
     padding-top: 10px;
-    border-top: 1px dashed var(--border-color);
+    border-top: 0;
     font-size: var(--font-size-xs);
+}
+
+.group-card-date::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 142px;
+    border-top: 1px dashed var(--border-color);
 }
 
 .group-card-order-actions {
