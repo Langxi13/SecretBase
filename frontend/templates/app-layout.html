@@ -1,0 +1,326 @@
+        <!-- 加载中 -->
+        <div v-if="loading" class="loading-screen">
+            <div class="loading-spinner"></div>
+            <p>加载中...</p>
+        </div>
+
+        <!-- 未初始化 - 设置主密码 -->
+        <div v-else-if="!initialized" class="auth-screen">
+            <div class="auth-card">
+                <h1>🔐 SecretBase</h1>
+                <h2>设置主密码</h2>
+                <p class="auth-hint">这是唯一密码，请牢记</p>
+
+                <form @submit.prevent="initPassword">
+                    <div class="form-group">
+                        <label>主密码</label>
+                        <input
+                            type="password"
+                            name="init_password"
+                            id="init_password"
+                            autocomplete="new-password"
+                            v-model="password"
+                            placeholder="请输入主密码（至少 8 位）"
+                            minlength="8"
+                            required
+                        >
+                    </div>
+                    <div class="form-group">
+                        <label>确认密码</label>
+                        <input
+                            type="password"
+                            name="init_confirm_password"
+                            id="init_confirm_password"
+                            autocomplete="new-password"
+                            v-model="confirmPassword"
+                            placeholder="请再次输入密码"
+                            required
+                        >
+                    </div>
+                    <p v-if="passwordError" class="error-message">{{ passwordError }}</p>
+                    <button type="submit" class="btn-primary" :disabled="submitting">
+                        {{ submitting ? '设置中...' : '设置主密码' }}
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <!-- 已锁定 - 解锁界面 -->
+        <div v-else-if="locked" class="auth-screen">
+            <div class="auth-card">
+                <h1>🔐 SecretBase</h1>
+                <h2>解锁</h2>
+
+                <form @submit.prevent="unlock">
+                    <div class="form-group">
+                        <label>主密码</label>
+                        <input
+                            type="password"
+                            name="unlock_password"
+                            id="unlock_password"
+                            autocomplete="current-password"
+                            v-model="password"
+                            placeholder="请输入主密码"
+                            autofocus
+                            required
+                        >
+                    </div>
+                    <p v-if="unlockError" class="error-message">{{ unlockError }}</p>
+                    <button type="submit" class="btn-primary" :disabled="submitting">
+                        {{ submitting ? '解锁中...' : '解锁' }}
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <!-- 已解锁 - 主界面 -->
+        <div v-else class="app-container" :class="{ 'sidebar-collapsed': isSidebarCollapsed }">
+            <aside class="desktop-sidebar" aria-label="桌面侧边栏导航">
+                <div class="sidebar-brand">
+                    <div class="sidebar-logo">🔐</div>
+                    <div class="sidebar-brand-text">
+                        <h1>SecretBase</h1>
+                        <p>本地加密密码库</p>
+                    </div>
+                    <button class="sidebar-collapse-toggle" @click="toggleSidebar" :title="isSidebarCollapsed ? '展开侧边栏' : '收起侧边栏'">
+                        <span>{{ isSidebarCollapsed ? '⏭' : '⏮' }}</span>
+                    </button>
+                </div>
+                <button class="btn-primary sidebar-create" @click="openCreateModal" :title="isSidebarCollapsed ? '新建条目' : ''">
+                    <span class="sidebar-btn-icon">+</span>
+                    <span class="sidebar-btn-text">新建条目</span>
+                </button>
+                <nav class="sidebar-section" aria-label="条目视图">
+                    <span class="sidebar-label" :title="isSidebarCollapsed ? '视图' : ''">
+                        <span class="label-text">视图</span>
+                        <i class="label-indicator"></i>
+                    </span>
+                    <button class="sidebar-nav-item" :class="{ active: filter === 'all' && !activeTagName }" @click="showAllEntries" :title="isSidebarCollapsed ? '全部条目 (' + totalEntries + ')' : ''">
+                        <span class="nav-icon-text"><i class="nav-icon">📑</i><span class="nav-text">全部条目</span></span>
+                        <strong class="nav-count">{{ totalEntries }}</strong>
+                    </button>
+                    <button class="sidebar-nav-item" :class="{ active: filter === 'starred' }" @click="showStarredEntries" :title="isSidebarCollapsed ? '星标条目' : ''">
+                        <span class="nav-icon-text"><i class="nav-icon">★</i><span class="nav-text">星标条目</span></span>
+                        <strong class="nav-count">★</strong>
+                    </button>
+                    <button class="sidebar-nav-item" :class="{ active: filter === 'groups' }" @click="showGroupMode" :title="isSidebarCollapsed ? '密码组 (' + groups.length + ')' : ''">
+                        <span class="nav-icon-text"><i class="nav-icon">🗂️</i><span class="nav-text">密码组</span></span>
+                        <strong class="nav-count">{{ groups.length }}</strong>
+                    </button>
+                </nav>
+                <nav class="sidebar-section sidebar-tags" aria-label="标签筛选">
+                    <span class="sidebar-label" :title="isSidebarCollapsed ? '标签' : ''">
+                        <span class="label-text">标签</span>
+                        <i class="label-indicator"></i>
+                    </span>
+                    <button
+                        class="sidebar-nav-item sidebar-more-tags"
+                        @click="openTagBrowser"
+                        :title="isSidebarCollapsed ? '更多标签' : ''"
+                    >
+                        <span class="nav-icon-text"><i class="nav-icon">🏷️</i><span class="nav-text">更多标签</span></span>
+                        <strong class="nav-count">{{ hiddenSidebarTagCount > 0 ? '+' + hiddenSidebarTagCount : tags.length }}</strong>
+                    </button>
+                    <button
+                        v-for="tag in visibleSidebarTags"
+                        :key="tag.name"
+                        class="sidebar-nav-item tag-nav-item"
+                        :class="{ active: activeTagName === tag.name }"
+                        @click="filterByTag(tag.name)"
+                        :title="tag.name + ' (' + tag.count + ')'"
+                    >
+                        <span class="nav-icon-text"><i class="tag-dot" :style="{ backgroundColor: tag.color }"></i><span class="nav-text">{{ tag.name }}</span></span>
+                        <strong class="nav-count">{{ tag.count }}</strong>
+                    </button>
+                </nav>
+                <nav class="sidebar-section sidebar-tools" aria-label="管理工具">
+                    <span class="sidebar-label" :title="isSidebarCollapsed ? '管理' : ''">
+                        <span class="label-text">管理</span>
+                        <i class="label-indicator"></i>
+                    </span>
+                    <button class="sidebar-nav-item" @click="openAiParse" :title="isSidebarCollapsed ? 'AI 智能录入' : ''"><span class="nav-icon-text"><i class="nav-icon">🤖</i><span class="nav-text">AI 智能录入</span></span><strong class="nav-count">🤖</strong></button>
+                    <button class="sidebar-nav-item" @click="showTagManager = true" :title="isSidebarCollapsed ? '标签管理' : ''"><span class="nav-icon-text"><i class="nav-icon">🏷️</i><span class="nav-text">标签管理</span></span><strong class="nav-count">🏷️</strong></button>
+                    <button class="sidebar-nav-item" @click="showTrash = true" :title="isSidebarCollapsed ? '回收站' : ''"><span class="nav-icon-text"><i class="nav-icon">🗑️</i><span class="nav-text">回收站</span></span><strong class="nav-count">🗑️</strong></button>
+                    <button class="sidebar-nav-item" @click="openBackupCenter" :title="isSidebarCollapsed ? '备份' : ''"><span class="nav-icon-text"><i class="nav-icon">💾</i><span class="nav-text">备份</span></span><strong class="nav-count">💾</strong></button>
+                    <button class="sidebar-nav-item" @click="openToolsModal" :title="isSidebarCollapsed ? '工具' : ''"><span class="nav-icon-text"><i class="nav-icon">🧰</i><span class="nav-text">工具</span></span><strong class="nav-count">🧰</strong></button>
+                    <button class="sidebar-nav-item" @click="openSettings" :title="isSidebarCollapsed ? '设置' : ''"><span class="nav-icon-text"><i class="nav-icon">⚙️</i><span class="nav-text">设置</span></span><strong class="nav-count">⚙️</strong></button>
+                </nav>
+            </aside>
+            <div class="workspace-shell">
+            <!-- 顶部导航 -->
+            <header class="app-header">
+                <div class="header-left">
+                    <h1 class="logo">🔐 SecretBase</h1>
+                </div>
+                <div class="header-right">
+                    <button class="btn-icon" @click="openAiParse" title="AI 智能录入">
+                        🤖
+                    </button>
+                    <button class="btn-icon" @click="toggleTheme" title="切换主题">
+                        {{ themeIcon }}
+                    </button>
+                    <button class="btn-icon" @click="openBackupCenter" title="备份">
+                        💾
+                    </button>
+                    <button class="btn-icon" @click="openSettings" title="设置">
+                        ⚙️
+                    </button>
+                    <button class="btn-icon" @click="lock" title="锁定">
+                        🔒
+                    </button>
+                </div>
+            </header>
+
+            <!-- 搜索和筛选栏 -->
+            <div class="search-bar">
+                <input
+                    type="text"
+                    v-model="searchQuery"
+                    placeholder="搜索条目..."
+                    class="search-input"
+                    @input="debounceSearch"
+                >
+                <div class="search-scope-selector" aria-label="搜索范围">
+                    <span class="search-scope-label">搜索范围</span>
+                    <button
+                        v-for="scope in searchScopeOptions"
+                        :key="scope.key"
+                        type="button"
+                        class="search-scope-chip"
+                        :class="{ active: selectedSearchScopes.includes(scope.key) }"
+                        :aria-pressed="selectedSearchScopes.includes(scope.key)"
+                        @click="toggleSearchScope(scope.key)"
+                    >
+                        {{ scope.label }}
+                    </button>
+                </div>
+                <p class="search-scope-hint">只在已选范围内搜索；全部取消时，输入搜索词不会返回结果。</p>
+                <div class="sort-controls">
+                    <label>
+                        排序
+                        <select v-model="sortBy" @change="applySort">
+                            <option value="updated_at">更新时间</option>
+                            <option value="created_at">创建时间</option>
+                            <option value="title">标题</option>
+                        </select>
+                    </label>
+                    <label>
+                        方向
+                        <select v-model="sortOrder" @change="applySort">
+                            <option value="desc">降序</option>
+                            <option value="asc">升序</option>
+                        </select>
+                    </label>
+                </div>
+                <div class="advanced-filters">
+                    <button class="btn-small" @click="showAdvancedFilters = !showAdvancedFilters">
+                        高级筛选 {{ showAdvancedFilters ? '▲' : '▼' }}
+                    </button>
+                    <div v-if="activeAdvancedFilterChips.length > 0" class="active-filter-chips">
+                        <span v-for="chip in activeAdvancedFilterChips" :key="chip.key" class="tag filter-chip">
+                            {{ chip.label }}
+                            <button @click="removeAdvancedFilterChip(chip)">✕</button>
+                        </span>
+                    </div>
+                    <div v-if="showAdvancedFilters" class="advanced-filter-panel">
+                        <div class="advanced-filter-row full-width">
+                            <span class="filter-label">多标签</span>
+                            <div class="filter-tags-input">
+                                <span v-for="tag in advancedTagList" :key="tag" class="tag filter-chip">
+                                    {{ tag }}
+                                    <button @click="removeAdvancedTag(tag)">✕</button>
+                                </span>
+                                <input
+                                    type="text"
+                                    v-model="advancedTagDraft"
+                                    placeholder="输入标签后回车，也支持逗号分隔"
+                                    @keydown.enter.prevent="commitAndApplyAdvancedTags"
+                                    @keydown.tab.prevent="commitAndApplyAdvancedTags"
+                                    @keydown="handleAdvancedTagKey"
+                                    @input="handleAdvancedTagInput"
+                                    @blur="commitAdvancedTags"
+                                >
+                            </div>
+                        </div>
+                        <div class="advanced-filter-card advanced-filter-dates">
+                            <span class="filter-label">创建时间</span>
+                            <span class="filter-help">留空表示不限，默认 {{ defaultTimeRange.from }} 至 {{ defaultTimeRange.to }}</span>
+                            <div class="advanced-filter-inline">
+                                <label>起始 <input type="date" v-model="advancedFilters.createdFrom" @change="applyAdvancedFilters"></label>
+                                <label>结束 <input type="date" v-model="advancedFilters.createdTo" @change="applyAdvancedFilters"></label>
+                            </div>
+                        </div>
+                        <div class="advanced-filter-card advanced-filter-state">
+                            <span class="filter-label">状态</span>
+                            <label class="checkbox-label compact-checkbox">
+                                <input type="checkbox" v-model="advancedFilters.untagged" @change="applyAdvancedFilters">
+                                只看无标签
+                            </label>
+                            <div class="advanced-filter-inline">
+                                <label>网址
+                                    <select v-model="advancedFilters.hasUrl" @change="applyAdvancedFilters">
+                                        <option value="">不限</option>
+                                        <option value="yes">有网址</option>
+                                        <option value="no">无网址</option>
+                                    </select>
+                                </label>
+                                <label>备注
+                                    <select v-model="advancedFilters.hasRemarks" @change="applyAdvancedFilters">
+                                        <option value="">不限</option>
+                                        <option value="yes">有备注</option>
+                                        <option value="no">无备注</option>
+                                    </select>
+                                </label>
+                            </div>
+                        </div>
+                        <div class="advanced-filter-card advanced-filter-actions">
+                            <span class="filter-label">操作</span>
+                            <button class="btn-small" @click="applyAdvancedFilters">应用</button>
+                            <button class="btn-small" @click="clearAdvancedFilters">清空</button>
+                            <button class="btn-small" @click="saveCurrentAdvancedFilter">保存</button>
+                        </div>
+                        <div v-if="savedAdvancedFilters.length > 0" class="saved-filter-list full-width">
+                            <span class="filter-label">常用筛选</span>
+                            <span v-for="item in savedAdvancedFilters" :key="item.id" class="saved-filter-chip">
+                                <button @click="applySavedAdvancedFilter(item)">{{ item.name }}</button>
+                                <button class="saved-filter-remove" @click="deleteSavedAdvancedFilter(item)">✕</button>
+                            </span>
+                        </div>
+                    </div>
+                </div>
+                <div class="filter-tabs">
+                    <button
+                        class="tab-btn"
+                        :class="{ active: filter === 'all' }"
+                        @click="showAllEntries"
+                    >
+                        全部
+                    </button>
+                    <button
+                        class="tab-btn"
+                        :class="{ active: filter === 'starred' }"
+                        @click="showStarredEntries"
+                    >
+                        ⭐ 星标
+                    </button>
+                    <div class="tag-filter" v-if="tags.length > 0">
+                        <button class="tab-btn" @click="openTagBrowser">
+                            🏷️ 标签
+                        </button>
+                    </div>
+                    <button
+                        class="tab-btn"
+                        :class="{ active: filter === 'groups' }"
+                        @click="showGroupMode"
+                    >
+                        🗂️ 密码组
+                    </button>
+                </div>
+                <div v-if="hasActiveListState" class="list-state-banner">
+                    <div>
+                        <strong>当前列表状态</strong>
+                        <span v-for="item in activeListStateItems" :key="item" class="state-pill">{{ item }}</span>
+                    </div>
+                    <button class="btn-small" @click="clearListState">清除定位/筛选</button>
+                </div>
+            </div>

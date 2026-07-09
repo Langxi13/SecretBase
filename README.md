@@ -276,8 +276,15 @@ node scripts\test-frontend-tag-management.js
 node scripts\test-frontend-password-groups.js
 node scripts\test-frontend-module-split.js
 node scripts\test-frontend-feature-modules.js
+node scripts\test-frontend-template-split.js
+node scripts\test-frontend-template-loader-runtime.js
+node scripts\test-frontend-runtime-setup.js
+node scripts\test-frontend-store-runtime.js
 node scripts\test-frontend-toast-security.js
 node --check frontend\js\app.js
+node --check frontend\js\template-loader.js
+node --check frontend\js\download-helper.js
+Get-ChildItem frontend\js\controllers\*.js | ForEach-Object { node --check $_.FullName }
 node --check frontend\js\api.js
 node --check frontend\js\store.js
 node --check frontend\js\utils.js
@@ -348,9 +355,11 @@ backend/
   storage.py           vault state, locking, persistence, backups
   routes/              auth, entries, tags, trash, transfer, tools, AI
 frontend/
-  index.html           Vue CDN application shell
-  js/                  API client, app logic, store, utilities
-  css/                 layout, components, themes
+  index.html           轻量 Vue CDN 入口、资源清单和加载壳
+  templates/           同源加载的页面与弹窗模板片段
+  js/                  组合根、状态、Store 资源域、视图工厂、领域控制器和工具
+    controllers/       条目、密码组、标签、AI、备份、导入、回收站、维护、列表控制器
+  css/                 基础、工作台、弹窗、表单、AI、管理、响应式和主题样式
 desktop/
   launcher.py          local desktop-mode launcher
 docs/
@@ -599,8 +608,15 @@ node scripts\test-frontend-tag-management.js
 node scripts\test-frontend-password-groups.js
 node scripts\test-frontend-module-split.js
 node scripts\test-frontend-feature-modules.js
+node scripts\test-frontend-template-split.js
+node scripts\test-frontend-template-loader-runtime.js
+node scripts\test-frontend-runtime-setup.js
+node scripts\test-frontend-store-runtime.js
 node scripts\test-frontend-toast-security.js
 node --check frontend\js\app.js
+node --check frontend\js\template-loader.js
+node --check frontend\js\download-helper.js
+Get-ChildItem frontend\js\controllers\*.js | ForEach-Object { node --check $_.FullName }
 node --check frontend\js\api.js
 node --check frontend\js\store.js
 node --check frontend\js\utils.js
@@ -671,9 +687,11 @@ backend/
   storage.py           vault state, locking, persistence, backups
   routes/              auth, entries, tags, trash, transfer, tools, AI
 frontend/
-  index.html           Vue CDN application shell
-  js/                  API client, app logic, store, utilities
-  css/                 layout, components, themes
+  index.html           lightweight Vue CDN entry, asset manifest, and loading shell
+  templates/           same-origin page and dialog template fragments
+  js/                  composition root, state, Store resource domains, view factories, domain controllers, and utilities
+    controllers/       entry, group, tag, AI, backup, transfer, trash, maintenance, list controllers
+  css/                 base, workspace, modal, form, AI, management, responsive, and theme styles
 desktop/
   launcher.py          local desktop-mode launcher
 docs/

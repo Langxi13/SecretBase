@@ -1,0 +1,216 @@
+        <!-- 修改密码弹窗 -->
+        <div v-if="showChangePassword" class="modal-overlay">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2>修改主密码</h2>
+                    <button class="modal-close" @click="showChangePassword = false">✕</button>
+                </div>
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label>旧密码</label>
+                        <input type="password" v-model="passwordForm.oldPassword" placeholder="请输入旧密码">
+                    </div>
+                    <div class="form-group">
+                        <label>新密码</label>
+                        <input type="password" v-model="passwordForm.newPassword" placeholder="请输入新密码（至少 8 位）">
+                    </div>
+                    <div class="form-group">
+                        <label>确认新密码</label>
+                        <input type="password" v-model="passwordForm.confirmPassword" placeholder="请再次输入新密码">
+                    </div>
+                    <p v-if="passwordForm.error" class="error-message">{{ passwordForm.error }}</p>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn-secondary" @click="showChangePassword = false">取消</button>
+                    <button class="btn-primary" @click="changePassword">确认修改</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 回收站弹窗 -->
+        <div v-if="showTrash" class="modal-overlay">
+            <div class="modal-content trash-modal">
+                <div class="modal-header">
+                    <h2>🗑️ 回收站</h2>
+                    <button class="modal-close" @click="showTrash = false">✕</button>
+                </div>
+                <div class="modal-body">
+                    <div v-if="trashItems.length === 0" class="empty-state">
+                        <p>回收站是空的</p>
+                    </div>
+                    <div v-else>
+                        <div v-for="item in trashItems" :key="item.id" class="trash-item">
+                            <div class="trash-item-info">
+                                <h4>{{ item.title }}</h4>
+                                <p>删除于 {{ formatDate(item.deleted_at) }} · 剩余 {{ item.remaining_days }} 天</p>
+                            </div>
+                            <div class="trash-item-actions">
+                                <button class="btn-small" @click="restoreTrashItem(item.id)">恢复</button>
+                                <button class="btn-small btn-danger" @click="deleteTrashItem(item.id)">彻底删除</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer" v-if="trashItems.length > 0">
+                    <label class="tag-page-size-control" title="输入自定义条数或选择">
+                        <span>每页</span>
+                        <input type="number" class="page-size-input" v-model.number="trashPageSize" min="1" max="500">
+                        <select class="page-size-quick-select" :value="trashPageSize" @change="trashPageSize = Number($event.target.value)">
+                            <option :value="trashPageSize" v-if="!(trashPageSizeOptions || [5, 10, 20, 50, 100]).includes(trashPageSize)">{{ trashPageSize }} (自定)</option>
+                            <option v-for="size in (trashPageSizeOptions || [5, 10, 20, 50, 100])" :key="'trash-size-' + size" :value="size">{{ size }}</option>
+                        </select>
+                        <span>条</span>
+                    </label>
+                    <button class="btn-secondary" :disabled="trashPage <= 1" @click="goToTrashPage(trashPage - 1)">上一页</button>
+                    <span class="page-info">{{ trashPage }} / {{ trashTotalPages }} · 共 {{ trashTotal }} 条</span>
+                    <button class="btn-secondary" :disabled="trashPage >= trashTotalPages" @click="goToTrashPage(trashPage + 1)">下一页</button>
+                    <button class="btn-danger" @click="emptyTrashConfirm">清空回收站</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 标签管理弹窗 -->
+        <div v-if="showTagManager" class="modal-overlay">
+            <div class="modal-content tag-manager-modal">
+                <div class="modal-header">
+                    <h2>🏷️ 标签管理</h2>
+                    <button class="modal-close" @click="closeTagManager">✕</button>
+                </div>
+                <div class="modal-body">
+                    <div class="tag-manager-segmented" role="tablist" aria-label="标签管理功能">
+                        <button
+                            type="button"
+                            :class="{ active: tagManagerPanel === 'list' }"
+                            @click="tagManagerPanel = 'list'"
+                        >标签列表</button>
+                        <button
+                            type="button"
+                            :class="{ active: tagManagerPanel === 'merge' }"
+                            @click="tagManagerPanel = 'merge'"
+                        >合并标签</button>
+                    </div>
+                    <section v-if="tagManagerPanel === 'list'" class="tag-manager-panel tag-manager-list-panel">
+                    <div class="tag-manager-toolbar">
+                        <div class="tag-manager-summary">
+                            <strong>标签列表</strong>
+                            <span>{{ tags.length }} 个标签 · 第 {{ tagManagerPage }} / {{ tagManagerTotalPages }} 页</span>
+                        </div>
+                        <div class="tag-manager-actions">
+                            <label class="tag-page-size-control">
+                                <span>每页</span>
+                                <select v-model.number="tagManagerPageSize">
+                                    <option v-for="size in tagPageSizeOptions" :key="'manager-size-' + size" :value="size">{{ size }}</option>
+                                </select>
+                            </label>
+                            <button class="btn-secondary" @click="openCreateTagModal">新建标签</button>
+                            <button class="btn-danger" @click="batchDeleteManagedTags" :disabled="selectedManagedTagNames.length === 0">
+                                批量删除（{{ selectedManagedTagNames.length }}）
+                            </button>
+                        </div>
+                    </div>
+                    <div v-if="tags.length === 0" class="empty-state">
+                        <p>暂无标签</p>
+                    </div>
+                    <div v-else class="tag-manager-list">
+                        <div class="tag-manager-list-head">
+                            <label class="tag-select-control">
+                                <input type="checkbox" :checked="allManagedPageTagsSelected" @change="toggleManagedTagPageSelection">
+                                <span>选择当前页</span>
+                            </label>
+                            <span>{{ paginatedManagedTags.length }} / {{ tags.length }}</span>
+                        </div>
+                        <div v-for="tag in paginatedManagedTags" :key="tag.name" class="tag-item">
+                            <label class="tag-select-box" :aria-label="`选择标签 ${tag.name}`">
+                                <input type="checkbox" :checked="isManagedTagSelected(tag.name)" @change="toggleManagedTagSelection(tag.name)">
+                            </label>
+                            <span class="tag-dot" :style="{ backgroundColor: tag.color }"></span>
+                            <div class="tag-main">
+                                <span class="tag-name">{{ tag.name }}</span>
+                                <span class="tag-description">{{ tag.description || '暂无简介' }}</span>
+                            </div>
+                            <span class="tag-count">{{ tag.count }} 个条目</span>
+                            <button class="btn-small" @click="startEditManagedTag(tag)">编辑</button>
+                            <button class="btn-small btn-danger" @click="deleteTag(tag)">删除</button>
+                        </div>
+                        <div class="tag-manager-pagination">
+                            <label class="tag-page-size-control" title="输入自定义条数或选择">
+                                <span>每页</span>
+                                <input type="number" class="page-size-input" v-model.number="tagManagerPageSize" min="1" max="500">
+                                <select class="page-size-quick-select" :value="tagManagerPageSize" @change="tagManagerPageSize = Number($event.target.value)">
+                                    <option :value="tagManagerPageSize" v-if="!(tagPageSizeOptions || [5, 10, 20, 50, 100]).includes(tagManagerPageSize)">{{ tagManagerPageSize }} (自定)</option>
+                                    <option v-for="size in (tagPageSizeOptions || [5, 10, 20, 50, 100])" :key="'manager-size-' + size" :value="size">{{ size }}</option>
+                                </select>
+                                <span>条</span>
+                            </label>
+                            <button class="btn-secondary" :disabled="tagManagerPage <= 1" @click="goToTagManagerPage(tagManagerPage - 1)">上一页</button>
+                            <span class="page-info">{{ tagManagerPage }} / {{ tagManagerTotalPages }}</span>
+                            <button class="btn-secondary" :disabled="tagManagerPage >= tagManagerTotalPages" @click="goToTagManagerPage(tagManagerPage + 1)">下一页</button>
+                        </div>
+                    </div>
+                    </section>
+                    <section v-else class="tag-manager-panel tag-manager-merge-panel">
+                    <div class="tag-merge-panel">
+                        <h3>合并标签</h3>
+                        <div class="form-group">
+                            <label>源标签</label>
+                            <div class="filter-tags-input tag-merge-source-input">
+                                <span v-for="tag in tagMergeSourceList" :key="tag" class="tag filter-chip">
+                                    {{ tag }}
+                                    <button @click="removeTagMergeSourceTag(tag)">✕</button>
+                                </span>
+                                <input
+                                    type="text"
+                                    v-model="tagMergeForm.sourceTags"
+                                    placeholder="输入源标签后回车，支持中英文逗号"
+                                    @keydown.enter.prevent="commitTagMergeSourceTags"
+                                    @keydown.tab.prevent="commitTagMergeSourceTags"
+                                    @keydown="handleTagMergeSourceKey"
+                                    @input="handleTagMergeSourceInput"
+                                    @blur="commitTagMergeSourceTags"
+                                >
+                            </div>
+                            <p class="muted-text">多个源标签可用中文逗号、英文逗号或回车逐个锁定。</p>
+                        </div>
+                        <div class="form-group">
+                            <label>目标标签</label>
+                            <input type="text" v-model="tagMergeForm.targetTag" placeholder="合并后的标签名" @keydown.enter.prevent="mergeTags">
+                        </div>
+                        <button class="btn-secondary" @click="mergeTags" :disabled="(!tagMergeForm.sourceTags && tagMergeSourceList.length === 0) || !tagMergeForm.targetTag">
+                            合并标签
+                        </button>
+                    </div>
+                    </section>
+                </div>
+            </div>
+        </div>
+
+        <!-- 标签新建/编辑弹窗 -->
+        <div v-if="showTagEditorModal" class="modal-overlay">
+            <div class="modal-content tag-editor-modal">
+                <div class="modal-header">
+                    <h2>{{ tagEditorForm.mode === 'edit' ? '编辑标签' : '新建标签' }}</h2>
+                    <button class="modal-close" @click="closeTagEditorModal">✕</button>
+                </div>
+                <div class="modal-body">
+                    <div class="tag-edit-grid">
+                        <label>
+                            <span>标签名称</span>
+                            <input type="text" v-model="tagEditorForm.name" placeholder="例如：云服务" @keydown.enter.prevent="saveManagedTag">
+                        </label>
+                        <label>
+                            <span>标签简介</span>
+                            <input type="text" v-model="tagEditorForm.description" placeholder="简要说明适用范围" @keydown.enter.prevent="saveManagedTag">
+                        </label>
+                        <label>
+                            <span>标签颜色</span>
+                            <input type="color" v-model="tagEditorForm.color">
+                        </label>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn-secondary" @click="closeTagEditorModal">取消</button>
+                    <button class="btn-primary" v-if="tagEditorForm.mode === 'create'" @click="createTagFromManager" :disabled="!tagEditorForm.name.trim()">新建</button>
+                    <button class="btn-primary" v-else @click="saveManagedTag" :disabled="!tagEditorForm.name.trim()">保存</button>
+                </div>
+            </div>
+        </div>

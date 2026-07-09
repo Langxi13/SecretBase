@@ -6,14 +6,16 @@
 
 | 阶段 | 前端实现目标 |
 |------|--------------|
-| V1 | `index.html` 内联模板 + `js/app.js` 统一状态和事件逻辑，完成核心页面和操作；支持 Windows 本地直连后端和 Ubuntu 生产 `/api` 代理 |
+| V1 | 完成核心页面和操作；支持 Windows 本地直连后端和 Ubuntu 生产 `/api` 代理 |
 | V1.1 | 补齐批量操作 UI、导入导出 UI、AI 智能录入、首次引导、自动锁定提醒 |
 | V2 | 已完成 token 存储安全适配；PC/移动端布局分层优化已完成并通过手动确认；组件拆分或构建式 Vue 迁移暂缓，后续单独计划 |
 | V2.4 | 前端视觉刷新：在不引入构建链、不改变接口和数据语义的前提下，优化主题变量、主工作台、条目卡片、弹窗、备份中心、移动端触达和轻量浮层状态清理。 |
 | V2.5 | 卡片区分度优化：密码组和条目卡片使用稳定色线、轻量 tint、数量徽章和受控 chip 展示，提高列表扫描效率，同时保持功能入口和数据结构不变。 |
 | V2.6 | 低风险前端模块拆分：保持 Vue 3 CDN 和内联模板形态，先拆出分页偏好、Toast DOM 逻辑和后段视觉覆盖 CSS，降低巨型文件维护成本。 |
+| V2.7 | 前端深度模块化：入口页只保留资源与加载壳；同源模板片段由加载器按顺序组合；条目、密码组、标签、AI、备份、导入导出、回收站、维护工具和列表交互由独立控制器承载。 |
+| V2.8 | 组合根与资源域拆分：根入口仅连接依赖；响应式状态、会话生命周期、数据加载、监听和模板上下文独立；Store 按认证、条目、标签/密码组、回收站拆分；CSS 按基础、工作台、弹窗、表单、AI、管理与响应式拆分。 |
 
-V2.0 只调整认证 token 存储：前端使用 `sessionStorage`，不再使用 `localStorage` 长期保存 token。V2.3 前的页面重构采用“布局分层、逻辑复用”的低风险方案：PC 端增加桌面侧边栏和卡片工作台，移动端继续使用现有单列卡片流；不引入 npm 构建链，不拆 Vue SFC。该布局分层已在 Windows 本地浏览器完成手动确认。
+V2.0 只调整认证 token 存储：前端使用 `sessionStorage`，不再使用 `localStorage` 长期保存 token。V2.3 前的页面重构采用“布局分层、逻辑复用”的低风险方案：PC 端增加桌面侧边栏和卡片工作台，移动端继续使用现有单列卡片流；不引入 npm 构建链，不拆 Vue SFC。V2.7 保持这一部署边界，使用同源静态模板片段和浏览器脚本模块进行拆分，不引入运行时路由或服务端模板引擎。
 
 生产环境启用 nginx Basic Auth 后，前端不得再用 HTTP `Authorization` 头传 SecretBase session token，避免覆盖浏览器 Basic Auth 认证头。前端应用 token 使用 `X-SecretBase-Token`，后端保持对旧 `Authorization: Bearer ...` 的兼容读取。
 
@@ -41,24 +43,47 @@ V2.0 只调整认证 token 存储：前端使用 `sessionStorage`，不再使用
 
 ## 2. 文件结构
 
-### 2.1 V1 当前结构
+### 2.1 当前结构
 
 ```
 frontend/
-├── index.html              # 主页面和 Vue 模板
+├── index.html              # 轻量入口页、资源清单和加载壳
+├── templates/              # 按加载顺序组合的 Vue 模板片段
+│   ├── app-layout.html     # 认证、侧边栏、顶部与搜索筛选区
+│   ├── workspace-list.html # 密码组、条目列表、分页与批量操作
+│   ├── entry-dialogs.html  # 引导、条目和密码组编辑相关弹窗
+│   └── ...                 # AI、设置、备份、标签、导入等领域弹窗
 ├── css/
-│   ├── style.css           # 基础布局和页面样式
-│   ├── components.css      # 弹窗、表单、卡片、Toast 等组件样式
+│   ├── base.css            # 重置、认证、基础按钮和通用状态
+│   ├── workspace*.css      # 工作台布局、响应式规则和工作台视觉调整
+│   ├── modals.css          # 弹窗框架
+│   ├── form-controls.css   # 表单、字段、标签和复制控件
+│   ├── ai-components.css   # Toast 与 AI 交互组件
+│   ├── management-components.css # 设置、工具、备份、标签和回收站组件
+│   ├── component-responsive.css # 弹窗与管理组件的移动端规则
 │   ├── visual-polish.css   # 后段整体视觉覆盖层，必须在主题样式之后加载
-│   ├── component-polish.css # 后段组件覆盖层，必须在 components.css 之后加载
+│   ├── component-polish.css # 后段组件覆盖层，必须在领域组件样式之后加载
 │   └── themes/
 │       ├── variables.css   # CSS 变量定义
 │       ├── dark.css        # 暗色主题
 │       └── light.css       # 亮色主题
 └── js/
-    ├── app.js              # Vue 应用入口、状态、页面方法
+    ├── app.js              # 轻量组合根，只连接各模块依赖
+    ├── app-state.js        # 共享响应式状态和纯派生值
+    ├── app-data-controller.js # 数据加载和条目分页偏好
+    ├── app-ui-controller.js # 根级轻量交互和展示辅助暴露
+    ├── app-session-controller.js # 认证、锁定、设置和生命周期
+    ├── app-feature-composition.js # 视图工厂和领域控制器装配
+    ├── app-watchers.js     # 跨模块响应式监听
+    ├── app-template-context.js # 向 Vue 模板平铺状态、视图和操作
+    ├── template-loader.js  # 并行加载同源模板片段后挂载 Vue
     ├── api.js              # Fetch API 封装，Windows 开发直连后端，生产环境使用 /api 前缀
-    ├── store.js            # API 调用和轻量状态管理
+    ├── store.js            # Store 外观和领域方法组合
+    ├── store-state.js      # Store 初始状态、字段映射和查询参数
+    ├── store-auth-settings.js # 认证与设置 API 方法
+    ├── store-entry-methods.js # 条目读写和批量操作
+    ├── store-taxonomy-methods.js # 标签和密码组 API 方法
+    ├── store-trash-methods.js # 回收站 API 方法
     ├── utils.js            # 通用工具函数、复制、favicon、日期格式化
     ├── pagination.js       # 分页条数归一化和本地偏好读写
     ├── auto-lock.js        # 自动锁定计时器和活动监听
@@ -69,8 +94,30 @@ frontend/
     ├── group-view.js       # 密码组分页和选择已有条目 computed
     ├── backup-view.js      # 备份中心分组、摘要和忙碌态 computed
     ├── ai-view.js          # AI 输入状态、整理摘要和操作计划摘要 computed
+    ├── download-helper.js  # 带会话令牌的受保护文件下载
+    ├── controllers/        # 领域操作控制器，不直接读取其他控制器私有状态
+    │   ├── entry-controller.js
+    │   ├── group-controller.js
+    │   ├── tag-controller.js
+    │   ├── ai-controller.js
+    │   ├── backup-controller.js
+    │   ├── transfer-controller.js
+    │   ├── trash-controller.js
+    │   ├── maintenance-controller.js
+    │   └── list-controller.js
     └── toast.js            # Toast DOM 创建与安全文本写入
 ```
+
+### 2.1.1 模板与控制器边界
+
+- `index.html` 不承载业务模板；`template-loader.js` 必须在 `app.js` 前加载，并通过同源 `fetch` 并行读取 `templates/` 片段后再挂载 Vue。
+- 模板片段按加载器数组中的顺序拼接。片段可以共享外层 DOM 边界，因此不可单独当作完整 HTML 页面访问或编译。
+- `app.js` 仅创建状态、根级控制器和组合上下文；不得新增领域 API 请求、响应式监听或大段业务分支。
+- `app-state.js` 只创建状态；`app-data-controller.js` 处理共享加载；`app-session-controller.js` 管理认证、锁定和生命周期；`app-watchers.js` 集中注册跨模块监听；`app-template-context.js` 是模板绑定的唯一展平出口。
+- `app-feature-composition.js` 只负责显式注入依赖并组合既有控制器和 computed 工厂，不实现领域业务分支。
+- `store.js` 保持现有 `store.*` 公共调用面；具体 API 方法按资源域拆到 `store-*.js`，避免 UI 控制器感知拆分细节。
+- 控制器仅接收显式注入的 ref、reactive 状态、帮助函数和回调。跨领域刷新通过 `loadEntries`、`loadTags`、`loadGroups`、`loadAllData` 等公开回调完成，避免模块直接依赖其他控制器的内部实现。
+- `scripts/test-frontend-template-loader-runtime.js` 验证片段请求顺序与挂载目标；`scripts/test-frontend-runtime-setup.js` 在模拟浏览器环境中验证脚本实际加载顺序与 Vue `setup()` 装配，防止遗漏依赖导致登录页白屏；`scripts/test-frontend-store-runtime.js` 通过模拟 API 验证 Store 组合后的方法、筛选参数和字段映射。
 
 ### 2.2 V2 目标组件结构
 
@@ -235,11 +282,12 @@ V2.4 以“高级暗色 + 克制工具层级”为主方向，优化 SecretBase 
 - 主题变量补齐表面层级、焦点环、状态背景、阴影和固定控件尺寸；暗色、亮色和自动按时间主题均保持可读。
 - 主工作台保持“桌面侧边栏 + 右侧卡片工作区”的结构，优化搜索筛选区、条目卡片、列表状态提示、分页和底部批量操作栏。
 - 模态框、设置、工具、AI 解析、备份中心、恢复向导、标签管理、回收站和导入流程统一 8px 圆角、边框、长文本换行、加载态和移动端按钮触达。
-- CSS 使用现有 `style.css`、`components.css` 和 `themes/*.css`，不引入 npm 构建链或外部图标库。
+- CSS 使用按职责拆分的基础、工作台、弹窗、表单、AI、管理和响应式文件，以及 `themes/*.css`，不引入 npm 构建链或外部图标库。
 - 后段增强样式拆分到 `visual-polish.css` 与 `component-polish.css`，入口顺序必须保持为基础样式、主题样式、视觉覆盖、组件覆盖，避免覆盖关系失效。
 - `pagination.js` 必须在 `app.js` 之前加载，提供 `window.SecretBasePagination`。所有前端分页条数偏好统一通过 `normalizeUniversalPageSize`、`loadPageSizePreference` 和 `savePageSizePreference` 处理。
-- `auto-lock.js`、`theme-controller.js`、`filter-controller.js`、`tag-view.js`、`group-view.js`、`backup-view.js`、`ai-view.js` 和 `view-helpers.js` 只承载展示层、computed 工厂或本地控制逻辑，不直接改后端接口语义。
+- `auto-lock.js`、`theme-controller.js`、`filter-controller.js`、`tag-view.js`、`group-view.js`、`backup-view.js`、`ai-view.js` 和 `view-helpers.js` 只承载展示层、computed 工厂或本地控制逻辑，不直接改后端接口语义；`controllers/` 按领域封装用户操作，通过显式注入调用既有 API/store 边界。
 - `toast.js` 必须在 `store.js` 和 `app.js` 之前加载，Toast 消息必须使用 `textContent` 写入，不得用 `innerHTML` 拼接用户或错误内容。
+- `template-loader.js` 必须在 `app.js` 前加载；加载失败时必须保留可见的刷新重试提示，不能留下空白页面。
 - 入口页引用本地 CSS/JS 时使用版本查询参数；生产 nginx 可以长缓存静态资源，但每次前端视觉发布都必须同步更新资源版本，避免浏览器继续使用旧样式。
 - 轻量浮层使用具名 document click 监听关闭复制菜单和标签菜单；组件卸载时清理事件监听和自动锁定计时器。
 
@@ -247,46 +295,26 @@ V2.4 以“高级暗色 + 克制工具层级”为主方向，优化 SecretBase 
 
 ```javascript
 // app.js
-const { createApp, ref, reactive, computed, watch, onMounted } = Vue;
-
 const app = createApp({
-  setup() {
-    // 全局状态
-    const state = reactive({
-      locked: true,
-      initialized: false,
-      currentPage: 'home',
-      entries: [],
-      tags: [],
-      trash: [],
-      settings: {},
-      pagination: {
-        page: 1,
-        pageSize: 20,
-        total: 0
-      }
-    });
+  setup: () => {
+    const state = SecretBaseAppState.createAppState(/* Vue 与分页依赖 */);
+    const data = SecretBaseAppDataController.createAppDataController(/* 显式依赖 */);
+    const features = SecretBaseFeatureComposition.createFeatureComposition(/* 显式依赖 */);
+    const session = SecretBaseAppSessionController.createAppSessionController(/* 显式依赖 */);
 
-    // 页面切换
-    const currentPage = computed(() => state.currentPage);
-    
-    // 初始化
-    onMounted(async () => {
-      await checkAuthStatus();
-      if (!state.locked) {
-        await loadData();
-      }
-    });
-
-    return {
+    SecretBaseAppWatchers.registerAppWatchers({ state, views: features.views });
+    session.registerLifecycle({ onMounted, onUnmounted });
+    return SecretBaseTemplateContext.createTemplateContext({
       state,
-      currentPage,
-      // ... 其他方法和属性
-    };
+      views: features.views,
+      actions: features.actions,
+      data,
+      session
+    });
   }
 });
 
-app.mount('#app');
+SecretBaseTemplateLoader.mount(app);
 ```
 
 ### 3.3 状态管理
@@ -295,80 +323,22 @@ app.mount('#app');
 // store.js
 class Store {
   constructor() {
-    this.state = reactive({
-      locked: true,
-      initialized: false,
-      entries: [],
-      tags: [],
-      trash: [],
-      settings: {
-        theme: 'system',
-        pageSize: 20,
-        autoLockMinutes: 5
-      },
-      pagination: {
-        page: 1,
-        pageSize: 20,
-        total: 0
-      },
-      filters: {
-        search: '',
-        tag: null,
-        starred: false,
-        sortBy: 'updated_at',
-        sortOrder: 'desc'
-      }
-    });
+    this.state = SecretBaseStoreState.createInitialStoreState();
   }
-
-  // 获取条目列表
-  async fetchEntries() {
-    const params = new URLSearchParams({
-      page: this.state.pagination.page,
-      page_size: this.state.pagination.pageSize,
-      search: this.state.filters.search,
-      sort_by: this.state.filters.sortBy,
-      sort_order: this.state.filters.sortOrder
-    });
-    
-    if (this.state.filters.tag) {
-      params.append('tag', this.state.filters.tag);
-    }
-    if (this.state.filters.starred) {
-      params.append('starred', 'true');
-    }
-    
-    const response = await api.get(`/entries?${params}`);
-    this.state.entries = response.data.items;
-    this.state.pagination.total = response.data.pagination.total;
-  }
-
-  // 创建条目
-  async createEntry(entry) {
-    const response = await api.post('/entries', entry);
-    await this.fetchEntries();
-    return response;
-  }
-
-  // 更新条目
-  async updateEntry(id, updates) {
-    const response = await api.put(`/entries/${id}`, updates);
-    await this.fetchEntries();
-    return response;
-  }
-
-  // 删除条目
-  async deleteEntry(id) {
-    const response = await api.delete(`/entries/${id}`);
-    await this.fetchEntries();
-    return response;
-  }
-
-  // ... 其他方法
 }
+
+Object.assign(
+  Store.prototype,
+  SecretBaseStoreAuthSettings.createAuthAndSettingsMethods(/* api */),
+  SecretBaseStoreEntryMethods.createEntryMethods(/* api, toast */),
+  SecretBaseStoreTaxonomyMethods.createTaxonomyMethods(/* api, toast */),
+  SecretBaseStoreTrashMethods.createTrashMethods(/* api, toast */)
+);
 
 const store = new Store();
 ```
+
+控制器继续通过稳定的 `store.loadEntries()`、`store.loadTags()`、`store.assignEntriesToGroup()` 等方法访问数据；Store 内部模块调整不应改变该调用面。
 
 ## 4. 组件设计
 

@@ -1,0 +1,145 @@
+/* ==========================================================================
+   SecretBase Components - Modals, Panels & AI Tools Glassmorphism
+   ========================================================================== */
+
+/* 🖼️ 1. 模态框背景遮罩与光滑入场动画 (Modal Backdrops & Animations) */
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: var(--bg-modal);
+    backdrop-filter: blur(12px) saturate(160%);
+    -webkit-backdrop-filter: blur(12px) saturate(160%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 2000;
+    padding: 20px;
+    animation: overlayFadeIn 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes overlayFadeIn {
+    from { opacity: 0; backdrop-filter: blur(0px); }
+    to { opacity: 1; backdrop-filter: blur(12px); }
+}
+
+/* 💠 2. 模态框主体毛玻璃悬浮卡片 (Modal Card PopUp Effect) */
+.modal-content {
+    background: var(--bg-card);
+    backdrop-filter: blur(24px) saturate(180%);
+    -webkit-backdrop-filter: blur(24px) saturate(180%);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius-xl);
+    width: 100%;
+    max-width: 620px;
+    max-height: 88vh;
+    overflow-y: auto;
+    box-shadow: var(--shadow-lg), 0 0 0 1px rgba(255, 255, 255, 0.08);
+    animation: modalPopUp 0.32s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes modalPopUp {
+    from {
+        opacity: 0;
+        transform: scale(0.92) translateY(15px);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1) translateY(0);
+    }
+}
+
+.modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 22px 28px;
+    border-bottom: 1px solid var(--border-color);
+    background: color-mix(in srgb, var(--bg-elevated) 60%, transparent);
+    position: sticky;
+    top: 0;
+    z-index: 10;
+}
+
+.modal-header h2 {
+    font-size: 21px;
+    font-weight: 700;
+    color: var(--text-primary);
+    background: linear-gradient(135deg, var(--text-primary), var(--color-primary));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+.modal-close {
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    border: 1px solid var(--border-subtle);
+    background: var(--surface-2);
+    color: var(--text-secondary);
+    font-size: 18px;
+    transition: all var(--transition-fast);
+}
+
+.modal-close:hover {
+    background: var(--status-error-bg);
+    color: var(--color-error);
+    border-color: var(--color-error);
+    transform: rotate(90deg);
+}
+
+.modal-body {
+    padding: 28px;
+}
+
+.modal-footer {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 12px;
+    padding: 18px 28px;
+    border-top: 1px solid var(--border-color);
+    background: color-mix(in srgb, var(--bg-sunken) 50%, transparent);
+    flex-wrap: wrap;
+    position: sticky;
+    bottom: 0;
+    z-index: 10;
+}
+
+.warning-panel,
+.info-panel {
+    padding: 12px 14px;
+    border-radius: var(--border-radius);
+    margin-bottom: 16px;
+    font-size: var(--font-size-sm);
+}
+
+.warning-panel {
+    background: rgba(250, 173, 20, 0.12);
+    color: var(--color-warning);
+}
+
+.info-panel {
+    background: var(--color-primary-light);
+    color: var(--color-primary);
+}
+
+.onboarding-intro,
+.onboarding-note {
+    color: var(--text-secondary);
+}
+
+.onboarding-list {
+    margin: 16px 0;
+    padding-left: 20px;
+    color: var(--text-primary);
+}
+
+.onboarding-list li {
+    margin-bottom: 8px;
+}

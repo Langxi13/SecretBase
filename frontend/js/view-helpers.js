@@ -86,12 +86,6 @@
         return `${(size / 1024 / 1024).toFixed(1)} MB`;
     }
 
-    function backupTypeLabel(type) {
-        if (type === 'manual') return '手动备份';
-        if (type === 'auto') return '自动备份';
-        return '旧版备份';
-    }
-
     function friendlyApiMessage(error, fallback) {
         if (!error) return fallback;
         if (error.status === 401) return '当前会话已失效，请重新解锁后再操作。';
@@ -242,7 +236,6 @@
         normalizeFieldHidden,
         normalizeFieldForEdit,
         formatBytes,
-        backupTypeLabel,
         friendlyApiMessage,
         aiTagActionLabel,
         aiTagActionTitle,

@@ -226,21 +226,41 @@ client = TestClient(main.app)
 index_response = client.get("/")
 assert index_response.status_code == 200
 assert "text/html" in index_response.headers["content-type"]
-assert '<div id="app">' in index_response.text
-assert 'class="settings-tabs"' in index_response.text
-assert "AI 配置" in index_response.text
-assert "@click.self" not in index_response.text
-assert "清空解析" in index_response.text
-assert "去配置 AI" in index_response.text
-assert "当前 AI 配置" in index_response.text
-assert "修改配置" in index_response.text
-assert "取消修改" in index_response.text
-assert "ai-config-summary" in index_response.text
-assert "当前已保存" in index_response.text
-assert "aiConfiguredBaseUrl" in index_response.text
-asset_response = client.get("/css/style.css")
-assert asset_response.status_code == 200
-assert "text/css" in asset_response.headers["content-type"]
+assert '<div id="app"' in index_response.text
+assert 'js/template-loader.js' in index_response.text
+assert 'js/app.js' in index_response.text
+
+settings_response = client.get("/templates/settings-dialog.html")
+assert settings_response.status_code == 200
+assert "text/html" in settings_response.headers["content-type"]
+assert 'class="settings-tabs"' in settings_response.text
+assert "AI 配置" in settings_response.text
+assert "当前 AI 配置" in settings_response.text
+assert "修改配置" in settings_response.text
+assert "取消修改" in settings_response.text
+assert "ai-config-summary" in settings_response.text
+assert "当前已保存" in settings_response.text
+assert "aiConfiguredBaseUrl" in settings_response.text
+
+ai_response = client.get("/templates/ai-dialog.html")
+assert ai_response.status_code == 200
+assert "清空解析" in ai_response.text
+assert "去配置 AI" in ai_response.text
+assert "@click.self" not in settings_response.text
+for asset_path in (
+    "/css/base.css",
+    "/css/workspace.css",
+    "/css/modals.css",
+    "/css/management-components.css",
+    "/js/app-state.js",
+    "/js/app-feature-composition.js",
+    "/js/store-state.js",
+    "/js/store-taxonomy-methods.js",
+):
+    asset_response = client.get(asset_path)
+    assert asset_response.status_code == 200, asset_path
+    expected_content_type = "text/css" if asset_path.endswith(".css") else "javascript"
+    assert expected_content_type in asset_response.headers["content-type"], asset_path
 """,
             {
                 "SECRETBASE_MODE": "desktop",

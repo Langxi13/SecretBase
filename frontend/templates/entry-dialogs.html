@@ -1,0 +1,312 @@
+        <!-- 首次引导弹窗 -->
+        <div v-if="showOnboarding" class="modal-overlay">
+            <div class="modal-content onboarding-modal">
+                <div class="modal-header">
+                    <h2>欢迎使用 SecretBase</h2>
+                    <button class="modal-close" @click="skipOnboarding">✕</button>
+                </div>
+                <div class="modal-body">
+                    <p class="onboarding-intro">开始保存真实密码前，请先确认这些使用边界：</p>
+                    <ul class="onboarding-list">
+                        <li>主密码不可找回，请妥善保存。</li>
+                        <li>数据写入本地加密文件，不会上传到第三方服务。</li>
+                        <li>建议定期导出加密备份，并保存到安全位置。</li>
+                        <li>自动锁定会在长时间无操作后清除解锁状态。</li>
+                    </ul>
+                    <p class="onboarding-note">可以导入 3 条明显的假示例数据，先熟悉创建、复制、标签和删除流程。</p>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn-secondary" @click="skipOnboarding">跳过</button>
+                    <button class="btn-primary inline" @click="importSampleData" :disabled="importingSamples">
+                        {{ importingSamples ? '导入中...' : '导入示例数据' }}
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 条目详情弹窗 -->
+        <div v-if="selectedEntry" class="modal-overlay">
+            <div class="modal-content entry-detail-modal">
+                <div class="modal-header">
+                    <h2>{{ selectedEntry.title }}</h2>
+                    <button class="modal-close" @click="closeEntryDetail">✕</button>
+                </div>
+                <div class="modal-body">
+                    <div v-if="selectedEntry.url" class="detail-row">
+                        <span>网址</span>
+                        <a :href="selectedEntry.url" target="_blank" rel="noopener noreferrer">{{ selectedEntry.url }}</a>
+                    </div>
+                    <div class="detail-tags" v-if="selectedEntry.tags.length > 0">
+                        <span
+                            v-for="tag in selectedEntry.tags"
+                            :key="tag"
+                            class="tag"
+                            :style="{ backgroundColor: getTagColor(tag) }"
+                        >
+                            {{ tag }}
+                        </span>
+                    </div>
+                    <div class="detail-tags" v-if="selectedEntry.groups && selectedEntry.groups.length > 0">
+                        <span
+                            v-for="group in selectedEntry.groups"
+                            :key="group"
+                            class="group-chip"
+                            @click="filterByGroup(group); closeEntryDetail()"
+                        >
+                            {{ group }}
+                        </span>
+                    </div>
+                    <div class="detail-fields">
+                        <div v-for="field in selectedEntry.fields" :key="field.name" class="detail-field">
+                            <span class="field-name">{{ field.name }}</span>
+                            <span class="field-value">{{ field.hidden && !isFieldRevealed(field.name) ? '••••••' : field.value }}</span>
+                            <button v-if="field.hidden" class="btn-small" @click="toggleFieldReveal(field.name)">
+                                {{ isFieldRevealed(field.name) ? '隐藏' : '显示' }}
+                            </button>
+                            <button v-if="field.copyable" class="btn-small" @click="copyField(selectedEntry.id, field)">复制</button>
+                        </div>
+                    </div>
+                    <div v-if="selectedEntry.remarks" class="detail-remarks">
+                        <h4>备注</h4>
+                        <p>{{ selectedEntry.remarks }}</p>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn-secondary" @click="editEntry(selectedEntry); closeEntryDetail()">编辑</button>
+                    <button class="btn-danger" @click="confirmDeleteEntry(selectedEntry)">删除</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 创建/编辑条目弹窗 -->
+        <div v-if="showCreateModal || showEditModal" class="modal-overlay">
+            <div class="modal-content entry-editor-modal">
+                <div class="modal-header">
+                    <h2>{{ showEditModal ? '编辑条目' : '新建条目' }}</h2>
+                    <button class="modal-close" @click="closeEntryModal">✕</button>
+                </div>
+                <div class="modal-body">
+                    <div v-if="!showEditModal" class="form-group">
+                        <label>条目模板</label>
+                        <select v-model="selectedTemplate" @change="applyEntryTemplate">
+                            <option value="">空白条目</option>
+                            <option v-for="template in entryTemplates" :key="template.id" :value="template.id">{{ template.name }}</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>标题 *</label>
+                        <input type="text" v-model="entryForm.title" placeholder="请输入标题" required>
+                    </div>
+                    <div class="form-group">
+                        <label>网址</label>
+                        <input type="url" v-model="entryForm.url" placeholder="https://example.com">
+                    </div>
+                    <div class="form-group">
+                        <label>标签</label>
+                        <div class="tags-input" @click="$refs.tagInput?.focus()">
+                            <span v-for="(tag, index) in entryForm.tags" :key="index" class="tag">
+                                {{ tag }}
+                                <span class="remove-tag" @click="removeTag(index)">✕</span>
+                            </span>
+                            <input
+                                ref="tagInput"
+                                type="text"
+                                v-model="newTag"
+                                placeholder="输入标签后按回车"
+                                @keydown.enter.prevent="addTag"
+                                @keydown.tab.prevent="addTag"
+                            >
+                        </div>
+                        <div v-if="tags.length > 0" class="existing-choice-row">
+                            <span>已有标签</span>
+                            <button
+                                v-for="tag in tags"
+                                :key="tag.name"
+                                type="button"
+                                class="choice-chip"
+                                :class="{ selected: entryForm.tags.includes(tag.name) }"
+                                @click="addExistingTag(tag)"
+                            >
+                                {{ tag.name }}
+                            </button>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>密码组</label>
+                        <div class="tags-input group-input">
+                            <span v-for="(group, index) in entryForm.groups" :key="group" class="group-chip selected">
+                                {{ group }}
+                                <span class="remove-tag" @click="removeGroup(index)">✕</span>
+                            </span>
+                            <input
+                                type="text"
+                                v-model="newGroup"
+                                placeholder="输入密码组后按回车"
+                                @keydown.enter.prevent="addGroup"
+                                @keydown.tab.prevent="addGroup"
+                            >
+                        </div>
+                        <input
+                            v-model="newGroupDescription"
+                            class="group-description-input"
+                            type="text"
+                            placeholder="新密码组简介，可选"
+                            @keydown.enter.prevent="addGroup"
+                        >
+                        <div v-if="groups.length > 0" class="existing-choice-row">
+                            <span>已有密码组</span>
+                            <button
+                                v-for="group in groups"
+                                :key="group.name"
+                                type="button"
+                                class="choice-chip group-choice-chip"
+                                :class="{ selected: entryForm.groups.includes(group.name) }"
+                                @click="addExistingGroup(group)"
+                            >
+                                {{ group.name }}
+                            </button>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>自定义字段</label>
+                        <div class="fields-editor">
+                            <div v-for="(field, index) in entryForm.fields" :key="index" class="field-item">
+                                <input type="text" v-model="field.name" placeholder="字段名">
+                                <input type="text" v-model="field.value" placeholder="字段值">
+                                <label class="checkbox-label compact-check-option">
+                                    <input type="checkbox" v-model="field.copyable">
+                                    可复制
+                                </label>
+                                <label class="checkbox-label compact-check-option">
+                                    <input type="checkbox" v-model="field.hidden">
+                                    隐藏
+                                </label>
+                                <button class="remove-btn" @click="removeField(index)">✕</button>
+                            </div>
+                            <button class="add-field-btn" @click="addField">
+                                + 添加字段
+                            </button>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>备注</label>
+                        <textarea v-model="entryForm.remarks" placeholder="添加备注..." rows="3"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn-secondary" @click="closeEntryModal">取消</button>
+                    <button v-if="showEditModal" class="btn-secondary" @click="createEntryFromCurrentEdit">
+                        在此基础上新建
+                    </button>
+                    <button class="btn-primary" @click="saveEntry" :disabled="!entryForm.title">
+                        {{ showEditModal ? '保存' : '创建' }}
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 新建/编辑密码组弹窗 -->
+        <div v-if="showGroupModal" class="modal-overlay">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2>{{ editingGroupName ? '编辑密码组' : '新建密码组' }}</h2>
+                    <button class="modal-close" @click="closeGroupModal">✕</button>
+                </div>
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label>名称 *</label>
+                        <input type="text" v-model="groupForm.name" placeholder="例如：工作账号" @keydown.enter.prevent="saveGroup">
+                    </div>
+                    <div class="form-group">
+                        <label>简介</label>
+                        <textarea v-model="groupForm.description" placeholder="简单描述这个密码组" rows="3"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn-secondary" @click="closeGroupModal">取消</button>
+                    <button class="btn-primary" @click="saveGroup" :disabled="!groupForm.name.trim()">{{ editingGroupName ? '保存' : '创建' }}</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 选择条目加入密码组弹窗 -->
+        <div v-if="showGroupEntryPicker" class="modal-overlay">
+            <div class="modal-content group-entry-picker-modal">
+                <div class="modal-header">
+                    <div>
+                        <h2>选择已有条目</h2>
+                        <p>加入当前密码组：{{ activeGroupName }}</p>
+                    </div>
+                    <button class="modal-close" @click="closeGroupEntryPicker">✕</button>
+                </div>
+                <div class="modal-body">
+                    <div class="group-entry-picker-toolbar">
+                        <label class="filter-select-field">
+                            <span>按标签</span>
+                            <select v-model="groupPickerTagFilter">
+                                <option value="">全部标签</option>
+                                <option v-for="tag in tags" :key="tag.name" :value="tag.name">{{ tag.name }}</option>
+                            </select>
+                        </label>
+                        <label class="filter-select-field">
+                            <span>按密码组</span>
+                            <select v-model="groupPickerGroupFilter">
+                                <option value="">全部密码组</option>
+                                <option v-for="group in selectableGroupPickerGroups" :key="group.name" :value="group.name">
+                                    {{ group.name }}
+                                </option>
+                            </select>
+                        </label>
+                        <button class="btn-secondary" @click="toggleAllGroupPickerEntries" :disabled="availableGroupPickerEntries.length === 0">
+                            {{ allGroupPickerEntriesSelected ? '取消本页全选' : '全选本页' }}
+                        </button>
+                    </div>
+                    <div v-if="groupPickerLoading" class="loading-state">正在加载条目...</div>
+                    <div v-else-if="availableGroupPickerEntries.length === 0" class="empty-state compact-empty">
+                        <h3>没有可加入的条目</h3>
+                        <p>当前筛选下没有可加入当前密码组的条目。</p>
+                    </div>
+                    <div v-else class="group-entry-picker-list">
+                        <label
+                            v-for="entry in paginatedGroupPickerEntries"
+                            :key="entry.id"
+                            class="group-entry-picker-row"
+                        >
+                            <input
+                                type="checkbox"
+                                :checked="groupPickerSelectedIds.includes(entry.id)"
+                                @change="toggleGroupPickerEntry(entry.id)"
+                            >
+                            <span>
+                                <strong>{{ entry.title }}</strong>
+                                <small>{{ entry.url || (entry.tags || []).join('、') || '无网址' }}</small>
+                            </span>
+                        </label>
+                    </div>
+                    <div v-if="!groupPickerLoading && availableGroupPickerEntries.length > 0" class="group-entry-picker-pagination">
+                        <label class="tag-page-size-control" title="输入自定义条数或选择">
+                            <span>每页</span>
+                            <input type="number" class="page-size-input" v-model.number="groupPickerPageSize" min="1" max="500">
+                            <select class="page-size-quick-select" :value="groupPickerPageSize" @change="groupPickerPageSize = Number($event.target.value)">
+                                <option :value="groupPickerPageSize" v-if="!(groupPickerPageSizeOptions || [5, 10, 20, 50, 100]).includes(groupPickerPageSize)">{{ groupPickerPageSize }} (自定)</option>
+                                <option v-for="size in (groupPickerPageSizeOptions || [5, 10, 20, 50, 100])" :key="'picker-size-' + size" :value="size">{{ size }}</option>
+                            </select>
+                            <span>条</span>
+                        </label>
+                        <button class="btn-secondary" @click="goToGroupPickerPage(groupPickerPage - 1)" :disabled="groupPickerPage <= 1">
+                            上一页
+                        </button>
+                        <span>第 {{ groupPickerPage }} / {{ groupPickerTotalPages }} 页</span>
+                        <button class="btn-secondary" @click="goToGroupPickerPage(groupPickerPage + 1)" :disabled="groupPickerPage >= groupPickerTotalPages">
+                            下一页
+                        </button>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn-secondary" @click="closeGroupEntryPicker">取消</button>
+                    <button class="btn-primary" @click="assignSelectedEntriesToActiveGroup" :disabled="groupPickerSelectedIds.length === 0">
+                        加入当前密码组（{{ groupPickerSelectedIds.length }} 条）
+                    </button>
+                </div>
+            </div>
+        </div>

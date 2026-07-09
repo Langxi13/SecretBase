@@ -3,12 +3,10 @@ const path = require('path');
 
 const root = path.resolve(__dirname, '..');
 const read = file => fs.readFileSync(path.join(root, file), 'utf8');
+const { readFrontendMarkup, readFrontendCss } = require('./frontend-source');
 
-const indexHtml = read('frontend/index.html');
-const componentsCss = [
-    read('frontend/css/components.css'),
-    read('frontend/css/component-polish.css')
-].join('\n');
+const indexHtml = readFrontendMarkup();
+const componentsCss = readFrontendCss();
 
 function assertIncludes(content, needle, message) {
     if (!content.includes(needle)) {

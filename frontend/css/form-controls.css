@@ -1,0 +1,383 @@
+/* 表单 */
+.form-row {
+    display: flex;
+    gap: 16px;
+    margin-bottom: 20px;
+}
+
+.form-row .form-group {
+    flex: 1;
+    margin-bottom: 0;
+}
+
+.form-group textarea,
+.form-group select {
+    width: 100%;
+    padding: 12px 16px;
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius);
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    resize: vertical;
+    min-height: 100px;
+    transition: border-color var(--transition-fast);
+}
+
+.form-group textarea:focus,
+.form-group select:focus {
+    outline: none;
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 3px var(--color-primary-light);
+}
+
+/* 字段列表编辑器 */
+.fields-editor {
+    margin-bottom: 20px;
+}
+
+.fields-editor .field-item {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    margin-bottom: 12px;
+    padding: 12px;
+    background: var(--bg-secondary);
+    border-radius: var(--border-radius);
+}
+
+.fields-editor .field-item input:not([type="checkbox"]) {
+    flex: 1;
+    min-width: 120px;
+    padding: 8px 12px;
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius);
+    background: var(--bg-primary);
+    color: var(--text-primary);
+}
+
+.fields-editor .field-item input:not([type="checkbox"]):focus {
+    outline: none;
+    border-color: var(--color-primary);
+}
+
+.fields-editor .field-item .checkbox-label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: var(--font-size-sm);
+    white-space: nowrap;
+}
+
+.compact-check-option {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    width: auto;
+    min-width: max-content;
+    min-height: 30px;
+    margin: 0;
+    padding: 5px 8px;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    background: var(--surface-1, var(--bg-card));
+    color: var(--text-secondary);
+    line-height: 1;
+}
+
+.fields-editor .field-item .compact-check-option {
+    flex: 0 0 auto;
+    height: 26px;
+    min-height: 26px;
+    padding: 0 8px;
+    border-radius: 7px;
+    font-size: var(--font-size-xs);
+    font-weight: 500;
+    line-height: 1;
+}
+
+.compact-check-option input[type="checkbox"],
+.fields-editor .field-item .compact-check-option input[type="checkbox"],
+.ai-field-row .compact-check-option input[type="checkbox"] {
+    flex: 0 0 auto;
+    width: 14px;
+    height: 14px;
+    min-width: 14px;
+    margin: 0;
+    padding: 0;
+    accent-color: var(--color-primary);
+}
+
+.fields-editor .field-item .compact-check-option input[type="checkbox"] {
+    width: 13px;
+    height: 13px;
+    min-width: 13px;
+}
+
+.compact-check-option:has(input:checked) {
+    border-color: color-mix(in srgb, var(--color-primary) 45%, var(--border-color));
+    color: var(--text-primary);
+    background: var(--color-primary-light);
+}
+
+.fields-editor .field-item .remove-btn {
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--border-radius);
+    color: var(--color-error);
+    transition: background var(--transition-fast);
+}
+
+.fields-editor .field-item .remove-btn:hover {
+    background: rgba(255, 77, 79, 0.1);
+}
+
+.add-field-btn {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 16px;
+    border: 1px dashed var(--border-color);
+    border-radius: var(--border-radius);
+    color: var(--text-secondary);
+    font-size: var(--font-size-sm);
+    width: 100%;
+    transition: all var(--transition-fast);
+}
+
+.add-field-btn:hover {
+    border-color: var(--color-primary);
+    color: var(--color-primary);
+}
+
+/* 标签输入 */
+.tags-input {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 8px 12px;
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius);
+    background: var(--bg-primary);
+    min-height: 44px;
+    cursor: text;
+}
+
+.tags-input:focus-within {
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 3px var(--color-primary-light);
+}
+
+.tags-input .tag {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    background: var(--color-primary);
+    color: var(--text-inverse);
+    border-radius: 20px;
+    font-size: var(--font-size-xs);
+}
+
+.tags-input .remove-tag {
+    cursor: pointer;
+    opacity: 0.7;
+    margin-left: 6px;
+}
+
+.tags-input .remove-tag:hover {
+    opacity: 1;
+}
+
+.tags-input input {
+    flex: 1;
+    min-width: 100px;
+    border: none;
+    outline: none;
+    background: transparent;
+    font-size: var(--font-size-sm);
+}
+
+.existing-choice-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    margin-top: 10px;
+}
+
+.existing-choice-row > span {
+    color: var(--text-secondary);
+    font-size: var(--font-size-xs);
+}
+
+.choice-chip {
+    display: inline-flex;
+    align-items: center;
+    max-width: 100%;
+    min-height: 28px;
+    padding: 4px 9px;
+    border: 1px solid var(--border-color);
+    border-radius: 999px;
+    background: var(--bg-secondary);
+    color: var(--text-secondary);
+    font-size: var(--font-size-xs);
+    line-height: 1.2;
+    cursor: pointer;
+    word-break: break-word;
+}
+
+.choice-chip:hover,
+.choice-chip.selected {
+    border-color: color-mix(in srgb, var(--color-primary) 45%, var(--border-color));
+    background: var(--color-primary-light);
+    color: var(--text-primary);
+}
+
+.group-entry-picker-modal {
+    max-width: min(820px, calc(100vw - 28px));
+}
+
+.group-entry-picker-toolbar {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+    gap: 10px;
+    align-items: end;
+    margin-bottom: 14px;
+}
+
+.filter-select-field {
+    display: grid;
+    gap: 6px;
+    min-width: 0;
+}
+
+.filter-select-field span {
+    color: var(--text-secondary);
+    font-size: var(--font-size-xs);
+    font-weight: 600;
+}
+
+.filter-select-field select {
+    width: 100%;
+    min-width: 0;
+    height: 38px;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    padding: 0 34px 0 10px;
+}
+
+.group-entry-picker-list {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 8px;
+    max-height: min(58vh, 560px);
+    overflow: auto;
+    padding-right: 4px;
+}
+
+.group-entry-picker-row {
+    display: grid;
+    grid-template-columns: 16px minmax(0, 1fr);
+    gap: 10px;
+    align-items: center;
+    padding: 10px 12px;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    background: var(--bg-secondary);
+    cursor: pointer;
+}
+
+.group-entry-picker-row input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+    margin: 0;
+}
+
+.group-entry-picker-row span,
+.group-entry-picker-row strong,
+.group-entry-picker-row small {
+    min-width: 0;
+}
+
+.group-entry-picker-row strong,
+.group-entry-picker-row small {
+    display: block;
+    overflow-wrap: anywhere;
+}
+
+.group-entry-picker-row small {
+    margin-top: 3px;
+    color: var(--text-secondary);
+    font-size: var(--font-size-xs);
+}
+
+.group-entry-picker-pagination {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 10px;
+    margin-top: 14px;
+    color: var(--text-secondary);
+    font-size: var(--font-size-sm);
+}
+
+.group-entry-picker-pagination .btn-secondary {
+    min-width: 82px;
+}
+
+.compact-empty {
+    min-height: 160px;
+    padding: 20px;
+}
+
+.group-input {
+    margin-bottom: 10px;
+}
+
+.group-description-input {
+    margin-top: 0;
+}
+
+/* 复制下拉 */
+.copy-dropdown {
+    position: relative;
+    display: inline-block;
+}
+
+.copy-menu {
+    position: absolute;
+    bottom: 100%;
+    left: 0;
+    margin-bottom: 4px;
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius);
+    box-shadow: var(--shadow-md);
+    min-width: 160px;
+    z-index: 1000;
+}
+
+.copy-menu .copy-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    padding: 10px 16px;
+    font-size: var(--font-size-sm);
+    text-align: left;
+}
+
+.copy-menu .copy-item:hover {
+    background: var(--bg-secondary);
+}
+
+.copy-menu .divider {
+    height: 1px;
+    background: var(--border-color);
+    margin: 4px 0;
+}

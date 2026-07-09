@@ -1,0 +1,399 @@
+/* 响应式 */
+@media (max-width: 767px) {
+    .group-entry-picker-toolbar {
+        grid-template-columns: 1fr;
+        align-items: stretch;
+    }
+
+    .group-entry-picker-pagination {
+        flex-wrap: wrap;
+    }
+
+    .modal-content {
+        max-height: 100vh;
+        border-radius: 0;
+    }
+
+    .form-row {
+        flex-direction: column;
+        gap: 0;
+    }
+
+    #toast-container {
+        left: 20px;
+        right: 20px;
+    }
+
+    .toast {
+        min-width: auto;
+    }
+
+    .modal-footer .btn-primary,
+    .modal-footer .btn-secondary,
+    .modal-footer .btn-danger {
+        flex: 1 1 100%;
+    }
+
+    .setting-item,
+    .setting-actions {
+        align-items: stretch;
+        flex-direction: column;
+    }
+
+    .setting-item .btn-secondary,
+    .setting-item .file-action,
+    .setting-item select,
+    .setting-item input[type="number"] {
+        width: 100%;
+    }
+
+    .backup-item {
+        align-items: stretch;
+        flex-direction: column;
+    }
+
+    .backup-toolbar,
+    .backup-item-actions {
+        align-items: stretch;
+        flex-direction: column;
+    }
+
+    .backup-toolbar-actions,
+    .backup-item-actions .btn-small {
+        width: 100%;
+    }
+
+    .backup-restore-btn {
+        width: 100%;
+    }
+}
+
+/* 回收站条目 */
+.trash-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px;
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius);
+    margin-bottom: 8px;
+}
+
+.trash-item-info h4 {
+    font-size: var(--font-size-md);
+    margin-bottom: 4px;
+}
+
+.trash-item-info p {
+    font-size: var(--font-size-sm);
+    color: var(--text-secondary);
+}
+
+.trash-item-actions {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+/* 标签管理条目 */
+.tag-manager-modal .modal-body {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    overflow: hidden;
+}
+
+.tag-manager-segmented {
+    display: inline-flex;
+    align-self: flex-start;
+    gap: 4px;
+    padding: 4px;
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius);
+    background: var(--bg-secondary);
+}
+
+.tag-manager-segmented button {
+    min-height: 34px;
+    padding: 0 14px;
+    border-radius: calc(var(--border-radius) - 2px);
+    color: var(--text-secondary);
+    font-size: var(--font-size-sm);
+}
+
+.tag-manager-segmented button.active {
+    background: var(--bg-card);
+    color: var(--text-primary);
+    box-shadow: var(--shadow-sm);
+}
+
+.tag-manager-panel {
+    min-height: 0;
+    flex: 1 1 auto;
+}
+
+.tag-manager-list-panel {
+    display: flex;
+    flex-direction: column;
+}
+
+.tag-manager-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 14px;
+    margin-bottom: 14px;
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius);
+    background: var(--bg-secondary);
+}
+
+.tag-manager-summary {
+    display: grid;
+    gap: 4px;
+    min-width: 0;
+}
+
+.tag-manager-summary strong {
+    color: var(--text-primary);
+    font-size: var(--font-size-md);
+}
+
+.tag-manager-summary span,
+.tag-manager-list-head span {
+    color: var(--text-secondary);
+    font-size: var(--font-size-sm);
+}
+
+.tag-manager-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+}
+
+.tag-page-size-control {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-height: var(--control-height);
+    color: var(--text-secondary);
+    font-size: var(--font-size-sm);
+    white-space: nowrap;
+}
+
+.tag-page-size-control select {
+    min-width: 68px;
+    min-height: 34px;
+    padding: 0 28px 0 10px;
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius);
+    background: var(--bg-card);
+    color: var(--text-primary);
+}
+
+.tag-manager-list {
+    display: grid;
+    gap: 8px;
+    min-height: 0;
+    overflow-y: auto;
+    padding-right: 4px;
+}
+
+.tag-manager-list-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 0 2px 4px;
+}
+
+.tag-select-control,
+.tag-select-box {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    color: var(--text-secondary);
+    font-size: var(--font-size-sm);
+}
+
+.tag-select-box {
+    width: 24px;
+}
+
+.tag-item {
+    display: grid;
+    grid-template-columns: 24px 12px minmax(160px, 1fr) auto auto auto;
+    align-items: center;
+    gap: 12px;
+    padding: 12px;
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius);
+    margin-bottom: 8px;
+}
+
+.tag-item .tag-dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.tag-main {
+    min-width: 0;
+    display: grid;
+    gap: 3px;
+}
+
+.tag-item .tag-name {
+    font-weight: 500;
+    overflow-wrap: anywhere;
+}
+
+.tag-item .tag-description {
+    color: var(--text-secondary);
+    font-size: var(--font-size-xs);
+    overflow-wrap: anywhere;
+}
+
+.tag-item .tag-count {
+    font-size: var(--font-size-sm);
+    color: var(--text-secondary);
+    white-space: nowrap;
+}
+
+.tag-edit-grid {
+    display: grid;
+    grid-template-columns: minmax(120px, 1fr) minmax(160px, 2fr) minmax(96px, auto);
+    gap: 10px;
+    align-items: end;
+}
+
+.tag-edit-grid label {
+    display: grid;
+    gap: 6px;
+    min-width: 0;
+}
+
+.tag-edit-grid span {
+    color: var(--text-secondary);
+    font-size: var(--font-size-xs);
+}
+
+.tag-edit-grid input[type="color"] {
+    min-height: 38px;
+    padding: 4px;
+}
+
+.tag-editor-actions {
+    display: flex;
+    gap: 8px;
+    justify-content: flex-end;
+    margin-top: 12px;
+}
+
+.tag-manager-pagination {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    padding-top: 8px;
+    margin-top: 4px;
+}
+
+.tag-editor-modal {
+    max-width: min(720px, calc(100vw - 48px));
+}
+
+.tag-merge-panel {
+    margin-top: 0;
+    padding: 16px;
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius);
+    background: var(--bg-secondary);
+}
+
+.tag-merge-panel h3 {
+    font-size: var(--font-size-md);
+    margin-bottom: 12px;
+}
+
+.tag-merge-panel .btn-secondary {
+    width: 100%;
+}
+
+.tag-merge-source-input {
+    margin-top: 0;
+}
+
+@media (max-width: 767px) {
+    .trash-item {
+        align-items: stretch;
+        flex-direction: column;
+    }
+
+    .trash-item-actions .btn-small,
+    .tag-item .btn-small {
+        flex: 1 1 calc(50% - 8px);
+    }
+
+    .tag-item {
+        grid-template-columns: 24px 12px minmax(0, 1fr);
+    }
+
+    .tag-item .tag-count,
+    .tag-item .btn-small {
+        grid-column: 3;
+        justify-self: stretch;
+    }
+
+    .tag-manager-toolbar,
+    .tag-manager-list-head,
+    .tag-manager-actions,
+    .tag-manager-pagination {
+        align-items: stretch;
+        flex-direction: column;
+    }
+
+    .tag-edit-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* 复选框样式 */
+input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+    accent-color: var(--color-primary);
+}
+
+/* 下拉菜单动画 */
+.dropdown-menu {
+    animation: fadeIn 0.15s ease;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(-4px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* 按钮禁用状态 */
+.btn-small:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.btn-secondary:disabled,
+.btn-primary:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+}

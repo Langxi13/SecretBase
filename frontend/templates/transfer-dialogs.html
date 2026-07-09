@@ -1,0 +1,167 @@
+        <!-- 导入冲突弹窗 -->
+        <div v-if="showImportConflicts" class="modal-overlay">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2>导入发现冲突</h2>
+                    <button class="modal-close" @click="closeImportConflicts">✕</button>
+                </div>
+                <div class="modal-body">
+                    <p>发现 {{ importConflicts.length }} 个可能重复的条目。请选择处理方式后重新导入。</p>
+                    <div class="conflict-list">
+                        <div v-for="conflict in importConflicts.slice(0, 8)" :key="conflict.id || conflict.import_title" class="conflict-item">
+                            <span>现有：{{ conflict.existing_title || '未知条目' }}</span>
+                            <span>导入：{{ conflict.import_title || '未知条目' }}</span>
+                        </div>
+                    </div>
+                    <p v-if="importConflicts.length > 8" class="warning-message">还有 {{ importConflicts.length - 8 }} 个冲突未显示。</p>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn-secondary" @click="retryImportPlain('skip')">跳过已有条目</button>
+                    <button class="btn-secondary" @click="retryImportPlain('overwrite')">覆盖已有条目</button>
+                    <button class="btn-danger" @click="closeImportConflicts">取消</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 导入预览弹窗 -->
+        <div v-if="showImportPreview" class="modal-overlay">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2>导入预览</h2>
+                    <button class="modal-close" @click="closeImportPreview">✕</button>
+                </div>
+                <div class="modal-body" v-if="importPreview">
+                    <p>总条目：{{ importPreview.total_count }}，新增：{{ importPreview.new_count }}，冲突：{{ importPreview.conflict_count }}，已选择：{{ selectedImportPreviewCount }}，已选冲突：{{ selectedImportConflictCount }}</p>
+                    <div class="setting-actions">
+                        <button class="btn-small" @click="selectAllImportPreviewEntries">全选</button>
+                        <button class="btn-small" @click="clearImportPreviewSelection">清空选择</button>
+                    </div>
+                    <div v-if="importPreview.entries && importPreview.entries.length > 0" class="import-preview-list">
+                        <div v-for="entry in importPreview.entries" :key="entry.id" class="import-preview-item" :class="{ conflict: entry.is_conflict }">
+                            <input type="checkbox" :checked="isImportPreviewSelected(entry.id)" @change="toggleImportPreviewSelection(entry.id)">
+                            <span>
+                                <strong>{{ entry.title }}</strong>
+                                <small>{{ entry.is_conflict ? '冲突' : '新增' }} · 字段 {{ entry.field_count }} · 标签 {{ entry.tag_count }}</small>
+                            </span>
+                            <label v-if="entry.is_conflict" class="conflict-resolution-select">
+                                冲突处理
+                                <select :value="importConflictResolutions[entry.id] || 'skip'" @change="setImportConflictResolution(entry.id, $event.target.value)">
+                                    <option value="skip">跳过</option>
+                                    <option value="overwrite">覆盖</option>
+                                    <option value="ask">停止</option>
+                                </select>
+                            </label>
+                        </div>
+                    </div>
+                    <div v-if="importPreview.conflicts.length > 0" class="conflict-list">
+                        <div v-for="conflict in importPreview.conflicts.slice(0, 8)" :key="conflict.id" class="conflict-item">
+                            <span>现有：{{ conflict.existing_title }}</span>
+                            <span>导入：{{ conflict.import_title }}</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn-secondary" @click="confirmImportPlain" :disabled="selectedImportPreviewCount === 0">导入已选择 {{ selectedImportPreviewCount }} 条</button>
+                    <button class="btn-danger" @click="closeImportPreview">取消</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 导入完成报告弹窗 -->
+        <div v-if="showImportReport" class="modal-overlay">
+            <div class="modal-content import-report-modal">
+                <div class="modal-header">
+                    <h2>导入完成报告</h2>
+                    <button class="modal-close" @click="showImportReport = false">✕</button>
+                </div>
+                <div class="modal-body" v-if="importReport">
+                    <div class="report-grid import-result-grid">
+                        <div><strong>{{ importReport.selectedCount }}</strong><span>本次选择</span></div>
+                        <div><strong>{{ importReport.importedCount }}</strong><span>成功导入</span></div>
+                        <div><strong>{{ importReport.createdCount }}</strong><span>新增条目</span></div>
+                        <div><strong>{{ importReport.overwrittenCount }}</strong><span>覆盖条目</span></div>
+                        <div><strong>{{ importReport.skippedCount }}</strong><span>跳过条目</span></div>
+                        <div><strong>{{ importReport.conflictCount }}</strong><span>冲突条目</span></div>
+                    </div>
+                    <p class="info-message">列表已刷新。若本次覆盖了条目，可通过自动备份恢复导入前状态。</p>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn-primary inline" @click="showImportReport = false">完成</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 工具弹窗 -->
+        <div v-if="showTools" class="modal-overlay">
+            <div class="modal-content tools-modal">
+                <div class="modal-header">
+                    <h2>🧰 管理工具</h2>
+                    <button class="modal-close" @click="showTools = false">✕</button>
+                </div>
+                <div class="modal-body">
+                    <div class="settings-section">
+                        <h3>密码健康检查</h3>
+                        <button class="btn-secondary" @click="loadHealthReport">刷新健康报告</button>
+                        <div v-if="healthReport" class="report-grid">
+                            <button class="report-action" @click="focusReportItems(healthReport.weak_items, '弱密码条目')">弱密码字段：{{ healthReport.weak_count }}</button>
+                            <button class="report-action" @click="focusReportGroups(healthReport.duplicate_groups, '重复密码条目')">重复密码条目：{{ healthReport.duplicate_count }}</button>
+                            <button class="report-action" @click="focusReportItems(healthReport.stale_items, '长期未更新条目')">长期未更新：{{ healthReport.stale_count }}</button>
+                        </div>
+                    </div>
+                    <div class="settings-section">
+                        <h3>数据维护</h3>
+                        <button class="btn-secondary" @click="loadMaintenanceReport">刷新维护报告</button>
+                        <div v-if="maintenanceReport" class="report-grid">
+                            <button class="report-action" @click="focusReportGroups(maintenanceReport.duplicate_title_groups, '重复标题条目')">重复标题：{{ maintenanceReport.duplicate_title_count }}</button>
+                            <button class="report-action" @click="focusUntaggedItems">无标签：{{ maintenanceReport.untagged_count }}</button>
+                            <button class="report-action" @click="focusReportItems(maintenanceReport.empty_field_items, '空字段条目')">空字段：{{ maintenanceReport.empty_field_count }}</button>
+                            <button class="report-action" @click="focusReportItems(maintenanceReport.sample_items, '示例数据')">示例数据：{{ maintenanceReport.sample_count }}</button>
+                        </div>
+                        <button v-if="maintenanceReport && maintenanceReport.untagged_count > 0" class="btn-secondary" @click="addTagToUntaggedItems">
+                            给无标签条目批量加标签
+                        </button>
+                        <button v-if="maintenanceReport && maintenanceReport.sample_count > 0" class="btn-danger" @click="deleteSampleEntries">
+                            删除示例数据
+                        </button>
+                    </div>
+                    <div class="settings-section tools-security-section">
+                        <h3>安全自检</h3>
+                        <button class="btn-secondary" @click="loadSecurityReport">刷新安全自检</button>
+                        <div v-if="securityReport" class="report-grid">
+                            <div class="report-action">通过：{{ securityReport.summary.ok }}</div>
+                            <div class="report-action">警告：{{ securityReport.summary.warning }}</div>
+                            <div class="report-action">错误：{{ securityReport.summary.error }}</div>
+                        </div>
+                        <div v-if="securityReport" class="settings-list">
+                            <div v-for="check in securityReport.checks" :key="check.name" class="settings-row">
+                                <div>
+                                    <strong>{{ check.name }}</strong>
+                                    <p class="muted-text">{{ check.message }}</p>
+                                </div>
+                                <span class="tag" :class="check.status === 'ok' ? 'tag-success' : check.status === 'warning' ? 'tag-warning' : 'tag-danger'">
+                                    {{ check.status }}
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 确认弹窗 -->
+        <div v-if="showConfirm" class="modal-overlay">
+            <div class="modal-content" style="max-width: 400px;">
+                <div class="modal-body confirm-dialog">
+                    <div class="confirm-icon">⚠️</div>
+                    <h3>{{ confirmTitle }}</h3>
+                    <p>{{ confirmMessage }}</p>
+                    <div class="confirm-actions">
+                        <button class="btn-secondary" @click="showConfirm = false">取消</button>
+                        <button class="btn-danger" @click="confirmAction">确认</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Toast 提示 -->
+        <div id="toast-container"></div>

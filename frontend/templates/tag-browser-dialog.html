@@ -1,0 +1,74 @@
+        <!-- 更多标签弹窗 -->
+        <div v-if="showTagBrowser" class="modal-overlay tag-browser-overlay">
+            <div class="modal-content tag-browser-modal" role="dialog" aria-modal="true" aria-label="更多标签">
+                <div class="modal-header tag-browser-header">
+                    <div>
+                        <h2>🏷️ 更多标签</h2>
+                        <p>共 {{ tags.length }} 个标签，点击即可筛选</p>
+                    </div>
+                    <button class="modal-close" @click="closeTagBrowser">✕</button>
+                </div>
+                <div class="modal-body tag-browser-body">
+                    <div class="tag-browser-controls">
+                        <input
+                            type="text"
+                            v-model="tagBrowserQuery"
+                            class="tag-browser-search"
+                            placeholder="搜索标签..."
+                            autofocus
+                        >
+                        <div class="tag-browser-sort" role="group" aria-label="标签排序">
+                            <span class="tag-browser-sort-label">排序</span>
+                            <div class="tag-browser-sort-options">
+                                <button
+                                    v-for="option in tagBrowserSortOptions"
+                                    :key="option.value"
+                                    type="button"
+                                    class="tag-browser-sort-option"
+                                    :class="{ active: tagBrowserSort === option.value }"
+                                    @click="tagBrowserSort = option.value"
+                                >{{ option.label }}</button>
+                            </div>
+                        </div>
+                    </div>
+                    <div v-if="filteredTagBrowserTags.length > 0" class="tag-browser-list">
+                        <button
+                            v-for="tag in paginatedTagBrowserTags"
+                            :key="tag.name"
+                            class="tag-browser-item"
+                            :class="{ active: activeTagName === tag.name }"
+                            @click="filterByTag(tag.name)"
+                        >
+                            <span class="tag-browser-name">
+                                <i class="tag-dot" :style="{ backgroundColor: tag.color }"></i>
+                                <span>{{ tag.name }}</span>
+                            </span>
+                            <strong>{{ tag.count }}</strong>
+                        </button>
+                    </div>
+                    <div v-else class="empty-state tag-browser-empty">
+                        <div class="empty-icon">🔎</div>
+                        <h3>没有匹配标签</h3>
+                        <p>换个关键词试试</p>
+                    </div>
+                </div>
+                <div class="modal-footer tag-browser-footer">
+                    <label class="tag-page-size-control" title="输入自定义条数或选择">
+                        <span>每页</span>
+                        <input type="number" class="page-size-input" v-model.number="tagBrowserPageSize" min="1" max="500">
+                        <select class="page-size-quick-select" :value="tagBrowserPageSize" @change="tagBrowserPageSize = Number($event.target.value)">
+                            <option :value="tagBrowserPageSize" v-if="!(tagPageSizeOptions || [5, 10, 20, 50, 100]).includes(tagBrowserPageSize)">{{ tagBrowserPageSize }} (自定)</option>
+                            <option v-for="size in (tagPageSizeOptions || [5, 10, 20, 50, 100])" :key="'browser-size-' + size" :value="size">{{ size }}</option>
+                        </select>
+                        <span>条</span>
+                    </label>
+                    <div class="tag-browser-pagination" v-if="filteredTagBrowserTags.length > 0">
+                        <button class="btn-secondary" :disabled="tagBrowserPage <= 1" @click="goToTagBrowserPage(tagBrowserPage - 1)">上一页</button>
+                        <span class="page-info">{{ tagBrowserPage }} / {{ tagBrowserTotalPages }}</span>
+                        <button class="btn-secondary" :disabled="tagBrowserPage >= tagBrowserTotalPages" @click="goToTagBrowserPage(tagBrowserPage + 1)">下一页</button>
+                    </div>
+                    <button class="btn-secondary" @click="showTagManager = true; closeTagBrowser();">标签管理</button>
+                    <button class="btn-primary" @click="closeTagBrowser">关闭</button>
+                </div>
+            </div>
+        </div>
