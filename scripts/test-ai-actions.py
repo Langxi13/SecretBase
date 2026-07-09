@@ -92,6 +92,8 @@ def main() -> None:
                         {
                             "type": "update_entry",
                             "entry_id": entry_payload["id"],
+                            "field_index": 0,
+                            "field_name": "账号",
                             "add_tags": ["云平台"],
                             "reason": "给原条目补充分类标签",
                         },
@@ -160,6 +162,8 @@ def main() -> None:
         assert preview["actions"][1]["source_entry_title"] == "demo.example"
         assert preview["actions"][4]["entry_title"] == "demo.example"
         assert preview["actions"][4]["title"] is None
+        assert preview["actions"][4]["field_index"] is None
+        assert preview["actions"][4]["field_name"] is None
         assert "delete_entry" not in {action["type"] for action in preview["actions"]}
         assert any("不支持" in warning or "已忽略" in warning for warning in preview["warnings"])
         assert "不会发送任何字段值" in preview["privacy_note"]
@@ -193,6 +197,7 @@ def main() -> None:
         assert {"demo.example", "demo-service 账号", "demo-service 密码", "demo-service API Key"}.issubset(titles)
         source_detail = expect_success(client.get(f"/entries/{source['id']}", headers=headers), "source detail")
         assert [field["value"] for field in source_detail["fields"]] == ["main-user", "demo-service-password", "sk-secret"]
+        assert [field["name"] for field in source_detail["fields"]] == ["账号", "密码", "API Key"]
         assert "云平台" in source_detail["tags"]
 
         details_by_title = {}

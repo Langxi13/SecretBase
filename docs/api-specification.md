@@ -1429,7 +1429,7 @@ POST /ai/actions/preview
 }
 ```
 
-允许动作：`create_group`、`create_entry`、`create_entry_from_field`、`update_entry`。不允许删除条目、删除字段或覆盖字段值。
+允许动作：`create_group`、`create_entry`、`create_entry_from_field`、`update_entry`。不允许删除条目、删除字段或覆盖字段值。`update_entry` 只有同时提供 `field_index`、`field_name` 和 `field_name_new` 时才会重命名字段；只有部分字段重命名信息时，预览会忽略这些字段上下文，不影响标签、密码组、标题、网址或备注更新。
 
 **错误情况：**
 

@@ -930,7 +930,16 @@ def _normalize_ai_action(item, valid_entry_ids: set[str]) -> tuple[dict | None, 
     }
     if action["url"] and not action["url"].startswith(("http://", "https://")):
         action["url"] = None
-    return action, None
+    warning = None
+    if action_type == "update_entry":
+        has_field_context = action["field_index"] is not None or bool(action["field_name"]) or bool(action["field_name_new"])
+        has_complete_rename = action["field_index"] is not None and bool(action["field_name"]) and bool(action["field_name_new"])
+        if has_field_context and not has_complete_rename:
+            action["field_index"] = None
+            action["field_name"] = None
+            action["field_name_new"] = None
+            warning = "已忽略不完整的字段重命名信息"
+    return action, warning
 
 
 def _normalize_ai_actions_payload(payload, valid_entry_ids: set[str]) -> tuple[list[dict], list[str]]:
@@ -1493,7 +1502,7 @@ async def ai_actions_apply(request: AiActionApplyRequest):
             entry = entries_by_id.get(action.entry_id or "")
             if not entry:
                 raise HTTPException(status_code=422, detail="更新条目操作引用的条目不存在")
-            wants_field_rename = action.field_index is not None or bool(action.field_name) or bool(action.field_name_new)
+            wants_field_rename = bool(action.field_name_new)
             if wants_field_rename:
                 if action.field_index is None or not action.field_name or not action.field_name_new:
                     raise HTTPException(status_code=422, detail="字段重命名必须提供字段索引、当前字段名和新字段名")
