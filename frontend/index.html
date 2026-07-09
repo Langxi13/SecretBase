@@ -4,20 +4,27 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SecretBase - 密码管理工具</title>
-    
+
     <!-- Vue 3 CDN (Production) -->
     <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
-    <script src="/secretbase-runtime-config.js?v=20260709-ui-v58"></script>
-    
+    <script src="/secretbase-runtime-config.js?v=20260710-ui-v64"></script>
+
+    <!-- 现代排版字体集 (Google Fonts: Outfit & Inter) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@500;600;700&display=swap" rel="stylesheet">
+
     <!-- 基础样式 -->
-    <link rel="stylesheet" href="css/style.css?v=20260709-ui-v58">
-    <link rel="stylesheet" href="css/components.css?v=20260709-ui-v58">
-    
+    <link rel="stylesheet" href="css/style.css?v=20260710-ui-v64">
+    <link rel="stylesheet" href="css/components.css?v=20260710-ui-v64">
+
     <!-- 主题样式 -->
-    <link rel="stylesheet" href="css/themes/variables.css?v=20260709-ui-v58">
-    <link rel="stylesheet" href="css/themes/dark.css?v=20260709-ui-v58">
-    <link rel="stylesheet" href="css/themes/light.css?v=20260709-ui-v58">
-    
+    <link rel="stylesheet" href="css/themes/variables.css?v=20260710-ui-v64">
+    <link rel="stylesheet" href="css/themes/dark.css?v=20260710-ui-v64">
+    <link rel="stylesheet" href="css/themes/light.css?v=20260710-ui-v64">
+    <link rel="stylesheet" href="css/visual-polish.css?v=20260710-ui-v64">
+    <link rel="stylesheet" href="css/component-polish.css?v=20260710-ui-v64">
+
     <!-- Favicon -->
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🔐</text></svg>">
 </head>
@@ -35,13 +42,16 @@
                 <h1>🔐 SecretBase</h1>
                 <h2>设置主密码</h2>
                 <p class="auth-hint">这是唯一密码，请牢记</p>
-                
+
                 <form @submit.prevent="initPassword">
                     <div class="form-group">
                         <label>主密码</label>
-                        <input 
-                            type="password" 
-                            v-model="password" 
+                        <input
+                            type="password"
+                            name="init_password"
+                            id="init_password"
+                            autocomplete="new-password"
+                            v-model="password"
                             placeholder="请输入主密码（至少 8 位）"
                             minlength="8"
                             required
@@ -49,9 +59,12 @@
                     </div>
                     <div class="form-group">
                         <label>确认密码</label>
-                        <input 
-                            type="password" 
-                            v-model="confirmPassword" 
+                        <input
+                            type="password"
+                            name="init_confirm_password"
+                            id="init_confirm_password"
+                            autocomplete="new-password"
+                            v-model="confirmPassword"
                             placeholder="请再次输入密码"
                             required
                         >
@@ -63,19 +76,22 @@
                 </form>
             </div>
         </div>
-        
+
         <!-- 已锁定 - 解锁界面 -->
         <div v-else-if="locked" class="auth-screen">
             <div class="auth-card">
                 <h1>🔐 SecretBase</h1>
                 <h2>解锁</h2>
-                
+
                 <form @submit.prevent="unlock">
                     <div class="form-group">
                         <label>主密码</label>
-                        <input 
-                            type="password" 
-                            v-model="password" 
+                        <input
+                            type="password"
+                            name="unlock_password"
+                            id="unlock_password"
+                            autocomplete="current-password"
+                            v-model="password"
                             placeholder="请输入主密码"
                             autofocus
                             required
@@ -88,43 +104,54 @@
                 </form>
             </div>
         </div>
-        
+
         <!-- 已解锁 - 主界面 -->
-        <div v-else class="app-container">
+        <div v-else class="app-container" :class="{ 'sidebar-collapsed': isSidebarCollapsed }">
             <aside class="desktop-sidebar" aria-label="桌面侧边栏导航">
                 <div class="sidebar-brand">
                     <div class="sidebar-logo">🔐</div>
-                    <div>
+                    <div class="sidebar-brand-text">
                         <h1>SecretBase</h1>
                         <p>本地加密密码库</p>
                     </div>
+                    <button class="sidebar-collapse-toggle" @click="toggleSidebar" :title="isSidebarCollapsed ? '展开侧边栏' : '收起侧边栏'">
+                        <span>{{ isSidebarCollapsed ? '⏭' : '⏮' }}</span>
+                    </button>
                 </div>
-                <button class="btn-primary sidebar-create" @click="openCreateModal">
-                    + 新建条目
+                <button class="btn-primary sidebar-create" @click="openCreateModal" :title="isSidebarCollapsed ? '新建条目' : ''">
+                    <span class="sidebar-btn-icon">+</span>
+                    <span class="sidebar-btn-text">新建条目</span>
                 </button>
                 <nav class="sidebar-section" aria-label="条目视图">
-                    <span class="sidebar-label">视图</span>
-                    <button class="sidebar-nav-item" :class="{ active: filter === 'all' && !activeTagName }" @click="showAllEntries">
-                        <span>全部条目</span>
-                        <strong>{{ totalEntries }}</strong>
+                    <span class="sidebar-label" :title="isSidebarCollapsed ? '视图' : ''">
+                        <span class="label-text">视图</span>
+                        <i class="label-indicator"></i>
+                    </span>
+                    <button class="sidebar-nav-item" :class="{ active: filter === 'all' && !activeTagName }" @click="showAllEntries" :title="isSidebarCollapsed ? '全部条目 (' + totalEntries + ')' : ''">
+                        <span class="nav-icon-text"><i class="nav-icon">📑</i><span class="nav-text">全部条目</span></span>
+                        <strong class="nav-count">{{ totalEntries }}</strong>
                     </button>
-                    <button class="sidebar-nav-item" :class="{ active: filter === 'starred' }" @click="showStarredEntries">
-                        <span>星标条目</span>
-                        <strong>★</strong>
+                    <button class="sidebar-nav-item" :class="{ active: filter === 'starred' }" @click="showStarredEntries" :title="isSidebarCollapsed ? '星标条目' : ''">
+                        <span class="nav-icon-text"><i class="nav-icon">★</i><span class="nav-text">星标条目</span></span>
+                        <strong class="nav-count">★</strong>
                     </button>
-                    <button class="sidebar-nav-item" :class="{ active: filter === 'groups' }" @click="showGroupMode">
-                        <span>密码组模式</span>
-                        <strong>{{ groups.length }}</strong>
+                    <button class="sidebar-nav-item" :class="{ active: filter === 'groups' }" @click="showGroupMode" :title="isSidebarCollapsed ? '密码组 (' + groups.length + ')' : ''">
+                        <span class="nav-icon-text"><i class="nav-icon">🗂️</i><span class="nav-text">密码组</span></span>
+                        <strong class="nav-count">{{ groups.length }}</strong>
                     </button>
                 </nav>
                 <nav class="sidebar-section sidebar-tags" aria-label="标签筛选">
-                    <span class="sidebar-label">标签</span>
+                    <span class="sidebar-label" :title="isSidebarCollapsed ? '标签' : ''">
+                        <span class="label-text">标签</span>
+                        <i class="label-indicator"></i>
+                    </span>
                     <button
                         class="sidebar-nav-item sidebar-more-tags"
                         @click="openTagBrowser"
+                        :title="isSidebarCollapsed ? '更多标签' : ''"
                     >
-                        <span>更多标签</span>
-                        <strong>{{ hiddenSidebarTagCount > 0 ? '+' + hiddenSidebarTagCount : tags.length }}</strong>
+                        <span class="nav-icon-text"><i class="nav-icon">🏷️</i><span class="nav-text">更多标签</span></span>
+                        <strong class="nav-count">{{ hiddenSidebarTagCount > 0 ? '+' + hiddenSidebarTagCount : tags.length }}</strong>
                     </button>
                     <button
                         v-for="tag in visibleSidebarTags"
@@ -132,20 +159,23 @@
                         class="sidebar-nav-item tag-nav-item"
                         :class="{ active: activeTagName === tag.name }"
                         @click="filterByTag(tag.name)"
-                        :title="tag.name"
+                        :title="tag.name + ' (' + tag.count + ')'"
                     >
-                        <span><i class="tag-dot" :style="{ backgroundColor: tag.color }"></i>{{ tag.name }}</span>
-                        <strong>{{ tag.count }}</strong>
+                        <span class="nav-icon-text"><i class="tag-dot" :style="{ backgroundColor: tag.color }"></i><span class="nav-text">{{ tag.name }}</span></span>
+                        <strong class="nav-count">{{ tag.count }}</strong>
                     </button>
                 </nav>
                 <nav class="sidebar-section sidebar-tools" aria-label="管理工具">
-                    <span class="sidebar-label">管理</span>
-                    <button class="sidebar-nav-item" @click="openAiParse"><span>AI 智能录入</span><strong>🤖</strong></button>
-                    <button class="sidebar-nav-item" @click="showTagManager = true"><span>标签管理</span><strong>🏷️</strong></button>
-                    <button class="sidebar-nav-item" @click="showTrash = true"><span>回收站</span><strong>🗑️</strong></button>
-                    <button class="sidebar-nav-item" @click="openBackupCenter"><span>备份</span><strong>💾</strong></button>
-                    <button class="sidebar-nav-item" @click="openToolsModal"><span>工具</span><strong>🧰</strong></button>
-                    <button class="sidebar-nav-item" @click="openSettings"><span>设置</span><strong>⚙️</strong></button>
+                    <span class="sidebar-label" :title="isSidebarCollapsed ? '管理' : ''">
+                        <span class="label-text">管理</span>
+                        <i class="label-indicator"></i>
+                    </span>
+                    <button class="sidebar-nav-item" @click="openAiParse" :title="isSidebarCollapsed ? 'AI 智能录入' : ''"><span class="nav-icon-text"><i class="nav-icon">🤖</i><span class="nav-text">AI 智能录入</span></span><strong class="nav-count">🤖</strong></button>
+                    <button class="sidebar-nav-item" @click="showTagManager = true" :title="isSidebarCollapsed ? '标签管理' : ''"><span class="nav-icon-text"><i class="nav-icon">🏷️</i><span class="nav-text">标签管理</span></span><strong class="nav-count">🏷️</strong></button>
+                    <button class="sidebar-nav-item" @click="showTrash = true" :title="isSidebarCollapsed ? '回收站' : ''"><span class="nav-icon-text"><i class="nav-icon">🗑️</i><span class="nav-text">回收站</span></span><strong class="nav-count">🗑️</strong></button>
+                    <button class="sidebar-nav-item" @click="openBackupCenter" :title="isSidebarCollapsed ? '备份' : ''"><span class="nav-icon-text"><i class="nav-icon">💾</i><span class="nav-text">备份</span></span><strong class="nav-count">💾</strong></button>
+                    <button class="sidebar-nav-item" @click="openToolsModal" :title="isSidebarCollapsed ? '工具' : ''"><span class="nav-icon-text"><i class="nav-icon">🧰</i><span class="nav-text">工具</span></span><strong class="nav-count">🧰</strong></button>
+                    <button class="sidebar-nav-item" @click="openSettings" :title="isSidebarCollapsed ? '设置' : ''"><span class="nav-icon-text"><i class="nav-icon">⚙️</i><span class="nav-text">设置</span></span><strong class="nav-count">⚙️</strong></button>
                 </nav>
             </aside>
             <div class="workspace-shell">
@@ -172,12 +202,12 @@
                     </button>
                 </div>
             </header>
-            
+
             <!-- 搜索和筛选栏 -->
             <div class="search-bar">
-                <input 
-                    type="text" 
-                    v-model="searchQuery" 
+                <input
+                    type="text"
+                    v-model="searchQuery"
                     placeholder="搜索条目..."
                     class="search-input"
                     @input="debounceSearch"
@@ -291,15 +321,15 @@
                     </div>
                 </div>
                 <div class="filter-tabs">
-                    <button 
-                        class="tab-btn" 
+                    <button
+                        class="tab-btn"
                         :class="{ active: filter === 'all' }"
                         @click="showAllEntries"
                     >
                         全部
                     </button>
-                    <button 
-                        class="tab-btn" 
+                    <button
+                        class="tab-btn"
                         :class="{ active: filter === 'starred' }"
                         @click="showStarredEntries"
                     >
@@ -326,7 +356,7 @@
                     <button class="btn-small" @click="clearListState">清除定位/筛选</button>
                 </div>
             </div>
-            
+
             <!-- 主内容区 -->
             <main class="main-content">
                 <section v-if="filter === 'groups'" class="group-mode-panel">
@@ -347,7 +377,7 @@
                     </div>
                     <div v-else class="group-cards">
                         <div
-                            v-for="group in groups"
+                            v-for="group in paginatedGroups"
                             :key="group.name"
                             class="group-card"
                             :style="groupCardStyle(group)"
@@ -374,6 +404,71 @@
                             <button type="button" class="btn-small group-card-edit group-card-action-btn group-card-edit-action" @click.stop="openEditGroupModal(group)">编辑</button>
                         </div>
                     </div>
+
+                    <!-- 密码组底部分页（常驻显示 & 支持自定每页条数） -->
+                    <div v-if="groups.length > 0" class="pagination group-pagination">
+                        <label class="tag-page-size-control group-page-size" title="输入自定义条数或选择常用下拉值">
+                            <span>每页</span>
+                            <input type="number" class="page-size-input" v-model.number="groupPageSize" min="1" max="500">
+                            <select class="page-size-quick-select" :value="groupPageSize" @change="groupPageSize = Number($event.target.value)">
+                                <option :value="groupPageSize" v-if="!(groupPageSizeOptions || [3, 6, 9, 12, 15, 24, 50, 100]).includes(groupPageSize)">{{ groupPageSize }} (自定)</option>
+                                <option v-for="size in (groupPageSizeOptions || [3, 6, 9, 12, 15, 24, 50, 100])" :key="'group-size-' + size" :value="size">{{ size }}</option>
+                            </select>
+                            <span>个</span>
+                        </label>
+
+                        <button
+                            class="page-btn"
+                            :disabled="groupCurrentPage <= 1"
+                            @click="goToGroupPage(1)"
+                        >
+                            首页
+                        </button>
+                        <button
+                            class="page-btn"
+                            :disabled="groupCurrentPage <= 1"
+                            @click="goToGroupPage(groupCurrentPage - 1)"
+                        >
+                            上一页
+                        </button>
+
+                        <template v-for="page in visibleGroupPages" :key="page">
+                            <button
+                                v-if="page === '...'"
+                                class="page-btn ellipsis"
+                                disabled
+                            >
+                                ...
+                            </button>
+                            <button
+                                v-else
+                                class="page-btn"
+                                :class="{ active: page === groupCurrentPage }"
+                                @click="goToGroupPage(page)"
+                            >
+                                {{ page }}
+                            </button>
+                        </template>
+
+                        <button
+                            class="page-btn"
+                            :disabled="groupCurrentPage >= groupTotalPages"
+                            @click="goToGroupPage(groupCurrentPage + 1)"
+                        >
+                            下一页
+                        </button>
+                        <button
+                            class="page-btn"
+                            :disabled="groupCurrentPage >= groupTotalPages"
+                            @click="goToGroupPage(groupTotalPages)"
+                        >
+                            末页
+                        </button>
+
+                        <span class="page-info">
+                            第 {{ groupCurrentPage }} / {{ groupTotalPages }} 页 · 共 {{ groups.length }} 个
+                        </span>
+                    </div>
                 </section>
 
                 <section v-if="filter === 'group' && activeGroupName" class="active-group-toolbar">
@@ -395,11 +490,11 @@
                         + 新建条目
                     </button>
                 </div>
-                
+
                 <!-- 条目列表 -->
                 <div v-if="filter !== 'groups' && (entries.length > 0 || loading)" class="entries-grid">
-                    <div 
-                        v-for="entry in entries" 
+                    <div
+                        v-for="entry in entries"
                         :key="entry.id"
                         class="entry-card"
                         :style="entryCardStyle(entry)"
@@ -413,76 +508,87 @@
                                 @click.stop
                                 @change="toggleEntrySelection(entry.id)"
                             >
-                            <img 
-                                v-if="entry.url" 
-                                :src="getFavicon(entry.url)" 
-                                class="favicon" 
+                            <img
+                                v-if="entry.url"
+                                :src="getFavicon(entry.url)"
+                                class="favicon"
                                 @error="e => e.target.style.display='none'"
                             >
                             <span v-else class="favicon-placeholder">🔗</span>
                             <h3 class="entry-title">{{ entry.title }}</h3>
-                            <button 
-                                class="star-btn" 
+                            <button
+                                class="star-btn"
                                 :class="{ starred: entry.starred }"
                                 @click.stop="toggleStar(entry)"
                             >
                                 {{ entry.starred ? '★' : '☆' }}
                             </button>
                         </div>
-                        
-                        <div class="card-tags" v-if="entry.tags.length > 0">
-                            <span 
-                                v-for="tag in entry.tags" 
-                                :key="tag"
-                                class="tag"
-                                :style="{ backgroundColor: getTagColor(tag) }"
-                                @click.stop="filterByTag(tag)"
-                            >
-                                {{ tag }}
-                            </span>
+
+                        <div class="card-meta-area">
+                            <div class="card-tags" v-if="entry.tags && entry.tags.length > 0">
+                                <span class="meta-badge meta-tag-prefix">🏷️ 标签</span>
+                                <span
+                                    v-for="tag in entry.tags.slice(0, 3)"
+                                    :key="tag"
+                                    class="tag"
+                                    :style="{ backgroundColor: getTagColor(tag) }"
+                                    @click.stop="filterByTag(tag)"
+                                >
+                                    {{ tag }}
+                                </span>
+                                <span
+                                    v-if="entry.tags.length > 3"
+                                    class="tag tag-more"
+                                    :title="entry.tags.join('、')"
+                                >
+                                    +{{ entry.tags.length - 3 }}
+                                </span>
+                            </div>
+
+                            <div class="card-groups" v-if="entry.groups && entry.groups.length > 0">
+                                <span class="meta-badge meta-group-prefix">🗂️ 密码组</span>
+                                <span
+                                    v-for="group in visibleEntryGroups(entry)"
+                                    :key="group"
+                                    class="group-chip"
+                                    :style="groupChipStyle(group)"
+                                    @click.stop="filterByGroup(group)"
+                                >
+                                    {{ group }}
+                                </span>
+                                <span
+                                    v-if="remainingEntryGroupsCount(entry) > 0"
+                                    class="group-chip group-chip-more"
+                                    :title="entry.groups.join('、')"
+                                >
+                                    +{{ remainingEntryGroupsCount(entry) }}
+                                </span>
+                            </div>
                         </div>
 
-                        <div class="card-groups" v-if="entry.groups && entry.groups.length > 0">
-                            <span
-                                v-for="group in visibleEntryGroups(entry)"
-                                :key="group"
-                                class="group-chip"
-                                :style="groupChipStyle(group)"
-                                @click.stop="filterByGroup(group)"
-                            >
-                                {{ group }}
-                            </span>
-                            <span
-                                v-if="remainingEntryGroupsCount(entry) > 0"
-                                class="group-chip group-chip-more"
-                                :title="entry.groups.join('、')"
-                            >
-                                +{{ remainingEntryGroupsCount(entry) }}
-                            </span>
-                        </div>
-                        
                         <div class="card-fields">
-                            <div 
-                                v-for="field in entry.fields.slice(0, 3)" 
+                            <div
+                                v-for="field in entry.fields.slice(0, 2)"
                                 :key="field.name"
                                 class="field-row"
                             >
                                 <span class="field-name">{{ field.name }}</span>
                                 <span class="field-value">{{ field.masked ? '••••••' : field.value }}</span>
                             </div>
-                            <div v-if="entry.fields.length > 3" class="field-overflow-hint">
-                                还有 {{ entry.fields.length - 3 }} 个字段，点击查看详情
+                            <div v-if="entry.fields.length > 2" class="field-overflow-hint">
+                                还有 {{ entry.fields.length - 2 }} 个字段，点击查看详情
                             </div>
                         </div>
-                        
+
                         <div class="card-actions">
                             <div class="copy-dropdown" v-if="entry.fields.some(f => f.copyable)">
                                 <button class="btn-small" @click.stop="toggleCopyMenu(entry.id)">
                                     复制 ▼
                                 </button>
                                 <div v-if="copyMenuEntryId === entry.id" class="copy-menu">
-                                    <button 
-                                        v-for="field in entry.fields.filter(f => f.copyable)" 
+                                    <button
+                                        v-for="field in entry.fields.filter(f => f.copyable)"
                                         :key="field.name"
                                         class="copy-item"
                                         @click.stop="copyField(entry.id, field)"
@@ -495,20 +601,20 @@
                                     </button>
                                 </div>
                             </div>
-                            <button 
-                                v-if="entry.url" 
+                            <button
+                                v-if="entry.url"
                                 class="btn-small"
                                 @click.stop="openUrl(entry.url)"
                             >
                                 打开
                             </button>
-                            <button 
+                            <button
                                 class="btn-small"
                                 @click.stop="editEntry(entry)"
                             >
                                 编辑
                             </button>
-                            <button 
+                            <button
                                 class="btn-small btn-small-danger"
                                 @click.stop="confirmDeleteEntry(entry)"
                             >
@@ -517,63 +623,73 @@
                         </div>
                     </div>
                 </div>
-                
-                <!-- 分页 -->
-                <div v-if="filter !== 'groups' && totalPages > 1" class="pagination">
-                    <button 
-                        class="page-btn" 
-                        :disabled="currentPage === 1"
+
+                <!-- 条目与星标列表分页（常驻显示 & 支持自定每页条数） -->
+                <div v-if="filter !== 'groups' && entries.length > 0" class="pagination">
+                    <label class="tag-page-size-control group-page-size" title="输入自定义条数或选择常用下拉值">
+                        <span>每页</span>
+                        <input type="number" class="page-size-input" v-model.number="settingsForm.pageSize" @change="updateEntryPageSize(settingsForm.pageSize)" @keyup.enter="updateEntryPageSize(settingsForm.pageSize)" min="1" max="500">
+                        <select class="page-size-quick-select" :value="settingsForm.pageSize" @change="updateEntryPageSize(Number($event.target.value))">
+                            <option :value="settingsForm.pageSize" v-if="!(entryPageSizeOptions || [6, 12, 20, 30, 50, 100]).includes(settingsForm.pageSize)">{{ settingsForm.pageSize }} (自定)</option>
+                            <option v-for="size in (entryPageSizeOptions || [6, 12, 20, 30, 50, 100])" :key="'entry-size-' + size" :value="size">{{ size }}</option>
+                        </select>
+                        <span>条</span>
+                    </label>
+
+                    <button
+                        class="page-btn"
+                        :disabled="currentPage <= 1"
                         @click="goToPage(1)"
                     >
                         首页
                     </button>
-                    <button 
-                        class="page-btn" 
-                        :disabled="currentPage === 1"
+                    <button
+                        class="page-btn"
+                        :disabled="currentPage <= 1"
                         @click="goToPage(currentPage - 1)"
                     >
                         上一页
                     </button>
-                    
+
                     <template v-for="page in visiblePages" :key="page">
-                        <button 
+                        <button
                             v-if="page === '...'"
                             class="page-btn ellipsis"
                             disabled
                         >
                             ...
                         </button>
-                        <button 
+                        <button
                             v-else
-                            class="page-btn" 
+                            class="page-btn"
                             :class="{ active: page === currentPage }"
                             @click="goToPage(page)"
                         >
                             {{ page }}
                         </button>
                     </template>
-                    
-                    <button 
-                        class="page-btn" 
+
+                    <button
+                        class="page-btn"
                         :disabled="currentPage === totalPages"
                         @click="goToPage(currentPage + 1)"
                     >
                         下一页
                     </button>
-                    <button 
-                        class="page-btn" 
+                    <button
+                        class="page-btn"
                         :disabled="currentPage === totalPages"
                         @click="goToPage(totalPages)"
                     >
                         末页
                     </button>
-                    
+
                     <span class="page-info">
                         共 {{ totalEntries }} 条
                     </span>
                 </div>
             </main>
-            
+
             <!-- 底部操作栏 -->
             <footer class="app-footer">
                 <button class="btn-primary" @click="openCreateModal">
@@ -681,7 +797,7 @@
                 </div>
             </div>
         </div>
-        
+
         <!-- 创建/编辑条目弹窗 -->
         <div v-if="showCreateModal || showEditModal" class="modal-overlay">
             <div class="modal-content entry-editor-modal">
@@ -712,10 +828,10 @@
                                 {{ tag }}
                                 <span class="remove-tag" @click="removeTag(index)">✕</span>
                             </span>
-                            <input 
+                            <input
                                 ref="tagInput"
-                                type="text" 
-                                v-model="newTag" 
+                                type="text"
+                                v-model="newTag"
                                 placeholder="输入标签后按回车"
                                 @keydown.enter.prevent="addTag"
                                 @keydown.tab.prevent="addTag"
@@ -888,6 +1004,15 @@
                         </label>
                     </div>
                     <div v-if="!groupPickerLoading && availableGroupPickerEntries.length > 0" class="group-entry-picker-pagination">
+                        <label class="tag-page-size-control" title="输入自定义条数或选择">
+                            <span>每页</span>
+                            <input type="number" class="page-size-input" v-model.number="groupPickerPageSize" min="1" max="500">
+                            <select class="page-size-quick-select" :value="groupPickerPageSize" @change="groupPickerPageSize = Number($event.target.value)">
+                                <option :value="groupPickerPageSize" v-if="!(groupPickerPageSizeOptions || [5, 10, 20, 50, 100]).includes(groupPickerPageSize)">{{ groupPickerPageSize }} (自定)</option>
+                                <option v-for="size in (groupPickerPageSizeOptions || [5, 10, 20, 50, 100])" :key="'picker-size-' + size" :value="size">{{ size }}</option>
+                            </select>
+                            <span>条</span>
+                        </label>
                         <button class="btn-secondary" @click="goToGroupPickerPage(groupPickerPage - 1)" :disabled="groupPickerPage <= 1">
                             上一页
                         </button>
@@ -905,7 +1030,7 @@
                 </div>
             </div>
         </div>
-        
+
         <!-- AI 智能录入弹窗 -->
         <div v-if="showAiParse" class="modal-overlay">
             <div class="modal-content ai-assistant-modal">
@@ -1258,13 +1383,16 @@
                     </div>
                 </div>
                 <div class="modal-footer tag-browser-footer">
-                    <label class="tag-page-size-control">
+                    <label class="tag-page-size-control" title="输入自定义条数或选择">
                         <span>每页</span>
-                        <select v-model.number="tagBrowserPageSize">
-                            <option v-for="size in tagPageSizeOptions" :key="'browser-size-' + size" :value="size">{{ size }}</option>
+                        <input type="number" class="page-size-input" v-model.number="tagBrowserPageSize" min="1" max="500">
+                        <select class="page-size-quick-select" :value="tagBrowserPageSize" @change="tagBrowserPageSize = Number($event.target.value)">
+                            <option :value="tagBrowserPageSize" v-if="!(tagPageSizeOptions || [5, 10, 20, 50, 100]).includes(tagBrowserPageSize)">{{ tagBrowserPageSize }} (自定)</option>
+                            <option v-for="size in (tagPageSizeOptions || [5, 10, 20, 50, 100])" :key="'browser-size-' + size" :value="size">{{ size }}</option>
                         </select>
+                        <span>条</span>
                     </label>
-                    <div class="tag-browser-pagination" v-if="tagBrowserTotalPages > 1">
+                    <div class="tag-browser-pagination" v-if="filteredTagBrowserTags.length > 0">
                         <button class="btn-secondary" :disabled="tagBrowserPage <= 1" @click="goToTagBrowserPage(tagBrowserPage - 1)">上一页</button>
                         <span class="page-info">{{ tagBrowserPage }} / {{ tagBrowserTotalPages }}</span>
                         <button class="btn-secondary" :disabled="tagBrowserPage >= tagBrowserTotalPages" @click="goToTagBrowserPage(tagBrowserPage + 1)">下一页</button>
@@ -1274,7 +1402,7 @@
                 </div>
             </div>
         </div>
-        
+
         <!-- 设置弹窗 -->
         <div v-if="showSettings" class="modal-overlay">
             <div class="modal-content settings-modal">
@@ -1307,10 +1435,6 @@
                                     <option value="light">亮色</option>
                                     <option value="dark">暗色</option>
                                 </select>
-                            </div>
-                            <div class="setting-item">
-                                <label>每页条目数</label>
-                                <input type="number" v-model.number="settingsForm.pageSize" min="1" max="1000" @change="saveSettings">
                             </div>
                         </div>
 
@@ -1519,6 +1643,15 @@
                                 </div>
                             </div>
                             <div class="backup-pagination">
+                                <label class="tag-page-size-control" title="输入自定义条数或选择">
+                                    <span>每页</span>
+                                    <input type="number" class="page-size-input" v-model.number="backupPageSize" min="1" max="500">
+                                    <select class="page-size-quick-select" :value="backupPageSize" @change="backupPageSize = Number($event.target.value)">
+                                        <option :value="backupPageSize" v-if="!(backupPageSizeOptions || [3, 6, 10, 20, 50, 100]).includes(backupPageSize)">{{ backupPageSize }} (自定)</option>
+                                        <option v-for="size in (backupPageSizeOptions || [3, 6, 10, 20, 50, 100])" :key="'backup-size-' + size" :value="size">{{ size }}</option>
+                                    </select>
+                                    <span>个</span>
+                                </label>
                                 <button class="btn-small" :disabled="group.page <= 1" @click="setBackupPage(group.type, group.page - 1)">上一页</button>
                                 <span>{{ group.page }} / {{ group.totalPages }}</span>
                                 <button class="btn-small" :disabled="group.page >= group.totalPages" @click="setBackupPage(group.type, group.page + 1)">下一页</button>
@@ -1530,7 +1663,7 @@
         </div>
 
         <!-- 恢复备份向导 -->
-        <div v-if="restoreWizard.visible" class="modal-overlay">
+        <div v-if="restoreWizard && restoreWizard.visible" class="modal-overlay">
             <div class="modal-content restore-wizard-modal">
                 <div class="modal-header">
                     <h2>恢复备份</h2>
@@ -1649,7 +1782,7 @@
                 </div>
             </div>
         </div>
-        
+
         <!-- 回收站弹窗 -->
         <div v-if="showTrash" class="modal-overlay">
             <div class="modal-content trash-modal">
@@ -1675,6 +1808,15 @@
                     </div>
                 </div>
                 <div class="modal-footer" v-if="trashItems.length > 0">
+                    <label class="tag-page-size-control" title="输入自定义条数或选择">
+                        <span>每页</span>
+                        <input type="number" class="page-size-input" v-model.number="trashPageSize" min="1" max="500">
+                        <select class="page-size-quick-select" :value="trashPageSize" @change="trashPageSize = Number($event.target.value)">
+                            <option :value="trashPageSize" v-if="!(trashPageSizeOptions || [5, 10, 20, 50, 100]).includes(trashPageSize)">{{ trashPageSize }} (自定)</option>
+                            <option v-for="size in (trashPageSizeOptions || [5, 10, 20, 50, 100])" :key="'trash-size-' + size" :value="size">{{ size }}</option>
+                        </select>
+                        <span>条</span>
+                    </label>
                     <button class="btn-secondary" :disabled="trashPage <= 1" @click="goToTrashPage(trashPage - 1)">上一页</button>
                     <span class="page-info">{{ trashPage }} / {{ trashTotalPages }} · 共 {{ trashTotal }} 条</span>
                     <button class="btn-secondary" :disabled="trashPage >= trashTotalPages" @click="goToTrashPage(trashPage + 1)">下一页</button>
@@ -1682,7 +1824,7 @@
                 </div>
             </div>
         </div>
-        
+
         <!-- 标签管理弹窗 -->
         <div v-if="showTagManager" class="modal-overlay">
             <div class="modal-content tag-manager-modal">
@@ -1747,6 +1889,15 @@
                             <button class="btn-small btn-danger" @click="deleteTag(tag)">删除</button>
                         </div>
                         <div class="tag-manager-pagination">
+                            <label class="tag-page-size-control" title="输入自定义条数或选择">
+                                <span>每页</span>
+                                <input type="number" class="page-size-input" v-model.number="tagManagerPageSize" min="1" max="500">
+                                <select class="page-size-quick-select" :value="tagManagerPageSize" @change="tagManagerPageSize = Number($event.target.value)">
+                                    <option :value="tagManagerPageSize" v-if="!(tagPageSizeOptions || [5, 10, 20, 50, 100]).includes(tagManagerPageSize)">{{ tagManagerPageSize }} (自定)</option>
+                                    <option v-for="size in (tagPageSizeOptions || [5, 10, 20, 50, 100])" :key="'manager-size-' + size" :value="size">{{ size }}</option>
+                                </select>
+                                <span>条</span>
+                            </label>
                             <button class="btn-secondary" :disabled="tagManagerPage <= 1" @click="goToTagManagerPage(tagManagerPage - 1)">上一页</button>
                             <span class="page-info">{{ tagManagerPage }} / {{ tagManagerTotalPages }}</span>
                             <button class="btn-secondary" :disabled="tagManagerPage >= tagManagerTotalPages" @click="goToTagManagerPage(tagManagerPage + 1)">下一页</button>
@@ -1969,7 +2120,7 @@
                 </div>
             </div>
         </div>
-        
+
         <!-- 确认弹窗 -->
         <div v-if="showConfirm" class="modal-overlay">
             <div class="modal-content" style="max-width: 400px;">
@@ -1984,15 +2135,17 @@
                 </div>
             </div>
         </div>
-        
+
         <!-- Toast 提示 -->
         <div id="toast-container"></div>
     </div>
-    
+
     <!-- JS 模块 -->
-    <script src="js/api.js?v=20260709-ui-v58"></script>
-    <script src="js/utils.js?v=20260709-ui-v58"></script>
-    <script src="js/store.js?v=20260709-ui-v58"></script>
-    <script src="js/app.js?v=20260709-ui-v58"></script>
+    <script src="js/api.js?v=20260710-ui-v64"></script>
+    <script src="js/utils.js?v=20260710-ui-v64"></script>
+    <script src="js/pagination.js?v=20260710-ui-v64"></script>
+    <script src="js/toast.js?v=20260710-ui-v64"></script>
+    <script src="js/store.js?v=20260710-ui-v64"></script>
+    <script src="js/app.js?v=20260710-ui-v64"></script>
 </body>
 </html>

@@ -11,6 +11,7 @@
 | V2 | 已完成 token 存储安全适配；PC/移动端布局分层优化已完成并通过手动确认；组件拆分或构建式 Vue 迁移暂缓，后续单独计划 |
 | V2.4 | 前端视觉刷新：在不引入构建链、不改变接口和数据语义的前提下，优化主题变量、主工作台、条目卡片、弹窗、备份中心、移动端触达和轻量浮层状态清理。 |
 | V2.5 | 卡片区分度优化：密码组和条目卡片使用稳定色线、轻量 tint、数量徽章和受控 chip 展示，提高列表扫描效率，同时保持功能入口和数据结构不变。 |
+| V2.6 | 低风险前端模块拆分：保持 Vue 3 CDN 和内联模板形态，先拆出分页偏好、Toast DOM 逻辑和后段视觉覆盖 CSS，降低巨型文件维护成本。 |
 
 V2.0 只调整认证 token 存储：前端使用 `sessionStorage`，不再使用 `localStorage` 长期保存 token。V2.3 前的页面重构采用“布局分层、逻辑复用”的低风险方案：PC 端增加桌面侧边栏和卡片工作台，移动端继续使用现有单列卡片流；不引入 npm 构建链，不拆 Vue SFC。该布局分层已在 Windows 本地浏览器完成手动确认。
 
@@ -48,6 +49,8 @@ frontend/
 ├── css/
 │   ├── style.css           # 基础布局和页面样式
 │   ├── components.css      # 弹窗、表单、卡片、Toast 等组件样式
+│   ├── visual-polish.css   # 后段整体视觉覆盖层，必须在主题样式之后加载
+│   ├── component-polish.css # 后段组件覆盖层，必须在 components.css 之后加载
 │   └── themes/
 │       ├── variables.css   # CSS 变量定义
 │       ├── dark.css        # 暗色主题
@@ -56,7 +59,9 @@ frontend/
     ├── app.js              # Vue 应用入口、状态、页面方法
     ├── api.js              # Fetch API 封装，Windows 开发直连后端，生产环境使用 /api 前缀
     ├── store.js            # API 调用和轻量状态管理
-    └── utils.js            # 工具函数、Toast、复制、favicon、日期格式化
+    ├── utils.js            # 通用工具函数、复制、favicon、日期格式化
+    ├── pagination.js       # 分页条数归一化和本地偏好读写
+    └── toast.js            # Toast DOM 创建与安全文本写入
 ```
 
 ### 2.2 V2 目标组件结构
@@ -223,6 +228,9 @@ V2.4 以“高级暗色 + 克制工具层级”为主方向，优化 SecretBase 
 - 主工作台保持“桌面侧边栏 + 右侧卡片工作区”的结构，优化搜索筛选区、条目卡片、列表状态提示、分页和底部批量操作栏。
 - 模态框、设置、工具、AI 解析、备份中心、恢复向导、标签管理、回收站和导入流程统一 8px 圆角、边框、长文本换行、加载态和移动端按钮触达。
 - CSS 使用现有 `style.css`、`components.css` 和 `themes/*.css`，不引入 npm 构建链或外部图标库。
+- 后段增强样式拆分到 `visual-polish.css` 与 `component-polish.css`，入口顺序必须保持为基础样式、主题样式、视觉覆盖、组件覆盖，避免覆盖关系失效。
+- `pagination.js` 必须在 `app.js` 之前加载，提供 `window.SecretBasePagination`。所有前端分页条数偏好统一通过 `normalizeUniversalPageSize`、`loadPageSizePreference` 和 `savePageSizePreference` 处理。
+- `toast.js` 必须在 `store.js` 和 `app.js` 之前加载，Toast 消息必须使用 `textContent` 写入，不得用 `innerHTML` 拼接用户或错误内容。
 - 入口页引用本地 CSS/JS 时使用版本查询参数；生产 nginx 可以长缓存静态资源，但每次前端视觉发布都必须同步更新资源版本，避免浏览器继续使用旧样式。
 - 轻量浮层使用具名 document click 监听关闭复制菜单和标签菜单；组件卸载时清理事件监听和自动锁定计时器。
 

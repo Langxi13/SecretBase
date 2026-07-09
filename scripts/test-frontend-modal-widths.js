@@ -5,7 +5,10 @@ const root = path.resolve(__dirname, '..');
 const read = file => fs.readFileSync(path.join(root, file), 'utf8');
 
 const indexHtml = read('frontend/index.html');
-const componentsCss = read('frontend/css/components.css');
+const componentsCss = [
+    read('frontend/css/components.css'),
+    read('frontend/css/component-polish.css')
+].join('\n');
 
 function assertIncludes(content, needle, message) {
     if (!content.includes(needle)) {

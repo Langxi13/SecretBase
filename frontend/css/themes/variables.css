@@ -1,77 +1,84 @@
-/* CSS 变量定义 */
+/* ==========================================================================
+   SecretBase Ultra-Premium Design System Variables
+   ========================================================================== */
+
 :root {
     color-scheme: light;
 
-    /* 颜色 */
-    --color-primary: #2563eb;
-    --color-primary-hover: #1d4ed8;
-    --color-primary-light: rgba(37, 99, 235, 0.12);
-    --color-accent: #0f766e;
-    --color-success: #16a34a;
-    --color-warning: #d97706;
-    --color-error: #dc2626;
-    --color-info: #0284c7;
+    /* 🎨 主色与渐变体系 (High-Chroma Gradients & Brand Palette) */
+    --color-primary: #3b82f6;
+    --color-primary-hover: #2563eb;
+    --color-primary-light: rgba(59, 130, 246, 0.12);
+    --color-primary-gradient: linear-gradient(135deg, #3b82f6 0%, #6366f1 100%);
+    --color-accent: #0d9488;
+    --color-accent-gradient: linear-gradient(135deg, #0d9488 0%, #10b981 100%);
+    --color-success: #10b981;
+    --color-warning: #f59e0b;
+    --color-error: #ef4444;
+    --color-info: #0ea5e9;
 
-    /* 背景和表面 */
-    --bg-primary: #f5f7fb;
-    --bg-secondary: #edf2f7;
-    --bg-card: #ffffff;
-    --bg-elevated: rgba(255, 255, 255, 0.92);
-    --bg-sunken: #e8edf5;
-    --bg-overlay-soft: rgba(15, 23, 42, 0.08);
-    --bg-modal: rgba(15, 23, 42, 0.58);
+    /* 💎 背景与表面质感 (Glassmorphism & Surfaces) */
+    --bg-primary: #f1f5f9;
+    --bg-secondary: #e2e8f0;
+    --bg-card: rgba(255, 255, 255, 0.88);
+    --bg-elevated: rgba(255, 255, 255, 0.96);
+    --bg-sunken: #e8edf4;
+    --bg-overlay-soft: rgba(15, 23, 42, 0.06);
+    --bg-modal: rgba(15, 23, 42, 0.65);
     --surface-1: #ffffff;
-    --surface-2: #f9fbff;
-    --surface-3: #eef3fa;
+    --surface-2: #f8fafc;
+    --surface-3: #f1f5f9;
 
-    /* 文本 */
-    --text-primary: #172033;
-    --text-secondary: #536176;
-    --text-tertiary: #7b8798;
-    --text-muted: #98a3b3;
+    /* 🏷️ 字体排版颜色 (Modern Typography Palette) */
+    --text-primary: #0f172a;
+    --text-secondary: #475569;
+    --text-tertiary: #64748b;
+    --text-muted: #94a3b8;
     --text-inverse: #ffffff;
 
-    /* 边框 */
-    --border-color: #d8e1ee;
-    --border-strong: #c6d2e3;
-    --border-subtle: rgba(15, 23, 42, 0.08);
-    --border-radius: 8px;
-    --border-radius-lg: 14px;
-    --border-radius-xl: 18px;
+    /* 🖼️ 边框与圆角 (High-Precision Borders & Radii) */
+    --border-color: rgba(203, 213, 225, 0.8);
+    --border-strong: rgba(148, 163, 184, 0.85);
+    --border-subtle: rgba(15, 23, 42, 0.06);
+    --border-radius-sm: 8px;
+    --border-radius: 12px;
+    --border-radius-lg: 16px;
+    --border-radius-xl: 22px;
 
-    /* 阴影和状态 */
-    --focus-ring: 0 0 0 3px rgba(37, 99, 235, 0.18);
-    --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.06);
-    --shadow-md: 0 14px 34px rgba(15, 23, 42, 0.10);
-    --shadow-lg: 0 26px 70px rgba(15, 23, 42, 0.18);
-    --shadow-glow: 0 0 0 1px rgba(37, 99, 235, 0.10), 0 18px 45px rgba(37, 99, 235, 0.14);
-    --status-success-bg: rgba(22, 163, 74, 0.12);
-    --status-warning-bg: rgba(217, 119, 6, 0.13);
-    --status-error-bg: rgba(220, 38, 38, 0.12);
-    --status-info-bg: rgba(2, 132, 199, 0.12);
+    /* ✨ 阴影与光晕状态 (Elevation, Glows & Glass Shadows) */
+    --focus-ring: 0 0 0 4px rgba(59, 130, 246, 0.22);
+    --shadow-sm: 0 2px 6px -1px rgba(15, 23, 42, 0.06), 0 1px 4px -1px rgba(15, 23, 42, 0.04);
+    --shadow-md: 0 12px 28px -4px rgba(15, 23, 42, 0.08), 0 4px 10px -2px rgba(15, 23, 42, 0.04);
+    --shadow-lg: 0 24px 60px -12px rgba(15, 23, 42, 0.16), 0 8px 24px -4px rgba(15, 23, 42, 0.08);
+    --shadow-glow: 0 0 0 1px rgba(59, 130, 246, 0.16), 0 14px 40px -8px rgba(59, 130, 246, 0.25);
+    --status-success-bg: rgba(16, 185, 129, 0.12);
+    --status-warning-bg: rgba(245, 158, 11, 0.14);
+    --status-error-bg: rgba(239, 68, 68, 0.12);
+    --status-info-bg: rgba(14, 165, 233, 0.12);
 
-    /* 尺寸 */
-    --control-height: 42px;
-    --sidebar-width: 278px;
-    --content-max-width: 1240px;
+    /* 📏 几何与尺寸控制 */
+    --control-height: 44px;
+    --sidebar-width: 280px;
+    --content-max-width: 1280px;
 
-    /* 间距 */
+    /* 📐 间距体系 */
     --spacing-xs: 4px;
     --spacing-sm: 8px;
     --spacing-md: 16px;
     --spacing-lg: 24px;
     --spacing-xl: 32px;
 
-    /* 字体 */
-    --font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    /* 🔤 高端现代排版字体 (Modern Aesthetics Fonts) */
+    --font-family: 'Outfit', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
     --font-size-xs: 12px;
     --font-size-sm: 14px;
-    --font-size-md: 16px;
-    --font-size-lg: 18px;
+    --font-size-md: 15px;
+    --font-size-lg: 17px;
     --font-size-xl: 20px;
 
-    /* 动画 */
-    --transition-fast: 0.1s ease;
-    --transition-normal: 0.2s ease;
-    --transition-slow: 0.3s ease;
+    /* ⚡ 丝滑微动效曲线 (Smooth Motion Curves) */
+    --transition-fast: 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+    --transition-normal: 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    --transition-slow: 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+    --transition-spring: 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
 }

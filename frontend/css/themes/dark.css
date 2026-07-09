@@ -1,44 +1,54 @@
-/* 暗色主题 */
+/* ==========================================================================
+   SecretBase Dark Theme - Apple Pro & Linear Obsidian Glassmorphism
+   ========================================================================== */
+
 [data-theme="dark"] {
     color-scheme: dark;
 
-    --color-primary: #60a5fa;
-    --color-primary-hover: #93c5fd;
-    --color-primary-light: rgba(96, 165, 250, 0.16);
-    --color-accent: #2dd4bf;
-    --color-success: #34d399;
-    --color-warning: #fbbf24;
-    --color-error: #fb7185;
-    --color-info: #38bdf8;
+    /* 🎨 高阶电光蓝紫与极客强调色 (Pro Sapphire & Violet Accents) */
+    --color-primary: #3b82f6;
+    --color-primary-hover: #60a5fa;
+    --color-primary-light: rgba(59, 130, 246, 0.14);
+    --color-primary-gradient: linear-gradient(135deg, #3b82f6 0%, #6366f1 50%, #8b5cf6 100%);
+    --color-accent: #10b981;
+    --color-accent-gradient: linear-gradient(135deg, #10b981 0%, #06b6d4 100%);
+    --color-success: #10b981;
+    --color-warning: #f59e0b;
+    --color-error: #ef4444;
+    --color-info: #0ea5e9;
 
-    --bg-primary: #090f1a;
-    --bg-secondary: #0e1624;
-    --bg-card: #121b2b;
-    --bg-elevated: rgba(18, 27, 43, 0.94);
-    --bg-sunken: #070c14;
-    --bg-overlay-soft: rgba(148, 163, 184, 0.08);
-    --bg-modal: rgba(3, 7, 18, 0.72);
-    --surface-1: #111827;
-    --surface-2: #162235;
-    --surface-3: #1d2b42;
+    /* 🌃 极深黑曜石黑与高定炭黑玻璃表面 (Obsidian Carbon & Crisp Glass) */
+    --bg-primary: #090a0f;
+    --bg-secondary: #0e1017;
+    --bg-card: rgba(22, 25, 33, 0.82);
+    --bg-elevated: rgba(30, 34, 45, 0.92);
+    --bg-sunken: #050608;
+    --bg-overlay-soft: rgba(255, 255, 255, 0.04);
+    --bg-modal: rgba(5, 6, 10, 0.86);
+    --surface-1: #151821;
+    --surface-2: #1c202b;
+    --surface-3: #252a38;
 
-    --text-primary: #f4f7fb;
-    --text-secondary: #bfcbda;
-    --text-tertiary: #8ea0b8;
-    --text-muted: #6f7f95;
-    --text-inverse: #0b1120;
+    /* 🏷️ 高光学对比度文字层级 (Optically Balanced Text Hierarchy) */
+    --text-primary: #f8fafc;
+    --text-secondary: #c2c9d6;
+    --text-tertiary: #8b95a5;
+    --text-muted: #5e6778;
+    --text-inverse: #090a0f;
 
-    --border-color: rgba(148, 163, 184, 0.22);
-    --border-strong: rgba(148, 163, 184, 0.36);
-    --border-subtle: rgba(148, 163, 184, 0.12);
+    /* 🖼️ 光学微反光边框与白缝线切边 (Crisp Glass Micro-Borders) */
+    --border-color: rgba(255, 255, 255, 0.08);
+    --border-strong: rgba(255, 255, 255, 0.16);
+    --border-subtle: rgba(255, 255, 255, 0.04);
 
-    --focus-ring: 0 0 0 3px rgba(96, 165, 250, 0.22);
-    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.35);
-    --shadow-md: 0 18px 45px rgba(0, 0, 0, 0.28);
-    --shadow-lg: 0 32px 90px rgba(0, 0, 0, 0.46);
-    --shadow-glow: 0 0 0 1px rgba(96, 165, 250, 0.20), 0 22px 60px rgba(37, 99, 235, 0.22);
-    --status-success-bg: rgba(52, 211, 153, 0.13);
-    --status-warning-bg: rgba(251, 191, 36, 0.14);
-    --status-error-bg: rgba(251, 113, 133, 0.14);
-    --status-info-bg: rgba(56, 189, 248, 0.14);
+    /* ✨ 极度干净与深邃的立体暗影 (Pro Dark Elevation & Glows) */
+    --focus-ring: 0 0 0 3px rgba(59, 130, 246, 0.35);
+    --shadow-sm: 0 2px 6px -1px rgba(0, 0, 0, 0.65), inset 0 1px 0 rgba(255, 255, 255, 0.07);
+    --shadow-md: 0 16px 36px -6px rgba(0, 0, 0, 0.75), 0 0 0 1px rgba(255, 255, 255, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+    --shadow-lg: 0 30px 80px -15px rgba(0, 0, 0, 0.9), 0 0 0 1px rgba(255, 255, 255, 0.11), inset 0 1px 0 rgba(255, 255, 255, 0.12);
+    --shadow-glow: 0 0 0 1px rgba(99, 102, 241, 0.4), 0 16px 42px -8px rgba(59, 130, 246, 0.35);
+    --status-success-bg: rgba(16, 185, 129, 0.14);
+    --status-warning-bg: rgba(245, 158, 11, 0.14);
+    --status-error-bg: rgba(239, 68, 68, 0.14);
+    --status-info-bg: rgba(14, 165, 233, 0.14);
 }

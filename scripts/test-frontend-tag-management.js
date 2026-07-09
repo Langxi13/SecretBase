@@ -7,7 +7,10 @@ const read = file => fs.readFileSync(path.join(root, file), 'utf8');
 const indexHtml = read('frontend/index.html');
 const appJs = read('frontend/js/app.js');
 const storeJs = read('frontend/js/store.js');
-const componentsCss = read('frontend/css/components.css');
+const componentsCss = [
+    read('frontend/css/components.css'),
+    read('frontend/css/component-polish.css')
+].join('\n');
 
 function assertIncludes(content, needle, message) {
     if (!content.includes(needle)) {
@@ -60,16 +63,16 @@ assertIncludes(appJs, 'const paginatedTagBrowserTags', '前端必须计算更多
 assertIncludes(appJs, 'const tagPageSizeOptions = [5, 10, 20, 50]', '每页数量选项必须固定为 5、10、20、50');
 assertIncludes(appJs, 'secretbase.tagBrowserPageSize', '更多标签每页数量必须保存到本地偏好');
 assertIncludes(appJs, 'secretbase.tagManagerPageSize', '标签管理每页数量必须保存到本地偏好');
-assertIncludes(appJs, 'function loadTagPageSizePreference', '前端必须从本地偏好恢复标签每页数量');
-assertIncludes(appJs, 'function saveTagPageSizePreference', '前端必须在用户切换每页数量时暂存偏好');
+assertIncludes(appJs, 'loadPageSizePreference', '前端必须从统一分页偏好工具恢复标签每页数量');
+assertIncludes(appJs, 'savePageSizePreference', '前端必须在用户切换每页数量时暂存偏好');
 assertMatches(
     appJs,
-    /watch\(tagBrowserPageSize[\s\S]*saveTagPageSizePreference\('secretbase\.tagBrowserPageSize'/,
+    /watch\(tagBrowserPageSize[\s\S]*savePageSizePreference\('secretbase\.tagBrowserPageSize'/,
     '更多标签每页数量变化后必须写入本地偏好'
 );
 assertMatches(
     appJs,
-    /watch\(tagManagerPageSize[\s\S]*saveTagPageSizePreference\('secretbase\.tagManagerPageSize'/,
+    /watch\(tagManagerPageSize[\s\S]*savePageSizePreference\('secretbase\.tagManagerPageSize'/,
     '标签管理每页数量变化后必须写入本地偏好'
 );
 assertIncludes(appJs, 'async function batchDeleteManagedTags', '前端必须支持批量删除标签');

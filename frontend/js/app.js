@@ -14,11 +14,22 @@ const app = createApp({
         const passwordError = ref('');
         const unlockError = ref('');
         const submitting = ref(false);
+        const isSidebarCollapsed = ref(localStorage.getItem('secretbase.sidebarCollapsed') === 'true');
 
         // 主界面状态
         const entries = ref([]);
         const tags = ref([]);
         const groups = ref([]);
+        const entryPageSizeOptions = [6, 12, 20, 30, 50, 100];
+        const groupPageSizeOptions = [3, 6, 9, 12, 15, 24, 50, 100];
+        const {
+            normalizeUniversalPageSize,
+            loadPageSizePreference,
+            savePageSizePreference
+        } = window.SecretBasePagination;
+
+        const groupCurrentPage = ref(1);
+        const groupPageSize = ref(loadPageSizePreference('secretbase.groupPageSize', 12));
         const currentPage = ref(1);
         const totalPages = ref(0);
         const totalEntries = ref(0);
@@ -44,7 +55,7 @@ const app = createApp({
         const tagBrowserSort = ref('count_desc');
         const tagBrowserPage = ref(1);
         const tagPageSizeOptions = [5, 10, 20, 50];
-        const tagBrowserPageSize = ref(loadTagPageSizePreference('secretbase.tagBrowserPageSize', 5));
+        const tagBrowserPageSize = ref(loadPageSizePreference('secretbase.tagBrowserPageSize', 5));
         const advancedTagDraft = ref('');
         const advancedTagList = ref([]);
 
@@ -74,7 +85,8 @@ const app = createApp({
         const groupPickerTagFilter = ref('');
         const groupPickerGroupFilter = ref('');
         const groupPickerPage = ref(1);
-        const groupPickerPageSize = 10;
+        const groupPickerPageSize = ref(loadPageSizePreference('secretbase.groupPickerPageSize', 10));
+        const groupPickerPageSizeOptions = [5, 10, 20, 50, 100];
         const groupPickerLoading = ref(false);
         const importConflictMessage = ref('');
         const showOnboarding = ref(false);
@@ -102,7 +114,8 @@ const app = createApp({
             auto: 1,
             legacy: 1
         });
-        const backupPageSize = 3;
+        const backupPageSize = ref(loadPageSizePreference('secretbase.backupPageSize', 3));
+        const backupPageSizeOptions = [3, 6, 10, 20, 50, 100];
         const restoreWizard = reactive({
             visible: false,
             step: 1,
@@ -220,7 +233,7 @@ const app = createApp({
         const tagMergeSourceList = ref([]);
         const tagManagerPanel = ref('list');
         const tagManagerPage = ref(1);
-        const tagManagerPageSize = ref(loadTagPageSizePreference('secretbase.tagManagerPageSize', 5));
+        const tagManagerPageSize = ref(loadPageSizePreference('secretbase.tagManagerPageSize', 5));
         const selectedManagedTagNames = ref([]);
         const tagEditorForm = reactive({
             mode: 'create',
@@ -248,6 +261,8 @@ const app = createApp({
         const trashPage = ref(1);
         const trashTotalPages = ref(0);
         const trashTotal = ref(0);
+        const trashPageSize = ref(loadPageSizePreference('secretbase.trashPageSize', 10));
+        const trashPageSizeOptions = [5, 10, 20, 50, 100];
 
         // 确认弹窗
         const confirmTitle = ref('');
@@ -484,27 +499,6 @@ const app = createApp({
             return pageTags.length > 0 && pageTags.every(tag => selectedManagedTagNames.value.includes(tag.name));
         });
 
-        function normalizeTagPageSize(value, fallback = 5) {
-            const numericValue = Number(value);
-            return tagPageSizeOptions.includes(numericValue) ? numericValue : fallback;
-        }
-
-        function loadTagPageSizePreference(key, fallback = 5) {
-            try {
-                return normalizeTagPageSize(localStorage.getItem(key), fallback);
-            } catch (error) {
-                return fallback;
-            }
-        }
-
-        function saveTagPageSizePreference(key, value) {
-            try {
-                localStorage.setItem(key, String(normalizeTagPageSize(value)));
-            } catch (error) {
-                // 本地偏好保存失败不影响标签功能。
-            }
-        }
-
         const activeAdvancedFilterChips = computed(() => {
             const chips = advancedTagList.value.map(tag => ({
                 key: `tag:${tag}`,
@@ -573,11 +567,11 @@ const app = createApp({
             });
         });
 
-        const groupPickerTotalPages = computed(() => Math.max(1, Math.ceil(availableGroupPickerEntries.value.length / groupPickerPageSize)));
+        const groupPickerTotalPages = computed(() => Math.max(1, Math.ceil(availableGroupPickerEntries.value.length / groupPickerPageSize.value)));
 
         const paginatedGroupPickerEntries = computed(() => {
-            const start = (groupPickerPage.value - 1) * groupPickerPageSize;
-            return availableGroupPickerEntries.value.slice(start, start + groupPickerPageSize);
+            const start = (groupPickerPage.value - 1) * groupPickerPageSize.value;
+            return availableGroupPickerEntries.value.slice(start, start + groupPickerPageSize.value);
         });
 
         const selectableGroupPickerGroups = computed(() => {
@@ -634,16 +628,16 @@ const app = createApp({
                 }))
                 .filter(group => group.type !== 'legacy' || group.items.length > 0)
                 .map(group => {
-                    const totalPages = Math.max(1, Math.ceil(group.items.length / backupPageSize));
+                    const totalPages = Math.max(1, Math.ceil(group.items.length / backupPageSize.value));
                     const current = Math.min(backupPages[group.type] || 1, totalPages);
-                    const start = (current - 1) * backupPageSize;
-                    const pagedItems = group.items.slice(start, start + backupPageSize);
+                    const start = (current - 1) * backupPageSize.value;
+                    const pagedItems = group.items.slice(start, start + backupPageSize.value);
                     return {
                         ...group,
                         page: current,
                         totalPages,
                         pagedItems,
-                        emptySlots: Math.max(0, backupPageSize - pagedItems.length)
+                        emptySlots: Math.max(0, backupPageSize.value - pagedItems.length)
                     };
                 });
         });
@@ -669,6 +663,42 @@ const app = createApp({
             return pages;
         });
 
+        // 密码组纯前端分页
+        const paginatedGroups = computed(() => {
+            const start = (groupCurrentPage.value - 1) * groupPageSize.value;
+            return groups.value.slice(start, start + groupPageSize.value);
+        });
+
+        const groupTotalPages = computed(() => {
+            return Math.ceil((groups.value?.length || 0) / groupPageSize.value) || 1;
+        });
+
+        const visibleGroupPages = computed(() => {
+            const pages = [];
+            const total = groupTotalPages.value;
+            const current = groupCurrentPage.value;
+
+            if (total <= 7) {
+                for (let i = 1; i <= total; i++) pages.push(i);
+            } else {
+                pages.push(1);
+                if (current > 3) pages.push('...');
+                for (let i = Math.max(2, current - 1); i <= Math.min(total - 1, current + 1); i++) {
+                    pages.push(i);
+                }
+                if (current < total - 2) pages.push('...');
+                pages.push(total);
+            }
+
+            return pages;
+        });
+
+        function goToGroupPage(page) {
+            if (page < 1 || page > groupTotalPages.value) return;
+            groupCurrentPage.value = page;
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
         // 初始化
         onMounted(async () => {
             try {
@@ -690,7 +720,7 @@ const app = createApp({
                         autoLockMinutes: authStatus.auto_lock_minutes ?? store.state.settings.autoLockMinutes
                     }
                     : await store.loadSettings();
-                applySettings(settings);
+                await applySettings(settings);
                 applyTheme(currentTheme.value);
                 startAutoThemeTimer();
                 loadSavedAdvancedFilters();
@@ -729,11 +759,15 @@ const app = createApp({
             ]);
         }
 
-        function applySettings(settings) {
+        async function applySettings(settings) {
             currentTheme.value = settings.theme;
             applyTheme(settings.theme);
             settingsForm.theme = settings.theme;
-            settingsForm.pageSize = settings.pageSize;
+            const savedEntryPageSize = loadPageSizePreference('secretbase.entryPageSize', settings.pageSize || 20);
+            settingsForm.pageSize = savedEntryPageSize;
+            if (savedEntryPageSize !== settings.pageSize && api.getToken()) {
+                await store.updateSettings({ pageSize: savedEntryPageSize });
+            }
             settingsForm.autoLockMinutes = settings.autoLockMinutes;
             settingsForm.autoBackupRetention = settings.autoBackupRetention;
         }
@@ -845,6 +879,9 @@ const app = createApp({
         // 加载密码组
         async function loadGroups() {
             groups.value = await store.loadGroups();
+            if (groupCurrentPage.value > groupTotalPages.value && groupTotalPages.value > 0) {
+                groupCurrentPage.value = groupTotalPages.value;
+            }
         }
 
         // 初始化密码
@@ -867,7 +904,7 @@ const app = createApp({
                 locked.value = false;
                 password.value = '';
                 confirmPassword.value = '';
-                applySettings(await store.loadSettings());
+                await applySettings(await store.loadSettings());
                 await loadAllData();
                 startAutoLockTimer();
                 showOnboarding.value = true;
@@ -893,7 +930,7 @@ const app = createApp({
                 await store.unlock(password.value);
                 locked.value = false;
                 password.value = '';
-                applySettings(await store.loadSettings());
+                await applySettings(await store.loadSettings());
                 await loadAllData();
                 startAutoLockTimer();
             } catch (error) {
@@ -988,6 +1025,7 @@ const app = createApp({
 
         async function showGroupMode() {
             filter.value = 'groups';
+            groupCurrentPage.value = 1;
             activeTagName.value = '';
             activeGroupName.value = '';
             listContextNotice.value = '';
@@ -1217,6 +1255,14 @@ const app = createApp({
             settingsForm.theme = currentTheme.value;
             applyTheme(currentTheme.value);
             store.updateSettings({ theme: currentTheme.value });
+        }
+
+        // 切换侧边栏收缩/展开
+        function toggleSidebar() {
+            isSidebarCollapsed.value = !isSidebarCollapsed.value;
+            try {
+                localStorage.setItem('secretbase.sidebarCollapsed', String(isSidebarCollapsed.value));
+            } catch (e) {}
         }
 
         // 应用主题
@@ -2545,7 +2591,7 @@ const app = createApp({
         // 加载回收站
         async function loadTrash(page = 1) {
             try {
-                const result = await api.get(`/trash?page=${page}&page_size=${settingsForm.pageSize}`);
+                const result = await api.get(`/trash?page=${page}&page_size=${trashPageSize.value}`);
                 trashItems.value = result.data.items;
                 trashPage.value = result.data.pagination.page;
                 trashTotalPages.value = result.data.pagination.total_pages;
@@ -3299,14 +3345,43 @@ const app = createApp({
         });
 
         watch(tagBrowserPageSize, () => {
-            saveTagPageSizePreference('secretbase.tagBrowserPageSize', tagBrowserPageSize.value);
+            savePageSizePreference('secretbase.tagBrowserPageSize', tagBrowserPageSize.value);
             tagBrowserPage.value = 1;
         });
 
         watch(tagManagerPageSize, () => {
-            saveTagPageSizePreference('secretbase.tagManagerPageSize', tagManagerPageSize.value);
+            savePageSizePreference('secretbase.tagManagerPageSize', tagManagerPageSize.value);
             tagManagerPage.value = 1;
         });
+
+        watch(groupPageSize, () => {
+            savePageSizePreference('secretbase.groupPageSize', groupPageSize.value);
+            groupCurrentPage.value = 1;
+        });
+
+        watch(groupPickerPageSize, () => {
+            savePageSizePreference('secretbase.groupPickerPageSize', groupPickerPageSize.value);
+            groupPickerPage.value = 1;
+        });
+
+        watch(backupPageSize, () => {
+            savePageSizePreference('secretbase.backupPageSize', backupPageSize.value);
+        });
+
+        watch(trashPageSize, () => {
+            savePageSizePreference('secretbase.trashPageSize', trashPageSize.value);
+            goToTrashPage(1);
+        });
+
+        async function updateEntryPageSize(val) {
+            const size = normalizeUniversalPageSize(val, 20);
+            settingsForm.pageSize = size;
+            savePageSizePreference('secretbase.entryPageSize', size);
+            if (api.getToken()) {
+                await store.updateSettings({ pageSize: size });
+                await loadEntries(1);
+            }
+        }
 
         return {
             // 状态
@@ -3321,6 +3396,12 @@ const app = createApp({
             entries,
             tags,
             groups,
+            paginatedGroups,
+            groupCurrentPage,
+            groupPageSize,
+            groupPageSizeOptions,
+            groupTotalPages,
+            visibleGroupPages,
             currentPage,
             totalPages,
             totalEntries,
@@ -3370,6 +3451,7 @@ const app = createApp({
             groupPickerGroupFilter,
             groupPickerPage,
             groupPickerPageSize,
+            groupPickerPageSizeOptions,
             groupPickerLoading,
             importConflictMessage,
             showOnboarding,
@@ -3389,6 +3471,8 @@ const app = createApp({
             restoringBackupFilename,
             downloadingBackupFilename,
             backupPages,
+            backupPageSize,
+            backupPageSizeOptions,
             restoreWizard,
             healthReport,
             maintenanceReport,
@@ -3435,6 +3519,8 @@ const app = createApp({
             canPreviewAiActions,
             lastAiParseText,
             settingsForm,
+            entryPageSizeOptions,
+            updateEntryPageSize,
             activeSettingsTab,
             settingsTabs,
             aiSettingsForm,
@@ -3466,10 +3552,13 @@ const app = createApp({
             trashPage,
             trashTotalPages,
             trashTotal,
+            trashPageSize,
+            trashPageSizeOptions,
             confirmTitle,
             confirmMessage,
             currentTheme,
             themeIcon,
+            isSidebarCollapsed,
             visiblePages,
             selectedImportPreviewCount,
             selectedImportConflictCount,
@@ -3519,6 +3608,7 @@ const app = createApp({
             showAllEntries,
             showStarredEntries,
             toggleTheme,
+            toggleSidebar,
             openSettings,
             selectSettingsTab,
             getFavicon,
@@ -3562,6 +3652,7 @@ const app = createApp({
             copyField,
             copyAllFields,
             goToPage,
+            goToGroupPage,
             applySort,
             clearListState,
             applyAdvancedFilters,

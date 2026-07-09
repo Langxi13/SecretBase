@@ -112,7 +112,10 @@ class Store {
             return result.data;
         } catch (error) {
             console.error('检查认证状态失败:', error);
-            return { initialized: false, locked: true };
+            const isUninitialized = error.status === 404 || (error.data && error.data.initialized === false);
+            const initializedValue = isUninitialized ? false : (this.state.initialized || true);
+            this.setState({ initialized: initializedValue, locked: true });
+            return { initialized: initializedValue, locked: true };
         }
     }
 

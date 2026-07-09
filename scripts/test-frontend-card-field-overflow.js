@@ -20,11 +20,11 @@ function assertMatches(content, pattern, message) {
     }
 }
 
-assertIncludes(indexHtml, 'entry.fields.slice(0, 3)', '条目卡片必须继续只展示前三个字段，保持列表可扫描');
-assertIncludes(indexHtml, 'entry.fields.length > 3', '字段超过三个时必须显示剩余字段提示');
+assertIncludes(indexHtml, 'entry.fields.slice(0, 2)', '条目卡片必须继续限制字段数量，保持列表可扫描');
+assertIncludes(indexHtml, 'entry.fields.length > 2', '字段超过展示数量时必须显示剩余字段提示');
 assertIncludes(indexHtml, 'field-overflow-hint', '字段剩余提示必须使用专用样式');
-assertIncludes(indexHtml, '还有 {{ entry.fields.length - 3 }} 个字段，点击查看详情', '字段剩余提示必须明确展示剩余数量和详情入口');
-assertIncludes(indexHtml, '?v=20260709-ui-v58', '前端资源版本必须随卡片视觉区分优化更新，避免浏览器继续使用旧 CSS');
+assertIncludes(indexHtml, '还有 {{ entry.fields.length - 2 }} 个字段，点击查看详情', '字段剩余提示必须明确展示剩余数量和详情入口');
+assertIncludes(indexHtml, '?v=20260710-ui-v64', '前端资源版本必须随 setup 初始化修复更新，避免浏览器继续使用旧 JS');
 assertIncludes(indexHtml, ':style="entryCardStyle(entry)"', '条目卡片必须通过标签或密码组颜色注入视觉区分变量');
 assertIncludes(indexHtml, 'visibleEntryGroups(entry)', '条目卡片必须控制密码组 chip 展示数量');
 assertIncludes(indexHtml, 'remainingEntryGroupsCount(entry)', '密码组较多时必须显示剩余数量提示');
