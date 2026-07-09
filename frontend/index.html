@@ -7,16 +7,16 @@
     
     <!-- Vue 3 CDN (Production) -->
     <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
-    <script src="/secretbase-runtime-config.js?v=20260709-ui-v54"></script>
+    <script src="/secretbase-runtime-config.js?v=20260709-ui-v55"></script>
     
     <!-- 基础样式 -->
-    <link rel="stylesheet" href="css/style.css?v=20260709-ui-v54">
-    <link rel="stylesheet" href="css/components.css?v=20260709-ui-v54">
+    <link rel="stylesheet" href="css/style.css?v=20260709-ui-v55">
+    <link rel="stylesheet" href="css/components.css?v=20260709-ui-v55">
     
     <!-- 主题样式 -->
-    <link rel="stylesheet" href="css/themes/variables.css?v=20260709-ui-v54">
-    <link rel="stylesheet" href="css/themes/dark.css?v=20260709-ui-v54">
-    <link rel="stylesheet" href="css/themes/light.css?v=20260709-ui-v54">
+    <link rel="stylesheet" href="css/themes/variables.css?v=20260709-ui-v55">
+    <link rel="stylesheet" href="css/themes/dark.css?v=20260709-ui-v55">
+    <link rel="stylesheet" href="css/themes/light.css?v=20260709-ui-v55">
     
     <!-- Favicon -->
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🔐</text></svg>">
@@ -367,10 +367,10 @@
                             </span>
                             <span class="group-card-date">{{ group.updated_at ? formatDate(group.updated_at) : '暂无更新' }}</span>
                             <span class="group-card-order-actions" @click.stop>
-                                <button type="button" class="btn-small" @click.stop="moveGroupOrder(group.name, -1)">上移</button>
-                                <button type="button" class="btn-small" @click.stop="moveGroupOrder(group.name, 1)">下移</button>
+                                <button type="button" class="btn-small group-card-action-btn" @click.stop="moveGroupOrder(group.name, -1)">上移</button>
+                                <button type="button" class="btn-small group-card-action-btn" @click.stop="moveGroupOrder(group.name, 1)">下移</button>
                             </span>
-                            <button type="button" class="btn-small group-card-edit" @click.stop="openEditGroupModal(group)">编辑</button>
+                            <button type="button" class="btn-small group-card-edit group-card-action-btn" @click.stop="openEditGroupModal(group)">编辑</button>
                         </div>
                     </div>
                 </section>
@@ -1980,9 +1980,9 @@
     </div>
     
     <!-- JS 模块 -->
-    <script src="js/api.js?v=20260709-ui-v54"></script>
-    <script src="js/utils.js?v=20260709-ui-v54"></script>
-    <script src="js/store.js?v=20260709-ui-v54"></script>
-    <script src="js/app.js?v=20260709-ui-v54"></script>
+    <script src="js/api.js?v=20260709-ui-v55"></script>
+    <script src="js/utils.js?v=20260709-ui-v55"></script>
+    <script src="js/store.js?v=20260709-ui-v55"></script>
+    <script src="js/app.js?v=20260709-ui-v55"></script>
 </body>
 </html>

@@ -1382,7 +1382,7 @@ body {
 
 .group-mode-actions {
     display: flex;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
     gap: 8px;
     justify-content: flex-end;
 }
@@ -1468,7 +1468,8 @@ body {
 .group-card-date {
     grid-column: 1 / -1;
     align-self: end;
-    padding-right: 156px;
+    min-height: 30px;
+    padding-right: 132px;
     padding-top: 10px;
     border-top: 1px dashed var(--border-color);
     font-size: var(--font-size-xs);
@@ -1476,18 +1477,26 @@ body {
 
 .group-card-order-actions {
     position: absolute;
-    right: 82px;
-    bottom: 18px;
+    right: 72px;
+    bottom: 19px;
     display: inline-flex;
-    gap: 6px;
+    gap: 4px;
 }
 
 .group-card-edit {
     position: absolute;
     right: 18px;
-    bottom: 18px;
-    min-width: 56px;
-    padding-inline: 12px;
+    bottom: 19px;
+}
+
+.group-card-action-btn {
+    height: 22px;
+    min-height: 22px;
+    min-width: 42px;
+    padding: 0 8px;
+    border-radius: 6px;
+    font-size: var(--font-size-xs);
+    line-height: 20px;
 }
 
 .group-empty-state {
