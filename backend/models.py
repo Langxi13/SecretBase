@@ -220,6 +220,11 @@ class GroupRequest(BaseModel):
     description: str = Field(default="", max_length=300)
 
 
+class GroupOrderRequest(BaseModel):
+    """密码组自定义排序请求"""
+    names: List[str] = Field(default_factory=list)
+
+
 class AiParseRequest(BaseModel):
     """AI 解析请求"""
     text: str = Field(..., min_length=1)

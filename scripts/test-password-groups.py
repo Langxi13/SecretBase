@@ -87,6 +87,28 @@ def main() -> None:
         assert work_group["description"] == "公司系统、云平台、协作工具"
         assert work_group["count"] == 2
         assert work_group["updated_at"]
+        assert [group["name"] for group in groups[:4]] == ["工作账号", "开发资源", "服务器", "邮箱"]
+
+        ordered_groups = expect_success(
+            client.post(
+                "/groups/order",
+                json={"names": ["邮箱", "服务器", "工作账号", "开发资源"]},
+                headers=headers,
+            ),
+            "save custom group order",
+        )["groups"]
+        assert [group["name"] for group in ordered_groups[:4]] == ["邮箱", "服务器", "工作账号", "开发资源"]
+        assert ordered_groups[0]["order_index"] == 0
+
+        persisted_order = expect_success(client.get("/groups", headers=headers), "list custom ordered groups")["groups"]
+        assert [group["name"] for group in persisted_order[:4]] == ["邮箱", "服务器", "工作账号", "开发资源"]
+
+        reset_order = expect_success(
+            client.post("/groups/order", json={"names": []}, headers=headers),
+            "reset custom group order",
+        )["groups"]
+        assert [group["name"] for group in reset_order[:4]] == ["工作账号", "开发资源", "服务器", "邮箱"]
+        assert all(group["order_index"] is None for group in reset_order[:4])
 
         filtered = expect_success(client.get("/entries?group=工作账号&page_size=10", headers=headers), "filter group")
         filtered_ids = {entry["id"] for entry in filtered["items"]}

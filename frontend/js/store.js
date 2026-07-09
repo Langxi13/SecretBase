@@ -481,6 +481,20 @@ class Store {
         }
     }
 
+    async updateGroupOrder(names) {
+        try {
+            const result = await api.post('/groups/order', { names });
+            showToast(result.message || '密码组排序已更新', 'success');
+            const groups = result.data.groups || [];
+            this.setState({ groups });
+            return groups;
+        } catch (error) {
+            console.error('更新密码组排序失败:', error);
+            showToast(error.message || '更新密码组排序失败', 'error');
+            return null;
+        }
+    }
+
     async deleteGroup(groupName) {
         try {
             const result = await api.delete(`/groups/${encodeURIComponent(groupName)}`);

@@ -1022,6 +1022,36 @@ const app = createApp({
             groupForm.description = '';
         }
 
+        function groupOrderNamesAfterMove(groupName, direction) {
+            const names = groups.value.map(group => group.name);
+            const index = names.indexOf(groupName);
+            const nextIndex = index + direction;
+            if (index < 0 || nextIndex < 0 || nextIndex >= names.length) {
+                return names;
+            }
+            const [name] = names.splice(index, 1);
+            names.splice(nextIndex, 0, name);
+            return names;
+        }
+
+        async function moveGroupOrder(groupName, direction) {
+            const nextNames = groupOrderNamesAfterMove(groupName, direction);
+            if (nextNames.join('\n') === groups.value.map(group => group.name).join('\n')) {
+                return;
+            }
+            const updatedGroups = await store.updateGroupOrder(nextNames);
+            if (updatedGroups) {
+                groups.value = updatedGroups;
+            }
+        }
+
+        async function resetGroupOrder() {
+            const updatedGroups = await store.updateGroupOrder([]);
+            if (updatedGroups) {
+                groups.value = updatedGroups;
+            }
+        }
+
         async function saveGroup() {
             const name = groupForm.name.trim();
             if (!name) {
@@ -3422,6 +3452,8 @@ const app = createApp({
             showGroupMode,
             openCreateGroupModal,
             openEditGroupModal,
+            moveGroupOrder,
+            resetGroupOrder,
             closeGroupModal,
             saveGroup,
             filterByGroup,

@@ -2,7 +2,7 @@ import logging
 from datetime import datetime
 from fastapi import APIRouter, HTTPException
 
-from models import BatchRequest, GroupRequest
+from models import BatchRequest, GroupOrderRequest, GroupRequest
 from storage import is_unlocked, get_vault_data, save_vault_data
 from utils import get_tag_color
 
@@ -25,22 +25,60 @@ def group_meta(vault, name: str) -> dict:
     return raw if isinstance(raw, dict) else {}
 
 
-@router.get("")
-async def get_groups():
-    """获取所有密码组"""
-    check_unlocked()
-    vault = get_vault_data()
+def group_order_index(meta: dict) -> int | None:
+    try:
+        return int(meta.get("order_index")) if meta.get("order_index") is not None else None
+    except (TypeError, ValueError):
+        return None
 
+
+def group_order_enabled(vault) -> bool:
+    return any(
+        group_order_index(meta) is not None
+        for meta in (vault.groups_meta or {}).values()
+        if isinstance(meta, dict)
+    )
+
+
+def next_group_order_index(vault) -> int:
+    indexes = [
+        group_order_index(meta)
+        for meta in (vault.groups_meta or {}).values()
+        if isinstance(meta, dict)
+    ]
+    indexes = [index for index in indexes if index is not None]
+    return max(indexes, default=-1) + 1
+
+
+def sorted_group_items(stats: dict[str, dict]) -> list[dict]:
+    groups = list(stats.values())
+    has_custom_order = any(item.get("order_index") is not None for item in groups)
+    if has_custom_order:
+        return sorted(
+            groups,
+            key=lambda item: (
+                item["order_index"] is None,
+                item["order_index"] if item["order_index"] is not None else 0,
+                -item["count"],
+                item["name"],
+            ),
+        )
+    return sorted(groups, key=lambda item: (-item["count"], item["name"]))
+
+
+def collect_group_stats(vault) -> dict[str, dict]:
     stats: dict[str, dict] = {}
     for name, meta in (vault.groups_meta or {}).items():
         normalized = normalize_group_name(name)
         if normalized:
+            meta = meta if isinstance(meta, dict) else {}
             stats[normalized] = {
                 "name": normalized,
-                "description": str(meta.get("description", "") if isinstance(meta, dict) else ""),
+                "description": str(meta.get("description", "")),
                 "count": 0,
                 "updated_at": "",
                 "color": get_tag_color(normalized),
+                "order_index": group_order_index(meta),
             }
 
     for entry in vault.entries:
@@ -57,12 +95,21 @@ async def get_groups():
                     "count": 0,
                     "updated_at": "",
                     "color": get_tag_color(normalized),
+                    "order_index": None,
                 }
             stats[normalized]["count"] += 1
             if entry.updated_at and entry.updated_at > stats[normalized]["updated_at"]:
                 stats[normalized]["updated_at"] = entry.updated_at
+    return stats
 
-    groups = sorted(stats.values(), key=lambda item: (-item["count"], item["name"]))
+
+@router.get("")
+async def get_groups():
+    """获取所有密码组"""
+    check_unlocked()
+    vault = get_vault_data()
+
+    groups = sorted_group_items(collect_group_stats(vault))
     return {"success": True, "data": {"groups": groups}}
 
 
@@ -85,6 +132,8 @@ async def create_group(request: GroupRequest):
         "created_at": datetime.now().isoformat(),
         "updated_at": datetime.now().isoformat(),
     }
+    if group_order_enabled(vault):
+        vault.groups_meta[name]["order_index"] = next_group_order_index(vault)
     save_vault_data(vault)
     logger.info(f"创建密码组: {name}")
     return {"success": True, "data": {"name": name}, "message": "密码组已创建"}
@@ -141,6 +190,8 @@ async def assign_entries_to_group(group_name: str, request: BatchRequest):
             "created_at": now,
             "updated_at": now,
         }
+        if group_order_enabled(vault):
+            vault.groups_meta[name]["order_index"] = next_group_order_index(vault)
         meta_changed = True
     elif updated_count > 0:
         vault.groups_meta[name]["updated_at"] = now
@@ -159,6 +210,51 @@ async def assign_entries_to_group(group_name: str, request: BatchRequest):
         },
         "message": f"已将 {updated_count} 个条目加入「{name}」"
     }
+
+
+@router.post("/order")
+async def update_group_order(request: GroupOrderRequest):
+    """保存或清空密码组自定义排序。"""
+    check_unlocked()
+    vault = get_vault_data()
+    if not isinstance(vault.groups_meta, dict):
+        vault.groups_meta = {}
+
+    stats = collect_group_stats(vault)
+    if not request.names:
+        for meta in vault.groups_meta.values():
+            if isinstance(meta, dict):
+                meta.pop("order_index", None)
+        save_vault_data(vault)
+        return {"success": True, "data": {"groups": sorted_group_items(collect_group_stats(vault))}, "message": "已恢复默认排序"}
+
+    names = []
+    seen = set()
+    for raw_name in request.names:
+        name = normalize_group_name(raw_name)
+        if not name or name in seen:
+            continue
+        if name not in stats:
+            raise HTTPException(status_code=422, detail=f"密码组不存在：{name}")
+        names.append(name)
+        seen.add(name)
+
+    for group in sorted_group_items(stats):
+        if group["name"] not in seen:
+            names.append(group["name"])
+            seen.add(group["name"])
+
+    now = datetime.now().isoformat()
+    for index, name in enumerate(names):
+        meta = group_meta(vault, name)
+        meta.setdefault("description", stats.get(name, {}).get("description", ""))
+        meta.setdefault("created_at", now)
+        meta["updated_at"] = now
+        meta["order_index"] = index
+        vault.groups_meta[name] = meta
+
+    save_vault_data(vault)
+    return {"success": True, "data": {"groups": sorted_group_items(collect_group_stats(vault))}, "message": "密码组排序已更新"}
 
 
 @router.put("/{group_name}")
