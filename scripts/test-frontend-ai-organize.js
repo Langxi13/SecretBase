@@ -63,6 +63,8 @@ assertIncludes(appJs, 'async function applyAiActions', 'AI 交互必须提供操
 assertIncludes(appJs, 'function clearAiActions', 'AI 交互必须支持清空计划');
 assertIncludes(appJs, 'function aiActionTypeLabel', 'AI 交互必须展示可读动作类型');
 assertIncludes(appJs, 'function aiActionEntryLabel', 'AI 交互必须把条目 id 映射为可读条目标题');
+assertIncludes(appJs, "update_group: '更新密码组'", 'AI 交互必须展示更新密码组动作类型');
+assertIncludes(appJs, 'action.group_new', 'AI 交互必须展示密码组改名目标');
 assertIncludes(appJs, 'entry_title || action.entry_id', '更新条目计划标题必须优先展示条目标题而不是唯一代码');
 assertIncludes(appJs, 'source_entry_title || action.source_entry_id', '字段拆分计划标题必须优先展示来源条目标题而不是唯一代码');
 assertIncludes(appJs, '/ai/organize/preview', '前端必须调用整理预览接口');

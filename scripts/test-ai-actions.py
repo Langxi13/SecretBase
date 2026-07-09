@@ -60,6 +60,13 @@ def main() -> None:
                             "reason": "用户要求创建独立密码组",
                         },
                         {
+                            "type": "update_group",
+                            "group": "待归档",
+                            "group_new": "客户系统",
+                            "description": "客户系统和业务资料相关凭据",
+                            "reason": "用户希望整理现有密码组",
+                        },
+                        {
                             "type": "create_entry_from_field",
                             "source_entry_id": entry_payload["id"],
                             "field_index": 0,
@@ -128,7 +135,7 @@ def main() -> None:
                     "title": "demo.example",
                     "url": "https://demo.example",
                     "tags": ["待整理"],
-                    "groups": [],
+                    "groups": ["待归档"],
                     "fields": [
                         {"name": "账号", "value": "main-user", "copyable": True, "hidden": False},
                         {"name": "密码", "value": "demo-service-password", "copyable": True, "hidden": True},
@@ -139,6 +146,10 @@ def main() -> None:
                 headers=headers,
             ),
             "create source entry",
+        )
+        expect_success(
+            client.post("/groups", json={"name": "待归档", "description": "临时分组"}, headers=headers),
+            "create existing group",
         )
 
         preview = expect_success(
@@ -154,22 +165,25 @@ def main() -> None:
         )
         assert captured_payloads, "AI 交互必须调用模型生成操作计划"
         assert preview["entry_count"] == 1
-        assert len(preview["actions"]) == 5
+        assert len(preview["actions"]) == 6
         assert preview["summary"]["create_group"] == 1
+        assert preview["summary"]["update_group"] == 1
         assert preview["summary"]["create_entry_from_field"] == 3
         assert preview["summary"]["update_entry"] == 1
         assert preview["actions"][0]["selected"] is True
-        assert preview["actions"][1]["source_entry_title"] == "demo.example"
-        assert preview["actions"][4]["entry_title"] == "demo.example"
-        assert preview["actions"][4]["title"] is None
-        assert preview["actions"][4]["field_index"] is None
-        assert preview["actions"][4]["field_name"] is None
+        assert preview["actions"][1]["group"] == "待归档"
+        assert preview["actions"][1]["group_new"] == "客户系统"
+        assert preview["actions"][2]["source_entry_title"] == "demo.example"
+        assert preview["actions"][5]["entry_title"] == "demo.example"
+        assert preview["actions"][5]["title"] is None
+        assert preview["actions"][5]["field_index"] is None
+        assert preview["actions"][5]["field_name"] is None
         assert "delete_entry" not in {action["type"] for action in preview["actions"]}
         assert any("不支持" in warning or "已忽略" in warning for warning in preview["warnings"])
         assert "不会发送任何字段值" in preview["privacy_note"]
 
         bad_actions = [dict(item) for item in preview["actions"]]
-        bad_actions[1]["field_name"] = "已改名字段"
+        bad_actions[2]["field_name"] = "已改名字段"
         expect_error(
             client.post("/ai/actions/apply", json={"actions": bad_actions}, headers=headers),
             422,
@@ -183,11 +197,15 @@ def main() -> None:
         assert apply_result["created_groups"] == 1
         assert apply_result["created_entries"] == 3
         assert apply_result["updated_entries"] == 1
-        assert apply_result["applied_count"] == 5
+        assert apply_result["updated_groups"] == 1
+        assert apply_result["applied_count"] == 6
 
         groups = expect_success(client.get("/groups", headers=headers), "groups")["groups"]
         demo-service_group = next(group for group in groups if group["name"] == "demo-service")
         assert demo-service_group["description"] == "demo.example 相关凭据"
+        renamed_group = next(group for group in groups if group["name"] == "客户系统")
+        assert renamed_group["description"] == "客户系统和业务资料相关凭据"
+        assert not any(group["name"] == "待归档" for group in groups)
 
         entries = expect_success(
             client.get("/entries", params={"search": "demo-service", "search_scopes": "title", "page_size": 20}, headers=headers),
@@ -198,6 +216,8 @@ def main() -> None:
         source_detail = expect_success(client.get(f"/entries/{source['id']}", headers=headers), "source detail")
         assert [field["value"] for field in source_detail["fields"]] == ["main-user", "demo-service-password", "sk-secret"]
         assert [field["name"] for field in source_detail["fields"]] == ["账号", "密码", "API Key"]
+        assert "客户系统" in source_detail["groups"]
+        assert "待归档" not in source_detail["groups"]
         assert "云平台" in source_detail["tags"]
 
         details_by_title = {}
@@ -214,6 +234,31 @@ def main() -> None:
         assert details_by_title["demo-service API Key"]["fields"][0]["value"] == "sk-secret"
         assert details_by_title["demo-service API Key"]["groups"] == ["demo-service"]
         assert set(details_by_title["demo-service API Key"]["tags"]) == {"demo-service", "API"}
+
+        rename_only_result = expect_success(
+            client.post(
+                "/ai/actions/apply",
+                json={
+                    "actions": [
+                        {
+                            "type": "update_group",
+                            "selected": True,
+                            "group": "客户系统",
+                            "group_new": "客户资料",
+                        }
+                    ]
+                },
+                headers=headers,
+            ),
+            "ai actions apply rename group only",
+        )
+        assert rename_only_result["updated_groups"] == 1
+        groups_after_rename = expect_success(client.get("/groups", headers=headers), "groups after rename only")["groups"]
+        renamed_only_group = next(group for group in groups_after_rename if group["name"] == "客户资料")
+        assert renamed_only_group["description"] == "客户系统和业务资料相关凭据"
+        source_after_rename = expect_success(client.get(f"/entries/{source['id']}", headers=headers), "source after rename only")
+        assert "客户资料" in source_after_rename["groups"]
+        assert "客户系统" not in source_after_rename["groups"]
 
         print("PASS ai actions")
 

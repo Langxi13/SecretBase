@@ -315,9 +315,10 @@ class AiActionPreviewRequest(BaseModel):
 
 class AiActionPlanItem(BaseModel):
     """AI 操作计划项。字段值不允许由 AI 提供。"""
-    type: str = Field(..., pattern="^(create_group|create_entry|create_entry_from_field|update_entry)$")
+    type: str = Field(..., pattern="^(create_group|update_group|create_entry|create_entry_from_field|update_entry)$")
     selected: bool = True
     group: Optional[str] = Field(default=None, max_length=50)
+    group_new: Optional[str] = Field(default=None, max_length=50)
     description: str = Field(default="", max_length=300)
     title: Optional[str] = Field(default=None, max_length=200)
     url: Optional[str] = Field(default=None, max_length=2000)
@@ -338,7 +339,7 @@ class AiActionPlanItem(BaseModel):
     remove_groups: List[str] = Field(default_factory=list)
     reason: str = Field(default="", max_length=500)
 
-    @validator('group', 'title', 'entry_id', 'source_entry_id', 'field_name', 'field_name_new')
+    @validator('group', 'group_new', 'title', 'entry_id', 'source_entry_id', 'field_name', 'field_name_new')
     def validate_optional_text(cls, v):
         if v is None:
             return v

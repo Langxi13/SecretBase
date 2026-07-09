@@ -1388,8 +1388,9 @@ POST /ai/actions/preview
   "data": {
     "entry_count": 1,
     "summary": {
-      "total_actions": 5,
+      "total_actions": 6,
       "create_group": 1,
+      "update_group": 1,
       "create_entry": 0,
       "create_entry_from_field": 3,
       "update_entry": 1
@@ -1401,6 +1402,14 @@ POST /ai/actions/preview
         "group": "demo-service",
         "description": "demo.example 相关凭据",
         "reason": "用户要求创建独立密码组"
+      },
+      {
+        "type": "update_group",
+        "selected": true,
+        "group": "待归档",
+        "group_new": "客户系统",
+        "description": "客户系统和业务资料相关凭据",
+        "reason": "用户希望整理已有密码组"
       },
       {
         "type": "create_entry_from_field",
@@ -1429,7 +1438,7 @@ POST /ai/actions/preview
 }
 ```
 
-允许动作：`create_group`、`create_entry`、`create_entry_from_field`、`update_entry`。不允许删除条目、删除字段或覆盖字段值。`update_entry` 只有同时提供 `field_index`、`field_name` 和 `field_name_new` 时才会重命名字段；只有部分字段重命名信息时，预览会忽略这些字段上下文，不影响标签、密码组、标题、网址或备注更新。
+允许动作：`create_group`、`update_group`、`create_entry`、`create_entry_from_field`、`update_entry`。`update_group` 必须提供原密码组 `group`，可通过 `group_new` 改名，也可通过 `description` 更新简介；至少提供其中一项。不允许删除条目、删除字段或覆盖字段值。`update_entry` 只有同时提供 `field_index`、`field_name` 和 `field_name_new` 时才会重命名字段；只有部分字段重命名信息时，预览会忽略这些字段上下文，不影响标签、密码组、标题、网址或备注更新。
 
 **错误情况：**
 
@@ -1472,6 +1481,7 @@ POST /ai/actions/apply
     "applied_count": 1,
     "created_entries": 1,
     "created_groups": 0,
+    "updated_groups": 0,
     "updated_entries": 0
   },
   "message": "已应用 1 项 AI 操作计划"

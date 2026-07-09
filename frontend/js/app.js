@@ -229,6 +229,7 @@ const app = createApp({
             description: '',
             color: '#64748b'
         });
+        const editingGroupName = ref('');
         const groupForm = reactive({
             name: '',
             description: ''
@@ -389,6 +390,7 @@ const app = createApp({
             }, {
                 total_actions: 0,
                 create_group: 0,
+                update_group: 0,
                 create_entry: 0,
                 create_entry_from_field: 0,
                 update_entry: 0
@@ -998,13 +1000,24 @@ const app = createApp({
         }
 
         function openCreateGroupModal() {
+            editingGroupName.value = '';
             groupForm.name = '';
             groupForm.description = '';
             showGroupModal.value = true;
         }
 
+        function openEditGroupModal(group) {
+            const name = String(group?.name || '').trim();
+            if (!name) return;
+            editingGroupName.value = name;
+            groupForm.name = name;
+            groupForm.description = String(group?.description || '');
+            showGroupModal.value = true;
+        }
+
         function closeGroupModal() {
             showGroupModal.value = false;
+            editingGroupName.value = '';
             groupForm.name = '';
             groupForm.description = '';
         }
@@ -1015,13 +1028,20 @@ const app = createApp({
                 showToast('请输入密码组名称', 'error');
                 return;
             }
-            const result = await store.createGroup({
+            const oldName = editingGroupName.value;
+            const payload = {
                 name,
                 description: groupForm.description.trim()
-            });
+            };
+            const result = oldName
+                ? await store.updateGroup(oldName, payload)
+                : await store.createGroup(payload);
             if (result) {
                 closeGroupModal();
                 await loadGroups();
+                if (oldName && activeGroupName.value === oldName) {
+                    await filterByGroup(result.new_name || name);
+                }
             }
         }
 
@@ -1979,6 +1999,7 @@ const app = createApp({
         function aiActionTypeLabel(type) {
             const labels = {
                 create_group: '新建密码组',
+                update_group: '更新密码组',
                 create_entry: '新建条目',
                 create_entry_from_field: '字段拆分为条目',
                 update_entry: '更新条目'
@@ -1998,6 +2019,10 @@ const app = createApp({
             if (!action) return '操作计划';
             if (action.type === 'create_group') {
                 return `${aiActionTypeLabel(action.type)}：${action.group || ''}`;
+            }
+            if (action.type === 'update_group') {
+                const groupChange = action.group_new && action.group_new !== action.group ? ` → ${action.group_new}` : '';
+                return `${aiActionTypeLabel(action.type)}：${action.group || ''}${groupChange}`;
             }
             if (action.type === 'create_entry_from_field') {
                 const sourceLabel = aiActionEntryLabel(action);
@@ -3355,6 +3380,7 @@ const app = createApp({
             allManagedPageTagsSelected,
             selectedManagedTagNames,
             tagEditorForm,
+            editingGroupName,
             groupForm,
             passwordForm,
             trashItems,
@@ -3395,6 +3421,7 @@ const app = createApp({
             filterByTag,
             showGroupMode,
             openCreateGroupModal,
+            openEditGroupModal,
             closeGroupModal,
             saveGroup,
             filterByGroup,

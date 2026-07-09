@@ -1460,9 +1460,18 @@ body {
 .group-card-date {
     grid-column: 1 / -1;
     align-self: end;
+    padding-right: 76px;
     padding-top: 10px;
     border-top: 1px dashed var(--border-color);
     font-size: var(--font-size-xs);
+}
+
+.group-card-edit {
+    position: absolute;
+    right: 18px;
+    bottom: 18px;
+    min-width: 56px;
+    padding-inline: 12px;
 }
 
 .group-empty-state {
