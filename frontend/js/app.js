@@ -5,7 +5,6 @@ const { createApp, ref, reactive, computed, watch, onMounted, onUnmounted, nextT
 
 const app = createApp({
     setup() {
-        // 状态
         const loading = ref(true);
         const initialized = ref(false);
         const locked = ref(true);
@@ -16,7 +15,6 @@ const app = createApp({
         const submitting = ref(false);
         const isSidebarCollapsed = ref(localStorage.getItem('secretbase.sidebarCollapsed') === 'true');
 
-        // 主界面状态
         const entries = ref([]);
         const tags = ref([]);
         const groups = ref([]);
@@ -27,6 +25,7 @@ const app = createApp({
             loadPageSizePreference,
             savePageSizePreference
         } = window.SecretBasePagination;
+        const ViewHelpers = window.SecretBaseViewHelpers;
 
         const groupCurrentPage = ref(1);
         const groupPageSize = ref(loadPageSizePreference('secretbase.groupPageSize', 12));
@@ -59,7 +58,6 @@ const app = createApp({
         const advancedTagDraft = ref('');
         const advancedTagList = ref([]);
 
-        // 弹窗状态
         const showCreateModal = ref(false);
         const showEditModal = ref(false);
         const showAiParse = ref(false);
@@ -133,7 +131,6 @@ const app = createApp({
         const securityReport = ref(null);
         const savedAdvancedFilters = ref([]);
 
-        // 表单
         const entryForm = reactive({
             id: null,
             title: '',
@@ -157,7 +154,6 @@ const app = createApp({
             { id: 'card', name: '银行卡/证件', fields: [{ name: '号码', value: '', copyable: true, hidden: true }, { name: '姓名', value: '', copyable: false, hidden: false }, { name: '有效期', value: '', copyable: false, hidden: false }] }
         ];
 
-        // AI 解析
         const aiMode = ref('parse');
         const aiText = ref('');
         const aiResult = ref(null);
@@ -185,7 +181,6 @@ const app = createApp({
         const aiNow = ref(Date.now());
         const lastAiParseText = ref('');
 
-        // 设置
         const settingsForm = reactive({
             theme: 'system',
             pageSize: 20,
@@ -248,7 +243,6 @@ const app = createApp({
             description: ''
         });
 
-        // 修改密码
         const passwordForm = reactive({
             oldPassword: '',
             newPassword: '',
@@ -256,7 +250,6 @@ const app = createApp({
             error: ''
         });
 
-        // 回收站
         const trashItems = ref([]);
         const trashPage = ref(1);
         const trashTotalPages = ref(0);
@@ -264,52 +257,37 @@ const app = createApp({
         const trashPageSize = ref(loadPageSizePreference('secretbase.trashPageSize', 10));
         const trashPageSizeOptions = [5, 10, 20, 50, 100];
 
-        // 确认弹窗
         const confirmTitle = ref('');
         const confirmMessage = ref('');
         let confirmCallback = null;
-        let autoLockTimer = null;
         let entriesRequestSeq = 0;
-        let autoThemeTimer = null;
-        const activityEventNames = ['click', 'keydown', 'mousemove', 'touchstart'];
-
-        // 主题
-        const currentTheme = ref('system');
-        const themeIcon = computed(() => {
-            switch (currentTheme.value) {
-                case 'dark': return '🌙';
-                case 'light': return '☀️';
-                default: return '🕒';
-            }
+        const {
+            startAutoLockTimer,
+            clearAutoLockTimer,
+            resetAutoLockTimer,
+            bindActivityListeners,
+            unbindActivityListeners,
+            handleUnauthorizedLock
+        } = window.SecretBaseAutoLock.createAutoLockController({
+            settingsForm,
+            locked,
+            initialized,
+            store,
+            applyLockedState
         });
 
-        const aiCooldownSeconds = computed(() => Math.max(0, Math.ceil((aiCooldownUntil.value - aiNow.value) / 1000)));
-        const aiSoftInputChars = 3000;
-        const aiMaxInputChars = 6000;
-        const aiTextLength = computed(() => aiText.value.length);
-        const aiInputWarning = computed(() => {
-            const text = aiText.value.trim();
-            if (aiText.value.length > aiMaxInputChars) return `内容过长，请分批解析，单次最多 ${aiMaxInputChars} 字符。`;
-            if (text.split(/\n+/).filter(Boolean).length > 60) return '内容行数较多，建议按系统或账号分批解析，避免 AI 合并或误分条目。';
-            if (aiText.value.length > aiSoftInputChars) return '内容较长，建议分批解析并逐条检查结果。';
-            return '';
-        });
-        const canParseAi = computed(() => {
-            const text = aiText.value.trim();
-            return Boolean(text)
-                && Boolean(aiStatus.value?.configured)
-                && aiText.value.length <= aiMaxInputChars
-                && !aiParsing.value
-                && aiCooldownSeconds.value === 0
-                && text !== lastAiParseText.value;
-        });
-
-        const selectedAiEntryCount = computed(() => {
-            return aiResult.value?.entries?.filter(entry => entry.selected).length || 0;
-        });
-
-        const selectedAiOrganizeCount = computed(() => {
-            return aiOrganizeResult.value?.suggestions?.filter(item => item.selected).length || 0;
+        const {
+            currentTheme,
+            themeIcon,
+            toggleTheme,
+            applyTheme,
+            startAutoThemeTimer,
+            clearAutoThemeTimer
+        } = window.SecretBaseThemeController.createThemeController({
+            ref,
+            computed,
+            settingsForm,
+            store
         });
 
         const isAiTagGovernanceMode = computed(() => aiOrganizeMode.value === 'tag-governance');
@@ -323,105 +301,37 @@ const app = createApp({
             }
         });
 
-        const aiOrganizeSummary = computed(() => {
-            const suggestions = (aiOrganizeResult.value?.suggestions || []).filter(item => item.selected);
-            if (isAiTagGovernanceMode.value) {
-                const affectedEntries = new Set();
-                const summary = {
-                    affected_entries: 0,
-                    total_actions: suggestions.length,
-                    create_tag: 0,
-                    update_tag: 0,
-                    delete_tag: 0,
-                    merge_tags: 0,
-                    replace_tag: 0,
-                    assign_tag: 0
-                };
-                suggestions.forEach(item => {
-                    (item.entry_ids || []).forEach(entryId => affectedEntries.add(entryId));
-                    if (Object.prototype.hasOwnProperty.call(summary, item.action)) {
-                        summary[item.action] += 1;
-                    }
-                });
-                summary.affected_entries = affectedEntries.size;
-                return summary;
-            }
-
-            const existingGroupNames = new Set(groups.value.map(group => group.name));
-            const uniqueAddGroups = new Set();
-            let addGroupAssignments = 0;
-            const summary = {
-                affected_entries: suggestions.length,
-                add_tags: 0,
-                remove_tags: 0,
-                add_groups: 0,
-                add_group_assignments: 0,
-                assigned_groups: 0,
-                remove_groups: 0
-            };
-            suggestions.forEach(item => {
-                summary.add_tags += (item.add_tags || []).length;
-                summary.remove_tags += (item.remove_tags || []).length;
-                summary.remove_groups += (item.remove_groups || []).length;
-                (item.add_groups || []).forEach(group => {
-                    uniqueAddGroups.add(group);
-                    addGroupAssignments += 1;
-                });
-            });
-            const uniqueNewGroups = [...uniqueAddGroups].filter(group => !existingGroupNames.has(group));
-            summary.add_groups = uniqueNewGroups.length;
-            summary.add_group_assignments = addGroupAssignments;
-            summary.assigned_groups = uniqueAddGroups.size;
-            return summary;
-        });
-
-        const selectedAiOrganizeChangeCount = computed(() => {
-            return (aiOrganizeResult.value?.suggestions || [])
-                .filter(item => item.selected)
-                .reduce((total, item) => {
-                    if (isAiTagGovernanceMode.value) {
-                        return total + (item.action ? 1 : 0);
-                    }
-                    return total
-                        + (item.add_tags || []).length
-                        + (item.remove_tags || []).length
-                        + (item.add_groups || []).length
-                        + (item.remove_groups || []).length;
-                }, 0);
-        });
-
-        const selectedAiActionCount = computed(() => {
-            return aiActionResult.value?.actions?.filter(action => action.selected).length || 0;
-        });
-
-        const aiActionSummary = computed(() => {
-            const actions = (aiActionResult.value?.actions || []).filter(action => action.selected);
-            return actions.reduce((summary, action) => {
-                summary.total_actions += 1;
-                if (Object.prototype.hasOwnProperty.call(summary, action.type)) {
-                    summary[action.type] += 1;
-                }
-                return summary;
-            }, {
-                total_actions: 0,
-                create_group: 0,
-                update_group: 0,
-                create_entry: 0,
-                create_entry_from_field: 0,
-                update_entry: 0
-            });
-        });
-
-        const canPreviewAiOrganize = computed(() => {
-            return Boolean(aiStatus.value?.configured)
-                && !aiOrganizing.value
-                && (isAiTagGovernanceMode.value || aiOrganizeOptions.organizeTags || aiOrganizeOptions.organizeGroups);
-        });
-
-        const canPreviewAiActions = computed(() => {
-            return Boolean(aiStatus.value?.configured)
-                && !aiOrganizing.value
-                && Boolean(aiActionInstruction.value.trim());
+        const {
+            aiSoftInputChars,
+            aiMaxInputChars,
+            aiCooldownSeconds,
+            aiTextLength,
+            aiInputWarning,
+            canParseAi,
+            selectedAiEntryCount,
+            selectedAiOrganizeCount,
+            aiOrganizeSummary,
+            selectedAiOrganizeChangeCount,
+            selectedAiActionCount,
+            aiActionSummary,
+            canPreviewAiOrganize,
+            canPreviewAiActions
+        } = window.SecretBaseAiView.createAiView({
+            computed,
+            aiText,
+            aiParsing,
+            aiStatus,
+            aiCooldownUntil,
+            aiNow,
+            lastAiParseText,
+            aiResult,
+            aiOrganizing,
+            aiOrganizeOptions,
+            aiActionInstruction,
+            aiOrganizeResult,
+            isAiTagGovernanceMode,
+            groups,
+            aiActionResult
         });
 
         const selectedImportPreviewCount = computed(() => importPreviewSelectedIds.value.length);
@@ -436,262 +346,113 @@ const app = createApp({
                 .map(scope => scope.label);
         });
 
-        const sidebarTagLimit = 6;
-        const tagNameCollator = new Intl.Collator('zh-CN', { numeric: true, sensitivity: 'base' });
-        const tagBrowserSortOptions = [
-            { value: 'count_desc', label: '条目数量多到少' },
-            { value: 'count_asc', label: '条目数量少到多' },
-            { value: 'name_asc', label: '名称 A-Z / 中文升序' },
-            { value: 'name_desc', label: '名称 Z-A / 中文降序' }
-        ];
-
-        const sortedTagBrowserTags = computed(() => {
-            const sorted = [...tags.value];
-            sorted.sort((left, right) => {
-                const nameCompare = tagNameCollator.compare(left.name || '', right.name || '');
-                if (tagBrowserSort.value === 'count_asc') {
-                    return (left.count || 0) - (right.count || 0) || nameCompare;
-                }
-                if (tagBrowserSort.value === 'name_asc') {
-                    return nameCompare || (right.count || 0) - (left.count || 0);
-                }
-                if (tagBrowserSort.value === 'name_desc') {
-                    return -nameCompare || (right.count || 0) - (left.count || 0);
-                }
-                return (right.count || 0) - (left.count || 0) || nameCompare;
-            });
-            return sorted;
+        const {
+            tagBrowserSortOptions,
+            sortedTagBrowserTags,
+            visibleSidebarTags,
+            hiddenSidebarTagCount,
+            filteredTagBrowserTags,
+            tagBrowserTotalPages,
+            paginatedTagBrowserTags,
+            tagManagerTotalPages,
+            paginatedManagedTags,
+            allManagedPageTagsSelected
+        } = window.SecretBaseTagView.createTagView({
+            computed,
+            tags,
+            activeTagName,
+            tagBrowserSort,
+            tagBrowserQuery,
+            tagBrowserPage,
+            tagBrowserPageSize,
+            tagManagerPage,
+            tagManagerPageSize,
+            selectedManagedTagNames
         });
 
-        const visibleSidebarTags = computed(() => {
-            if (tags.value.length <= sidebarTagLimit) return tags.value;
-            const activeTag = tags.value.find(tag => tag.name === activeTagName.value);
-            const baseTags = tags.value
-                .filter(tag => tag.name !== activeTagName.value)
-                .slice(0, activeTag ? sidebarTagLimit - 1 : sidebarTagLimit);
-            return activeTag ? [activeTag, ...baseTags] : baseTags;
-        });
-
-        const hiddenSidebarTagCount = computed(() => Math.max(0, tags.value.length - visibleSidebarTags.value.length));
-
-        const filteredTagBrowserTags = computed(() => {
-            const query = tagBrowserQuery.value.trim().toLowerCase();
-            if (!query) return sortedTagBrowserTags.value;
-            return sortedTagBrowserTags.value.filter(tag => String(tag.name || '').toLowerCase().includes(query));
-        });
-
-        const tagBrowserTotalPages = computed(() => Math.max(1, Math.ceil(filteredTagBrowserTags.value.length / tagBrowserPageSize.value)));
-
-        const paginatedTagBrowserTags = computed(() => {
-            const start = (tagBrowserPage.value - 1) * tagBrowserPageSize.value;
-            return filteredTagBrowserTags.value.slice(start, start + tagBrowserPageSize.value);
-        });
-
-        const tagManagerTotalPages = computed(() => Math.max(1, Math.ceil(tags.value.length / tagManagerPageSize.value)));
-
-        const paginatedManagedTags = computed(() => {
-            const start = (tagManagerPage.value - 1) * tagManagerPageSize.value;
-            return sortedTagBrowserTags.value.slice(start, start + tagManagerPageSize.value);
-        });
-
-        const allManagedPageTagsSelected = computed(() => {
-            const pageTags = paginatedManagedTags.value;
-            return pageTags.length > 0 && pageTags.every(tag => selectedManagedTagNames.value.includes(tag.name));
-        });
-
-        const activeAdvancedFilterChips = computed(() => {
-            const chips = advancedTagList.value.map(tag => ({
-                key: `tag:${tag}`,
-                label: `标签：${tag}`,
-                type: 'tag',
-                value: tag
-            }));
-            if (advancedFilters.untagged) chips.push({ key: 'untagged', label: '只看无标签', type: 'untagged' });
-            if (advancedFilters.createdFrom) chips.push({ key: 'createdFrom', label: `创建起：${advancedFilters.createdFrom}`, type: 'createdFrom' });
-            if (advancedFilters.createdTo) chips.push({ key: 'createdTo', label: `创建止：${advancedFilters.createdTo}`, type: 'createdTo' });
-            if (advancedFilters.hasUrl === 'yes') chips.push({ key: 'hasUrlYes', label: '有网址', type: 'hasUrl' });
-            if (advancedFilters.hasUrl === 'no') chips.push({ key: 'hasUrlNo', label: '无网址', type: 'hasUrl' });
-            if (advancedFilters.hasRemarks === 'yes') chips.push({ key: 'hasRemarksYes', label: '有备注', type: 'hasRemarks' });
-            if (advancedFilters.hasRemarks === 'no') chips.push({ key: 'hasRemarksNo', label: '无备注', type: 'hasRemarks' });
-            return chips;
-        });
-
-        const activeListStateItems = computed(() => {
-            const items = [];
-            if (listContextNotice.value) items.push(listContextNotice.value);
-            if (searchQuery.value.trim()) {
-                const scopes = selectedSearchScopeLabels.value.length > 0 ? selectedSearchScopeLabels.value.join('、') : '未选择范围';
-                items.push(`搜索：${searchQuery.value.trim()}（${scopes}）`);
-            }
-            if (filter.value === 'starred') items.push('仅星标');
-            if (filter.value === 'tag' && activeTagName.value) items.push(`标签：${activeTagName.value}`);
-            if (filter.value === 'group' && activeGroupName.value) items.push(`密码组：${activeGroupName.value}`);
-            activeAdvancedFilterChips.value.forEach(chip => items.push(chip.label));
-            if (sortBy.value !== 'updated_at' || sortOrder.value !== 'desc') {
-                const sortLabel = sortBy.value === 'title' ? '标题' : sortBy.value === 'created_at' ? '创建时间' : '更新时间';
-                items.push(`排序：${sortLabel}${sortOrder.value === 'asc' ? '升序' : '降序'}`);
-            }
-            return items;
-        });
-
-        const hasActiveListState = computed(() => activeListStateItems.value.length > 0);
-
-        const activeGroup = computed(() => {
-            if (!activeGroupName.value) return null;
-            return groups.value.find(group => group.name === activeGroupName.value) || {
-                name: activeGroupName.value,
-                description: '',
-                count: totalEntries.value
-            };
+        const {
+            activeAdvancedFilterChips,
+            activeListStateItems,
+            hasActiveListState,
+            resetAdvancedFilterForm,
+            removeAdvancedFilterChip,
+            loadSavedAdvancedFilters,
+            persistSavedAdvancedFilters,
+            getAdvancedFilterSnapshot,
+            saveCurrentAdvancedFilter,
+            applySavedAdvancedFilter,
+            deleteSavedAdvancedFilter,
+            addAdvancedTags,
+            commitAdvancedTags,
+            removeAdvancedTag,
+            commitAndApplyAdvancedTags,
+            handleAdvancedTagKey,
+            handleAdvancedTagInput
+        } = window.SecretBaseFilterController.createAdvancedFilterController({
+            computed,
+            advancedTagDraft,
+            advancedTagList,
+            advancedFilters,
+            savedAdvancedFilters,
+            listContextNotice,
+            searchQuery,
+            selectedSearchScopeLabels,
+            filter,
+            activeTagName,
+            activeGroupName,
+            sortBy,
+            sortOrder,
+            applyAdvancedFilters,
+            clearAdvancedFilters
         });
 
         const allCurrentPageSelected = computed(() => {
             return entries.value.length > 0 && entries.value.every(entry => selectedEntryIds.value.includes(entry.id));
         });
 
-        const availableGroupPickerEntries = computed(() => {
-            const groupName = activeGroupName.value;
-            const tagFilter = groupPickerTagFilter.value;
-            const groupFilter = groupPickerGroupFilter.value;
-            return groupPickerEntries.value.filter(entry => {
-                if (!groupName || (entry.groups || []).includes(groupName)) {
-                    return false;
-                }
-                if (tagFilter && !(entry.tags || []).includes(tagFilter)) {
-                    return false;
-                }
-                if (groupFilter && !(entry.groups || []).includes(groupFilter)) {
-                    return false;
-                }
-                return true;
-            });
+        const {
+            activeGroup,
+            availableGroupPickerEntries,
+            groupPickerTotalPages,
+            paginatedGroupPickerEntries,
+            selectableGroupPickerGroups,
+            allGroupPickerEntriesSelected,
+            paginatedGroups,
+            groupTotalPages,
+            visibleGroupPages
+        } = window.SecretBaseGroupView.createGroupView({
+            computed,
+            groups,
+            totalEntries,
+            activeGroupName,
+            groupPickerEntries,
+            groupPickerTagFilter,
+            groupPickerGroupFilter,
+            groupPickerPage,
+            groupPickerPageSize,
+            groupPickerSelectedIds,
+            groupCurrentPage,
+            groupPageSize
         });
 
-        const groupPickerTotalPages = computed(() => Math.max(1, Math.ceil(availableGroupPickerEntries.value.length / groupPickerPageSize.value)));
-
-        const paginatedGroupPickerEntries = computed(() => {
-            const start = (groupPickerPage.value - 1) * groupPickerPageSize.value;
-            return availableGroupPickerEntries.value.slice(start, start + groupPickerPageSize.value);
+        const {
+            backupBusy,
+            sortedBackups,
+            backupSummary,
+            backupGroups
+        } = window.SecretBaseBackupView.createBackupView({
+            computed,
+            backups,
+            backupPages,
+            backupPageSize,
+            settingsForm,
+            backupListLoading,
+            creatingBackup,
+            restoringBackupFilename,
+            downloadingBackupFilename
         });
 
-        const selectableGroupPickerGroups = computed(() => {
-            return groups.value.filter(group => group.name !== activeGroupName.value);
-        });
-
-        const allGroupPickerEntriesSelected = computed(() => {
-            const ids = paginatedGroupPickerEntries.value.map(entry => entry.id);
-            return ids.length > 0 && ids.every(id => groupPickerSelectedIds.value.includes(id));
-        });
-
-        const backupBusy = computed(() => (
-            backupListLoading.value ||
-            creatingBackup.value ||
-            Boolean(restoringBackupFilename.value) ||
-            Boolean(downloadingBackupFilename.value)
-        ));
-        const sortedBackups = computed(() => {
-            return [...backups.value].sort((a, b) => new Date(b.modified_at || 0) - new Date(a.modified_at || 0));
-        });
-        const backupSummary = computed(() => {
-            const manualCount = backups.value.filter(backup => backup.type === 'manual').length;
-            const autoCount = backups.value.filter(backup => backup.type === 'auto').length;
-            const recent = sortedBackups.value[0] || null;
-            return {
-                manualCount,
-                autoCount,
-                retention: settingsForm.autoBackupRetention,
-                recent
-            };
-        });
-        const backupGroups = computed(() => {
-            const definitions = [
-                {
-                    type: 'manual',
-                    title: '手动备份',
-                    hint: '由你主动创建，不会被自动备份轮转清理。'
-                },
-                {
-                    type: 'auto',
-                    title: '自动备份',
-                    hint: '写入或恢复前自动创建，会按保留数量清理旧文件。'
-                },
-                {
-                    type: 'legacy',
-                    title: '旧版备份',
-                    hint: '旧目录中的兼容备份。刷新后通常会迁移到自动备份。'
-                }
-            ];
-            return definitions
-                .map(group => ({
-                    ...group,
-                    items: backups.value.filter(backup => (backup.type || 'legacy') === group.type)
-                }))
-                .filter(group => group.type !== 'legacy' || group.items.length > 0)
-                .map(group => {
-                    const totalPages = Math.max(1, Math.ceil(group.items.length / backupPageSize.value));
-                    const current = Math.min(backupPages[group.type] || 1, totalPages);
-                    const start = (current - 1) * backupPageSize.value;
-                    const pagedItems = group.items.slice(start, start + backupPageSize.value);
-                    return {
-                        ...group,
-                        page: current,
-                        totalPages,
-                        pagedItems,
-                        emptySlots: Math.max(0, backupPageSize.value - pagedItems.length)
-                    };
-                });
-        });
-
-        // 分页
-        const visiblePages = computed(() => {
-            const pages = [];
-            const total = totalPages.value;
-            const current = currentPage.value;
-
-            if (total <= 7) {
-                for (let i = 1; i <= total; i++) pages.push(i);
-            } else {
-                pages.push(1);
-                if (current > 3) pages.push('...');
-                for (let i = Math.max(2, current - 1); i <= Math.min(total - 1, current + 1); i++) {
-                    pages.push(i);
-                }
-                if (current < total - 2) pages.push('...');
-                pages.push(total);
-            }
-
-            return pages;
-        });
-
-        // 密码组纯前端分页
-        const paginatedGroups = computed(() => {
-            const start = (groupCurrentPage.value - 1) * groupPageSize.value;
-            return groups.value.slice(start, start + groupPageSize.value);
-        });
-
-        const groupTotalPages = computed(() => {
-            return Math.ceil((groups.value?.length || 0) / groupPageSize.value) || 1;
-        });
-
-        const visibleGroupPages = computed(() => {
-            const pages = [];
-            const total = groupTotalPages.value;
-            const current = groupCurrentPage.value;
-
-            if (total <= 7) {
-                for (let i = 1; i <= total; i++) pages.push(i);
-            } else {
-                pages.push(1);
-                if (current > 3) pages.push('...');
-                for (let i = Math.max(2, current - 1); i <= Math.min(total - 1, current + 1); i++) {
-                    pages.push(i);
-                }
-                if (current < total - 2) pages.push('...');
-                pages.push(total);
-            }
-
-            return pages;
-        });
+        const visiblePages = computed(() => window.SecretBasePagination.createVisiblePages(currentPage.value, totalPages.value));
 
         function goToGroupPage(page) {
             if (page < 1 || page > groupTotalPages.value) return;
@@ -699,7 +460,6 @@ const app = createApp({
             window.scrollTo({ top: 0, behavior: 'smooth' });
         }
 
-        // 初始化
         onMounted(async () => {
             try {
                 const authStatus = await store.checkAuth();
@@ -743,14 +503,11 @@ const app = createApp({
         onUnmounted(() => {
             window.removeEventListener('secretbase:unauthorized', handleUnauthorizedLock);
             document.removeEventListener('click', handleDocumentClick);
-            activityEventNames.forEach(eventName => {
-                window.removeEventListener(eventName, resetAutoLockTimer);
-            });
+            unbindActivityListeners();
             clearAutoThemeTimer();
             clearAutoLockTimer();
         });
 
-        // 加载所有数据
         async function loadAllData() {
             await Promise.all([
                 loadEntries(),
@@ -1247,16 +1004,6 @@ const app = createApp({
             await loadEntries(1);
         }
 
-        // 切换主题
-        function toggleTheme() {
-            const themes = ['system', 'light', 'dark'];
-            const currentIndex = themes.indexOf(currentTheme.value);
-            currentTheme.value = themes[(currentIndex + 1) % themes.length];
-            settingsForm.theme = currentTheme.value;
-            applyTheme(currentTheme.value);
-            store.updateSettings({ theme: currentTheme.value });
-        }
-
         // 切换侧边栏收缩/展开
         function toggleSidebar() {
             isSidebarCollapsed.value = !isSidebarCollapsed.value;
@@ -1265,119 +1012,17 @@ const app = createApp({
             } catch (e) {}
         }
 
-        // 应用主题
-        function applyTheme(theme) {
-            const root = document.documentElement;
-            if (theme === 'system') {
-                root.setAttribute('data-theme', resolveAutoTheme());
-                root.setAttribute('data-theme-mode', 'auto');
-            } else {
-                root.setAttribute('data-theme', theme);
-                root.setAttribute('data-theme-mode', theme);
-            }
-        }
-
-        function resolveAutoTheme(date = new Date()) {
-            const hour = date.getHours();
-            return hour >= 18 || hour < 6 ? 'dark' : 'light';
-        }
-
-        function applyAutoThemeIfNeeded() {
-            if (currentTheme.value === 'system') {
-                applyTheme('system');
-            }
-        }
-
-        function startAutoThemeTimer() {
-            clearAutoThemeTimer();
-            autoThemeTimer = setInterval(applyAutoThemeIfNeeded, 60 * 1000);
-        }
-
-        function clearAutoThemeTimer() {
-            if (!autoThemeTimer) return;
-            clearInterval(autoThemeTimer);
-            autoThemeTimer = null;
-        }
-
-        // 获取 favicon
-        function getFavicon(url) {
-            return getFaviconUrl(url);
-        }
-
-        // 获取标签颜色
-        function getTagColor(tagName) {
-            return window.getTagColor(tagName);
-        }
-
-        function groupAccentColor(group) {
-            const explicitColor = group && typeof group === 'object' ? String(group.color || '').trim() : '';
-            const groupName = group && typeof group === 'object' ? group.name : group;
-            const name = String(groupName || '').trim();
-            return explicitColor || getTagColor(name || '默认');
-        }
-
-        function groupCardStyle(group) {
-            return {
-                '--group-accent': groupAccentColor(group)
-            };
-        }
-
-        function entryAccentColor(entry = {}) {
-            const entryGroups = Array.isArray(entry.groups) ? entry.groups.filter(Boolean) : [];
-            if (entryGroups.length > 0) {
-                return groupAccentColor(entryGroups[0]);
-            }
-
-            const entryTags = Array.isArray(entry.tags) ? entry.tags.filter(Boolean) : [];
-            if (entryTags.length > 0) {
-                return getTagColor(entryTags[0]);
-            }
-
-            return 'var(--color-primary)';
-        }
-
-        function entryCardStyle(entry) {
-            return {
-                '--entry-accent': entryAccentColor(entry)
-            };
-        }
-
-        function visibleEntryGroups(entry = {}) {
-            const entryGroups = Array.isArray(entry.groups) ? entry.groups.filter(Boolean) : [];
-            return entryGroups.slice(0, 2);
-        }
-
-        function remainingEntryGroupsCount(entry = {}) {
-            const entryGroups = Array.isArray(entry.groups) ? entry.groups.filter(Boolean) : [];
-            return Math.max(0, entryGroups.length - visibleEntryGroups(entry).length);
-        }
-
-        function groupChipStyle(groupName) {
-            return {
-                '--chip-accent': groupAccentColor(groupName)
-            };
-        }
-
-        // 格式化日期
-        function formatDate(dateString) {
-            return window.formatDate ? window.formatDate(dateString) : dateString;
-        }
-
-        function normalizeFieldHidden(field = {}) {
-            if (Object.prototype.hasOwnProperty.call(field, 'hidden') && field.hidden !== null) {
-                return Boolean(field.hidden);
-            }
-            return Boolean(field.copyable);
-        }
-
-        function normalizeFieldForEdit(field = {}) {
-            return {
-                name: String(field.name || '').trim(),
-                value: String(field.value || ''),
-                copyable: Boolean(field.copyable),
-                hidden: normalizeFieldHidden(field)
-            };
-        }
+        const getFavicon = ViewHelpers.getFavicon;
+        const getTagColor = ViewHelpers.getTagColor;
+        const groupAccentColor = ViewHelpers.groupAccentColor;
+        const groupCardStyle = ViewHelpers.groupCardStyle;
+        const entryCardStyle = ViewHelpers.entryCardStyle;
+        const visibleEntryGroups = ViewHelpers.visibleEntryGroups;
+        const remainingEntryGroupsCount = ViewHelpers.remainingEntryGroupsCount;
+        const groupChipStyle = ViewHelpers.groupChipStyle;
+        const formatDate = ViewHelpers.formatDate;
+        const normalizeFieldHidden = ViewHelpers.normalizeFieldHidden;
+        const normalizeFieldForEdit = ViewHelpers.normalizeFieldForEdit;
 
         // 切换星标
         async function toggleStar(entry) {
@@ -1788,18 +1433,6 @@ const app = createApp({
             await loadEntries(1);
         }
 
-        function resetAdvancedFilterForm() {
-            advancedTagDraft.value = '';
-            advancedTagList.value = [];
-            advancedFilters.untagged = false;
-            advancedFilters.createdFrom = '';
-            advancedFilters.createdTo = '';
-            advancedFilters.updatedFrom = '';
-            advancedFilters.updatedTo = '';
-            advancedFilters.hasUrl = '';
-            advancedFilters.hasRemarks = '';
-        }
-
         async function clearAdvancedFilters() {
             resetAdvancedFilterForm();
             store.setFilter('tags', []);
@@ -1828,129 +1461,6 @@ const app = createApp({
             sortOrder.value = store.state.filters.sortOrder;
             clearSelection();
             await loadEntries(1);
-        }
-
-        async function removeAdvancedFilterChip(chip) {
-            if (chip.type === 'tag') {
-                advancedTagList.value = advancedTagList.value.filter(tag => tag !== chip.value);
-            } else if (chip.type === 'untagged') {
-                advancedFilters.untagged = false;
-            } else if (chip.type === 'createdFrom') {
-                advancedFilters.createdFrom = '';
-            } else if (chip.type === 'createdTo') {
-                advancedFilters.createdTo = '';
-            } else if (chip.type === 'hasUrl') {
-                advancedFilters.hasUrl = '';
-            } else if (chip.type === 'hasRemarks') {
-                advancedFilters.hasRemarks = '';
-            }
-            await applyAdvancedFilters();
-        }
-
-        function loadSavedAdvancedFilters() {
-            try {
-                const raw = localStorage.getItem('secretbase.savedAdvancedFilters');
-                const parsed = raw ? JSON.parse(raw) : [];
-                savedAdvancedFilters.value = Array.isArray(parsed) ? parsed : [];
-            } catch (error) {
-                savedAdvancedFilters.value = [];
-            }
-        }
-
-        function persistSavedAdvancedFilters() {
-            localStorage.setItem('secretbase.savedAdvancedFilters', JSON.stringify(savedAdvancedFilters.value));
-        }
-
-        function getAdvancedFilterSnapshot(name) {
-            return {
-                id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
-                name,
-                tags: [...advancedTagList.value],
-                untagged: advancedFilters.untagged,
-                createdFrom: advancedFilters.createdFrom,
-                createdTo: advancedFilters.createdTo,
-                hasUrl: advancedFilters.hasUrl,
-                hasRemarks: advancedFilters.hasRemarks
-            };
-        }
-
-        function saveCurrentAdvancedFilter() {
-            if (activeAdvancedFilterChips.value.length === 0) {
-                showToast('请先设置筛选条件', 'warning');
-                return;
-            }
-            const defaultName = activeAdvancedFilterChips.value.map(chip => chip.label).join(' + ').slice(0, 40);
-            const name = window.prompt('保存筛选名称', defaultName);
-            if (!name || !name.trim()) return;
-            savedAdvancedFilters.value = [
-                getAdvancedFilterSnapshot(name.trim()),
-                ...savedAdvancedFilters.value.filter(item => item.name !== name.trim())
-            ].slice(0, 12);
-            persistSavedAdvancedFilters();
-            showToast('已保存筛选', 'success');
-        }
-
-        async function applySavedAdvancedFilter(savedFilter) {
-            advancedTagDraft.value = '';
-            advancedTagList.value = Array.isArray(savedFilter.tags) ? [...savedFilter.tags] : [];
-            advancedFilters.untagged = Boolean(savedFilter.untagged);
-            advancedFilters.createdFrom = savedFilter.createdFrom || '';
-            advancedFilters.createdTo = savedFilter.createdTo || '';
-            advancedFilters.updatedFrom = '';
-            advancedFilters.updatedTo = '';
-            advancedFilters.hasUrl = savedFilter.hasUrl || '';
-            advancedFilters.hasRemarks = savedFilter.hasRemarks || '';
-            await applyAdvancedFilters();
-        }
-
-        function deleteSavedAdvancedFilter(savedFilter) {
-            savedAdvancedFilters.value = savedAdvancedFilters.value.filter(item => item.id !== savedFilter.id);
-            persistSavedAdvancedFilters();
-        }
-
-        function addAdvancedTags(input) {
-            const tagsToAdd = String(input || '')
-                .split(/[,，]/)
-                .map(tag => tag.trim())
-                .filter(Boolean);
-            if (tagsToAdd.length === 0) return;
-            advancedTagList.value = Array.from(new Set([...advancedTagList.value, ...tagsToAdd]));
-            advancedTagDraft.value = '';
-        }
-
-        function commitAdvancedTags() {
-            addAdvancedTags(advancedTagDraft.value);
-        }
-
-        async function removeAdvancedTag(tag) {
-            advancedTagList.value = advancedTagList.value.filter(item => item !== tag);
-            await applyAdvancedFilters();
-        }
-
-        async function commitAndApplyAdvancedTags() {
-            commitAdvancedTags();
-            await applyAdvancedFilters();
-        }
-
-        async function handleAdvancedTagKey(event) {
-            if (event.isComposing) return;
-            if ((event.key === 'Backspace' || event.key === 'Delete') && !advancedTagDraft.value && advancedTagList.value.length > 0) {
-                event.preventDefault();
-                advancedTagList.value = advancedTagList.value.slice(0, -1);
-                await applyAdvancedFilters();
-                return;
-            }
-            if (event.key === ',' || event.key === '，') {
-                event.preventDefault();
-                await commitAndApplyAdvancedTags();
-            }
-        }
-
-        async function handleAdvancedTagInput() {
-            if (/[,，]/.test(advancedTagDraft.value)) {
-                commitAdvancedTags();
-                await applyAdvancedFilters();
-            }
         }
 
         function isFieldRevealed(fieldName) {
@@ -2098,70 +1608,11 @@ const app = createApp({
             }
         }
 
-        function aiTagActionLabel(action) {
-            const labels = {
-                create_tag: '新建标签',
-                update_tag: '更新标签',
-                delete_tag: '删除标签',
-                merge_tags: '合并标签',
-                replace_tag: '替换标签',
-                assign_tag: '分配标签'
-            };
-            return labels[action] || action || '标签建议';
-        }
-
-        function aiTagActionTitle(suggestion) {
-            if (!suggestion) return '标签建议';
-            if (suggestion.action === 'merge_tags') {
-                return `${aiTagActionLabel(suggestion.action)}：${(suggestion.source_tags || []).join('、')} → ${suggestion.target_tag || ''}`;
-            }
-            if (suggestion.action === 'update_tag' || suggestion.action === 'replace_tag') {
-                return `${aiTagActionLabel(suggestion.action)}：${suggestion.tag || ''} → ${suggestion.new_tag || ''}`;
-            }
-            return `${aiTagActionLabel(suggestion.action)}：${suggestion.tag || suggestion.target_tag || ''}`;
-        }
-
-        function aiActionTypeLabel(type) {
-            const labels = {
-                create_group: '新建密码组',
-                update_group: '更新密码组',
-                create_entry: '新建条目',
-                create_entry_from_field: '字段拆分为条目',
-                update_entry: '更新条目'
-            };
-            return labels[type] || type || '操作';
-        }
-
-        function aiActionEntryLabel(action) {
-            if (!action) return '';
-            if (action.type === 'create_entry_from_field') {
-                return action.source_entry_title || action.source_entry_id || '';
-            }
-            return action.entry_title || action.entry_id || action.source_entry_title || action.source_entry_id || '';
-        }
-
-        function aiActionTitle(action) {
-            if (!action) return '操作计划';
-            if (action.type === 'create_group') {
-                return `${aiActionTypeLabel(action.type)}：${action.group || ''}`;
-            }
-            if (action.type === 'update_group') {
-                const groupChange = action.group_new && action.group_new !== action.group ? ` → ${action.group_new}` : '';
-                return `${aiActionTypeLabel(action.type)}：${action.group || ''}${groupChange}`;
-            }
-            if (action.type === 'create_entry_from_field') {
-                const sourceLabel = aiActionEntryLabel(action);
-                const fieldLabel = action.field_name ? ` · ${action.field_name}` : '';
-                const targetLabel = action.title ? ` → ${action.title}` : '';
-                return `${aiActionTypeLabel(action.type)}：${sourceLabel}${fieldLabel}${targetLabel}`;
-            }
-            if (action.type === 'update_entry') {
-                const entryLabel = aiActionEntryLabel(action);
-                const titleChange = action.title && action.title !== entryLabel ? ` → ${action.title}` : '';
-                return `${aiActionTypeLabel(action.type)}：${entryLabel}${titleChange}`;
-            }
-            return `${aiActionTypeLabel(action.type)}：${action.title || ''}`;
-        }
+        const aiTagActionLabel = ViewHelpers.aiTagActionLabel;
+        const aiTagActionTitle = ViewHelpers.aiTagActionTitle;
+        const aiActionTypeLabel = ViewHelpers.aiActionTypeLabel;
+        const aiActionEntryLabel = ViewHelpers.aiActionEntryLabel;
+        const aiActionTitle = ViewHelpers.aiActionTitle;
 
         async function previewAiActions() {
             const instruction = aiActionInstruction.value.trim();
@@ -2268,14 +1719,7 @@ const app = createApp({
             }
         }
 
-        function formatAiFailureMessage(error = {}) {
-            if (error.status === 401) return '当前 vault 已锁定，请重新解锁后再使用 AI。原文仍保留，可转为手动录入。';
-            if (error.status === 502) return 'AI 未配置、网络/API 不可用，或模型返回格式异常。原文仍保留，可转为手动录入。';
-            if (error.status >= 500) return 'AI 服务暂时不可用。原文仍保留，可转为手动录入。';
-            if (error.status === 413) return '输入内容过长，请分批解析。原文仍保留，可转为手动录入。';
-            if (error.status === 422) return '输入内容无法解析为有效请求。请调整文本，或转为手动录入。';
-            return `${error.message || 'AI 解析失败'}。原文仍保留，可转为手动录入。`;
-        }
+        const formatAiFailureMessage = ViewHelpers.formatAiFailureMessage;
 
         // 应用 AI 结果
         async function applyAiResult() {
@@ -2322,29 +1766,7 @@ const app = createApp({
             }
         }
 
-        function normalizeEditableAiEntry(entry = {}) {
-            const tags = String(entry.tagsText || '')
-                .split(/[,，]/)
-                .map(tag => tag.trim())
-                .filter(Boolean);
-            const fields = Array.isArray(entry.fields)
-                ? entry.fields
-                    .map(field => ({
-                        name: String(field.name || '').trim(),
-                        value: String(field.value || ''),
-                        copyable: Boolean(field.copyable),
-                        hidden: normalizeFieldHidden(field)
-                    }))
-                    .filter(field => field.name)
-                : [];
-            return {
-                title: String(entry.title || '').trim(),
-                url: String(entry.url || '').trim(),
-                fields,
-                tags: Array.from(new Set(tags)),
-                remarks: String(entry.remarks || '').trim()
-            };
-        }
+        const normalizeEditableAiEntry = ViewHelpers.normalizeEditableAiEntry;
 
         function toggleAiEntrySelection(entry) {
             entry.selected = !entry.selected;
@@ -2360,37 +1782,9 @@ const app = createApp({
             entry.fields.splice(index, 1);
         }
 
-        function normalizeAiParsedEntries(data = {}) {
-            const rawEntries = Array.isArray(data.parsed_entries)
-                ? data.parsed_entries
-                : data.parsed
-                    ? [data.parsed]
-                    : [];
-            return rawEntries.map((entry, index) => ({
-                aiKey: `${Date.now()}-${index}-${Math.random().toString(16).slice(2)}`,
-                selected: true,
-                title: String(entry?.title || `AI 解析条目 ${index + 1}`).trim(),
-                url: String(entry?.url || '').trim(),
-                fields: Array.isArray(entry?.fields) ? entry.fields : [],
-                tags: Array.isArray(entry?.tags) ? entry.tags : [],
-                tagsText: Array.isArray(entry?.tags) ? entry.tags.join(', ') : '',
-                remarks: String(entry?.remarks || '').trim()
-            }));
-        }
-
-        function normalizeAiWarnings(data = {}, entries = []) {
-            const warnings = Array.isArray(data.warnings) ? data.warnings.map(item => String(item || '').trim()).filter(Boolean) : [];
-            if (entries.length > 8) warnings.push('解析结果条目较多，建议逐条确认标题、字段和标签后再创建。');
-            if (entries.some(entry => !entry.fields || entry.fields.length === 0)) warnings.push('部分条目没有字段，可能需要手动补充账号、密码或备注。');
-            return Array.from(new Set(warnings));
-        }
-
-        function buildAiRemarks(entryRemarks = '') {
-            const parts = [];
-            if (entryRemarks) parts.push(entryRemarks);
-            if (aiText.value) parts.push(`AI 原文：\n${aiText.value}`);
-            return parts.join('\n\n');
-        }
+        const normalizeAiParsedEntries = ViewHelpers.normalizeAiParsedEntries;
+        const normalizeAiWarnings = ViewHelpers.normalizeAiWarnings;
+        const buildAiRemarks = entryRemarks => ViewHelpers.buildAiRemarks(entryRemarks, aiText.value);
 
         // 保存设置
         async function saveSettings() {
@@ -2512,48 +1906,6 @@ const app = createApp({
             aiSettingsForm.model = aiSettingsStatus.value?.model || '';
             aiSettingsForm.apiKey = '';
             aiModels.value = aiSettingsStatus.value?.model ? [aiSettingsStatus.value.model] : [];
-        }
-
-        function startAutoLockTimer() {
-            clearAutoLockTimer();
-            const minutes = Number(settingsForm.autoLockMinutes || 0);
-            if (locked.value || minutes <= 0) return;
-
-            autoLockTimer = setTimeout(async () => {
-                showToast('已因长时间无操作自动锁定', 'warning');
-                try {
-                    await store.lock();
-                } catch (error) {
-                    // 即使网络请求失败，也必须立即清除前端解锁态。
-                } finally {
-                    applyLockedState();
-                }
-            }, minutes * 60 * 1000);
-        }
-
-        function clearAutoLockTimer() {
-            if (autoLockTimer) {
-                clearTimeout(autoLockTimer);
-                autoLockTimer = null;
-            }
-        }
-
-        function resetAutoLockTimer() {
-            if (!locked.value) {
-                startAutoLockTimer();
-            }
-        }
-
-        function bindActivityListeners() {
-            activityEventNames.forEach(eventName => {
-                window.addEventListener(eventName, resetAutoLockTimer, { passive: true });
-            });
-        }
-
-        function handleUnauthorizedLock(event) {
-            if (locked.value) return;
-            showToast(event.detail?.message || '已锁定，请重新解锁', 'warning');
-            applyLockedState();
         }
 
         // 修改密码
@@ -2832,28 +2184,9 @@ const app = createApp({
             }
         }
 
-        function formatBytes(size) {
-            if (size < 1024) return `${size} B`;
-            if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`;
-            return `${(size / 1024 / 1024).toFixed(1)} MB`;
-        }
-
-        function backupTypeLabel(type) {
-            if (type === 'manual') return '手动备份';
-            if (type === 'auto') return '自动备份';
-            return '旧版备份';
-        }
-
-        function friendlyApiMessage(error, fallback) {
-            if (!error) return fallback;
-            if (error.status === 401) return '当前会话已失效，请重新解锁后再操作。';
-            if (error.status === 409) return '数据文件已被其他进程修改，请重新解锁或刷新后再操作。';
-            if (error.status === 413) return '请求或文件过大，请减小内容后重试。';
-            if (error.status === 422) return error.message || '请求内容无效，请检查输入后重试。';
-            if (error.status === 423 || error.code === 'VAULT_LOCKED') return '数据文件正在被其他进程使用。请确认没有旧的 SecretBase 进程仍在运行后重试。';
-            if (error.status >= 500) return '服务器内部错误，请稍后重试或检查后端日志。';
-            return error.message || fallback;
-        }
+        const formatBytes = ViewHelpers.formatBytes;
+        const backupTypeLabel = ViewHelpers.backupTypeLabel;
+        const friendlyApiMessage = ViewHelpers.friendlyApiMessage;
 
         async function loadBackups() {
             if (backupListLoading.value) return;

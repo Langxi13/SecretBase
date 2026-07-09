@@ -4,17 +4,19 @@ const vm = require('vm');
 
 const projectRoot = path.resolve(__dirname, '..');
 const appPath = path.join(projectRoot, 'frontend/js/app.js');
+const themeControllerPath = path.join(projectRoot, 'frontend/js/theme-controller.js');
 const indexPath = path.join(projectRoot, 'frontend/index.html');
 const systemCssPath = path.join(projectRoot, 'frontend/css/themes/system.css');
 
 const appSource = fs.readFileSync(appPath, 'utf8');
+const themeSource = fs.readFileSync(themeControllerPath, 'utf8');
 const indexSource = fs.readFileSync(indexPath, 'utf8');
 
-if (!appSource.includes("default: return '🕒';")) {
+if (!themeSource.includes("default: return '🕒';")) {
     throw new Error('Auto time theme should keep its own clock icon');
 }
 
-const resolverMatch = appSource.match(/function resolveAutoTheme\(date = new Date\(\)\) \{[\s\S]*?\n        \}/);
+const resolverMatch = themeSource.match(/function resolveAutoTheme\(date = new Date\(\)\) \{[\s\S]*?\n        \}/);
 if (!resolverMatch) {
     throw new Error('resolveAutoTheme function not found');
 }
@@ -35,8 +37,8 @@ for (const [name, date, expected] of cases) {
     }
 }
 
-if (appSource.includes('matchMedia')) {
-    throw new Error('Old system color-scheme matchMedia logic should not remain in app.js');
+if (appSource.includes('matchMedia') || themeSource.includes('matchMedia')) {
+    throw new Error('Old system color-scheme matchMedia logic should not remain in frontend theme code');
 }
 
 if (indexSource.includes('system.css')) {

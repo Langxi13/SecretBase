@@ -61,6 +61,14 @@ frontend/
     ├── store.js            # API 调用和轻量状态管理
     ├── utils.js            # 通用工具函数、复制、favicon、日期格式化
     ├── pagination.js       # 分页条数归一化和本地偏好读写
+    ├── auto-lock.js        # 自动锁定计时器和活动监听
+    ├── theme-controller.js # 主题状态、时间跟随主题和主题图标
+    ├── filter-controller.js # 高级筛选 chip、本地保存和标签输入处理
+    ├── view-helpers.js     # 卡片颜色、日期、字段、AI 标题等展示辅助
+    ├── tag-view.js         # 标签排序、更多标签和标签管理分页 computed
+    ├── group-view.js       # 密码组分页和选择已有条目 computed
+    ├── backup-view.js      # 备份中心分组、摘要和忙碌态 computed
+    ├── ai-view.js          # AI 输入状态、整理摘要和操作计划摘要 computed
     └── toast.js            # Toast DOM 创建与安全文本写入
 ```
 
@@ -230,6 +238,7 @@ V2.4 以“高级暗色 + 克制工具层级”为主方向，优化 SecretBase 
 - CSS 使用现有 `style.css`、`components.css` 和 `themes/*.css`，不引入 npm 构建链或外部图标库。
 - 后段增强样式拆分到 `visual-polish.css` 与 `component-polish.css`，入口顺序必须保持为基础样式、主题样式、视觉覆盖、组件覆盖，避免覆盖关系失效。
 - `pagination.js` 必须在 `app.js` 之前加载，提供 `window.SecretBasePagination`。所有前端分页条数偏好统一通过 `normalizeUniversalPageSize`、`loadPageSizePreference` 和 `savePageSizePreference` 处理。
+- `auto-lock.js`、`theme-controller.js`、`filter-controller.js`、`tag-view.js`、`group-view.js`、`backup-view.js`、`ai-view.js` 和 `view-helpers.js` 只承载展示层、computed 工厂或本地控制逻辑，不直接改后端接口语义。
 - `toast.js` 必须在 `store.js` 和 `app.js` 之前加载，Toast 消息必须使用 `textContent` 写入，不得用 `innerHTML` 拼接用户或错误内容。
 - 入口页引用本地 CSS/JS 时使用版本查询参数；生产 nginx 可以长缓存静态资源，但每次前端视觉发布都必须同步更新资源版本，避免浏览器继续使用旧样式。
 - 轻量浮层使用具名 document click 监听关闭复制菜单和标签菜单；组件卸载时清理事件监听和自动锁定计时器。

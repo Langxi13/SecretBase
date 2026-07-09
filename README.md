@@ -275,6 +275,7 @@ node scripts\test-frontend-ai-organize.js
 node scripts\test-frontend-tag-management.js
 node scripts\test-frontend-password-groups.js
 node scripts\test-frontend-module-split.js
+node scripts\test-frontend-feature-modules.js
 node scripts\test-frontend-toast-security.js
 node --check frontend\js\app.js
 node --check frontend\js\api.js
@@ -282,6 +283,14 @@ node --check frontend\js\store.js
 node --check frontend\js\utils.js
 node --check frontend\js\pagination.js
 node --check frontend\js\toast.js
+node --check frontend\js\auto-lock.js
+node --check frontend\js\theme-controller.js
+node --check frontend\js\filter-controller.js
+node --check frontend\js\view-helpers.js
+node --check frontend\js\tag-view.js
+node --check frontend\js\group-view.js
+node --check frontend\js\backup-view.js
+node --check frontend\js\ai-view.js
 ```
 
 `scripts/v1-fake-smoke-test.py` 使用临时 vault，不会读取或修改真实数据。
@@ -589,6 +598,7 @@ node scripts\test-frontend-ai-organize.js
 node scripts\test-frontend-tag-management.js
 node scripts\test-frontend-password-groups.js
 node scripts\test-frontend-module-split.js
+node scripts\test-frontend-feature-modules.js
 node scripts\test-frontend-toast-security.js
 node --check frontend\js\app.js
 node --check frontend\js\api.js
@@ -596,6 +606,14 @@ node --check frontend\js\store.js
 node --check frontend\js\utils.js
 node --check frontend\js\pagination.js
 node --check frontend\js\toast.js
+node --check frontend\js\auto-lock.js
+node --check frontend\js\theme-controller.js
+node --check frontend\js\filter-controller.js
+node --check frontend\js\view-helpers.js
+node --check frontend\js\tag-view.js
+node --check frontend\js\group-view.js
+node --check frontend\js\backup-view.js
+node --check frontend\js\ai-view.js
 ```
 
 `scripts/v1-fake-smoke-test.py` uses a temporary vault and does not read or modify real data.

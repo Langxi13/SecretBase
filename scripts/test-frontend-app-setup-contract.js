@@ -56,6 +56,19 @@ const returnEndIndex = appJs.indexOf('\n        };', returnIndex);
 const setupPrefix = appJs.slice(0, returnIndex);
 const returnBlock = appJs.slice(returnIndex, returnEndIndex);
 const returnedNames = [...returnBlock.matchAll(/^\s*([A-Za-z_$][\w$]*),\s*$/gm)].map(match => match[1]);
+const destructuredConstNames = new Set();
+[...setupPrefix.matchAll(/const\s+\{([\s\S]*?)\}\s*=/g)].forEach(match => {
+    match[1]
+        .split(',')
+        .map(name => name.trim())
+        .filter(Boolean)
+        .forEach(name => {
+            const localName = name.includes(':') ? name.split(':').pop().trim() : name;
+            if (/^[A-Za-z_$][\w$]*$/.test(localName)) {
+                destructuredConstNames.add(localName);
+            }
+        });
+});
 const missingReturnedNames = returnedNames.filter(name => {
     const declarationPatterns = [
         new RegExp(`\\bconst\\s+${name}\\b`),
@@ -64,7 +77,7 @@ const missingReturnedNames = returnedNames.filter(name => {
         new RegExp(`\\bfunction\\s+${name}\\b`),
         new RegExp(`\\basync\\s+function\\s+${name}\\b`)
     ];
-    return !declarationPatterns.some(pattern => pattern.test(setupPrefix));
+    return !destructuredConstNames.has(name) && !declarationPatterns.some(pattern => pattern.test(setupPrefix));
 });
 
 if (missingReturnedNames.length > 0) {
