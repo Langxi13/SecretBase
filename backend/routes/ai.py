@@ -956,6 +956,17 @@ def _normalize_ai_actions_payload(payload, valid_entry_ids: set[str]) -> tuple[l
     return actions, list(dict.fromkeys(warnings))
 
 
+def _attach_ai_action_entry_titles(actions: list[dict], entries_by_id: dict[str, object]) -> list[dict]:
+    for action in actions:
+        entry = entries_by_id.get(action.get("entry_id") or "")
+        if entry:
+            action["entry_title"] = entry.title
+        source_entry = entries_by_id.get(action.get("source_entry_id") or "")
+        if source_entry:
+            action["source_entry_title"] = source_entry.title
+    return actions
+
+
 def _ai_actions_summary(actions: list[dict]) -> dict:
     selected = [item for item in actions if item.get("selected", True)]
     summary = {
@@ -1419,7 +1430,9 @@ async def ai_actions_preview(request: AiActionPreviewRequest):
             5000,
         )
         payload = _extract_json_content(content)
-        actions, warnings = _normalize_ai_actions_payload(payload, {entry.id for entry in entries})
+        entries_by_id = {entry.id: entry for entry in entries}
+        actions, warnings = _normalize_ai_actions_payload(payload, set(entries_by_id.keys()))
+        actions = _attach_ai_action_entry_titles(actions, entries_by_id)
     except HTTPException:
         raise
     except json.JSONDecodeError as e:

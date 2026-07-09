@@ -1986,16 +1986,29 @@ const app = createApp({
             return labels[type] || type || '操作';
         }
 
+        function aiActionEntryLabel(action) {
+            if (!action) return '';
+            if (action.type === 'create_entry_from_field') {
+                return action.source_entry_title || action.source_entry_id || '';
+            }
+            return action.entry_title || action.entry_id || action.source_entry_title || action.source_entry_id || '';
+        }
+
         function aiActionTitle(action) {
             if (!action) return '操作计划';
             if (action.type === 'create_group') {
                 return `${aiActionTypeLabel(action.type)}：${action.group || ''}`;
             }
             if (action.type === 'create_entry_from_field') {
-                return `${aiActionTypeLabel(action.type)}：${action.title || action.field_name || ''}`;
+                const sourceLabel = aiActionEntryLabel(action);
+                const fieldLabel = action.field_name ? ` · ${action.field_name}` : '';
+                const targetLabel = action.title ? ` → ${action.title}` : '';
+                return `${aiActionTypeLabel(action.type)}：${sourceLabel}${fieldLabel}${targetLabel}`;
             }
             if (action.type === 'update_entry') {
-                return `${aiActionTypeLabel(action.type)}：${action.title || action.entry_id || ''}`;
+                const entryLabel = aiActionEntryLabel(action);
+                const titleChange = action.title && action.title !== entryLabel ? ` → ${action.title}` : '';
+                return `${aiActionTypeLabel(action.type)}：${entryLabel}${titleChange}`;
             }
             return `${aiActionTypeLabel(action.type)}：${action.title || ''}`;
         }
@@ -3469,6 +3482,7 @@ const app = createApp({
             aiTagActionLabel,
             aiTagActionTitle,
             aiActionTypeLabel,
+            aiActionEntryLabel,
             aiActionTitle,
             toggleAiEntrySelection,
             addAiEntryField,

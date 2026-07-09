@@ -90,6 +90,12 @@ def main() -> None:
                             "reason": "把字段拆成独立条目",
                         },
                         {
+                            "type": "update_entry",
+                            "entry_id": entry_payload["id"],
+                            "add_tags": ["云平台"],
+                            "reason": "给原条目补充分类标签",
+                        },
+                        {
                             "type": "delete_entry",
                             "entry_id": entry_payload["id"],
                             "reason": "不允许执行的危险动作",
@@ -146,10 +152,14 @@ def main() -> None:
         )
         assert captured_payloads, "AI 交互必须调用模型生成操作计划"
         assert preview["entry_count"] == 1
-        assert len(preview["actions"]) == 4
+        assert len(preview["actions"]) == 5
         assert preview["summary"]["create_group"] == 1
         assert preview["summary"]["create_entry_from_field"] == 3
+        assert preview["summary"]["update_entry"] == 1
         assert preview["actions"][0]["selected"] is True
+        assert preview["actions"][1]["source_entry_title"] == "demo.example"
+        assert preview["actions"][4]["entry_title"] == "demo.example"
+        assert preview["actions"][4]["title"] is None
         assert "delete_entry" not in {action["type"] for action in preview["actions"]}
         assert any("不支持" in warning or "已忽略" in warning for warning in preview["warnings"])
         assert "不会发送任何字段值" in preview["privacy_note"]
@@ -168,8 +178,8 @@ def main() -> None:
         )
         assert apply_result["created_groups"] == 1
         assert apply_result["created_entries"] == 3
-        assert apply_result["updated_entries"] == 0
-        assert apply_result["applied_count"] == 4
+        assert apply_result["updated_entries"] == 1
+        assert apply_result["applied_count"] == 5
 
         groups = expect_success(client.get("/groups", headers=headers), "groups")["groups"]
         demo-service_group = next(group for group in groups if group["name"] == "demo-service")
@@ -183,6 +193,7 @@ def main() -> None:
         assert {"demo.example", "demo-service 账号", "demo-service 密码", "demo-service API Key"}.issubset(titles)
         source_detail = expect_success(client.get(f"/entries/{source['id']}", headers=headers), "source detail")
         assert [field["value"] for field in source_detail["fields"]] == ["main-user", "demo-service-password", "sk-secret"]
+        assert "云平台" in source_detail["tags"]
 
         details_by_title = {}
         for entry in entries:

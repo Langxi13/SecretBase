@@ -1388,11 +1388,11 @@ POST /ai/actions/preview
   "data": {
     "entry_count": 1,
     "summary": {
-      "total_actions": 4,
+      "total_actions": 5,
       "create_group": 1,
       "create_entry": 0,
       "create_entry_from_field": 3,
-      "update_entry": 0
+      "update_entry": 1
     },
     "actions": [
       {
@@ -1406,12 +1406,21 @@ POST /ai/actions/preview
         "type": "create_entry_from_field",
         "selected": true,
         "source_entry_id": "uuid",
+        "source_entry_title": "demo.example",
         "field_index": 0,
         "field_name": "账号",
         "title": "demo-service 账号",
         "groups": ["demo-service"],
         "tags": ["demo-service"],
         "reason": "把字段拆成独立条目"
+      },
+      {
+        "type": "update_entry",
+        "selected": true,
+        "entry_id": "uuid",
+        "entry_title": "demo.example",
+        "add_tags": ["云平台"],
+        "reason": "给原条目补充分类标签"
       }
     ],
     "warnings": [],
