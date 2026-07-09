@@ -7,16 +7,16 @@
     
     <!-- Vue 3 CDN (Production) -->
     <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
-    <script src="/secretbase-runtime-config.js?v=20260709-ui-v57"></script>
+    <script src="/secretbase-runtime-config.js?v=20260709-ui-v58"></script>
     
     <!-- 基础样式 -->
-    <link rel="stylesheet" href="css/style.css?v=20260709-ui-v57">
-    <link rel="stylesheet" href="css/components.css?v=20260709-ui-v57">
+    <link rel="stylesheet" href="css/style.css?v=20260709-ui-v58">
+    <link rel="stylesheet" href="css/components.css?v=20260709-ui-v58">
     
     <!-- 主题样式 -->
-    <link rel="stylesheet" href="css/themes/variables.css?v=20260709-ui-v57">
-    <link rel="stylesheet" href="css/themes/dark.css?v=20260709-ui-v57">
-    <link rel="stylesheet" href="css/themes/light.css?v=20260709-ui-v57">
+    <link rel="stylesheet" href="css/themes/variables.css?v=20260709-ui-v58">
+    <link rel="stylesheet" href="css/themes/dark.css?v=20260709-ui-v58">
+    <link rel="stylesheet" href="css/themes/light.css?v=20260709-ui-v58">
     
     <!-- Favicon -->
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🔐</text></svg>">
@@ -350,20 +350,21 @@
                             v-for="group in groups"
                             :key="group.name"
                             class="group-card"
+                            :style="groupCardStyle(group)"
                             role="button"
                             tabindex="0"
                             @click="filterByGroup(group.name)"
                             @keydown.enter.prevent="filterByGroup(group.name)"
                             @keydown.space.prevent="filterByGroup(group.name)"
                         >
-                            <span class="group-card-accent" :style="{ backgroundColor: group.color || getTagColor(group.name) }"></span>
+                            <span class="group-card-accent"></span>
                             <span class="group-card-main">
                                 <strong>{{ group.name }}</strong>
                                 <small>{{ group.description || '暂无简介' }}</small>
                             </span>
                             <span class="group-card-meta">
                                 <b>{{ group.count || 0 }}</b>
-                                <small>条目</small>
+                                <small class="group-card-count-label">条目</small>
                             </span>
                             <span class="group-card-date">{{ group.updated_at ? formatDate(group.updated_at) : '暂无更新' }}</span>
                             <span class="group-card-order-actions" @click.stop>
@@ -401,6 +402,7 @@
                         v-for="entry in entries" 
                         :key="entry.id"
                         class="entry-card"
+                        :style="entryCardStyle(entry)"
                         @click="viewEntry(entry)"
                     >
                         <div class="card-header">
@@ -442,12 +444,20 @@
 
                         <div class="card-groups" v-if="entry.groups && entry.groups.length > 0">
                             <span
-                                v-for="group in entry.groups"
+                                v-for="group in visibleEntryGroups(entry)"
                                 :key="group"
                                 class="group-chip"
+                                :style="groupChipStyle(group)"
                                 @click.stop="filterByGroup(group)"
                             >
                                 {{ group }}
+                            </span>
+                            <span
+                                v-if="remainingEntryGroupsCount(entry) > 0"
+                                class="group-chip group-chip-more"
+                                :title="entry.groups.join('、')"
+                            >
+                                +{{ remainingEntryGroupsCount(entry) }}
                             </span>
                         </div>
                         
@@ -1980,9 +1990,9 @@
     </div>
     
     <!-- JS 模块 -->
-    <script src="js/api.js?v=20260709-ui-v57"></script>
-    <script src="js/utils.js?v=20260709-ui-v57"></script>
-    <script src="js/store.js?v=20260709-ui-v57"></script>
-    <script src="js/app.js?v=20260709-ui-v57"></script>
+    <script src="js/api.js?v=20260709-ui-v58"></script>
+    <script src="js/utils.js?v=20260709-ui-v58"></script>
+    <script src="js/store.js?v=20260709-ui-v58"></script>
+    <script src="js/app.js?v=20260709-ui-v58"></script>
 </body>
 </html>

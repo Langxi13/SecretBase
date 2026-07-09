@@ -1263,6 +1263,55 @@ const app = createApp({
             return window.getTagColor(tagName);
         }
 
+        function groupAccentColor(group) {
+            const explicitColor = group && typeof group === 'object' ? String(group.color || '').trim() : '';
+            const groupName = group && typeof group === 'object' ? group.name : group;
+            const name = String(groupName || '').trim();
+            return explicitColor || getTagColor(name || '默认');
+        }
+
+        function groupCardStyle(group) {
+            return {
+                '--group-accent': groupAccentColor(group)
+            };
+        }
+
+        function entryAccentColor(entry = {}) {
+            const entryGroups = Array.isArray(entry.groups) ? entry.groups.filter(Boolean) : [];
+            if (entryGroups.length > 0) {
+                return groupAccentColor(entryGroups[0]);
+            }
+
+            const entryTags = Array.isArray(entry.tags) ? entry.tags.filter(Boolean) : [];
+            if (entryTags.length > 0) {
+                return getTagColor(entryTags[0]);
+            }
+
+            return 'var(--color-primary)';
+        }
+
+        function entryCardStyle(entry) {
+            return {
+                '--entry-accent': entryAccentColor(entry)
+            };
+        }
+
+        function visibleEntryGroups(entry = {}) {
+            const entryGroups = Array.isArray(entry.groups) ? entry.groups.filter(Boolean) : [];
+            return entryGroups.slice(0, 2);
+        }
+
+        function remainingEntryGroupsCount(entry = {}) {
+            const entryGroups = Array.isArray(entry.groups) ? entry.groups.filter(Boolean) : [];
+            return Math.max(0, entryGroups.length - visibleEntryGroups(entry).length);
+        }
+
+        function groupChipStyle(groupName) {
+            return {
+                '--chip-accent': groupAccentColor(groupName)
+            };
+        }
+
         // 格式化日期
         function formatDate(dateString) {
             return window.formatDate ? window.formatDate(dateString) : dateString;
@@ -3474,6 +3523,11 @@ const app = createApp({
             selectSettingsTab,
             getFavicon,
             getTagColor,
+            groupCardStyle,
+            entryCardStyle,
+            visibleEntryGroups,
+            remainingEntryGroupsCount,
+            groupChipStyle,
             formatDate,
             toggleStar,
             viewEntry,

@@ -634,10 +634,12 @@ img {
 
 /* 条目卡片 */
 .entry-card {
-    background: var(--bg-card);
+    --entry-accent: var(--color-primary);
     border: 1px solid var(--border-color);
+    border-left: 4px solid var(--entry-accent);
+    background: color-mix(in srgb, var(--entry-accent) 5%, var(--bg-card));
     border-radius: var(--border-radius-lg);
-    padding: 16px;
+    padding: 16px 16px 16px 14px;
     cursor: pointer;
     transition: all var(--transition-fast);
 }
@@ -725,13 +727,14 @@ img {
 }
 
 .group-chip {
+    --chip-accent: var(--color-primary);
     display: inline-flex;
     align-items: center;
     max-width: 100%;
     padding: 4px 9px;
-    border: 1px solid color-mix(in srgb, var(--color-primary) 35%, var(--border-color));
+    border: 1px solid color-mix(in srgb, var(--chip-accent) 38%, var(--border-color));
     border-radius: 999px;
-    background: var(--color-primary-light);
+    background: color-mix(in srgb, var(--chip-accent) 12%, var(--bg-card));
     color: var(--text-primary);
     font-size: var(--font-size-xs);
     line-height: 1.2;
@@ -742,6 +745,13 @@ img {
 
 .group-chip.selected {
     background: color-mix(in srgb, var(--color-primary) 18%, var(--bg-card));
+}
+
+.group-chip-more {
+    border-style: dashed;
+    background: var(--bg-secondary);
+    color: var(--text-secondary);
+    cursor: default;
 }
 
 .card-fields {
@@ -1405,6 +1415,7 @@ body {
 }
 
 .group-card {
+    --group-accent: var(--color-primary);
     position: relative;
     display: grid;
     grid-template-columns: 1fr auto;
@@ -1413,24 +1424,26 @@ body {
     padding: 18px;
     overflow: hidden;
     text-align: left;
-    border: 1px solid var(--border-color);
+    border: 1px solid color-mix(in srgb, var(--group-accent) 24%, var(--border-color));
     border-radius: var(--border-radius-lg);
-    background: var(--bg-card);
+    background: color-mix(in srgb, var(--group-accent) 8%, var(--bg-card));
     box-shadow: var(--shadow-sm);
     cursor: pointer;
-    transition: transform var(--transition-fast), box-shadow var(--transition-fast), border-color var(--transition-fast);
+    transition: transform var(--transition-fast), box-shadow var(--transition-fast), border-color var(--transition-fast), background var(--transition-fast);
 }
 
 .group-card:hover {
     transform: translateY(-2px);
-    border-color: color-mix(in srgb, var(--color-primary) 42%, var(--border-color));
+    border-color: color-mix(in srgb, var(--group-accent) 48%, var(--border-color));
+    background: color-mix(in srgb, var(--group-accent) 12%, var(--bg-card));
     box-shadow: var(--shadow-md);
 }
 
 .group-card-accent {
     position: absolute;
     inset: 0 auto 0 0;
-    width: 4px;
+    width: 5px;
+    background: var(--group-accent);
 }
 
 .group-card-main {
@@ -1466,14 +1479,20 @@ body {
     flex-direction: column;
     min-width: 54px;
     min-height: 54px;
+    border: 1px solid color-mix(in srgb, var(--group-accent) 42%, var(--border-color));
     border-radius: 12px;
-    background: var(--bg-secondary);
+    background: color-mix(in srgb, var(--group-accent) 16%, var(--bg-card));
 }
 
 .group-card-meta b {
-    color: var(--text-primary);
+    color: color-mix(in srgb, var(--group-accent) 72%, var(--text-primary));
     font-size: var(--font-size-xl);
     line-height: 1;
+}
+
+.group-card-count-label {
+    margin-top: 3px;
+    font-size: 11px;
 }
 
 .group-card-date {
@@ -1551,7 +1570,8 @@ body {
 .entry-card {
     position: relative;
     overflow: hidden;
-    border-color: color-mix(in srgb, var(--border-color) 82%, transparent);
+    border-color: color-mix(in srgb, var(--entry-accent) 20%, var(--border-color));
+    border-left-color: var(--entry-accent);
     box-shadow: var(--shadow-sm);
 }
 
@@ -1560,7 +1580,7 @@ body {
     position: absolute;
     inset: 0 0 auto;
     height: 3px;
-    background: linear-gradient(90deg, var(--color-primary), var(--color-accent, var(--color-primary)));
+    background: linear-gradient(90deg, var(--entry-accent), var(--color-accent, var(--entry-accent)));
     opacity: 0;
     transition: opacity var(--transition-fast);
 }
@@ -1570,7 +1590,9 @@ body {
 }
 
 .entry-card:hover {
-    border-color: color-mix(in srgb, var(--color-primary) 40%, var(--border-color));
+    border-color: color-mix(in srgb, var(--entry-accent) 42%, var(--border-color));
+    border-left-color: var(--entry-accent);
+    background: color-mix(in srgb, var(--entry-accent) 8%, var(--bg-card));
 }
 
 .card-fields {
