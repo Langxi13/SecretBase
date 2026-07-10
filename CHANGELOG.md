@@ -8,6 +8,7 @@
 - 修复 Windows 启动器退出时可能遗留后端进程并占用日志文件的问题。
 - 增加 locale 无关的备份名称回归测试，恢复 Windows 发布检查。
 - 发布测试在清理临时目录前统一关闭日志文件，兼容 Windows 文件锁语义。
+- Vue vendored 完整性校验统一换行后计算哈希，兼容 Windows CRLF checkout。
 
 ## 3.0.0 - 2026-07-10
 
