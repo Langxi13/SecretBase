@@ -29,6 +29,11 @@ def test_powershell_encoding() -> None:
 
     launcher = (ROOT / "scripts" / "start-local.ps1").read_bytes()
     assert launcher.startswith(codecs.BOM_UTF8), "Windows 启动脚本必须兼容 PowerShell 5.1"
+    launcher_text = launcher.decode("utf-8-sig")
+    assert '$env:PYTHONUTF8 = "1"' in launcher_text
+    assert '$env:PYTHONIOENCODING = "utf-8"' in launcher_text
+    assert '$env:PIP_PROGRESS_BAR = "off"' in launcher_text
+    assert launcher_text.count("--progress-bar off") == 2
 
 
 def test_cmd_encoding_and_entrypoint() -> None:

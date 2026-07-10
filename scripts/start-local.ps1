@@ -5,6 +5,9 @@
 )
 
 $ErrorActionPreference = "Stop"
+$env:PYTHONUTF8 = "1"
+$env:PYTHONIOENCODING = "utf-8"
+$env:PIP_PROGRESS_BAR = "off"
 
 $ProjectRoot = Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Path)
 $VenvDir = Join-Path $ProjectRoot ".venv"
@@ -39,9 +42,9 @@ $RequirementsHash = (Get-FileHash -Algorithm SHA256 $Requirements).Hash.ToLowerI
 $InstalledHash = if (Test-Path $StampFile) { (Get-Content -Raw $StampFile).Trim() } else { "" }
 if ($RequirementsHash -ne $InstalledHash) {
     Write-Host "正在安装或更新 SecretBase 依赖..."
-    & $VenvPython -m pip install --disable-pip-version-check --upgrade pip
+    & $VenvPython -m pip install --disable-pip-version-check --progress-bar off --upgrade pip
     if ($LASTEXITCODE -ne 0) { throw "更新 pip 失败。" }
-    & $VenvPython -m pip install --disable-pip-version-check -r $Requirements
+    & $VenvPython -m pip install --disable-pip-version-check --progress-bar off -r $Requirements
     if ($LASTEXITCODE -ne 0) { throw "安装依赖失败。" }
     Set-Content -Path $StampFile -Value $RequirementsHash -NoNewline -Encoding ascii
 }

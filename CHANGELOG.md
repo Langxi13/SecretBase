@@ -5,6 +5,7 @@
 ### 修复
 
 - 修复 Windows PowerShell 5.1 将无 BOM UTF-8 启动脚本按系统代码页读取，导致中文乱码和脚本解析失败的问题。
+- 修复英文 Windows 等非中文系统在包含 Unicode 字符的解压路径中安装依赖时，Python/pip 输出编码失败的问题。
 
 ### 兼容性
 
