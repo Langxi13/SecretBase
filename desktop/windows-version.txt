@@ -1,0 +1,30 @@
+VSVersionInfo(
+  ffi=FixedFileInfo(
+    filevers=(3, 1, 0, 0),
+    prodvers=(3, 1, 0, 0),
+    mask=0x3f,
+    flags=0x0,
+    OS=0x40004,
+    fileType=0x1,
+    subtype=0x0,
+    date=(0, 0)
+  ),
+  kids=[
+    StringFileInfo([
+      StringTable(
+        '040904B0',
+        [
+          StringStruct('CompanyName', 'SecretBase contributors'),
+          StringStruct('FileDescription', 'SecretBase password manager'),
+          StringStruct('FileVersion', '3.1.0'),
+          StringStruct('InternalName', 'SecretBase'),
+          StringStruct('LegalCopyright', 'Copyright (c) 2026 SecretBase contributors'),
+          StringStruct('OriginalFilename', 'SecretBase.exe'),
+          StringStruct('ProductName', 'SecretBase'),
+          StringStruct('ProductVersion', '3.1.0')
+        ]
+      )
+    ]),
+    VarFileInfo([VarStruct('Translation', [1033, 1200])])
+  ]
+)
