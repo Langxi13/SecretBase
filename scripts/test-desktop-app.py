@@ -56,6 +56,32 @@ def test_desktop_app_self_test() -> None:
         assert payload["frontend_loaded"] is True
 
 
+def test_windowed_self_test_without_standard_streams() -> None:
+    with tempfile.TemporaryDirectory() as raw:
+        root = Path(raw)
+        report = root / "self-test.json"
+        exit_code = root / "exit-code.txt"
+        script = (
+            "import sys\n"
+            "from pathlib import Path\n"
+            "sys.stdout = None\n"
+            "sys.stderr = None\n"
+            "from desktop.app import run_self_test\n"
+            f"code = run_self_test({str(root / 'runtime')!r}, {str(report)!r})\n"
+            f"Path({str(exit_code)!r}).write_text(str(code), encoding='ascii')\n"
+        )
+        result = subprocess.run(
+            [sys.executable, "-c", script],
+            cwd=ROOT,
+            check=False,
+        )
+        assert result.returncode == 0
+        assert exit_code.read_text(encoding="ascii") == "0"
+        payload = json.loads(report.read_text(encoding="utf-8"))
+        assert payload["success"] is True
+        assert payload["frontend_loaded"] is True
+
+
 def test_desktop_download_bridge() -> None:
     server = ThreadingHTTPServer(("127.0.0.1", 0), DownloadHandler)
     thread = threading.Thread(target=server.serve_forever, daemon=True)
@@ -151,6 +177,7 @@ def test_non_windows_single_instance_fallback() -> None:
 def main() -> None:
     tests = (
         test_desktop_app_self_test,
+        test_windowed_self_test_without_standard_streams,
         test_desktop_download_bridge,
         test_desktop_download_cancel_stops_before_request,
         test_desktop_file_dialog_result_compatibility,

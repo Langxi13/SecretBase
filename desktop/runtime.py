@@ -202,6 +202,7 @@ class InProcessDesktopServer:
             host="127.0.0.1",
             port=self.port,
             log_level="warning",
+            log_config=None,
             access_log=False,
         )
         self._server = uvicorn.Server(config)
@@ -225,4 +226,3 @@ class InProcessDesktopServer:
         if self._thread is not None and self._thread.is_alive() and self._server is not None:
             self._server.force_exit = True
             self._thread.join(timeout=2)
-

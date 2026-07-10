@@ -13,6 +13,7 @@ import time
 import os
 import json
 import re
+import sys
 
 from config import (
     PORT,
@@ -100,9 +101,10 @@ def setup_logging():
     root_logger.setLevel(getattr(logging, LOG_LEVEL.upper(), logging.INFO))
     root_logger.addHandler(handler)
     
-    console_handler = logging.StreamHandler()
-    console_handler.setFormatter(formatter)
-    root_logger.addHandler(console_handler)
+    if sys.stderr is not None:
+        console_handler = logging.StreamHandler()
+        console_handler.setFormatter(formatter)
+        root_logger.addHandler(console_handler)
     root_logger._secretbase_logging_configured = True
 
 ensure_runtime_dirs()
