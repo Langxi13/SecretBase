@@ -91,9 +91,9 @@
                     <span class="sidebar-btn-text">新建条目</span>
                 </button>
                 <nav class="sidebar-section" aria-label="条目视图">
-                    <span class="sidebar-label" :title="isSidebarCollapsed ? '视图' : ''">
+                    <span class="sidebar-label sidebar-label-view" aria-label="视图" :title="isSidebarCollapsed ? '视图' : ''">
+                        <span class="sidebar-label-icon" aria-hidden="true">▦</span>
                         <span class="label-text">视图</span>
-                        <i class="label-indicator"></i>
                     </span>
                     <button class="sidebar-nav-item" :class="{ active: filter === 'all' && !activeTagName }" @click="showAllEntries" :title="isSidebarCollapsed ? '全部条目 (' + totalEntries + ')' : ''">
                         <span class="nav-icon-text"><i class="nav-icon">📑</i><span class="nav-text">全部条目</span></span>
@@ -109,9 +109,9 @@
                     </button>
                 </nav>
                 <nav class="sidebar-section sidebar-tags" aria-label="标签筛选">
-                    <span class="sidebar-label" :title="isSidebarCollapsed ? '标签' : ''">
+                    <span class="sidebar-label sidebar-label-tags" aria-label="标签" :title="isSidebarCollapsed ? '标签' : ''">
+                        <span class="sidebar-label-icon" aria-hidden="true">🏷️</span>
                         <span class="label-text">标签</span>
-                        <i class="label-indicator"></i>
                     </span>
                     <button
                         class="sidebar-nav-item sidebar-more-tags"
@@ -134,9 +134,9 @@
                     </button>
                 </nav>
                 <nav class="sidebar-section sidebar-tools" aria-label="管理工具">
-                    <span class="sidebar-label" :title="isSidebarCollapsed ? '管理' : ''">
+                    <span class="sidebar-label sidebar-label-tools" aria-label="管理" :title="isSidebarCollapsed ? '管理' : ''">
+                        <span class="sidebar-label-icon" aria-hidden="true">⚙️</span>
                         <span class="label-text">管理</span>
-                        <i class="label-indicator"></i>
                     </span>
                     <button class="sidebar-nav-item" @click="openAiParse" :title="isSidebarCollapsed ? 'AI 智能录入' : ''"><span class="nav-icon-text"><i class="nav-icon">🤖</i><span class="nav-text">AI 智能录入</span></span><strong class="nav-count">🤖</strong></button>
                     <button class="sidebar-nav-item" @click="showTagManager = true" :title="isSidebarCollapsed ? '标签管理' : ''"><span class="nav-icon-text"><i class="nav-icon">🏷️</i><span class="nav-text">标签管理</span></span><strong class="nav-count">🏷️</strong></button>

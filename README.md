@@ -276,6 +276,7 @@ node scripts\test-frontend-auto-theme.js
 node scripts\test-frontend-ai-organize.js
 node scripts\test-frontend-tag-management.js
 node scripts\test-frontend-password-groups.js
+node scripts\test-frontend-sidebar-labels.js
 node scripts\test-frontend-module-split.js
 node scripts\test-frontend-feature-modules.js
 node scripts\test-frontend-template-split.js
@@ -614,6 +615,7 @@ node scripts\test-frontend-auto-theme.js
 node scripts\test-frontend-ai-organize.js
 node scripts\test-frontend-tag-management.js
 node scripts\test-frontend-password-groups.js
+node scripts\test-frontend-sidebar-labels.js
 node scripts\test-frontend-module-split.js
 node scripts\test-frontend-feature-modules.js
 node scripts\test-frontend-template-split.js

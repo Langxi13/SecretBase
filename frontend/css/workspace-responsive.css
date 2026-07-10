@@ -174,11 +174,13 @@
         gap: 6px;
     }
 
-    /* 🏷️ 醒目分界标题徽标：解决 视图、标签、管理 不显眼的问题 */
+    /* 分组标题在折叠态采用导航栏图标，保留结构与识别性。 */
     .sidebar-label {
+        --sidebar-label-accent: var(--color-primary);
         display: flex;
         align-items: center;
-        justify-content: space-between;
+        justify-content: flex-start;
+        gap: 8px;
         padding: 6px 12px;
         margin: 8px 0 4px;
         color: var(--text-primary);
@@ -186,20 +188,37 @@
         font-weight: 800;
         letter-spacing: 0.06em;
         text-transform: uppercase;
-        background: color-mix(in srgb, var(--color-primary) 12%, var(--surface-1));
-        border-left: 3.5px solid var(--color-primary);
+        background: color-mix(in srgb, var(--sidebar-label-accent) 12%, var(--surface-1));
+        border-left: 3px solid var(--sidebar-label-accent);
         border-radius: 8px;
         box-shadow: 0 2px 6px rgba(0, 0, 0, 0.03);
         user-select: none;
         transition: all 0.25s ease;
     }
 
-    .label-indicator {
-        width: 6px;
-        height: 6px;
-        border-radius: 50%;
-        background: var(--color-primary);
-        opacity: 0.8;
+    .sidebar-label-icon {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        flex: 0 0 18px;
+        width: 18px;
+        height: 18px;
+        color: var(--sidebar-label-accent);
+        font-size: 16px;
+        font-style: normal;
+        line-height: 1;
+    }
+
+    .sidebar-label-view {
+        --sidebar-label-accent: var(--color-primary);
+    }
+
+    .sidebar-label-tags {
+        --sidebar-label-accent: var(--color-success);
+    }
+
+    .sidebar-label-tools {
+        --sidebar-label-accent: var(--color-warning);
     }
 
     .sidebar-nav-item {
@@ -341,12 +360,28 @@
     }
 
     .app-container.sidebar-collapsed .sidebar-label {
-        padding: 6px 0;
-        margin: 10px 0 6px;
-        border-left: none;
-        background: transparent;
+        width: 36px;
+        height: 36px;
+        min-height: 36px;
+        box-sizing: border-box;
+        padding: 0;
+        margin: 10px auto 6px;
+        border: 1px solid color-mix(in srgb, var(--sidebar-label-accent) 28%, var(--border-color));
+        background: color-mix(in srgb, var(--sidebar-label-accent) 14%, var(--surface-1));
         box-shadow: none;
         justify-content: center;
+    }
+
+    .app-container.sidebar-collapsed .sidebar-label-icon {
+        flex-basis: 22px;
+        width: 22px;
+        height: 22px;
+        font-size: 18px;
+    }
+
+    .app-container.sidebar-collapsed .sidebar-label:hover {
+        border-color: var(--sidebar-label-accent);
+        background: color-mix(in srgb, var(--sidebar-label-accent) 20%, var(--surface-1));
     }
 
     .app-container.sidebar-collapsed .sidebar-nav-item {
