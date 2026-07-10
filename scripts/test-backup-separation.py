@@ -13,6 +13,7 @@ sys.path.insert(0, str(BACKEND))
 import storage  # noqa: E402
 from models import Entry  # noqa: E402
 from routes import transfer  # noqa: E402
+from routes import transfer_common  # noqa: E402
 from routes import settings as settings_route  # noqa: E402
 
 
@@ -118,6 +119,29 @@ def test_backup_list_includes_display_and_download_names() -> None:
         assert item["download_name_plain"].endswith(".json")
 
 
+def test_readable_backup_name_is_locale_independent() -> None:
+    class WindowsLocaleTimestamp:
+        year = 2026
+        month = 7
+        day = 10
+        hour = 9
+        minute = 8
+        second = 7
+
+        def strftime(self, format_string: str) -> str:
+            format_string.encode("ascii")
+            raise AssertionError("readable backup names must not depend on strftime locale encoding")
+
+    original = transfer_common.backup_timestamp
+    transfer_common.backup_timestamp = lambda _path: WindowsLocaleTimestamp()
+    try:
+        assert transfer_common.readable_backup_name(Path("unused"), "manual") == (
+            "手动备份-2026年07月10日09时08分07秒.bak"
+        )
+    finally:
+        transfer_common.backup_timestamp = original
+
+
 def test_backup_downloads_encrypted_and_plain_with_confirmation() -> None:
     with tempfile.TemporaryDirectory() as raw:
         tmpdir = Path(raw)
@@ -193,6 +217,7 @@ def main() -> None:
         test_backup_list_reports_manual_and_auto_types,
         test_auto_backup_cleanup_uses_settings_retention,
         test_backup_list_includes_display_and_download_names,
+        test_readable_backup_name_is_locale_independent,
         test_backup_downloads_encrypted_and_plain_with_confirmation,
         test_backup_summary_includes_current_vault_counts,
         test_plain_backup_download_requires_correct_legacy_password,

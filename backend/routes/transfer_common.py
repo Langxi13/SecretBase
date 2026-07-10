@@ -44,8 +44,12 @@ def backup_timestamp(path: Path) -> datetime:
 
 
 def readable_backup_name(path: Path, backup_type: str, suffix: str = "bak") -> str:
-    timestamp = backup_timestamp(path).strftime("%Y年%m月%d日%H时%M分%S秒")
-    return f"{backup_type_label(backup_type)}-{timestamp}.{suffix}"
+    timestamp = backup_timestamp(path)
+    readable_timestamp = (
+        f"{timestamp.year:04d}年{timestamp.month:02d}月{timestamp.day:02d}日"
+        f"{timestamp.hour:02d}时{timestamp.minute:02d}分{timestamp.second:02d}秒"
+    )
+    return f"{backup_type_label(backup_type)}-{readable_timestamp}.{suffix}"
 
 
 def content_disposition(path: Path, backup_type: str, suffix: str) -> str:

@@ -1971,7 +1971,7 @@ GET /health
   "success": true,
   "data": {
     "status": "healthy",
-    "version": "3.0.0",
+    "version": "3.0.1",
     "uptime": 3600
   }
 }

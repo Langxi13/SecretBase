@@ -6,7 +6,7 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
-RELEASE_VERSION = "3.0.0"
+RELEASE_VERSION = "3.0.1"
 
 
 def read(relative_path: str) -> str:
@@ -18,7 +18,7 @@ def test_version_is_centralized() -> None:
     assert f'APP_VERSION = "{RELEASE_VERSION}"' in version_source
     assert "version=APP_VERSION" in read("backend/main.py")
     assert '"version": APP_VERSION' in read("backend/routes/health.py")
-    assert "version: '3.0.0'" in read("frontend/secretbase-runtime-config.js")
+    assert f"version: '{RELEASE_VERSION}'" in read("frontend/secretbase-runtime-config.js")
     assert f"## {RELEASE_VERSION} -" in read("CHANGELOG.md")
 
 
