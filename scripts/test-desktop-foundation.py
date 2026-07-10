@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 import json
 import re
+import signal
 import subprocess
 import sys
 import tempfile
@@ -424,6 +425,7 @@ def test_launcher_no_browser_starts_health_endpoint() -> None:
             text=True,
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
+            creationflags=getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0) if os.name == "nt" else 0,
         )
         output: list[str] = []
         try:
@@ -451,7 +453,11 @@ def test_launcher_no_browser_starts_health_endpoint() -> None:
             if os.name != "nt":
                 assert root.stat().st_mode & 0o077 == 0
         finally:
-            process.terminate()
+            if process.poll() is None:
+                if os.name == "nt":
+                    process.send_signal(signal.CTRL_BREAK_EVENT)
+                else:
+                    process.terminate()
             try:
                 process.wait(timeout=5)
             except subprocess.TimeoutExpired:

@@ -113,6 +113,7 @@ def start_backend(env: dict[str, str], port: int) -> subprocess.Popen[str]:
         text=True,
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
+        creationflags=getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0) if os.name == "nt" else 0,
     )
 
 
@@ -192,6 +193,8 @@ def main() -> int:
 
     signal.signal(signal.SIGTERM, shutdown)
     signal.signal(signal.SIGINT, shutdown)
+    if hasattr(signal, "SIGBREAK"):
+        signal.signal(signal.SIGBREAK, shutdown)
 
     if not wait_for_health(url, process):
         print_failure(lines, data_root / "logs")
