@@ -200,11 +200,11 @@
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        flex: 0 0 18px;
-        width: 18px;
-        height: 18px;
+        flex: 0 0 22px;
+        width: 22px;
+        height: 22px;
         color: var(--sidebar-label-accent);
-        font-size: 16px;
+        font-size: 20px;
         font-style: normal;
         line-height: 1;
     }
@@ -215,6 +215,10 @@
 
     .sidebar-label-tags {
         --sidebar-label-accent: var(--color-success);
+    }
+
+    .sidebar-label-tags .sidebar-label-icon {
+        font-size: 22px;
     }
 
     .sidebar-label-tools {
@@ -373,10 +377,14 @@
     }
 
     .app-container.sidebar-collapsed .sidebar-label-icon {
-        flex-basis: 22px;
-        width: 22px;
-        height: 22px;
-        font-size: 18px;
+        flex-basis: 26px;
+        width: 26px;
+        height: 26px;
+        font-size: 22px;
+    }
+
+    .app-container.sidebar-collapsed .sidebar-label-tags .sidebar-label-icon {
+        font-size: 24px;
     }
 
     .app-container.sidebar-collapsed .sidebar-label:hover {

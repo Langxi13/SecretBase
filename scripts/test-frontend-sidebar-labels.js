@@ -36,8 +36,14 @@ assertNotIncludes(css, '.label-indicator', '旧的小圆点样式应删除，避
 
 assertMatches(
     css,
-    /\.sidebar-label-icon\s*\{[\s\S]*?flex:\s*0\s+0\s+18px[\s\S]*?width:\s*18px[\s\S]*?height:\s*18px/,
+    /\.sidebar-label-icon\s*\{[\s\S]*?flex:\s*0\s+0\s+22px[\s\S]*?width:\s*22px[\s\S]*?height:\s*22px[\s\S]*?font-size:\s*20px/,
     '展开态分组图标必须保持稳定尺寸'
+);
+
+assertMatches(
+    css,
+    /\.sidebar-label-tags\s+\.sidebar-label-icon\s*\{[\s\S]*?font-size:\s*22px/,
+    '标签分组图标必须明显大于更多标签的普通导航图标'
 );
 
 assertMatches(
@@ -48,8 +54,14 @@ assertMatches(
 
 assertMatches(
     css,
-    /\.app-container\.sidebar-collapsed\s+\.sidebar-label-icon\s*\{[\s\S]*?width:\s*22px[\s\S]*?height:\s*22px[\s\S]*?font-size:\s*18px/,
+    /\.app-container\.sidebar-collapsed\s+\.sidebar-label-icon\s*\{[\s\S]*?width:\s*26px[\s\S]*?height:\s*26px[\s\S]*?font-size:\s*22px/,
     '折叠态分组图标必须提高可识别性'
+);
+
+assertMatches(
+    css,
+    /\.app-container\.sidebar-collapsed\s+\.sidebar-label-tags\s+\.sidebar-label-icon\s*\{[\s\S]*?font-size:\s*24px/,
+    '折叠态标签分组图标必须保持最高识别度'
 );
 
 console.log('PASS frontend sidebar labels');
