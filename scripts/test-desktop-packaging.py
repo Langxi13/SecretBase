@@ -71,6 +71,23 @@ def test_build_script_is_ascii_and_runs_post_build_checks() -> None:
     assert re.search(r"sys\.version_info\[:2\].*\(3, 11\)", text)
 
 
+def test_windows_workflows_build_once_and_retest_downloaded_artifact() -> None:
+    reusable = (ROOT / ".github" / "workflows" / "reusable-windows-desktop.yml").read_text(encoding="utf-8")
+    desktop = (ROOT / ".github" / "workflows" / "windows-desktop.yml").read_text(encoding="utf-8")
+    release = (ROOT / ".github" / "workflows" / "release.yml").read_text(encoding="utf-8")
+
+    assert "runs-on: windows-2022" in reusable
+    assert "runs-on: windows-2025" in reusable
+    assert "actions/upload-artifact@v7" in reusable
+    assert "actions/download-artifact@v8" in reusable
+    assert "build-desktop-windows.ps1 -SkipDependencyInstall" in reusable
+    assert "SecretBase\\SecretBase.exe" in reusable
+    assert "retention-days: 14" in desktop
+    assert "uses: ./.github/workflows/reusable-windows-desktop.yml" in desktop
+    assert "needs: [verify, desktop]" in release
+    assert "gh release upload" in release
+
+
 def test_package_validator_accepts_clean_directory_and_archive() -> None:
     with tempfile.TemporaryDirectory() as raw:
         root = Path(raw)
@@ -121,6 +138,7 @@ def main() -> None:
         test_version_resources_match_application_version,
         test_desktop_icon_contains_multiple_windows_sizes,
         test_build_script_is_ascii_and_runs_post_build_checks,
+        test_windows_workflows_build_once_and_retest_downloaded_artifact,
         test_package_validator_accepts_clean_directory_and_archive,
         test_package_validator_rejects_private_runtime_files,
         test_package_validator_rejects_archive_traversal,

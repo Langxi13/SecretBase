@@ -13,6 +13,22 @@ Linux/macOS: ./scripts/start-local.sh
 
 The first run creates `.venv/`, installs pinned dependencies, allocates a random loopback port, and opens the application. Local data is stored outside the repository in the current user's application-data directory. Use `--data-root PATH` (or `-DataRoot PATH` in PowerShell) to override it.
 
+## Windows Independent Desktop Package
+
+V3.1 provides a PyInstaller one-folder Windows package with an independent pywebview/Edge WebView2 window. The package does not require a Python installation at runtime. It stores user data under `%LOCALAPPDATA%\SecretBase\` and keeps the source bootstrap above available for development and fallback use.
+
+Build with Windows Python 3.11 x64:
+
+```powershell
+.\scripts\build-desktop-windows.ps1
+```
+
+The build writes `SecretBase-v3.1.0-windows-x64.zip` and `SHA256SUMS.txt` under `artifacts/`. It also runs a packaged backend/frontend self-test and rejects release directories containing `.env`, vault, backup, log, settings, test, documentation, or Git metadata files.
+
+The target machine must have the Microsoft Edge WebView2 Runtime. Windows 10/11 normally includes it; when unavailable, SecretBase shows a startup error with the official runtime download option. Do not move files out of the extracted `SecretBase/` directory because `SecretBase.exe` depends on its `_internal/` contents.
+
+Formal release assets are built on Windows Server 2022 and retested from the downloaded ZIP on Windows Server 2025. A release tag must match `backend/version.py` before GitHub Release uploads the ZIP and checksum.
+
 ## Recommended Layout
 
 ```text
