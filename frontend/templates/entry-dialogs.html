@@ -34,7 +34,7 @@
                 <div class="modal-body">
                     <div v-if="selectedEntry.url" class="detail-row">
                         <span>网址</span>
-                        <a :href="selectedEntry.url" target="_blank" rel="noopener noreferrer">{{ selectedEntry.url }}</a>
+                        <a :href="selectedEntry.url" rel="noopener noreferrer" @click.prevent="openUrl(selectedEntry.url)">{{ selectedEntry.url }}</a>
                     </div>
                     <div class="detail-tags" v-if="selectedEntry.tags.length > 0">
                         <span

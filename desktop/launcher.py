@@ -1,97 +1,41 @@
 from __future__ import annotations
 
 import argparse
-import json
 import os
 import signal
-import socket
 import subprocess
 import sys
 import threading
 import time
-import urllib.request
 import webbrowser
 from collections import deque
 from pathlib import Path
 
-
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
-BACKEND_DIR = PROJECT_ROOT / "backend"
-LOCAL_URL_OPENER = urllib.request.build_opener(urllib.request.ProxyHandler({}))
-
-
-def choose_free_port() -> int:
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
-        sock.bind(("127.0.0.1", 0))
-        return int(sock.getsockname()[1])
-
-
-def default_data_root() -> Path:
-    override = os.getenv("SECRETBASE_DESKTOP_DATA_ROOT")
-    if override:
-        return Path(override).expanduser().resolve()
-
-    if sys.platform.startswith("win"):
-        local_app_data = os.getenv("LOCALAPPDATA")
-        if local_app_data:
-            return (Path(local_app_data) / "SecretBase").resolve()
-
-    if sys.platform == "darwin":
-        return (Path.home() / "Library" / "Application Support" / "SecretBase").resolve()
-
-    return (Path.home() / ".local" / "share" / "SecretBase").resolve()
-
-
-def resolve_data_root(value: str | None) -> Path:
-    if value:
-        return Path(value).expanduser().resolve()
-    return default_data_root()
-
-
-def prepare_data_root(data_root: Path) -> None:
-    """创建本地运行目录，并在平台允许时限制为当前用户访问。"""
-    directories = (
-        data_root,
-        data_root / "data",
-        data_root / "data" / "backups",
-        data_root / "logs",
+try:
+    from .runtime import (
+        SOURCE_ROOT as PROJECT_ROOT,
+        build_desktop_env,
+        bundled_backend_dir,
+        choose_free_port,
+        prepare_data_root,
+        resolve_data_root,
+        snapshot_json,
+        wait_for_health,
     )
-    for directory in directories:
-        directory.mkdir(parents=True, exist_ok=True)
-        if os.name != "nt":
-            directory.chmod(0o700)
+except ImportError:
+    from runtime import (
+        SOURCE_ROOT as PROJECT_ROOT,
+        build_desktop_env,
+        bundled_backend_dir,
+        choose_free_port,
+        prepare_data_root,
+        resolve_data_root,
+        snapshot_json,
+        wait_for_health,
+    )
 
 
-def build_desktop_env(data_root: Path, port: int) -> dict[str, str]:
-    env = os.environ.copy()
-    env.update({
-        "SECRETBASE_MODE": "desktop",
-        "HOST": "127.0.0.1",
-        "PORT": str(port),
-        "DATA_DIR": str(data_root / "data"),
-        "VAULT_PATH": str(data_root / "data" / "secretbase.enc"),
-        "BACKUP_DIR": str(data_root / "data" / "backups"),
-        "LOG_DIR": str(data_root / "logs"),
-        "SETTINGS_PATH": str(data_root / "settings.json"),
-        "CORS_ORIGINS": f"http://127.0.0.1:{port}",
-        "PYTHONPATH": str(BACKEND_DIR),
-        "PYTHONUNBUFFERED": "1",
-    })
-    return env
-
-
-def config_snapshot(data_root: Path, port: int) -> dict[str, str | int]:
-    return {
-        "mode": "desktop",
-        "host": "127.0.0.1",
-        "port": port,
-        "data_root": str(data_root),
-        "data_dir": str((data_root / "data").resolve()),
-        "vault_path": str((data_root / "data" / "secretbase.enc").resolve()),
-        "backup_dir": str((data_root / "data" / "backups").resolve()),
-        "log_dir": str((data_root / "logs").resolve()),
-        "settings_path": str((data_root / "settings.json").resolve()),
-    }
+BACKEND_DIR = bundled_backend_dir()
 
 
 def start_backend(env: dict[str, str], port: int) -> subprocess.Popen[str]:
@@ -129,20 +73,6 @@ def collect_output(process: subprocess.Popen[str], lines: deque[str]) -> threadi
     return thread
 
 
-def wait_for_health(url: str, process: subprocess.Popen[str], timeout: float = 15.0) -> bool:
-    deadline = time.time() + timeout
-    while time.time() < deadline:
-        if process.poll() is not None:
-            return False
-        try:
-            with LOCAL_URL_OPENER.open(f"{url}/health", timeout=1) as response:
-                if response.status == 200:
-                    return True
-        except Exception:
-            time.sleep(0.2)
-    return False
-
-
 def stop_backend(process: subprocess.Popen[str]) -> None:
     if process.poll() is not None:
         return
@@ -175,10 +105,8 @@ def main() -> int:
     args = parse_args()
     data_root = resolve_data_root(args.data_root)
     port = choose_free_port()
-    snapshot = config_snapshot(data_root, port)
-
     if args.dry_run:
-        print(json.dumps(snapshot, ensure_ascii=False, indent=2))
+        print(snapshot_json(data_root, port))
         return 0
 
     prepare_data_root(data_root)
@@ -196,7 +124,7 @@ def main() -> int:
     if hasattr(signal, "SIGBREAK"):
         signal.signal(signal.SIGBREAK, shutdown)
 
-    if not wait_for_health(url, process):
+    if not wait_for_health(url, timeout=15.0, is_running=lambda: process.poll() is None):
         print_failure(lines, data_root / "logs")
         stop_backend(process)
         return 1

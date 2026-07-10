@@ -9,6 +9,12 @@ __pycache__/
 venv/
 env/
 .conda/
+.desktop-build/
+
+# Build and release artifacts
+build/
+dist/
+artifacts/
 
 # SecretBase local configuration and data
 backend/.env

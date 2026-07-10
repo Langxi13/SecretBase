@@ -13,6 +13,20 @@
         successMessage = '备份已下载'
     }) {
         try {
+            const desktopApi = window.pywebview && window.pywebview.api;
+            if (desktopApi && typeof desktopApi.save_download === 'function') {
+                const result = await desktopApi.save_download({
+                    path,
+                    body: body || {},
+                    filename,
+                    method,
+                    token: api.getToken()
+                });
+                if (result && result.status === 'cancelled') return false;
+                showToast(successMessage, 'success');
+                return true;
+            }
+
             const headers = {
                 'X-SecretBase-Token': api.getToken()
             };
@@ -40,10 +54,11 @@
             anchor.click();
             URL.revokeObjectURL(url);
             showToast(successMessage, 'success');
+            return true;
         } catch (error) {
             if (!throwOnError) {
                 showToast(error.message || '导出失败', 'error');
-                return;
+                return false;
             }
             throw error;
         }

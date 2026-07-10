@@ -40,7 +40,8 @@ assertNotIncludes(utilsJs, 'favicon.im', '条目列表不得向第三方 favicon
 assertNotIncludes(workspaceList, '<img', '条目图标必须使用本地生成的占位图标');
 assertIncludes(workspaceList, 'getEntryIconText(entry)', '条目图标必须从本地条目元数据生成');
 assertIncludes(viewHelpersJs, 'function getEntryIconText', '视图辅助模块必须提供本地图标文本');
-assertIncludes(entryControllerJs, "'_blank', 'noopener,noreferrer'", '打开外部网址必须隔离 opener 和 referrer');
+assertIncludes(utilsJs, "'_blank', 'noopener,noreferrer'", '浏览器模式打开外部网址必须隔离 opener 和 referrer');
+assertIncludes(entryControllerJs, 'openExternalUrl(url)', '条目网址必须通过桌面兼容的外部链接方法打开');
 
 const normalizedVendorBytes = Buffer.from(vendorBytes.toString('utf8').replace(/\r\n/g, '\n'), 'utf8');
 const vendorHash = crypto.createHash('sha256').update(normalizedVendorBytes).digest('hex');

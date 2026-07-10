@@ -211,7 +211,26 @@ http://127.0.0.1:8001
 
 ### 桌面基础模式
 
-`v3.0.0` 已完成桌面基础模式，但还不是正式安装包。该模式复用现有前端和 FastAPI 后端，由 `desktop/launcher.py` 启动本机后端、分配随机端口，并让后端同源托管 `frontend/` 页面。
+`v3.0.0` 已完成由浏览器承载界面的桌面基础模式。`v3.1.0` 在此基础上增加 Windows 独立桌面窗口：使用 PyInstaller one-folder、pywebview 和 Edge WebView2，用户双击 `SecretBase.exe` 即可使用，不需要单独打开浏览器或安装 Python 依赖。
+
+V3.1 Windows 包已通过 Windows 10/11 真机验收并正式发布。GitHub Release 包含：
+
+```text
+SecretBase-v3.1.0-windows-x64.zip
+SHA256SUMS.txt
+```
+
+Windows 独立版默认将 vault、备份、日志、设置和 WebView 数据保存在 `%LOCALAPPDATA%\SecretBase\`。发布包只包含程序资源，构建时会扫描并拒绝 `.env`、vault、备份、日志和本地设置文件。桌面导出使用 Windows 原生“另存为”，外部网址交给系统默认浏览器打开；重复启动会恢复并聚焦已有窗口。
+
+在 Windows 3.11 x64 开发环境构建测试包：
+
+```powershell
+.\scripts\build-desktop-windows.ps1
+```
+
+构建脚本会创建隔离构建环境、运行 PyInstaller、执行后端与桌面运行时自检、校验发布目录并生成 SHA-256。详细实现与验收记录见 `docs/v3.1-windows-desktop-mvp.md` 和 `docs/manual-qa-checklist.md`。
+
+源码浏览器模式继续保留，由 `desktop/launcher.py` 启动本机后端、分配随机端口，并让后端同源托管 `frontend/` 页面。
 
 默认启动：
 
@@ -400,7 +419,10 @@ frontend/
     controllers/       条目、密码组、标签、AI、备份、导入、回收站、维护、列表控制器
   css/                 基础、工作台、弹窗、表单、AI、管理、响应式和主题样式
 desktop/
-  launcher.py          local desktop-mode launcher
+  app.py               Windows independent desktop window entry
+  launcher.py          browser-based local desktop-mode launcher
+  runtime.py           shared in-process backend and desktop paths
+  SecretBase.spec      PyInstaller one-folder build definition
 docs/
   api-specification.md
   app-roadmap.md
@@ -421,7 +443,8 @@ scripts/
 - `docs/deployment.md`：通用生产部署步骤。
 - `docs/app-roadmap.md`：桌面和手机 App 长期路线。
 - `docs/v3-desktop-foundation.md`：已实现的 V3.0 桌面基础模式、边界和验收。
-- `docs/v3.1-windows-desktop-mvp.md`：V3.1 Windows 桌面便携版规划。
+- `docs/v3.1-windows-desktop-mvp.md`：V3.1 Windows 桌面便携版实现与验收状态。
+- `docs/manual-qa-checklist.md`：Windows 桌面真机验收清单。
 - `docs/release-assessment-v3.0.0.md`：V3.0.0 完备性、风险和发布结论。
 - `docs/release-safety-checklist.md`：发布前安全检查清单。
 - `docs/roadmap.md`：路线图。
@@ -583,7 +606,19 @@ http://127.0.0.1:8001
 
 ### Desktop Foundation Mode
 
-`v3.0.0` completes the desktop foundation mode, but it is not a packaged desktop app yet. It reuses the existing frontend and FastAPI backend. `desktop/launcher.py` starts a local backend, allocates a random port, and lets FastAPI serve `frontend/` from the same origin.
+`v3.0.0` completes the browser-hosted desktop foundation. `v3.1.0` adds an independent Windows window built with PyInstaller one-folder, pywebview, and Edge WebView2. Users launch `SecretBase.exe` directly without opening a separate browser or installing Python dependencies.
+
+The V3.1 package has passed Windows 10/11 hardware acceptance and is formally released. GitHub Release provides `SecretBase-v3.1.0-windows-x64.zip` plus `SHA256SUMS.txt`.
+
+Desktop data is stored under `%LOCALAPPDATA%\SecretBase\`. Build validation rejects `.env`, vault, backup, log, and local settings files. Native exports use the Windows Save As dialog, external URLs open in the system browser, and a second launch activates the existing window.
+
+Build on Windows with Python 3.11 x64:
+
+```powershell
+.\scripts\build-desktop-windows.ps1
+```
+
+The browser-based source mode remains available through `desktop/launcher.py` and the commands below.
 
 Default startup:
 
@@ -772,7 +807,10 @@ frontend/
     controllers/       entry, group, tag, AI, backup, transfer, trash, maintenance, list controllers
   css/                 base, workspace, modal, form, AI, management, responsive, and theme styles
 desktop/
-  launcher.py          local desktop-mode launcher
+  app.py               Windows independent desktop window entry
+  launcher.py          browser-based local desktop-mode launcher
+  runtime.py           shared in-process backend and desktop paths
+  SecretBase.spec      PyInstaller one-folder build definition
 docs/
   api-specification.md
   app-roadmap.md
@@ -793,7 +831,8 @@ scripts/
 - `docs/deployment.md`: generic production deployment steps.
 - `docs/app-roadmap.md`: long-term desktop and mobile app roadmap.
 - `docs/v3-desktop-foundation.md`: implemented V3.0 desktop foundation, boundaries, and acceptance checks.
-- `docs/v3.1-windows-desktop-mvp.md`: V3.1 Windows desktop portable package plan.
+- `docs/v3.1-windows-desktop-mvp.md`: V3.1 Windows desktop implementation and acceptance status.
+- `docs/manual-qa-checklist.md`: Windows desktop hardware acceptance checklist.
 - `docs/release-assessment-v3.0.0.md`: V3.0.0 completeness, risk, and release assessment.
 - `docs/release-safety-checklist.md`: release safety checklist.
 - `docs/roadmap.md`: roadmap.

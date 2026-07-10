@@ -228,7 +228,7 @@ assert "javascript" in response.headers["content-type"]
 assert "window.SECRETBASE_RUNTIME_CONFIG" in response.text
 assert '"apiBaseUrl": ""' in response.text
 assert '"mode": "desktop"' in response.text
-assert '"version": "3.0.2"' in response.text
+assert '"version": "3.1.0"' in response.text
 assert response.headers["x-frame-options"] == "DENY"
 assert response.headers["referrer-policy"] == "no-referrer"
 """,
@@ -391,6 +391,43 @@ def test_desktop_launcher_forces_loopback_security() -> None:
         assert env["HOST"] == "127.0.0.1"
         assert env["CORS_ORIGINS"] == "http://127.0.0.1:45678"
         assert env["PYTHONUNBUFFERED"] == "1"
+        assert env["PYTHONUTF8"] == "1"
+        assert env["PYTHONIOENCODING"] == "utf-8"
+        assert env["SECRETBASE_FRONTEND_DIR"] == str((PROJECT_ROOT / "frontend").resolve())
+
+
+def test_in_process_desktop_server_starts_and_stops() -> None:
+    with tempfile.TemporaryDirectory() as raw:
+        root = Path(raw)
+        result = run_config_probe(
+            """
+import json
+import os
+import urllib.request
+from pathlib import Path
+from desktop.runtime import InProcessDesktopServer
+
+root = Path(os.environ["SECRETBASE_TEST_DATA_ROOT"])
+server = InProcessDesktopServer(root)
+try:
+    url = server.start()
+    assert server.is_running
+    with urllib.request.urlopen(f"{url}/health", timeout=5) as response:
+        payload = json.loads(response.read().decode("utf-8"))
+    assert response.status == 200
+    assert payload["data"]["status"] == "healthy"
+    with urllib.request.urlopen(f"{url}/", timeout=5) as response:
+        html = response.read().decode("utf-8")
+    assert '<div id="app"' in html
+finally:
+    server.stop()
+assert not server.is_running
+assert (root / "data").is_dir()
+assert (root / "webview").is_dir()
+""",
+            {"SECRETBASE_TEST_DATA_ROOT": str(root)},
+        )
+        assert_probe_ok(result)
 
 
 def test_desktop_rejects_untrusted_host() -> None:
@@ -503,6 +540,7 @@ def main() -> None:
         test_launcher_dry_run_reports_desktop_paths,
         test_launcher_data_root_argument_overrides_environment,
         test_desktop_launcher_forces_loopback_security,
+        test_in_process_desktop_server_starts_and_stops,
         test_desktop_rejects_untrusted_host,
         test_launcher_no_browser_starts_health_endpoint,
         test_dev_test_backend_script_uses_isolated_runtime,

@@ -1,5 +1,22 @@
 # 变更记录
 
+## 3.1.0 - 2026-07-11
+
+### 新增
+
+- 新增基于 pywebview 与 Edge WebView2 的 Windows 独立桌面窗口。
+- 新增单实例运行，重复启动时恢复并聚焦已有窗口。
+- 新增 Windows 原生“另存为”导出桥，桌面导出不再依赖浏览器下载行为。
+- 新增 PyInstaller one-folder 构建、自检、敏感文件扫描和 SHA-256 校验流程。
+
+### 兼容性
+
+- 保留现有服务端部署、源码启动器和 vault 文件格式。
+- Windows 桌面包使用独立本地数据目录，不在发布目录写入用户数据。
+- 固定 `pythonnet 3.0.5` 与 `clr-loader 0.2.10`，避免新依赖版本导致 WinForms 运行时无法加载。
+- 随 EXE 提供 .NET 应用配置，允许 Chrome 等浏览器下载的 ZIP 在继承 Mark-of-the-Web 后正常加载 `Python.Runtime.dll`。
+- Windows CI 增加 CLR、WinForms、Edge WebView2 和模拟 Internet Zone 标记的打包运行时自检。
+
 ## 3.0.2 - 2026-07-10
 
 ### 修复

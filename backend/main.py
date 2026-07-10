@@ -13,6 +13,7 @@ import time
 import os
 import json
 import re
+import sys
 
 from config import (
     PORT,
@@ -21,6 +22,7 @@ from config import (
     LOG_DIR_PATH,
     SETTINGS_PATH,
     BASE_DIR,
+    FRONTEND_DIR,
     ensure_runtime_dirs,
     get_cors_origins,
     is_desktop_mode,
@@ -99,9 +101,10 @@ def setup_logging():
     root_logger.setLevel(getattr(logging, LOG_LEVEL.upper(), logging.INFO))
     root_logger.addHandler(handler)
     
-    console_handler = logging.StreamHandler()
-    console_handler.setFormatter(formatter)
-    root_logger.addHandler(console_handler)
+    if sys.stderr is not None:
+        console_handler = logging.StreamHandler()
+        console_handler.setFormatter(formatter)
+        root_logger.addHandler(console_handler)
     root_logger._secretbase_logging_configured = True
 
 ensure_runtime_dirs()
@@ -402,8 +405,7 @@ app.include_router(transfer.router, prefix="/api", tags=["导入导出"])
 app.include_router(tools.router, prefix="/api/tools", tags=["管理工具"])
 
 if is_desktop_mode():
-    frontend_dir = BASE_DIR.parent / "frontend"
-    app.mount("/", StaticFiles(directory=frontend_dir, html=True), name="desktop_frontend")
+    app.mount("/", StaticFiles(directory=FRONTEND_DIR, html=True), name="desktop_frontend")
 
 
 if __name__ == "__main__":

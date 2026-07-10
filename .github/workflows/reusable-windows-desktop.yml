@@ -1,0 +1,130 @@
+name: Reusable Windows Desktop Build
+
+on:
+  workflow_call:
+    inputs:
+      retention-days:
+        description: Artifact retention period in days
+        required: false
+        type: number
+        default: 14
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build on Windows Server 2022
+    runs-on: windows-2022
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+          architecture: x64
+          cache: pip
+          cache-dependency-path: |
+            backend/requirements.txt
+            desktop/requirements.txt
+      - name: Install desktop build dependencies
+        run: python -m pip install --disable-pip-version-check --progress-bar off -r desktop/requirements.txt
+      - name: Run desktop packaging checks
+        run: python scripts/test-desktop-packaging.py
+      - name: Build Windows desktop package
+        shell: powershell
+        run: .\scripts\build-desktop-windows.ps1 -SkipDependencyInstall
+      - name: Upload Windows desktop package
+        uses: actions/upload-artifact@v7
+        with:
+          name: secretbase-windows-x64
+          path: |
+            artifacts/SecretBase-v*-windows-x64.zip
+            artifacts/SHA256SUMS.txt
+          if-no-files-found: error
+          retention-days: ${{ inputs.retention-days }}
+
+  packaged-self-test:
+    name: Test package on Windows Server 2025
+    needs: build
+    runs-on: windows-2025
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+          architecture: x64
+      - name: Download the package built on Windows Server 2022
+        uses: actions/download-artifact@v8
+        with:
+          name: secretbase-windows-x64
+          path: artifacts
+      - name: Verify checksum, contents, and packaged self-test
+        shell: powershell
+        run: |
+          $ChecksumLine = (Get-Content "artifacts\SHA256SUMS.txt" | Select-Object -First 1).Trim()
+          $ChecksumParts = $ChecksumLine -split '\s+', 2
+          if ($ChecksumParts.Count -ne 2) { throw "Invalid SHA256SUMS.txt format." }
+
+          $ArchivePath = Join-Path "artifacts" $ChecksumParts[1]
+          if (-not (Test-Path $ArchivePath)) { throw "Desktop archive was not downloaded." }
+          $ActualHash = (Get-FileHash -Algorithm SHA256 $ArchivePath).Hash.ToLowerInvariant()
+          if ($ActualHash -ne $ChecksumParts[0].ToLowerInvariant()) { throw "Desktop archive checksum mismatch." }
+
+          python scripts\verify_desktop_package.py $ArchivePath
+          if ($LASTEXITCODE -ne 0) { throw "Desktop archive validation failed." }
+
+          $ExtractRoot = Join-Path $env:RUNNER_TEMP "secretbase-desktop-package"
+          if (Test-Path $ExtractRoot) { Remove-Item -Recurse -Force $ExtractRoot }
+          Expand-Archive -LiteralPath $ArchivePath -DestinationPath $ExtractRoot
+
+          $Executable = Join-Path $ExtractRoot "SecretBase\SecretBase.exe"
+          $DataRoot = Join-Path $env:RUNNER_TEMP "secretbase-desktop-self-test-data"
+          $Report = Join-Path $env:RUNNER_TEMP "secretbase-desktop-self-test.json"
+          $Arguments = "--self-test --data-root secretbase-desktop-self-test-data --report secretbase-desktop-self-test.json"
+          $Process = Start-Process -FilePath $Executable -ArgumentList $Arguments -WorkingDirectory $env:RUNNER_TEMP -Wait -PassThru
+          if ($Process.ExitCode -ne 0) { throw "Packaged SecretBase self-test failed." }
+
+          $Result = Get-Content -Raw $Report | ConvertFrom-Json
+          if (-not $Result.success -or -not $Result.frontend_loaded) { throw "Packaged self-test report is invalid." }
+
+          $RuntimeReport = Join-Path $env:RUNNER_TEMP "secretbase-desktop-runtime-self-test.json"
+          $RuntimeArguments = "--desktop-runtime-self-test --report secretbase-desktop-runtime-self-test.json"
+          $RuntimeProcess = Start-Process -FilePath $Executable -ArgumentList $RuntimeArguments -WorkingDirectory $env:RUNNER_TEMP -Wait -PassThru
+          if ($RuntimeProcess.ExitCode -ne 0) {
+            if (Test-Path $RuntimeReport) { Get-Content -Raw $RuntimeReport | Write-Host }
+            throw "Packaged desktop runtime self-test failed."
+          }
+          $RuntimeResult = Get-Content -Raw $RuntimeReport | ConvertFrom-Json
+          if (-not $RuntimeResult.success -or $RuntimeResult.renderer -ne "edgechromium") {
+            throw "Packaged desktop runtime report is invalid."
+          }
+
+          $PythonRuntime = Join-Path $ExtractRoot "SecretBase\_internal\pythonnet\runtime\Python.Runtime.dll"
+          if (-not (Test-Path $PythonRuntime)) { throw "Python.Runtime.dll is missing from the desktop package." }
+          Set-Content -LiteralPath $PythonRuntime -Stream "Zone.Identifier" -Encoding Ascii -Value "[ZoneTransfer]`r`nZoneId=3"
+
+          $MotwReport = Join-Path $env:RUNNER_TEMP "secretbase-desktop-runtime-motw-self-test.json"
+          $MotwArguments = "--desktop-runtime-self-test --report secretbase-desktop-runtime-motw-self-test.json"
+          $MotwProcess = Start-Process -FilePath $Executable -ArgumentList $MotwArguments -WorkingDirectory $env:RUNNER_TEMP -Wait -PassThru
+          if ($MotwProcess.ExitCode -ne 0) {
+            if (Test-Path $MotwReport) { Get-Content -Raw $MotwReport | Write-Host }
+            throw "Desktop runtime failed with Mark-of-the-Web."
+          }
+          $MotwResult = Get-Content -Raw $MotwReport | ConvertFrom-Json
+          if (-not $MotwResult.success -or $MotwResult.renderer -ne "edgechromium") {
+            throw "Mark-of-the-Web runtime report is invalid."
+          }
+          Start-Sleep -Seconds 1
+          if (Get-Process -Name "SecretBase" -ErrorAction SilentlyContinue) { throw "SecretBase process remained after self-test." }
+      - name: Upload packaged self-test report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: secretbase-windows-2025-self-test
+          path: |
+            ${{ runner.temp }}/secretbase-desktop-self-test.json
+            ${{ runner.temp }}/secretbase-desktop-runtime*-self-test.json
+          if-no-files-found: warn
+          retention-days: ${{ inputs.retention-days }}

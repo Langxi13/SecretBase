@@ -35,6 +35,7 @@ class RuntimeConfig:
     vault_path: Path
     settings_path: Path
     secure_settings_path: Path
+    frontend_dir: Path
     cors_origins: str
     log_level: str
 
@@ -50,6 +51,7 @@ def load_runtime_config() -> RuntimeConfig:
     vault_path = resolve_backend_path(os.getenv("VAULT_PATH", data_dir / "secretbase.enc"))
     settings_path = resolve_backend_path(os.getenv("SETTINGS_PATH", data_dir / "settings.json"))
     secure_settings_path = data_dir / "secure-settings.enc"
+    frontend_dir = resolve_backend_path(os.getenv("SECRETBASE_FRONTEND_DIR", BASE_DIR.parent / "frontend"))
 
     port = int(os.getenv("PORT", 10004))
     default_cors_origins = f"http://127.0.0.1:{port}" if is_desktop_mode() else "*"
@@ -65,6 +67,7 @@ def load_runtime_config() -> RuntimeConfig:
         vault_path=vault_path,
         settings_path=settings_path,
         secure_settings_path=secure_settings_path,
+        frontend_dir=frontend_dir,
         cors_origins=os.getenv("CORS_ORIGINS", default_cors_origins),
         log_level=os.getenv("LOG_LEVEL", "INFO"),
     )
@@ -84,6 +87,7 @@ HOST = RUNTIME_CONFIG.host
 VAULT_PATH = str(RUNTIME_CONFIG.vault_path)
 SETTINGS_PATH = str(RUNTIME_CONFIG.settings_path)
 SECURE_SETTINGS_FILE = str(RUNTIME_CONFIG.secure_settings_path)
+FRONTEND_DIR = RUNTIME_CONFIG.frontend_dir
 
 # CORS 配置
 CORS_ORIGINS = RUNTIME_CONFIG.cors_origins

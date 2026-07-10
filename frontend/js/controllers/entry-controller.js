@@ -321,9 +321,8 @@
             });
         }
 
-        function openUrl(url) {
-            const openedWindow = window.open(url, '_blank', 'noopener,noreferrer');
-            if (openedWindow) openedWindow.opener = null;
+        async function openUrl(url) {
+            return openExternalUrl(url);
         }
 
         function toggleCopyMenu(entryId) {

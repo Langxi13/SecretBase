@@ -10,6 +10,8 @@ ROOT = Path(__file__).resolve().parents[1]
 PYTHON_TESTS = [
     "scripts/test-backup-separation.py",
     "scripts/test-desktop-foundation.py",
+    "scripts/test-desktop-app.py",
+    "scripts/test-desktop-packaging.py",
     "scripts/v1-fake-smoke-test.py",
     "scripts/test-ai-organize.py",
     "scripts/test-ai-actions.py",
