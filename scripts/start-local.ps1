@@ -1,4 +1,4 @@
-param(
+﻿param(
     [switch]$NoBrowser,
     [switch]$DryRun,
     [string]$DataRoot

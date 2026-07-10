@@ -33,6 +33,8 @@ V3.0 已实现，首个正式基线版本为 `v3.0.0`。
 start-secretbase.cmd
 ```
 
+该入口兼容 Windows 自带的 PowerShell 5.1 和 PowerShell 7。发布检查会从模拟源码压缩包中执行 CMD 入口，并覆盖包含中文和空格的解压路径。
+
 也可以从 PowerShell 启动：
 
 ```powershell

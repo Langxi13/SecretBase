@@ -9,8 +9,12 @@ permissions:
   contents: write
 
 jobs:
-  verify-and-release:
-    runs-on: ubuntu-latest
+  verify:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -26,7 +30,20 @@ jobs:
       - run: python -m pip install --upgrade pip
       - run: python -m pip install -r backend/requirements.txt
       - run: python scripts/run-release-checks.py
-      - run: scripts/start-local.sh --dry-run --data-root "$RUNNER_TEMP/secretbase-local"
+      - name: Verify Linux local bootstrap
+        if: runner.os == 'Linux'
+        run: scripts/start-local.sh --dry-run --data-root "$RUNNER_TEMP/secretbase-local"
+      - name: Verify Windows source bootstrap
+        if: runner.os == 'Windows'
+        uses: ./.github/actions/verify-windows-bootstrap
+
+  release:
+    needs: verify
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
       - name: Create GitHub release
         env:
           GH_TOKEN: ${{ github.token }}

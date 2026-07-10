@@ -31,7 +31,6 @@ jobs:
       - name: Verify Linux local bootstrap
         if: runner.os == 'Linux'
         run: scripts/start-local.sh --dry-run --data-root "$RUNNER_TEMP/secretbase-local"
-      - name: Verify Windows local bootstrap
+      - name: Verify Windows source bootstrap
         if: runner.os == 'Windows'
-        shell: pwsh
-        run: ./scripts/start-local.ps1 -DryRun -DataRoot "$env:RUNNER_TEMP\secretbase-local"
+        uses: ./.github/actions/verify-windows-bootstrap

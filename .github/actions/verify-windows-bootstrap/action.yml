@@ -1,0 +1,57 @@
+name: Verify Windows source bootstrap
+description: Exercise the archived CMD entrypoint with Windows PowerShell 5.1 and PowerShell 7.
+
+runs:
+  using: composite
+  steps:
+    - name: Prepare Windows source archive
+      shell: pwsh
+      run: |
+        $archive = Join-Path $env:RUNNER_TEMP "secretbase-source.zip"
+        $extractRoot = Join-Path $env:RUNNER_TEMP "SecretBase 发布包 测试"
+        $dataRoot = Join-Path $env:RUNNER_TEMP "SecretBase 数据 测试"
+        git archive --format=zip --output="$archive" HEAD
+        New-Item -ItemType Directory -Force -Path $extractRoot | Out-Null
+        Expand-Archive -Path $archive -DestinationPath $extractRoot -Force
+        "SECRETBASE_ARCHIVE_ROOT=$extractRoot" >> $env:GITHUB_ENV
+        "SECRETBASE_TEST_DATA_ROOT=$dataRoot" >> $env:GITHUB_ENV
+
+    - name: Verify CMD and Windows PowerShell 5.1 bootstrap
+      shell: powershell
+      run: |
+        $entrypoint = Join-Path $env:SECRETBASE_ARCHIVE_ROOT "start-secretbase.cmd"
+        $commandLine = "call `"$entrypoint`" -DryRun -DataRoot `"$env:SECRETBASE_TEST_DATA_ROOT`""
+        $output = @(& cmd.exe /d /s /c $commandLine 2>&1 | ForEach-Object { "$_" })
+        $output | ForEach-Object { Write-Host $_ }
+        if ($LASTEXITCODE -ne 0) {
+          throw "Windows PowerShell 5.1 bootstrap failed with exit code $LASTEXITCODE"
+        }
+        $jsonStart = -1
+        for ($index = 0; $index -lt $output.Count; $index++) {
+          if ($output[$index].Trim() -eq "{") {
+            $jsonStart = $index
+            break
+          }
+        }
+        if ($jsonStart -lt 0) {
+          throw "Windows PowerShell 5.1 bootstrap did not return desktop configuration JSON"
+        }
+        $config = ($output[$jsonStart..($output.Count - 1)] -join "`n") | ConvertFrom-Json
+        if ($config.mode -ne "desktop" -or $config.host -ne "127.0.0.1") {
+          throw "Windows PowerShell 5.1 bootstrap returned an invalid desktop configuration"
+        }
+
+    - name: Verify PowerShell 7 bootstrap
+      shell: pwsh
+      run: |
+        $script = Join-Path $env:SECRETBASE_ARCHIVE_ROOT "scripts\start-local.ps1"
+        $config = (& $script -DryRun -DataRoot $env:SECRETBASE_TEST_DATA_ROOT | Out-String) | ConvertFrom-Json
+        if ($LASTEXITCODE -ne 0) {
+          throw "PowerShell 7 bootstrap failed with exit code $LASTEXITCODE"
+        }
+        if ($config.mode -ne "desktop" -or $config.host -ne "127.0.0.1") {
+          throw "PowerShell 7 bootstrap returned an invalid desktop configuration"
+        }
+        if ([IO.Path]::GetFullPath($config.data_root) -ne [IO.Path]::GetFullPath($env:SECRETBASE_TEST_DATA_ROOT)) {
+          throw "PowerShell 7 bootstrap did not preserve the configured data path"
+        }

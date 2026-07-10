@@ -174,6 +174,8 @@ Windows：
 .\start-secretbase.cmd
 ```
 
+源码启动器兼容 Windows 自带的 PowerShell 5.1 和 PowerShell 7，无需额外安装 `pwsh`。
+
 Linux / macOS：
 
 ```bash
@@ -543,6 +545,8 @@ Windows:
 ```powershell
 .\start-secretbase.cmd
 ```
+
+The source bootstrap supports both Windows PowerShell 5.1 and PowerShell 7; installing `pwsh` is optional.
 
 Linux / macOS:
 
