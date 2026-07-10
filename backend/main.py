@@ -21,6 +21,7 @@ from config import (
     LOG_DIR_PATH,
     SETTINGS_PATH,
     BASE_DIR,
+    FRONTEND_DIR,
     ensure_runtime_dirs,
     get_cors_origins,
     is_desktop_mode,
@@ -402,8 +403,7 @@ app.include_router(transfer.router, prefix="/api", tags=["导入导出"])
 app.include_router(tools.router, prefix="/api/tools", tags=["管理工具"])
 
 if is_desktop_mode():
-    frontend_dir = BASE_DIR.parent / "frontend"
-    app.mount("/", StaticFiles(directory=frontend_dir, html=True), name="desktop_frontend")
+    app.mount("/", StaticFiles(directory=FRONTEND_DIR, html=True), name="desktop_frontend")
 
 
 if __name__ == "__main__":
