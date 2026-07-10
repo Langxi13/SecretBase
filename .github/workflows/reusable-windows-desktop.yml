@@ -82,8 +82,9 @@ jobs:
           $Executable = Join-Path $ExtractRoot "SecretBase\SecretBase.exe"
           $DataRoot = Join-Path $env:RUNNER_TEMP "secretbase-desktop-self-test-data"
           $Report = Join-Path $env:RUNNER_TEMP "secretbase-desktop-self-test.json"
-          & $Executable --self-test --data-root $DataRoot --report $Report
-          if ($LASTEXITCODE -ne 0) { throw "Packaged SecretBase self-test failed." }
+          $Arguments = '--self-test --data-root "{0}" --report "{1}"' -f $DataRoot, $Report
+          $Process = Start-Process -FilePath $Executable -ArgumentList $Arguments -Wait -PassThru
+          if ($Process.ExitCode -ne 0) { throw "Packaged SecretBase self-test failed." }
 
           $Result = Get-Content -Raw $Report | ConvertFrom-Json
           if (-not $Result.success -or -not $Result.frontend_loaded) { throw "Packaged self-test report is invalid." }

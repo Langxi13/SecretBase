@@ -78,8 +78,9 @@ try {
     if ($LASTEXITCODE -ne 0) { throw "The unpacked desktop package failed validation." }
 
     $Executable = Join-Path $PackageDir "SecretBase.exe"
-    & $Executable --self-test --data-root $SelfTestRoot --report $SelfTestReport
-    if ($LASTEXITCODE -ne 0) { throw "The packaged desktop self-test failed." }
+    $SelfTestArguments = '--self-test --data-root "{0}" --report "{1}"' -f $SelfTestRoot, $SelfTestReport
+    $SelfTestProcess = Start-Process -FilePath $Executable -ArgumentList $SelfTestArguments -Wait -PassThru
+    if ($SelfTestProcess.ExitCode -ne 0) { throw "The packaged desktop self-test failed." }
     $SelfTest = Get-Content -Raw $SelfTestReport | ConvertFrom-Json
     if (-not $SelfTest.success -or -not $SelfTest.frontend_loaded) {
         throw "The packaged desktop self-test report is invalid."

@@ -66,6 +66,8 @@ def test_build_script_is_ascii_and_runs_post_build_checks() -> None:
     build_script.decode("ascii")
     text = build_script.decode("ascii")
     assert "--self-test" in text
+    assert "Start-Process -FilePath $Executable" in text
+    assert "-Wait -PassThru" in text
     assert "verify_desktop_package.py" in text
     assert "SHA256SUMS.txt" in text
     assert re.search(r"sys\.version_info\[:2\].*\(3, 11\)", text)
@@ -84,6 +86,8 @@ def test_windows_workflows_build_once_and_retest_downloaded_artifact() -> None:
     assert "actions/download-artifact@v8" in reusable
     assert "build-desktop-windows.ps1 -SkipDependencyInstall" in reusable
     assert "SecretBase\\SecretBase.exe" in reusable
+    assert "Start-Process -FilePath $Executable" in reusable
+    assert "-Wait -PassThru" in reusable
     assert "retention-days: 14" in desktop
     assert "uses: ./.github/workflows/reusable-windows-desktop.yml" in desktop
     assert "needs: [verify, desktop]" in release
