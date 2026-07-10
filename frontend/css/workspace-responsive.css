@@ -200,11 +200,11 @@
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        flex: 0 0 22px;
-        width: 22px;
-        height: 22px;
+        flex: 0 0 26px;
+        width: 26px;
+        height: 26px;
         color: var(--sidebar-label-accent);
-        font-size: 20px;
+        font-size: 22px;
         font-style: normal;
         line-height: 1;
     }
@@ -218,7 +218,7 @@
     }
 
     .sidebar-label-tags .sidebar-label-icon {
-        font-size: 22px;
+        font-size: 28px;
     }
 
     .sidebar-label-tools {
@@ -364,9 +364,9 @@
     }
 
     .app-container.sidebar-collapsed .sidebar-label {
-        width: 36px;
-        height: 36px;
-        min-height: 36px;
+        width: 42px;
+        height: 42px;
+        min-height: 42px;
         box-sizing: border-box;
         padding: 0;
         margin: 10px auto 6px;
@@ -377,14 +377,14 @@
     }
 
     .app-container.sidebar-collapsed .sidebar-label-icon {
-        flex-basis: 26px;
-        width: 26px;
-        height: 26px;
-        font-size: 22px;
+        flex-basis: 30px;
+        width: 30px;
+        height: 30px;
+        font-size: 26px;
     }
 
     .app-container.sidebar-collapsed .sidebar-label-tags .sidebar-label-icon {
-        font-size: 24px;
+        font-size: 32px;
     }
 
     .app-container.sidebar-collapsed .sidebar-label:hover {

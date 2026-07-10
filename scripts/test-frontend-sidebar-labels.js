@@ -36,31 +36,31 @@ assertNotIncludes(css, '.label-indicator', '旧的小圆点样式应删除，避
 
 assertMatches(
     css,
-    /\.sidebar-label-icon\s*\{[\s\S]*?flex:\s*0\s+0\s+22px[\s\S]*?width:\s*22px[\s\S]*?height:\s*22px[\s\S]*?font-size:\s*20px/,
+    /\.sidebar-label-icon\s*\{[\s\S]*?flex:\s*0\s+0\s+26px[\s\S]*?width:\s*26px[\s\S]*?height:\s*26px[\s\S]*?font-size:\s*22px/,
     '展开态分组图标必须保持稳定尺寸'
 );
 
 assertMatches(
     css,
-    /\.sidebar-label-tags\s+\.sidebar-label-icon\s*\{[\s\S]*?font-size:\s*22px/,
+    /\.sidebar-label-tags\s+\.sidebar-label-icon\s*\{[\s\S]*?font-size:\s*28px/,
     '标签分组图标必须明显大于更多标签的普通导航图标'
 );
 
 assertMatches(
     css,
-    /\.app-container\.sidebar-collapsed\s+\.sidebar-label\s*\{[\s\S]*?width:\s*36px[\s\S]*?height:\s*36px[\s\S]*?margin:\s*10px\s+auto\s+6px[\s\S]*?border:\s*1px\s+solid[\s\S]*?background:\s*color-mix/,
+    /\.app-container\.sidebar-collapsed\s+\.sidebar-label\s*\{[\s\S]*?width:\s*42px[\s\S]*?height:\s*42px[\s\S]*?margin:\s*10px\s+auto\s+6px[\s\S]*?border:\s*1px\s+solid[\s\S]*?background:\s*color-mix/,
     '折叠态分组图标必须放在可见的稳定容器中'
 );
 
 assertMatches(
     css,
-    /\.app-container\.sidebar-collapsed\s+\.sidebar-label-icon\s*\{[\s\S]*?width:\s*26px[\s\S]*?height:\s*26px[\s\S]*?font-size:\s*22px/,
+    /\.app-container\.sidebar-collapsed\s+\.sidebar-label-icon\s*\{[\s\S]*?width:\s*30px[\s\S]*?height:\s*30px[\s\S]*?font-size:\s*26px/,
     '折叠态分组图标必须提高可识别性'
 );
 
 assertMatches(
     css,
-    /\.app-container\.sidebar-collapsed\s+\.sidebar-label-tags\s+\.sidebar-label-icon\s*\{[\s\S]*?font-size:\s*24px/,
+    /\.app-container\.sidebar-collapsed\s+\.sidebar-label-tags\s+\.sidebar-label-icon\s*\{[\s\S]*?font-size:\s*32px/,
     '折叠态标签分组图标必须保持最高识别度'
 );
 
