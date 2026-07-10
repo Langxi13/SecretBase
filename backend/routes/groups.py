@@ -285,17 +285,19 @@ async def update_group(group_name: str, request: GroupRequest):
 
     if not isinstance(vault.groups_meta, dict):
         vault.groups_meta = {}
+    now = datetime.now().isoformat()
     meta = group_meta(vault, old_name)
     meta["description"] = request.description.strip()
-    meta["updated_at"] = datetime.now().isoformat()
+    meta["updated_at"] = now
     if "created_at" not in meta:
-        meta["created_at"] = datetime.now().isoformat()
+        meta["created_at"] = now
 
     if new_name != old_name:
         vault.groups_meta.pop(old_name, None)
         for entry in vault.entries:
-            if old_name in (getattr(entry, "groups", []) or []):
+            if not entry.deleted and old_name in (getattr(entry, "groups", []) or []):
                 entry.groups = [new_name if item == old_name else item for item in entry.groups]
+                entry.updated_at = now
         logger.info(f"重命名密码组: {old_name} -> {new_name}")
     else:
         logger.info(f"更新密码组: {old_name}")
@@ -315,9 +317,11 @@ async def delete_group(group_name: str):
 
     vault = get_vault_data()
     affected_count = 0
+    now = datetime.now().isoformat()
     for entry in vault.entries:
         if not entry.deleted and name in (getattr(entry, "groups", []) or []):
             entry.groups = [item for item in entry.groups if item != name]
+            entry.updated_at = now
             affected_count += 1
 
     meta_removed = False

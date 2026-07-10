@@ -28,7 +28,10 @@ async def get_trash(
     items = []
     
     for entry in vault.deleted_entries:
-        deleted_at = datetime.fromisoformat(entry.deleted_at) if entry.deleted_at else now
+        try:
+            deleted_at = datetime.fromisoformat(entry.deleted_at) if entry.deleted_at else now
+        except (TypeError, ValueError):
+            deleted_at = now
         expires_at = deleted_at + timedelta(days=30)
         remaining_days = max(0, (expires_at - now).days)
         
@@ -39,6 +42,8 @@ async def get_trash(
             "expires_at": expires_at.isoformat(),
             "remaining_days": remaining_days
         })
+
+    items.sort(key=lambda item: item["deleted_at"] or "", reverse=True)
     
     # 分页
     total = len(items)
@@ -76,6 +81,8 @@ async def restore_entry(entry_id: str):
     
     if not entry:
         raise HTTPException(status_code=404, detail="条目不在回收站中")
+    if any(active_entry.id == entry_id for active_entry in vault.entries if not active_entry.deleted):
+        raise HTTPException(status_code=409, detail="存在相同 ID 的活动条目，无法恢复")
     
     # 恢复条目
     restored_at = datetime.now().isoformat()
@@ -134,6 +141,12 @@ async def empty_trash():
     vault = get_vault_data()
     
     deleted_count = len(vault.deleted_entries)
+    if not deleted_count:
+        return {
+            "success": True,
+            "data": {"deleted_count": 0},
+            "message": "回收站已清空，删除了 0 个条目"
+        }
     vault.deleted_entries.clear()
     
     save_vault_data(vault)

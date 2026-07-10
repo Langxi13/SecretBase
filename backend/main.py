@@ -29,7 +29,6 @@ from storage import ConflictError, VaultLockTimeoutError, enforce_auto_lock, is_
 from routes import auth, entries, trash, tags, groups, ai, settings, health, transfer, tools
 
 
-SENSITIVE_KEYS = {"password", "token", "key", "secret", "api_key", "authorization"}
 SENSITIVE_LOG_PATTERN = re.compile(r"(?i)(password|token|api[_-]?key|secret|authorization)=([^\s,]+)")
 
 
@@ -127,6 +126,10 @@ API_PREFIXES = (
 )
 
 
+def is_import_request(path: str) -> bool:
+    return path.startswith("/import/") or path.startswith("/api/import/")
+
+
 def session_token(request: Request) -> str | None:
     header_token = request.headers.get("x-secretbase-token", "").strip()
     if header_token:
@@ -182,7 +185,7 @@ async def log_requests(request: Request, call_next):
 
     content_length = request.headers.get("content-length")
     if content_length and content_length.isdigit():
-        limit = IMPORT_BODY_LIMIT_BYTES if request.url.path.startswith("/import/") else NORMAL_BODY_LIMIT_BYTES
+        limit = IMPORT_BODY_LIMIT_BYTES if is_import_request(request.url.path) else NORMAL_BODY_LIMIT_BYTES
         if int(content_length) > limit:
             return JSONResponse(
                 status_code=413,

@@ -31,6 +31,7 @@ def main() -> None:
         os.environ["SECURE_SETTINGS_FILE"] = str(Path(tmpdir) / "secure-settings.enc")
 
         from fastapi.testclient import TestClient  # noqa: E402
+        from ai_services import client as ai_client  # noqa: E402
         import routes.ai as ai_routes  # noqa: E402
         from main import app  # noqa: E402
 
@@ -115,8 +116,8 @@ def main() -> None:
                 ensure_ascii=False,
             )
 
-        ai_routes._request_chat_completion = fake_chat_completion
-        ai_routes._load_ai_config = lambda: {
+        ai_client._request_chat_completion = fake_chat_completion
+        ai_client._load_ai_config = lambda: {
             "base_url": "https://ai.example.test/v1",
             "api_key": "test-key",
             "model": "test-model",

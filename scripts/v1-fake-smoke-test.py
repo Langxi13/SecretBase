@@ -24,6 +24,7 @@ from fastapi.testclient import TestClient  # noqa: E402
 import main  # noqa: E402
 import storage  # noqa: E402
 import routes.ai as ai_route  # noqa: E402
+from ai_services import client as ai_client  # noqa: E402
 from crypto import encrypt_vault  # noqa: E402
 
 
@@ -215,8 +216,8 @@ def run():
     assert ai_status == {"configured": False, "base_url": "", "model": "", "api_key_mask": ""}
     expect_json(client.post("/ai/parse", json={"text": "cannot parse before ai setup"}), 502, "ai parse before configuration")
 
-    original_ai_client = ai_route.httpx.AsyncClient
-    ai_route.httpx.AsyncClient = FakeAiClient
+    original_ai_client = ai_client.httpx.AsyncClient
+    ai_client.httpx.AsyncClient = FakeAiClient
     try:
         models = expect_success(
             client.post("/ai/models", json={"baseUrl": "https://api.example.test/v1/", "apiKey": "sk-test-secret"}),
@@ -251,7 +252,7 @@ def run():
         )
         settings_text = Path(os.environ["SETTINGS_PATH"]).read_text(encoding="utf-8")
         assert "sk-test-secret" not in settings_text
-        secure_bytes = Path(ai_route.SECURE_SETTINGS_FILE).read_bytes()
+        secure_bytes = Path(ai_client.SECURE_SETTINGS_FILE).read_bytes()
         assert b"sk-test-secret" not in secure_bytes
 
         ai_status = expect_success(client.get("/ai/status"), "ai status configured")["data"]
@@ -293,7 +294,7 @@ def run():
         assert cleared == {"configured": False, "base_url": "", "model": "", "api_key_mask": ""}
         expect_json(client.post("/ai/parse", json={"text": "cannot parse after ai setup cleared"}), 502, "ai parse after configuration cleared")
 
-        secure_path = Path(ai_route.SECURE_SETTINGS_FILE)
+        secure_path = Path(ai_client.SECURE_SETTINGS_FILE)
         secure_path.write_bytes(b"stale local secure settings")
         ai_status = expect_success(client.get("/ai/status"), "ai status with stale secure settings")["data"]
         assert ai_status == {"configured": False, "base_url": "", "model": "", "api_key_mask": ""}
@@ -311,9 +312,10 @@ def run():
         assert cleared_stale == {"configured": False, "base_url": "", "model": "", "api_key_mask": ""}
         assert not secure_path.exists()
     finally:
-        ai_route.httpx.AsyncClient = original_ai_client
+        ai_client.httpx.AsyncClient = original_ai_client
 
     expect_json(client.post("/entries", json={"title": ""}), 422, "invalid empty title")
+    expect_json(client.post("/entries", json={"title": "Oversized tag", "tags": ["x" * 51]}), 422, "oversized entry tag")
     duplicate_fields = entry_payload("Invalid Duplicate", "invalid")
     duplicate_fields["fields"].append({"name": "password", "value": "duplicate", "copyable": True})
     expect_json(client.post("/entries", json=duplicate_fields), 422, "invalid duplicate fields")
@@ -334,6 +336,8 @@ def run():
     external_content = storage._encrypt_with_current_key(storage.get_vault_data().model_dump_json().encode("utf-8"))
     Path(storage.VAULT_PATH).write_bytes(external_content)
     expect_json(client.post("/entries", json=entry_payload("Conflict Probe", "conflict")), 409, "optimistic lock conflict")
+    conflict_recovery_entries = expect_success(client.get("/entries?page_size=10"), "entries after conflict recovery")["data"]
+    assert conflict_recovery_entries["pagination"]["total"] == 3
     unlock_after_conflict = expect_success(client.post("/auth/unlock", json={"password": PASSWORD}), "unlock after optimistic conflict")
     use_token(client, unlock_after_conflict, "unlock after conflict token")
 
@@ -373,6 +377,8 @@ def run():
     assert tag_filter["pagination"]["total"] == 1
     starred = expect_success(client.get("/entries?starred=true"), "starred filter entries")["data"]
     assert starred["pagination"]["total"] == 1
+    unstarred = expect_success(client.get("/entries?starred=false"), "unstarred filter entries")["data"]
+    assert unstarred["pagination"]["total"] == 2
     sort_asc = expect_success(client.get("/entries?sort_by=title&sort_order=asc&page_size=10"), "sort asc entries")["data"]
     assert [item["title"] for item in sort_asc["items"]] == ["Alpha Mail", "Fake Cloud Console", "Zulu Server"]
     sort_desc = expect_success(client.get("/entries?sort_by=title&sort_order=desc&page_size=10"), "sort desc entries")["data"]
@@ -433,6 +439,12 @@ def run():
     assert {"filename", "size", "modified_at"}.issubset(backups["items"][0].keys())
     manual_backup = expect_success(client.post("/backups"), "create manual backup")["data"]
     assert {"filename", "size", "modified_at"}.issubset(manual_backup.keys())
+    expect_json(client.get("/backups/not-a-backup/download/encrypted"), 422, "invalid backup download name")
+    expect_json(
+        client.get("/backups/secretbase.manual.20990101_000000_000000.bak/download/encrypted"),
+        404,
+        "missing backup download",
+    )
     backup_summary = expect_success(client.get(f"/backups/{manual_backup['filename']}/summary"), "backup summary")["data"]
     assert backup_summary["entry_count"] == 3
     assert backup_summary["filename"] == manual_backup["filename"]
@@ -505,6 +517,16 @@ def run():
     imported = expect_success(client.post("/import/plain", files=skip_files, data={"conflict_strategy": "skip"}), "plain import skip")["data"]
     assert imported["skipped_count"] >= 3
 
+    api_alias_large_import = expect_success(
+        client.post(
+            "/api/import/plain",
+            files={"file": ("api-large.json", json.dumps({"entries": [], "padding": "x" * (1024 * 1024 + 100)}).encode("utf-8"), "application/json")},
+            data={"conflict_strategy": "skip"},
+        ),
+        "api alias allows import body limit",
+    )["data"]
+    assert api_alias_large_import["imported_count"] == 0
+
     encrypted_files = {"file": ("fake-vault.enc", export_encrypted, "application/octet-stream")}
     encrypted_import = expect_success(client.post("/import/encrypted", files=encrypted_files), "encrypted import")["data"]
     assert encrypted_import["imported_count"] >= 3
@@ -515,6 +537,70 @@ def run():
     legacy_files = {"file": ("legacy-vault.enc", legacy_backup_content, "application/octet-stream")}
     legacy_import = expect_success(client.post("/import/encrypted", files=legacy_files, data={"password": PASSWORD}), "legacy encrypted import with password")["data"]
     assert legacy_import["imported_count"] >= 3
+
+    metadata_import_data = {
+        "entries": [{
+            "id": "plain-import-metadata-entry",
+            "title": "带元数据的导入条目",
+            "tags": ["导入标签"],
+            "groups": ["导入密码组"],
+            "fields": [{"name": "账号", "value": "import@example.test", "copyable": True, "hidden": False}],
+        }],
+        "tags_meta": {"导入标签": {"description": "从明文导入保留的标签说明", "color": "#0f766e"}},
+        "groups_meta": {"导入密码组": {"description": "从明文导入保留的密码组简介"}},
+    }
+    metadata_import = expect_success(
+        client.post(
+            "/import/plain",
+            files={"file": ("metadata.json", json.dumps(metadata_import_data).encode("utf-8"), "application/json")},
+            data={"conflict_strategy": "skip"},
+        ),
+        "plain import preserves entity metadata",
+    )["data"]
+    assert metadata_import["created_count"] == 1
+    imported_tag = next(tag for tag in expect_success(client.get("/tags"), "tags after metadata import")["data"]["tags"] if tag["name"] == "导入标签")
+    assert imported_tag["description"] == "从明文导入保留的标签说明"
+    assert imported_tag["color"] == "#0f766e"
+    imported_group = next(group for group in expect_success(client.get("/groups"), "groups after metadata import")["data"]["groups"] if group["name"] == "导入密码组")
+    assert imported_group["description"] == "从明文导入保留的密码组简介"
+
+    trash_collision = expect_success(client.post("/entries", json=entry_payload("Trash Collision", "trash-collision")), "create trash collision entry")["data"]
+    expect_success(client.delete(f"/entries/{trash_collision['id']}"), "delete trash collision entry")
+    trash_collision_data = {
+        "entries": [{
+            "id": trash_collision["id"],
+            "title": "从导入恢复的条目",
+            "fields": [{"name": "账号", "value": "restored@example.test", "copyable": True, "hidden": False}],
+        }]
+    }
+    collision_preview = expect_success(
+        client.post(
+            "/import/plain/preview",
+            files={"file": ("trash-collision.json", json.dumps(trash_collision_data).encode("utf-8"), "application/json")},
+        ),
+        "preview trash id conflict",
+    )["data"]
+    assert collision_preview["conflict_count"] == 1
+    assert collision_preview["conflicts"][0]["existing_deleted"] is True
+    expect_json(
+        client.post(
+            "/import/plain",
+            files={"file": ("trash-collision.json", json.dumps(trash_collision_data).encode("utf-8"), "application/json")},
+            data={"conflict_strategy": "ask"},
+        ),
+        409,
+        "plain import detects trash id conflict",
+    )
+    restored_from_import = expect_success(
+        client.post(
+            "/import/plain",
+            files={"file": ("trash-collision.json", json.dumps(trash_collision_data).encode("utf-8"), "application/json")},
+            data={"conflict_strategy": "overwrite"},
+        ),
+        "plain import overwrites trash id conflict",
+    )["data"]
+    assert restored_from_import["overwritten_count"] == 1
+    assert expect_success(client.get(f"/entries/{trash_collision['id']}"), "restored import detail")["data"]["title"] == "从导入恢复的条目"
 
     lock_path = Path(f"{storage.VAULT_PATH}.lock")
     original_lock = storage.VaultFileLock
@@ -592,12 +678,25 @@ def run():
     use_token(client, unlock, "unlock token")
     expect_success(client.get("/entries"), "entries after unlock")
 
+    ai_client._save_secure_settings({
+        "ai": {
+            "base_url": "https://api.example.test/v1",
+            "api_key": "sk-rekey-secret",
+            "api_key_mask": "sk-...cret",
+            "model": "rekey-test-model",
+        }
+    })
+    assert ai_client._load_ai_config()["model"] == "rekey-test-model"
+
     expect_json(client.post("/auth/change-password", json={"old_password": "wrong", "new_password": NEW_PASSWORD}), 401, "change password wrong old")
     expect_success(client.post("/auth/change-password", json={"old_password": PASSWORD, "new_password": NEW_PASSWORD}), "change password")
     expect_success(client.post("/auth/lock"), "lock after password change")
     expect_json(client.post("/auth/unlock", json={"password": PASSWORD}), 401, "old password rejected")
     new_unlock = expect_success(client.post("/auth/unlock", json={"password": NEW_PASSWORD}), "new password unlock")
     use_token(client, new_unlock, "new password unlock token")
+    ai_after_password_change = expect_success(client.get("/ai/status"), "ai settings after password change")["data"]
+    assert ai_after_password_change["configured"] is True
+    assert ai_after_password_change["model"] == "rekey-test-model"
 
     storage._last_activity_at = storage.time.time() - 61
     expect_json(client.get("/entries"), 401, "server auto lock")

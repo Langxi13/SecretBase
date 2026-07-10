@@ -1,5 +1,7 @@
 import json
 import logging
+import os
+from pathlib import Path
 from fastapi import APIRouter, HTTPException
 from models import Settings
 from config import SETTINGS_PATH
@@ -7,10 +9,6 @@ from storage import is_unlocked
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
-
-# 默认设置
-DEFAULT_SETTINGS = Settings()
-
 
 def check_unlocked():
     """检查是否已解锁"""
@@ -25,18 +23,25 @@ def load_settings() -> Settings:
             data = json.load(f)
             return Settings(**data)
     except FileNotFoundError:
-        return DEFAULT_SETTINGS
+        return Settings()
     except Exception as e:
         logger.error(f"加载设置失败: {e}")
-        return DEFAULT_SETTINGS
+        return Settings()
 
 
 def save_settings(settings: Settings):
     """保存设置"""
+    path = Path(SETTINGS_PATH)
+    temporary_path = path.with_suffix(path.suffix + ".tmp")
     try:
-        with open(SETTINGS_PATH, 'w', encoding='utf-8') as f:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with open(temporary_path, 'w', encoding='utf-8') as f:
             json.dump(settings.dict(), f, ensure_ascii=False, indent=2)
+            f.flush()
+            os.fsync(f.fileno())
+        os.replace(temporary_path, path)
     except Exception as e:
+        temporary_path.unlink(missing_ok=True)
         logger.error(f"保存设置失败: {e}")
         raise HTTPException(status_code=500, detail="保存设置失败")
 
@@ -69,10 +74,12 @@ async def update_settings(updates: dict):
     }
     
     # 更新设置
+    updated_keys = []
     for key, value in updates.items():
         backend_key = field_mapping.get(key, key)
-        if hasattr(settings, backend_key):
+        if backend_key in Settings.__fields__:
             setattr(settings, backend_key, value)
+            updated_keys.append(backend_key)
     
     # 验证设置
     try:
@@ -82,7 +89,7 @@ async def update_settings(updates: dict):
     
     save_settings(settings)
     
-    logger.info(f"设置已更新: {updates}")
+    logger.info("设置已更新: %s", ", ".join(updated_keys) or "无已知字段")
     
     return {
         "success": True,

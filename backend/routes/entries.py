@@ -1,11 +1,10 @@
 import logging
+from datetime import datetime
 from fastapi import APIRouter, HTTPException, Query
 from typing import Optional
 from models import EntryCreate, EntryUpdate, BatchRequest, BatchTagRequest, BatchStarRequest
-from storage import (
-    is_unlocked, get_vault_data, save_vault_data,
-    get_entry, add_entry, update_entry, delete_entry
-)
+from storage import is_unlocked, get_vault_data, save_vault_data
+from entry_service import add_entry, delete_entries, delete_entry, get_entry, update_entry
 from tag_utils import ensure_entry_tags_meta
 
 logger = logging.getLogger(__name__)
@@ -108,8 +107,8 @@ async def get_entries(
         entries = [e for e in entries if not e.tags]
     
     # 星标筛选
-    if starred:
-        entries = [e for e in entries if e.starred]
+    if starred is not None:
+        entries = [e for e in entries if e.starred == starred]
 
     if created_from:
         entries = [e for e in entries if e.created_at >= created_from]
@@ -262,11 +261,7 @@ async def delete_entry_api(entry_id: str):
 async def batch_delete(request: BatchRequest):
     """批量删除"""
     check_unlocked()
-    
-    deleted_count = 0
-    for entry_id in request.ids:
-        if delete_entry(entry_id):
-            deleted_count += 1
+    deleted_count = delete_entries(request.ids)
     
     logger.info(f"批量删除: {deleted_count} 个条目")
     
@@ -284,19 +279,22 @@ async def batch_update_tags(request: BatchTagRequest):
     
     vault = get_vault_data()
     updated_count = 0
+    now = datetime.now().isoformat()
     
     for entry in vault.entries:
         if entry.id in request.ids and not entry.deleted:
+            tags = [tag for tag in entry.tags if tag not in request.remove_tags]
             for tag in request.add_tags:
-                if tag not in entry.tags:
-                    entry.tags.append(tag)
-            ensure_entry_tags_meta(vault, entry.tags)
-            for tag in request.remove_tags:
-                if tag in entry.tags:
-                    entry.tags.remove(tag)
-            updated_count += 1
+                if tag not in tags:
+                    tags.append(tag)
+            if tags != entry.tags:
+                entry.tags = tags
+                ensure_entry_tags_meta(vault, entry.tags)
+                entry.updated_at = now
+                updated_count += 1
     
-    save_vault_data(vault)
+    if updated_count:
+        save_vault_data(vault)
     
     logger.info(f"批量更新标签: {updated_count} 个条目")
     
@@ -314,13 +312,17 @@ async def batch_star(request: BatchStarRequest):
     
     vault = get_vault_data()
     updated_count = 0
+    now = datetime.now().isoformat()
     
     for entry in vault.entries:
         if entry.id in request.ids and not entry.deleted:
-            entry.starred = request.starred
-            updated_count += 1
+            if entry.starred != request.starred:
+                entry.starred = request.starred
+                entry.updated_at = now
+                updated_count += 1
     
-    save_vault_data(vault)
+    if updated_count:
+        save_vault_data(vault)
     
     logger.info(f"批量星标: {updated_count} 个条目")
     

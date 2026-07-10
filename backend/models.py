@@ -4,6 +4,19 @@ from datetime import datetime
 import uuid
 
 
+def _normalize_entity_names(values: List[str], label: str) -> List[str]:
+    cleaned = []
+    for item in values:
+        name = str(item or "").strip()
+        if not name:
+            raise ValueError(f"{label}不能为空")
+        if len(name) > 50:
+            raise ValueError(f"{label}名称不能超过 50 个字符")
+        if name not in cleaned:
+            cleaned.append(name)
+    return cleaned
+
+
 class FieldItem(BaseModel):
     """自定义字段"""
     name: str = Field(..., min_length=1, max_length=100)
@@ -30,19 +43,11 @@ class EntryBase(BaseModel):
 
     @validator('tags')
     def validate_tags(cls, v):
-        for tag in v:
-            if not tag.strip():
-                raise ValueError('标签不能为空')
-        return list(set(tag.strip() for tag in v if tag.strip()))
+        return _normalize_entity_names(v, "标签")
 
     @validator('groups')
     def validate_groups(cls, v):
-        for group in v:
-            if not group.strip():
-                raise ValueError('密码组不能为空')
-            if len(group.strip()) > 50:
-                raise ValueError('密码组名称不能超过 50 个字符')
-        return list(set(group.strip() for group in v if group.strip()))
+        return _normalize_entity_names(v, "密码组")
 
     @validator('fields')
     def validate_fields(cls, v):
@@ -81,21 +86,13 @@ class EntryUpdate(BaseModel):
     def validate_tags(cls, v):
         if v is None:
             return v
-        for tag in v:
-            if not tag.strip():
-                raise ValueError('标签不能为空')
-        return list(set(tag.strip() for tag in v if tag.strip()))
+        return _normalize_entity_names(v, "标签")
 
     @validator('groups')
     def validate_groups(cls, v):
         if v is None:
             return v
-        for group in v:
-            if not group.strip():
-                raise ValueError('密码组不能为空')
-            if len(group.strip()) > 50:
-                raise ValueError('密码组名称不能超过 50 个字符')
-        return list(set(group.strip() for group in v if group.strip()))
+        return _normalize_entity_names(v, "密码组")
 
     @validator('fields')
     def validate_fields(cls, v):

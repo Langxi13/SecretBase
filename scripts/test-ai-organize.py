@@ -31,6 +31,8 @@ def main() -> None:
         os.environ["SECURE_SETTINGS_FILE"] = str(Path(tmpdir) / "secure-settings.enc")
 
         from fastapi.testclient import TestClient  # noqa: E402
+        from ai_services import client as ai_client  # noqa: E402
+        from ai_services import organize as ai_organize  # noqa: E402
         import routes.ai as ai_routes  # noqa: E402
         from main import app  # noqa: E402
 
@@ -80,15 +82,15 @@ def main() -> None:
                 ensure_ascii=False,
             )
 
-        ai_routes._request_chat_completion = fake_chat_completion
-        ai_routes._load_ai_config = lambda: {
+        ai_client._request_chat_completion = fake_chat_completion
+        ai_client._load_ai_config = lambda: {
             "base_url": "https://ai.example.test/v1",
             "api_key": "test-key",
             "model": "test-model",
             "api_key_mask": "tes...key",
         }
 
-        duplicate_group_summary = ai_routes._organize_summary(
+        duplicate_group_summary = ai_organize._organize_summary(
             [
                 {
                     "entry_id": f"entry-{index}",
@@ -105,7 +107,7 @@ def main() -> None:
         assert duplicate_group_summary["add_groups"] == 1
         assert duplicate_group_summary["add_group_assignments"] == 31
 
-        existing_group_summary = ai_routes._organize_summary(
+        existing_group_summary = ai_organize._organize_summary(
             [
                 {
                     "entry_id": f"entry-{index}",
@@ -329,6 +331,42 @@ def main() -> None:
         groups = expect_success(client.get("/groups", headers=headers), "groups")["groups"]
         work_group = next(group for group in groups if group["name"] == "工作账号")
         assert work_group["description"] == "公司邮箱、协作工具和内部系统"
+
+        metadata_entry = expect_success(
+            client.post(
+                "/entries",
+                json={
+                    "title": "待补充简介的工作条目",
+                    "groups": ["待补充简介"],
+                    "fields": [{"name": "账号", "value": "metadata@example.test", "copyable": True, "hidden": False}],
+                },
+                headers=headers,
+            ),
+            "create group metadata entry",
+        )
+        expect_success(
+            client.post("/groups", json={"name": "待补充简介", "description": ""}, headers=headers),
+            "create empty group metadata",
+        )
+        metadata_apply = expect_success(
+            client.post(
+                "/ai/organize/apply",
+                json={
+                    "suggestions": [{
+                        "entry_id": metadata_entry["id"],
+                        "add_groups": ["待补充简介"],
+                        "group_descriptions": {"待补充简介": "由 AI 补充的密码组简介"},
+                    }]
+                },
+                headers=headers,
+            ),
+            "persist ai-updated group metadata",
+        )
+        assert metadata_apply["updated_count"] == 0
+        assert metadata_apply["updated_groups"] == ["待补充简介"]
+        groups_after_metadata_apply = expect_success(client.get("/groups", headers=headers), "groups after metadata apply")["groups"]
+        metadata_group = next(group for group in groups_after_metadata_apply if group["name"] == "待补充简介")
+        assert metadata_group["description"] == "由 AI 补充的密码组简介"
 
         print("PASS ai organize")
 

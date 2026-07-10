@@ -31,6 +31,7 @@ def main() -> None:
         os.environ["SECURE_SETTINGS_FILE"] = str(Path(tmpdir) / "secure-settings.enc")
 
         from fastapi.testclient import TestClient  # noqa: E402
+        from ai_services import client as ai_client  # noqa: E402
         import routes.ai as ai_routes  # noqa: E402
         from main import app  # noqa: E402
 
@@ -90,8 +91,8 @@ def main() -> None:
                 ensure_ascii=False,
             )
 
-        ai_routes._request_chat_completion = fake_chat_completion
-        ai_routes._load_ai_config = lambda: {
+        ai_client._request_chat_completion = fake_chat_completion
+        ai_client._load_ai_config = lambda: {
             "base_url": "https://ai.example.test/v1",
             "api_key": "test-key",
             "model": "test-model",
@@ -180,6 +181,27 @@ def main() -> None:
         assert "待整理" not in tags_by_name
         assert "git" not in tags_by_name
         assert "代码" not in tags_by_name
+
+        stale_update = expect_success(
+            client.post(
+                "/ai/tags/apply",
+                json={
+                    "suggestions": [
+                        {
+                            "action": "update_tag",
+                            "tag": "不存在的旧标签",
+                            "new_tag": "不应被创建",
+                            "description": "过期建议不应创建新标签",
+                        }
+                    ]
+                },
+                headers=headers,
+            ),
+            "stale tag update must not create a tag",
+        )
+        assert stale_update["applied_count"] == 0
+        tags_after_stale_update = expect_success(client.get("/tags", headers=headers), "tags after stale update")["tags"]
+        assert "不应被创建" not in {tag["name"] for tag in tags_after_stale_update}
 
         for index in range(99):
             expect_success(

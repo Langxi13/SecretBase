@@ -246,7 +246,7 @@ CORS_ORIGINS=https://your-domain.example
 
 ### AI 解析与整理
 
-AI 解析是可选功能。用户需要在解锁后进入“设置 -> AI”填写 Base URL、API Key，实时获取模型列表并选择模型。API Key 加密保存在本机 `secure-settings.enc`，不会写入明文 `settings.json` 或进入 vault 备份。未配置 API Key 时，核心密码管理、搜索、备份和恢复功能不受影响。
+AI 解析是可选功能。用户需要在解锁后进入“设置 -> AI”填写 Base URL、API Key，实时获取模型列表并选择模型。API Key 加密保存在本机 `secure-settings.enc`，不会写入明文 `settings.json` 或进入 vault 备份；修改主密码时，该文件会随 vault 一起重加密。未配置 API Key 时，核心密码管理、搜索、备份和恢复功能不受影响。
 
 示例输入：
 
@@ -265,11 +265,13 @@ python scripts\test-backup-separation.py
 python scripts\test-desktop-foundation.py
 python scripts\v1-fake-smoke-test.py
 python scripts\test-ai-organize.py
+python scripts\test-ai-actions.py
 python scripts\test-ai-tag-governance.py
 python scripts\test-ai-timeouts.py
 python scripts\test-field-hidden-semantics.py
 python scripts\test-password-groups.py
 python scripts\test-tag-entities.py
+python scripts\test-backend-module-split.py
 node scripts\test-frontend-auto-theme.js
 node scripts\test-frontend-ai-organize.js
 node scripts\test-frontend-tag-management.js
@@ -353,7 +355,11 @@ backend/
   config.py            environment and path configuration
   crypto.py            vault encryption and key derivation
   storage.py           vault state, locking, persistence, backups
-  routes/              auth, entries, tags, trash, transfer, tools, AI
+  entry_service.py     entry mutation and single-write batch operations
+  import_service.py    plain import conflict and metadata merge logic
+  secure_settings.py   local encrypted-settings key derivation and rekeying
+  ai_services/         AI prompts, client, parsing, organization and action services
+  routes/              thin auth, entries, tags, trash, transfer, tools and AI routers
 frontend/
   index.html           轻量 Vue CDN 入口、资源清单和加载壳
   templates/           同源加载的页面与弹窗模板片段
@@ -578,7 +584,7 @@ CORS_ORIGINS=https://your-domain.example
 
 ### AI Parsing
 
-AI parsing is optional. Users configure it after unlocking from Settings -> AI by entering Base URL, API Key, fetching the provider model list, and selecting a model. The API key is encrypted in the local `secure-settings.enc` file and is not written to plaintext `settings.json` or included in vault backups. If no API key is configured, core password management, search, backup, and restore workflows remain available.
+AI parsing is optional. Users configure it after unlocking from Settings -> AI by entering Base URL, API Key, fetching the provider model list, and selecting a model. The API key is encrypted in the local `secure-settings.enc` file, is re-encrypted when the master password changes, and is not written to plaintext `settings.json` or included in vault backups. If no API key is configured, core password management, search, backup, and restore workflows remain available.
 
 Example input:
 
@@ -597,11 +603,13 @@ python scripts\test-backup-separation.py
 python scripts\test-desktop-foundation.py
 python scripts\v1-fake-smoke-test.py
 python scripts\test-ai-organize.py
+python scripts\test-ai-actions.py
 python scripts\test-ai-tag-governance.py
 python scripts\test-ai-timeouts.py
 python scripts\test-field-hidden-semantics.py
 python scripts\test-password-groups.py
 python scripts\test-tag-entities.py
+python scripts\test-backend-module-split.py
 node scripts\test-frontend-auto-theme.js
 node scripts\test-frontend-ai-organize.js
 node scripts\test-frontend-tag-management.js
@@ -685,7 +693,11 @@ backend/
   config.py            environment and path configuration
   crypto.py            vault encryption and key derivation
   storage.py           vault state, locking, persistence, backups
-  routes/              auth, entries, tags, trash, transfer, tools, AI
+  entry_service.py     entry mutation and single-write batch operations
+  import_service.py    plain import conflict and metadata merge logic
+  secure_settings.py   local encrypted-settings key derivation and rekeying
+  ai_services/         AI prompts, client, parsing, organization, and action services
+  routes/              thin auth, entries, tags, trash, transfer, tools, and AI routers
 frontend/
   index.html           lightweight Vue CDN entry, asset manifest, and loading shell
   templates/           same-origin page and dialog template fragments

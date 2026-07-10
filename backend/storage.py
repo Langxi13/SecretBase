@@ -9,7 +9,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
-from config import VAULT_PATH, BACKUP_DIR, SETTINGS_PATH
+from config import VAULT_PATH, BACKUP_DIR, SETTINGS_PATH, SECURE_SETTINGS_FILE
 from crypto import (
     SecureKey,
     decrypt_vault,
@@ -19,8 +19,8 @@ from crypto import (
     generate_salt,
     parse_vault_header,
 )
-from models import VaultData, Entry, EntryCreate, EntryUpdate, Settings
-from tag_utils import ensure_entry_tags_meta
+from models import VaultData, Settings
+from secure_settings import AI_SETTINGS_PURPOSE, derive_purpose_key, prepare_rekey, replace_file_atomically
 
 logger = logging.getLogger(__name__)
 
@@ -128,15 +128,7 @@ def derive_unlocked_purpose_key(purpose: str) -> tuple[bytes, bytes]:
     """Derive an AES key scoped to a named local setting purpose."""
     if _vault_key is None:
         raise ValueError("Vault 未解锁")
-    purpose_bytes = purpose.encode("utf-8")
-    key = hashlib.pbkdf2_hmac(
-        "sha256",
-        _vault_key.get(),
-        b"SecretBase:" + _vault_key.salt + b":" + purpose_bytes,
-        iterations=100_000,
-        dklen=32,
-    )
-    return key, _vault_key.salt
+    return derive_purpose_key(_vault_key.get(), _vault_key.salt, purpose), _vault_key.salt
 
 
 def create_session_token() -> str:
@@ -369,74 +361,6 @@ def export_plain_vault() -> str:
     return get_vault_data().model_dump_json()
 
 
-def import_plain_vault(
-    data: dict,
-    conflict_strategy: str = "skip",
-    selected_entry_ids: list[str] | None = None,
-    conflict_resolutions: dict[str, str] | None = None,
-) -> dict:
-    """导入明文 vault JSON，按 id 处理冲突。"""
-    incoming = VaultData(**data)
-    if selected_entry_ids is not None:
-        selected_ids = set(selected_entry_ids)
-        incoming.entries = [entry for entry in incoming.entries if entry.id in selected_ids]
-    conflict_resolutions = conflict_resolutions or {}
-    vault = get_vault_data()
-    existing_by_id = {entry.id: entry for entry in vault.entries}
-    conflicts = []
-
-    for entry in incoming.entries:
-        if entry.id in existing_by_id:
-            conflicts.append({
-                "id": entry.id,
-                "existing_title": existing_by_id[entry.id].title,
-                "import_title": entry.title
-            })
-
-    unresolved_conflicts = [conflict for conflict in conflicts if conflict_resolutions.get(conflict["id"], conflict_strategy) == "ask"]
-    if unresolved_conflicts:
-        return {
-            "imported_count": 0,
-            "skipped_count": 0,
-            "conflicts": unresolved_conflicts,
-            "needs_resolution": True
-        }
-
-    imported_count = 0
-    created_count = 0
-    overwritten_count = 0
-    skipped_count = 0
-
-    for entry in incoming.entries:
-        existing = existing_by_id.get(entry.id)
-        if existing:
-            entry_strategy = conflict_resolutions.get(entry.id, conflict_strategy)
-            if entry_strategy == "overwrite":
-                index = vault.entries.index(existing)
-                vault.entries[index] = entry
-                existing_by_id[entry.id] = entry
-                imported_count += 1
-                overwritten_count += 1
-            else:
-                skipped_count += 1
-        else:
-            vault.entries.append(entry)
-            existing_by_id[entry.id] = entry
-            imported_count += 1
-            created_count += 1
-
-    save_vault_data(vault)
-    logger.info(f"导入明文 vault 成功: imported={imported_count}, skipped={skipped_count}")
-    return {
-        "imported_count": imported_count,
-        "created_count": created_count,
-        "overwritten_count": overwritten_count,
-        "skipped_count": skipped_count,
-        "conflicts": conflicts,
-        "needs_resolution": False
-    }
-
-
 def _create_backup_unlocked(strict: bool = False, backup_type: str = AUTO_BACKUP_TYPE):
     """创建加密 vault 备份。"""
     try:
@@ -532,6 +456,20 @@ def get_vault_data() -> VaultData:
     return _vault_data
 
 
+def _restore_cached_vault_from_disk() -> None:
+    """写入失败后丢弃内存中的未持久化修改。"""
+    global _vault_data
+    try:
+        content = get_vault_content()
+        if content is None:
+            raise ValueError("数据文件不存在")
+        _vault_data = VaultData(**json.loads(_decrypt_with_current_key(content).decode("utf-8")))
+        _set_vault_fingerprint_from_content(content)
+    except Exception as error:
+        logger.warning("无法从磁盘恢复 vault 缓存，将锁定会话: %s", error)
+        lock_vault()
+
+
 def save_vault_data(vault: VaultData):
     """保存 vault 数据（必须已解锁）"""
     global _vault_data
@@ -546,6 +484,7 @@ def save_vault_data(vault: VaultData):
         _vault_data = vault
         logger.info("Vault 数据已保存")
     except Exception as e:
+        _restore_cached_vault_from_disk()
         logger.error(f"保存 vault 失败: {e}")
         raise
 
@@ -592,12 +531,37 @@ def change_vault_password(old_password: str, new_password: str) -> bool:
         from crypto import verify_password
         if not verify_password(old_password, content):
             return False
-        
+
         plaintext = decrypt_vault(old_password, content)
         new_salt = generate_salt()
         new_key = derive_key(new_password, new_salt)
         encrypted = encrypt_vault_with_key(new_key, new_salt, plaintext)
-        save_vault(encrypted)
+
+        # AI 本地设置的密钥依赖当前 vault 密钥；先完成可回滚的设置文件轮换，
+        # 再提交 vault，避免密码更新后遗留一份只能由旧主密码解密的 API Key。
+        old_key = _vault_key.get()
+        secure_settings_path = Path(SECURE_SETTINGS_FILE)
+        rekey_state = prepare_rekey(
+            secure_settings_path,
+            AI_SETTINGS_PURPOSE,
+            old_key,
+            _vault_key.salt,
+            new_key,
+            new_salt,
+        )
+        if rekey_state:
+            if rekey_state[1] is None:
+                logger.warning("AI 安全设置无法随主密码迁移，将清除遗留文件")
+            replace_file_atomically(secure_settings_path, rekey_state[1])
+        try:
+            save_vault(encrypted)
+        except Exception:
+            if rekey_state:
+                try:
+                    replace_file_atomically(secure_settings_path, rekey_state[0])
+                except Exception as rollback_error:
+                    logger.critical("主密码变更回滚 AI 安全设置失败: %s", rollback_error)
+            raise
 
         if _vault_key is not None:
             _vault_key.lock()
@@ -607,78 +571,3 @@ def change_vault_password(old_password: str, new_password: str) -> bool:
     except Exception as e:
         logger.error(f"修改密码失败: {e}")
         return False
-
-
-def get_entry(entry_id: str) -> Optional[Entry]:
-    """获取单个条目"""
-    vault = get_vault_data()
-    for entry in vault.entries:
-        if entry.id == entry_id and not entry.deleted:
-            return entry
-    return None
-
-
-def add_entry(entry_data: EntryCreate) -> Entry:
-    """添加条目"""
-    vault = get_vault_data()
-    
-    entry = Entry(
-        title=entry_data.title,
-        url=entry_data.url or "",
-        starred=entry_data.starred,
-        tags=entry_data.tags,
-        groups=entry_data.groups,
-        fields=entry_data.fields,
-        remarks=entry_data.remarks or ""
-    )
-    
-    vault.entries.append(entry)
-    ensure_entry_tags_meta(vault, entry.tags)
-    save_vault_data(vault)
-    
-    return entry
-
-
-def update_entry(entry_id: str, entry_data: EntryUpdate) -> Optional[Entry]:
-    """更新条目"""
-    vault = get_vault_data()
-    
-    for entry in vault.entries:
-        if entry.id == entry_id and not entry.deleted:
-            if entry_data.title is not None:
-                entry.title = entry_data.title
-            if entry_data.url is not None:
-                entry.url = entry_data.url
-            if entry_data.starred is not None:
-                entry.starred = entry_data.starred
-            if entry_data.tags is not None:
-                entry.tags = entry_data.tags
-                ensure_entry_tags_meta(vault, entry.tags)
-            if entry_data.groups is not None:
-                entry.groups = entry_data.groups
-            if entry_data.fields is not None:
-                entry.fields = entry_data.fields
-            if entry_data.remarks is not None:
-                entry.remarks = entry_data.remarks
-            
-            entry.updated_at = datetime.now().isoformat()
-            save_vault_data(vault)
-            return entry
-    
-    return None
-
-
-def delete_entry(entry_id: str) -> bool:
-    """删除条目（移到回收站）"""
-    vault = get_vault_data()
-    
-    for entry in vault.entries:
-        if entry.id == entry_id and not entry.deleted:
-            entry.deleted = True
-            entry.deleted_at = datetime.now().isoformat()
-            vault.entries.remove(entry)
-            vault.deleted_entries.append(entry)
-            save_vault_data(vault)
-            return True
-    
-    return False

@@ -26,6 +26,7 @@ def reset_storage(tmpdir: Path, max_backups: int = 5, auto_backup_retention: int
     storage.VAULT_PATH = str(data_dir / "secretbase.enc")
     storage.BACKUP_DIR = str(backup_dir)
     storage.SETTINGS_PATH = str(data_dir / "settings.json")
+    storage.SECURE_SETTINGS_FILE = str(data_dir / "secure-settings.enc")
     settings_route.SETTINGS_PATH = storage.SETTINGS_PATH
     Path(settings_route.SETTINGS_PATH).write_text(
         json.dumps({"auto_backup_retention": auto_backup_retention or max_backups}),

@@ -180,7 +180,7 @@ GET /auth/status
 
 ### 3.5 修改主密码
 
-**修改主密码，重新加密数据。**
+**修改主密码，重新加密 vault 数据，并同步重加密本机 AI 安全设置。**
 
 ```
 POST /auth/change-password
@@ -1634,6 +1634,8 @@ POST /import/plain
 
 当前前端支持三种冲突策略：跳过已有条目、覆盖已有条目、发现冲突时停止并提示。
 
+导入成功的条目会合并其引用标签和密码组的元数据。已有本地元数据优先；本地说明为空时才使用导入文件中的标签说明、标签颜色或密码组简介。导入文件中与回收站条目相同的 ID 同样属于冲突；`overwrite` 会以导入条目恢复该 ID，避免活动条目与回收站出现重复 ID。
+
 前端必须把 `ask` 策略下返回的冲突展示为详情弹窗，而不是只显示 toast。弹窗至少展示冲突数量、前若干条冲突标题，并提示用户可改用“跳过已有条目”或“覆盖已有条目”后重新导入。
 
 **响应（无冲突）：**
@@ -1661,7 +1663,8 @@ POST /import/plain
       {
         "id": "uuid",
         "existing_title": "现有条目",
-        "import_title": "导入条目"
+        "import_title": "导入条目",
+        "existing_deleted": false
       }
     ]
   },
@@ -1701,7 +1704,7 @@ POST /import/plain/preview
       {"id": "uuid", "title": "导入条目", "is_conflict": false, "field_count": 3, "tag_count": 2, "tags": ["服务器"]}
     ],
     "conflicts": [
-      {"id": "uuid", "existing_title": "现有条目", "import_title": "导入条目"}
+      {"id": "uuid", "existing_title": "现有条目", "import_title": "导入条目", "existing_deleted": false}
     ]
   }
 }
@@ -1937,7 +1940,7 @@ Authorization: Bearer <session-token>
 ### 请求体大小限制
 
 - 普通 API：1MB
-- 导入接口：10MB
+- 导入接口：10MB（包括 `/import/*` 与 `/api/import/*` 别名）
 
 后端会根据 `Content-Length` 拒绝超限请求；导入接口还会在读取文件后再次校验文件大小。
 
