@@ -93,6 +93,25 @@ assert not any(name.startswith("ai_") for name in config.RUNTIME_CONFIG.__datacl
     with_backend_env("PORT=12345\n", probe)
 
 
+def test_server_settings_default_inside_data_dir() -> None:
+    with tempfile.TemporaryDirectory() as raw:
+        data_dir = Path(raw) / "data"
+
+        def probe() -> None:
+            result = run_config_probe(
+                """
+from pathlib import Path
+import config
+assert Path(config.SETTINGS_PATH) == Path(config.DATA_DIR) / "settings.json"
+assert not Path(config.DATA_DIR).exists()
+""",
+                {"DATA_DIR": str(data_dir)},
+            )
+            assert_probe_ok(result)
+
+        with_backend_env("", probe)
+
+
 def test_desktop_mode_does_not_load_backend_dotenv() -> None:
     def probe() -> None:
         result = run_config_probe(
@@ -467,6 +486,7 @@ def test_dev_test_backend_script_uses_isolated_runtime() -> None:
 def main() -> None:
     tests = [
         test_server_mode_loads_dotenv_without_overriding_system_env,
+        test_server_settings_default_inside_data_dir,
         test_desktop_mode_does_not_load_backend_dotenv,
         test_importing_config_does_not_create_runtime_directories,
         test_ensure_runtime_dirs_creates_required_directories,

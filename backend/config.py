@@ -48,7 +48,7 @@ def load_runtime_config() -> RuntimeConfig:
     backup_dir = resolve_backend_path(os.getenv("BACKUP_DIR", data_dir / "backups"))
     log_dir = resolve_backend_path(os.getenv("LOG_DIR", "logs"))
     vault_path = resolve_backend_path(os.getenv("VAULT_PATH", data_dir / "secretbase.enc"))
-    settings_path = resolve_backend_path(os.getenv("SETTINGS_PATH", "settings.json"))
+    settings_path = resolve_backend_path(os.getenv("SETTINGS_PATH", data_dir / "settings.json"))
     secure_settings_path = data_dir / "secure-settings.enc"
 
     port = int(os.getenv("PORT", 10004))

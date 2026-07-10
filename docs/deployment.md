@@ -106,6 +106,7 @@ server {
 ## Data Safety
 
 - Never deploy local `backend/data/`, `backend/logs/`, or `backend/.env` from a development machine.
+- Keep `SETTINGS_PATH` inside the writable data directory. Deployments upgrading from an older `SETTINGS_PATH=./settings.json` should stop the service, move that file to `backend/data/settings.json`, preserve its contents and ownership, update `.env`, and then restart. This prevents atomic settings writes from failing when the application code directory is read-only.
 - Before restoring a backup, create a separate backup of the current vault.
 - In-app automatic backups are stored under `BACKUP_DIR/auto/` and are rotated by the `auto_backup_retention` setting, default 30 and range 5-200. Manual backups are stored under `BACKUP_DIR/manual/` and are not removed by automatic rotation.
 - Existing root-level `secretbase.enc.*.bak` files are migrated into `BACKUP_DIR/auto/` when backup management runs.
