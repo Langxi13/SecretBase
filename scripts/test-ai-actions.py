@@ -44,9 +44,9 @@ def main() -> None:
             user_payload = json.loads(messages[-1]["content"])
             captured_payloads.append(user_payload)
             serialized = json.dumps(user_payload, ensure_ascii=False)
-            assert "main-user" not in serialized
-            assert "demo-service-password" not in serialized
-            assert "sk-secret" not in serialized
+            assert "demo-user" not in serialized
+            assert "demo-password" not in serialized
+            assert "sk-example" not in serialized
             assert '"value"' not in serialized
             entry_payload = next(entry for entry in user_payload["entries"] if entry["title"] == "demo.example")
             assert entry_payload["fields"][0]["name"] == "账号"
@@ -140,9 +140,9 @@ def main() -> None:
                     "tags": ["待整理"],
                     "groups": ["待归档"],
                     "fields": [
-                        {"name": "账号", "value": "main-user", "copyable": True, "hidden": False},
-                        {"name": "密码", "value": "demo-service-password", "copyable": True, "hidden": True},
-                        {"name": "API Key", "value": "sk-secret", "copyable": True, "hidden": True},
+                        {"name": "账号", "value": "demo-user", "copyable": True, "hidden": False},
+                        {"name": "密码", "value": "demo-password", "copyable": True, "hidden": True},
+                        {"name": "API Key", "value": "sk-example", "copyable": True, "hidden": True},
                     ],
                     "remarks": "需要拆分字段",
                 },
@@ -160,7 +160,7 @@ def main() -> None:
                 "/ai/actions/preview",
                 json={
                     "instruction": "创建 demo-service 密码组，将 demo.example 条目的三个字段独立作为条目，从属于该密码组",
-                    "filters": {"search": "demo-service", "searchScopes": ["title"]},
+                    "filters": {"search": "demo", "searchScopes": ["title"]},
                 },
                 headers=headers,
             ),
@@ -204,20 +204,20 @@ def main() -> None:
         assert apply_result["applied_count"] == 6
 
         groups = expect_success(client.get("/groups", headers=headers), "groups")["groups"]
-        demo-service_group = next(group for group in groups if group["name"] == "demo-service")
-        assert demo-service_group["description"] == "demo.example 相关凭据"
+        demo_group = next(group for group in groups if group["name"] == "demo-service")
+        assert demo_group["description"] == "demo.example 相关凭据"
         renamed_group = next(group for group in groups if group["name"] == "客户系统")
         assert renamed_group["description"] == "客户系统和业务资料相关凭据"
         assert not any(group["name"] == "待归档" for group in groups)
 
         entries = expect_success(
-            client.get("/entries", params={"search": "demo-service", "search_scopes": "title", "page_size": 20}, headers=headers),
+            client.get("/entries", params={"search": "demo", "search_scopes": "title", "page_size": 20}, headers=headers),
             "entries after ai actions",
         )["items"]
         titles = {entry["title"] for entry in entries}
         assert {"demo.example", "demo-service 账号", "demo-service 密码", "demo-service API Key"}.issubset(titles)
         source_detail = expect_success(client.get(f"/entries/{source['id']}", headers=headers), "source detail")
-        assert [field["value"] for field in source_detail["fields"]] == ["main-user", "demo-service-password", "sk-secret"]
+        assert [field["value"] for field in source_detail["fields"]] == ["demo-user", "demo-password", "sk-example"]
         assert [field["name"] for field in source_detail["fields"]] == ["账号", "密码", "API Key"]
         assert "客户系统" in source_detail["groups"]
         assert "待归档" not in source_detail["groups"]
@@ -230,11 +230,11 @@ def main() -> None:
                 f"detail {entry['title']}",
             )
 
-        assert details_by_title["demo-service 账号"]["fields"][0]["value"] == "main-user"
+        assert details_by_title["demo-service 账号"]["fields"][0]["value"] == "demo-user"
         assert details_by_title["demo-service 账号"]["fields"][0]["hidden"] is False
-        assert details_by_title["demo-service 密码"]["fields"][0]["value"] == "demo-service-password"
+        assert details_by_title["demo-service 密码"]["fields"][0]["value"] == "demo-password"
         assert details_by_title["demo-service 密码"]["fields"][0]["hidden"] is True
-        assert details_by_title["demo-service API Key"]["fields"][0]["value"] == "sk-secret"
+        assert details_by_title["demo-service API Key"]["fields"][0]["value"] == "sk-example"
         assert details_by_title["demo-service API Key"]["groups"] == ["demo-service"]
         assert set(details_by_title["demo-service API Key"]["tags"]) == {"demo-service", "API"}
 

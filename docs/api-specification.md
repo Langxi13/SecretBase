@@ -1424,7 +1424,7 @@ POST /ai/actions/preview
 {
   "instruction": "创建 demo-service 密码组，将 demo.example 条目的三个字段独立作为条目，从属于该密码组",
   "filters": {
-    "search": "demo-service",
+    "search": "demo",
     "searchScopes": ["title"]
   }
 }
