@@ -68,6 +68,8 @@ def test_build_script_is_ascii_and_runs_post_build_checks() -> None:
     assert "--self-test" in text
     assert "Start-Process -FilePath $Executable" in text
     assert "-Wait -PassThru" in text
+    assert "--data-root self-test-data --report self-test-report.json" in text
+    assert "-WorkingDirectory $BuildRoot" in text
     assert "verify_desktop_package.py" in text
     assert "SHA256SUMS.txt" in text
     assert re.search(r"sys\.version_info\[:2\].*\(3, 11\)", text)
