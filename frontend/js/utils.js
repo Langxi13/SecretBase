@@ -95,3 +95,16 @@ async function copyToClipboard(text) {
         }
     }
 }
+
+/**
+ * 桌面壳使用系统浏览器打开外部链接，普通 Web 模式继续隔离 opener/referrer。
+ */
+async function openExternalUrl(url) {
+    const desktopApi = window.pywebview && window.pywebview.api;
+    if (desktopApi && typeof desktopApi.open_external === 'function') {
+        return desktopApi.open_external(url);
+    }
+    const openedWindow = window.open(url, '_blank', 'noopener,noreferrer');
+    if (openedWindow) openedWindow.opener = null;
+    return Boolean(openedWindow);
+}
