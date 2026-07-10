@@ -6,7 +6,7 @@
 
 - [ ] Windows 10 或 Windows 11 x64。
 - [ ] 已安装 Edge WebView2 Runtime。
-- [ ] 从 Draft PR 的 `Windows Desktop` 工作流下载 `secretbase-windows-x64` 产物。
+- [ ] 从 GitHub Release 或 `Windows Desktop` 工作流下载 `secretbase-windows-x64` 产物。
 - [ ] 使用 `SHA256SUMS.txt` 校验 ZIP 后再解压。
 - [ ] 使用浏览器正常下载并直接解压，不预先执行“解除锁定”，确认新版可直接启动。
 - [ ] 解压路径包含中文和空格时仍可启动。
@@ -62,3 +62,5 @@ ZIP SHA-256：
 非阻断问题：
 是否允许合并并创建 v3.1.0 标签：是 / 否
 ```
+
+V3.1 发布记录：2026-07-11，Windows 10/11 x64 真机验收通过，允许发布 `v3.1.0`。

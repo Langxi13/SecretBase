@@ -6,7 +6,7 @@ V3.0 已实现，首个正式基线版本为 `v3.0.0`。
 
 本阶段交付的是可稳定本地启动的桌面基础模式，不是 Windows 安装包。它复用现有 FastAPI 后端和静态前端，在用户本机启动仅监听回环地址的服务，并自动打开浏览器。
 
-[V3.1 Windows 桌面 MVP](v3.1-windows-desktop-mvp.md) 已在本基础上实现 `SecretBase.exe`、独立桌面窗口和 Windows 自动构建，目前等待真机验收。
+[V3.1 Windows 桌面 MVP](v3.1-windows-desktop-mvp.md) 已在本基础上实现 `SecretBase.exe`、独立桌面窗口和 Windows 自动构建，并在 `v3.1.0` 正式发布。
 
 ## 已实现能力
 
@@ -159,4 +159,4 @@ V3.0 暂不包含：
 
 ## V3.1 交接结果
 
-V3.1 已按本阶段边界复用 vault、API 和前端，增加 pywebview 窗口壳、进程内后端与 PyInstaller one-folder 构建。Windows 真机验收通过后进入桌面产品化和 macOS 打包；手机端仍需先完成跨语言 vault 兼容层设计。
+V3.1 已按本阶段边界复用 vault、API 和前端，增加 pywebview 窗口壳、进程内后端与 PyInstaller one-folder 构建，并已通过 Windows 真机验收。下一阶段进入桌面产品化和 macOS 打包；手机端仍需先完成跨语言 vault 兼容层设计。

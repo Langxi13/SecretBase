@@ -213,7 +213,7 @@ http://127.0.0.1:8001
 
 `v3.0.0` 已完成由浏览器承载界面的桌面基础模式。`v3.1.0` 在此基础上增加 Windows 独立桌面窗口：使用 PyInstaller one-folder、pywebview 和 Edge WebView2，用户双击 `SecretBase.exe` 即可使用，不需要单独打开浏览器或安装 Python 依赖。
 
-V3.1 Windows 包当前处于真机验收阶段，正式标签会在窗口、导入导出、单实例和退出行为确认后创建。PR/主分支 CI 生成的测试包包含：
+V3.1 Windows 包已通过 Windows 10/11 真机验收并正式发布。GitHub Release 包含：
 
 ```text
 SecretBase-v3.1.0-windows-x64.zip
@@ -228,7 +228,7 @@ Windows 独立版默认将 vault、备份、日志、设置和 WebView 数据保
 .\scripts\build-desktop-windows.ps1
 ```
 
-构建脚本会创建隔离构建环境、运行 PyInstaller、执行打包后自检、校验发布目录并生成 SHA-256。详细实现与验收状态见 `docs/v3.1-windows-desktop-mvp.md` 和 `docs/manual-qa-checklist.md`。
+构建脚本会创建隔离构建环境、运行 PyInstaller、执行后端与桌面运行时自检、校验发布目录并生成 SHA-256。详细实现与验收记录见 `docs/v3.1-windows-desktop-mvp.md` 和 `docs/manual-qa-checklist.md`。
 
 源码浏览器模式继续保留，由 `desktop/launcher.py` 启动本机后端、分配随机端口，并让后端同源托管 `frontend/` 页面。
 
@@ -608,7 +608,7 @@ http://127.0.0.1:8001
 
 `v3.0.0` completes the browser-hosted desktop foundation. `v3.1.0` adds an independent Windows window built with PyInstaller one-folder, pywebview, and Edge WebView2. Users launch `SecretBase.exe` directly without opening a separate browser or installing Python dependencies.
 
-The V3.1 package is currently gated on Windows hardware acceptance. PR and main-branch CI produce `SecretBase-v3.1.0-windows-x64.zip` plus `SHA256SUMS.txt`; the formal tag is created only after window, import/export, single-instance, and shutdown behavior are verified.
+The V3.1 package has passed Windows 10/11 hardware acceptance and is formally released. GitHub Release provides `SecretBase-v3.1.0-windows-x64.zip` plus `SHA256SUMS.txt`.
 
 Desktop data is stored under `%LOCALAPPDATA%\SecretBase\`. Build validation rejects `.env`, vault, backup, log, and local settings files. Native exports use the Windows Save As dialog, external URLs open in the system browser, and a second launch activates the existing window.
 
