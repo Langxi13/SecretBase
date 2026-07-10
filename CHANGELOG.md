@@ -9,6 +9,7 @@
 - 增加 locale 无关的备份名称回归测试，恢复 Windows 发布检查。
 - 发布测试在清理临时目录前统一关闭日志文件，兼容 Windows 文件锁语义。
 - Vue vendored 完整性校验统一换行后计算哈希，兼容 Windows CRLF checkout。
+- CI 与 Release 工作流升级到基于新 Node 运行时的官方 Actions 主版本。
 
 ## 3.0.0 - 2026-07-10
 
