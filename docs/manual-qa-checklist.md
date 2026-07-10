@@ -8,6 +8,7 @@
 - [ ] 已安装 Edge WebView2 Runtime。
 - [ ] 从 Draft PR 的 `Windows Desktop` 工作流下载 `secretbase-windows-x64` 产物。
 - [ ] 使用 `SHA256SUMS.txt` 校验 ZIP 后再解压。
+- [ ] 使用浏览器正常下载并直接解压，不预先执行“解除锁定”，确认新版可直接启动。
 - [ ] 解压路径包含中文和空格时仍可启动。
 
 记录：
@@ -49,6 +50,7 @@ ZIP SHA-256：
 
 - [ ] 数据写入 `%LOCALAPPDATA%\SecretBase\`，未写入解压后的程序目录。
 - [ ] ZIP 内不包含 `.env`、`settings.json`、vault、备份、日志、测试数据或 Git 元数据。
+- [ ] `SecretBase.exe.config` 与 `SecretBase.exe` 位于同一目录，未被移动或删除。
 - [ ] 移动整个 `SecretBase/` 目录后仍可启动，单独移动 EXE 会被文档明确禁止。
 - [ ] 旧版加密备份导入兼容性未回归。
 

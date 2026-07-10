@@ -1,5 +1,7 @@
 # -*- mode: python ; coding: utf-8 -*-
 
+import os
+from importlib import metadata
 from pathlib import Path
 
 from PyInstaller.utils.hooks import collect_submodules
@@ -8,6 +10,19 @@ from PyInstaller.utils.hooks import collect_submodules
 ROOT = Path(SPECPATH).resolve().parent
 DESKTOP_DIR = ROOT / "desktop"
 BACKEND_DIR = ROOT / "backend"
+
+if os.name == "nt":
+    expected_desktop_dependencies = {
+        "pythonnet": "3.0.5",
+        "clr-loader": "0.2.10",
+    }
+    for package, expected_version in expected_desktop_dependencies.items():
+        installed_version = metadata.version(package)
+        if installed_version != expected_version:
+            raise SystemExit(
+                f"SecretBase.spec: {package} {installed_version} is not supported; "
+                f"install the pinned {expected_version} release from desktop/requirements.txt."
+            )
 
 hidden_imports = [
     "main",

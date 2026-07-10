@@ -13,6 +13,9 @@
 
 - 保留现有服务端部署、源码启动器和 vault 文件格式。
 - Windows 桌面包使用独立本地数据目录，不在发布目录写入用户数据。
+- 固定 `pythonnet 3.0.5` 与 `clr-loader 0.2.10`，避免新依赖版本导致 WinForms 运行时无法加载。
+- 随 EXE 提供 .NET 应用配置，允许 Chrome 等浏览器下载的 ZIP 在继承 Mark-of-the-Web 后正常加载 `Python.Runtime.dll`。
+- Windows CI 增加 CLR、WinForms、Edge WebView2 和模拟 Internet Zone 标记的打包运行时自检。
 
 ## 3.0.2 - 2026-07-10
 

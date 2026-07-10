@@ -10,9 +10,10 @@ from pathlib import Path, PurePosixPath
 REQUIRED_FILES = {
     "LICENSE.txt",
     "SecretBase.exe",
+    "SecretBase.exe.config",
     "_internal/frontend/index.html",
 }
-ALLOWED_ROOT_ITEMS = {"LICENSE.txt", "SecretBase.exe", "_internal"}
+ALLOWED_ROOT_ITEMS = {"LICENSE.txt", "SecretBase.exe", "SecretBase.exe.config", "_internal"}
 FORBIDDEN_NAMES = {
     ".env",
     ".env.example",

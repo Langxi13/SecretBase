@@ -57,13 +57,14 @@ $DistRoot = Join-Path $BuildRoot "dist"
 $WorkRoot = Join-Path $BuildRoot "work"
 $SelfTestRoot = Join-Path $BuildRoot "self-test-data"
 $SelfTestReport = Join-Path $BuildRoot "self-test-report.json"
+$RuntimeSelfTestReport = Join-Path $BuildRoot "runtime-self-test-report.json"
 $PackageDir = Join-Path $DistRoot "SecretBase"
 $ArtifactsDir = Join-Path $ProjectRoot "artifacts"
 $ArchiveName = "SecretBase-v$Version-windows-x64.zip"
 $ArchivePath = Join-Path $ArtifactsDir $ArchiveName
 $ChecksumPath = Join-Path $ArtifactsDir "SHA256SUMS.txt"
 
-foreach ($Path in @($DistRoot, $WorkRoot, $SelfTestRoot, $SelfTestReport, $ArchivePath, $ChecksumPath)) {
+foreach ($Path in @($DistRoot, $WorkRoot, $SelfTestRoot, $SelfTestReport, $RuntimeSelfTestReport, $ArchivePath, $ChecksumPath)) {
     if (Test-Path $Path) { Remove-Item -Recurse -Force $Path }
 }
 New-Item -ItemType Directory -Force -Path $DistRoot, $WorkRoot, $ArtifactsDir | Out-Null
@@ -74,6 +75,7 @@ try {
     if ($LASTEXITCODE -ne 0) { throw "PyInstaller failed." }
 
     Copy-Item (Join-Path $ProjectRoot "LICENSE") (Join-Path $PackageDir "LICENSE.txt")
+    Copy-Item (Join-Path $ProjectRoot "desktop\SecretBase.exe.config") (Join-Path $PackageDir "SecretBase.exe.config")
     & $BuildPython "scripts\verify_desktop_package.py" $PackageDir
     if ($LASTEXITCODE -ne 0) { throw "The unpacked desktop package failed validation." }
 
@@ -89,6 +91,17 @@ try {
     $SelfTest = Get-Content -Raw $SelfTestReport | ConvertFrom-Json
     if (-not $SelfTest.success -or -not $SelfTest.frontend_loaded) {
         throw "The packaged desktop self-test report is invalid."
+    }
+
+    $RuntimeSelfTestArguments = "--desktop-runtime-self-test --report runtime-self-test-report.json"
+    $RuntimeSelfTestProcess = Start-Process -FilePath $Executable -ArgumentList $RuntimeSelfTestArguments -WorkingDirectory $BuildRoot -Wait -PassThru
+    if ($RuntimeSelfTestProcess.ExitCode -ne 0) {
+        if (Test-Path $RuntimeSelfTestReport) { Get-Content -Raw $RuntimeSelfTestReport | Write-Host }
+        throw "The packaged desktop runtime self-test failed with exit code $($RuntimeSelfTestProcess.ExitCode)."
+    }
+    $RuntimeSelfTest = Get-Content -Raw $RuntimeSelfTestReport | ConvertFrom-Json
+    if (-not $RuntimeSelfTest.success -or $RuntimeSelfTest.renderer -ne "edgechromium") {
+        throw "The packaged desktop runtime self-test report is invalid."
     }
 
     Compress-Archive -Path $PackageDir -DestinationPath $ArchivePath -CompressionLevel Optimal

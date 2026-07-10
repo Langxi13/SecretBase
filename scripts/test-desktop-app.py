@@ -12,7 +12,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from desktop.app import selected_file_path  # noqa: E402
+from desktop.app import desktop_window_failure, selected_file_path  # noqa: E402
 from desktop.bridge import DesktopApi, safe_filename, validate_download_request  # noqa: E402
 from desktop.instance import SingleInstanceCoordinator  # noqa: E402
 
@@ -130,6 +130,19 @@ def test_desktop_file_dialog_result_compatibility() -> None:
     assert selected_file_path(None) is None
 
 
+def test_desktop_runtime_error_does_not_mislabel_webview2() -> None:
+    message, offer_webview2 = desktop_window_failure(
+        RuntimeError("Failed to resolve Python.Runtime.Loader.Initialize from Python.Runtime.dll")
+    )
+    assert offer_webview2 is False
+    assert "桌面运行组件无法加载" in message
+    assert "解除锁定" in message
+
+    generic_message, generic_offer = desktop_window_failure(RuntimeError("WebView2 runtime unavailable"))
+    assert generic_offer is True
+    assert "WebView2 官方下载页面" in generic_message
+
+
 def test_desktop_bridge_rejects_unsafe_requests() -> None:
     assert validate_download_request("POST", "/export/plain") == ("POST", "/export/plain")
     assert validate_download_request("GET", "/backups/demo.bak/download/encrypted") == (
@@ -181,6 +194,7 @@ def main() -> None:
         test_desktop_download_bridge,
         test_desktop_download_cancel_stops_before_request,
         test_desktop_file_dialog_result_compatibility,
+        test_desktop_runtime_error_does_not_mislabel_webview2,
         test_desktop_bridge_rejects_unsafe_requests,
         test_desktop_external_link_validation,
         test_non_windows_single_instance_fallback,

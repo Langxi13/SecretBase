@@ -88,6 +88,34 @@ jobs:
 
           $Result = Get-Content -Raw $Report | ConvertFrom-Json
           if (-not $Result.success -or -not $Result.frontend_loaded) { throw "Packaged self-test report is invalid." }
+
+          $RuntimeReport = Join-Path $env:RUNNER_TEMP "secretbase-desktop-runtime-self-test.json"
+          $RuntimeArguments = "--desktop-runtime-self-test --report secretbase-desktop-runtime-self-test.json"
+          $RuntimeProcess = Start-Process -FilePath $Executable -ArgumentList $RuntimeArguments -WorkingDirectory $env:RUNNER_TEMP -Wait -PassThru
+          if ($RuntimeProcess.ExitCode -ne 0) {
+            if (Test-Path $RuntimeReport) { Get-Content -Raw $RuntimeReport | Write-Host }
+            throw "Packaged desktop runtime self-test failed."
+          }
+          $RuntimeResult = Get-Content -Raw $RuntimeReport | ConvertFrom-Json
+          if (-not $RuntimeResult.success -or $RuntimeResult.renderer -ne "edgechromium") {
+            throw "Packaged desktop runtime report is invalid."
+          }
+
+          $PythonRuntime = Join-Path $ExtractRoot "SecretBase\_internal\pythonnet\runtime\Python.Runtime.dll"
+          if (-not (Test-Path $PythonRuntime)) { throw "Python.Runtime.dll is missing from the desktop package." }
+          Set-Content -LiteralPath $PythonRuntime -Stream "Zone.Identifier" -Encoding Ascii -Value "[ZoneTransfer]`r`nZoneId=3"
+
+          $MotwReport = Join-Path $env:RUNNER_TEMP "secretbase-desktop-runtime-motw-self-test.json"
+          $MotwArguments = "--desktop-runtime-self-test --report secretbase-desktop-runtime-motw-self-test.json"
+          $MotwProcess = Start-Process -FilePath $Executable -ArgumentList $MotwArguments -WorkingDirectory $env:RUNNER_TEMP -Wait -PassThru
+          if ($MotwProcess.ExitCode -ne 0) {
+            if (Test-Path $MotwReport) { Get-Content -Raw $MotwReport | Write-Host }
+            throw "Desktop runtime failed with Mark-of-the-Web."
+          }
+          $MotwResult = Get-Content -Raw $MotwReport | ConvertFrom-Json
+          if (-not $MotwResult.success -or $MotwResult.renderer -ne "edgechromium") {
+            throw "Mark-of-the-Web runtime report is invalid."
+          }
           Start-Sleep -Seconds 1
           if (Get-Process -Name "SecretBase" -ErrorAction SilentlyContinue) { throw "SecretBase process remained after self-test." }
       - name: Upload packaged self-test report
@@ -95,6 +123,6 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: secretbase-windows-2025-self-test
-          path: ${{ runner.temp }}/secretbase-desktop-self-test.json
+          path: ${{ runner.temp }}/secretbase-desktop-*-self-test.json
           if-no-files-found: warn
           retention-days: ${{ inputs.retention-days }}

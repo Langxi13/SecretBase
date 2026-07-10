@@ -28,7 +28,13 @@ WEBVIEW2_DOWNLOAD_URL = "https://developer.microsoft.com/microsoft-edge/webview2
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Start SecretBase as a Windows desktop application.")
     parser.add_argument("--data-root", help="Override the local SecretBase data directory.")
-    parser.add_argument("--self-test", action="store_true", help="Run a packaged backend/resource test without a window.")
+    test_mode = parser.add_mutually_exclusive_group()
+    test_mode.add_argument("--self-test", action="store_true", help="Run a packaged backend/resource test without a window.")
+    test_mode.add_argument(
+        "--desktop-runtime-self-test",
+        action="store_true",
+        help="Load the packaged Windows desktop runtime without creating a window.",
+    )
     parser.add_argument("--report", help="Write the self-test result as JSON.")
     return parser.parse_args()
 
@@ -95,6 +101,57 @@ def run_self_test(data_root_value: str | None, report_path: str | None) -> int:
             temporary.cleanup()
 
 
+def run_desktop_runtime_self_test(report_path: str | None) -> int:
+    result = {"success": False, "mode": "desktop-runtime"}
+    try:
+        if os.name != "nt":
+            raise RuntimeError("桌面运行时自检只支持 Windows")
+
+        import clr
+
+        clr.AddReference("System")
+        import System
+        from webview.platforms import winforms
+
+        renderer = str(getattr(winforms, "renderer", ""))
+        result.update({
+            "success": renderer == "edgechromium",
+            "renderer": renderer,
+            "dotnet_version": str(System.Environment.Version),
+        })
+        if not result["success"]:
+            result["error"] = f"未加载 Edge WebView2 渲染器：{renderer or 'unknown'}"
+    except Exception as error:
+        result["error"] = str(error)
+    finally:
+        write_report(report_path, result)
+        logging.shutdown()
+    return 0 if result["success"] else 1
+
+
+def desktop_window_failure(error: Exception) -> tuple[str, bool]:
+    message = str(error)
+    normalized = message.lower()
+    runtime_markers = (
+        "python.runtime.loader.initialize",
+        "pythonnet",
+        "clr_loader",
+        "null pointer pointer",
+    )
+    if any(marker in normalized for marker in runtime_markers):
+        return (
+            "Windows 桌面运行组件无法加载。\n\n"
+            f"{message}\n\n"
+            "请重新下载最新的完整 x64 ZIP，不要单独移动 EXE。"
+            "如果仍使用旧测试包，请右键原始 ZIP，打开“属性”，勾选“解除锁定”后重新解压。",
+            False,
+        )
+    return (
+        f"无法启动 Windows 桌面窗口。\n\n{message}\n\n是否打开 WebView2 官方下载页面？",
+        True,
+    )
+
+
 def run_window(data_root_value: str | None) -> int:
     coordinator = SingleInstanceCoordinator()
     if not coordinator.acquire():
@@ -154,13 +211,14 @@ def run_window(data_root_value: str | None) -> int:
         )
         return 0
     except Exception as error:
+        failure_message, offer_webview2 = desktop_window_failure(error)
         install_runtime = show_message(
             "SecretBase 桌面窗口启动失败",
-            f"无法启动 Windows 桌面窗口。\n\n{error}\n\n是否打开 WebView2 官方下载页面？",
+            failure_message,
             error=True,
-            yes_no=True,
+            yes_no=offer_webview2,
         )
-        if install_runtime:
+        if offer_webview2 and install_runtime:
             webbrowser.open(WEBVIEW2_DOWNLOAD_URL)
         return 1
     finally:
@@ -173,8 +231,10 @@ def main() -> int:
     args = parse_args()
     if args.self_test:
         return run_self_test(args.data_root, args.report)
+    if args.desktop_runtime_self_test:
+        return run_desktop_runtime_self_test(args.report)
     if args.report:
-        raise SystemExit("--report 只能与 --self-test 一起使用")
+        raise SystemExit("--report 只能与自检参数一起使用")
     return run_window(args.data_root)
 
 
