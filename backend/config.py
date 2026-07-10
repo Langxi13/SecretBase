@@ -51,6 +51,9 @@ def load_runtime_config() -> RuntimeConfig:
     settings_path = resolve_backend_path(os.getenv("SETTINGS_PATH", "settings.json"))
     secure_settings_path = data_dir / "secure-settings.enc"
 
+    port = int(os.getenv("PORT", 10004))
+    default_cors_origins = f"http://127.0.0.1:{port}" if is_desktop_mode() else "*"
+
     return RuntimeConfig(
         mode=APP_MODE,
         base_dir=BASE_DIR,
@@ -58,11 +61,11 @@ def load_runtime_config() -> RuntimeConfig:
         backup_dir=backup_dir,
         log_dir=log_dir,
         host=os.getenv("HOST", "127.0.0.1"),
-        port=int(os.getenv("PORT", 10004)),
+        port=port,
         vault_path=vault_path,
         settings_path=settings_path,
         secure_settings_path=secure_settings_path,
-        cors_origins=os.getenv("CORS_ORIGINS", "*"),
+        cors_origins=os.getenv("CORS_ORIGINS", default_cors_origins),
         log_level=os.getenv("LOG_LEVEL", "INFO"),
     )
 
@@ -113,8 +116,8 @@ def ensure_runtime_dirs() -> None:
     Path(SECURE_SETTINGS_FILE).parent.mkdir(parents=True, exist_ok=True)
 
 
-def get_cors_origins() -> list:
+def get_cors_origins() -> list[str]:
     """获取 CORS 允许的来源列表"""
     if CORS_ORIGINS == "*":
         return ["*"]
-    return [origin.strip() for origin in CORS_ORIGINS.split(",")]
+    return [origin.strip() for origin in CORS_ORIGINS.split(",") if origin.strip()]

@@ -11,7 +11,7 @@
                 <h2>设置主密码</h2>
                 <p class="auth-hint">这是唯一密码，请牢记</p>
 
-                <form @submit.prevent="initPassword">
+                <form method="post" action="/" @submit.prevent="initPassword">
                     <div class="form-group">
                         <label>主密码</label>
                         <input
@@ -51,7 +51,7 @@
                 <h1>🔐 SecretBase</h1>
                 <h2>解锁</h2>
 
-                <form @submit.prevent="unlock">
+                <form method="post" action="/" @submit.prevent="unlock">
                     <div class="form-group">
                         <label>主密码</label>
                         <input

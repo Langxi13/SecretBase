@@ -1,4 +1,5 @@
 from fastapi import APIRouter
+from version import APP_VERSION
 
 router = APIRouter()
 
@@ -10,6 +11,6 @@ async def health_check():
         "success": True,
         "data": {
             "status": "healthy",
-            "version": "1.0.0"
+            "version": APP_VERSION
         }
     }

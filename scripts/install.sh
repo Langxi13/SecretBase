@@ -117,10 +117,10 @@ server {
     server_name _;
 
     # 安全头
-    add_header X-Frame-Options "SAMEORIGIN" always;
+    add_header X-Frame-Options "DENY" always;
     add_header X-Content-Type-Options "nosniff" always;
-    add_header X-XSS-Protection "1; mode=block" always;
-    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+    add_header Referrer-Policy "no-referrer" always;
+    add_header Permissions-Policy "camera=(), microphone=(), geolocation=()" always;
 
     # 前端静态文件
     root $APP_DIR/frontend;
@@ -128,7 +128,13 @@ server {
 
     # 前端路由
     location / {
+        expires -1;
         try_files \$uri \$uri/ /index.html;
+    }
+
+    location = /secretbase-runtime-config.js {
+        expires -1;
+        try_files \$uri =404;
     }
 
     # API 代理
@@ -159,7 +165,6 @@ server {
     # 静态资源缓存
     location ~* \.(css|js|png|jpg|jpeg|gif|ico|svg)$ {
         expires 7d;
-        add_header Cache-Control "public, immutable";
     }
 
     # 禁止访问隐藏文件

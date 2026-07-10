@@ -1,5 +1,7 @@
 # V3 Desktop Foundation Implementation Plan
 
+> **状态：已完成。** V3.0 桌面基础模式已在 `v3.0.0` 实现；当前运行方式、验证命令和后续边界以 `docs/v3-desktop-foundation.md` 为准。本文仅保留为历史实施记录。
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Build SecretBase V3.0 desktop foundation: local desktop launch mode, explicit runtime configuration, same-origin frontend hosting, desktop launcher, and verification without packaging a desktop app.

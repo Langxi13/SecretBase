@@ -48,7 +48,7 @@
             resetEntryForm,
             showConfirmDialog,
             confirmAction,
-            getFavicon: viewHelpers.getFavicon,
+            getEntryIconText: viewHelpers.getEntryIconText,
             getTagColor: viewHelpers.getTagColor,
             groupCardStyle: viewHelpers.groupCardStyle,
             entryCardStyle: viewHelpers.entryCardStyle,

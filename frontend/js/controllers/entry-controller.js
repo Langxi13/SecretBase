@@ -322,7 +322,8 @@
         }
 
         function openUrl(url) {
-            window.open(url, '_blank');
+            const openedWindow = window.open(url, '_blank', 'noopener,noreferrer');
+            if (openedWindow) openedWindow.opener = null;
         }
 
         function toggleCopyMenu(entryId) {

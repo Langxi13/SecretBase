@@ -17,6 +17,7 @@ from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 BACKEND_DIR = PROJECT_ROOT / "backend"
+LOCAL_URL_OPENER = urllib.request.build_opener(urllib.request.ProxyHandler({}))
 
 
 def choose_free_port() -> int:
@@ -41,6 +42,26 @@ def default_data_root() -> Path:
     return (Path.home() / ".local" / "share" / "SecretBase").resolve()
 
 
+def resolve_data_root(value: str | None) -> Path:
+    if value:
+        return Path(value).expanduser().resolve()
+    return default_data_root()
+
+
+def prepare_data_root(data_root: Path) -> None:
+    """创建本地运行目录，并在平台允许时限制为当前用户访问。"""
+    directories = (
+        data_root,
+        data_root / "data",
+        data_root / "data" / "backups",
+        data_root / "logs",
+    )
+    for directory in directories:
+        directory.mkdir(parents=True, exist_ok=True)
+        if os.name != "nt":
+            directory.chmod(0o700)
+
+
 def build_desktop_env(data_root: Path, port: int) -> dict[str, str]:
     env = os.environ.copy()
     env.update({
@@ -52,7 +73,9 @@ def build_desktop_env(data_root: Path, port: int) -> dict[str, str]:
         "BACKUP_DIR": str(data_root / "data" / "backups"),
         "LOG_DIR": str(data_root / "logs"),
         "SETTINGS_PATH": str(data_root / "settings.json"),
+        "CORS_ORIGINS": f"http://127.0.0.1:{port}",
         "PYTHONPATH": str(BACKEND_DIR),
+        "PYTHONUNBUFFERED": "1",
     })
     return env
 
@@ -111,7 +134,7 @@ def wait_for_health(url: str, process: subprocess.Popen[str], timeout: float = 1
         if process.poll() is not None:
             return False
         try:
-            with urllib.request.urlopen(f"{url}/health", timeout=1) as response:
+            with LOCAL_URL_OPENER.open(f"{url}/health", timeout=1) as response:
                 if response.status == 200:
                     return True
         except Exception:
@@ -143,12 +166,13 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Start SecretBase in local desktop mode.")
     parser.add_argument("--dry-run", action="store_true", help="Print resolved desktop config as JSON and exit.")
     parser.add_argument("--no-browser", action="store_true", help="Start backend without opening the default browser.")
+    parser.add_argument("--data-root", help="Override the local SecretBase data directory for this launch.")
     return parser.parse_args()
 
 
 def main() -> int:
     args = parse_args()
-    data_root = default_data_root()
+    data_root = resolve_data_root(args.data_root)
     port = choose_free_port()
     snapshot = config_snapshot(data_root, port)
 
@@ -156,6 +180,7 @@ def main() -> int:
         print(json.dumps(snapshot, ensure_ascii=False, indent=2))
         return 0
 
+    prepare_data_root(data_root)
     env = build_desktop_env(data_root, port)
     process = start_backend(env, port)
     lines: deque[str] = deque(maxlen=200)

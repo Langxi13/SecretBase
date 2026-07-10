@@ -2,6 +2,17 @@
 
 This document describes a generic SecretBase deployment. Replace every placeholder with your own values.
 
+## Local Source Startup
+
+For a local single-user deployment, use the desktop foundation bootstrap instead of configuring nginx:
+
+```text
+Windows: start-secretbase.cmd
+Linux/macOS: ./scripts/start-local.sh
+```
+
+The first run creates `.venv/`, installs pinned dependencies, allocates a random loopback port, and opens the application. Local data is stored outside the repository in the current user's application-data directory. Use `--data-root PATH` (or `-DataRoot PATH` in PowerShell) to override it.
+
 ## Recommended Layout
 
 ```text
@@ -43,21 +54,23 @@ server {
     root /opt/secretbase/frontend;
     index index.html;
 
+    add_header X-Frame-Options "DENY" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header Referrer-Policy "no-referrer" always;
+    add_header Permissions-Policy "camera=(), microphone=(), geolocation=()" always;
+
     location / {
         expires -1;
-        add_header Cache-Control "no-cache, must-revalidate";
         try_files $uri $uri/ /index.html;
     }
 
     location = /secretbase-runtime-config.js {
         expires -1;
-        add_header Cache-Control "no-store, no-cache, must-revalidate, max-age=0";
         try_files $uri =404;
     }
 
     location ~* \.(css|js|png|jpg|jpeg|gif|ico|svg)$ {
         expires 7d;
-        add_header Cache-Control "public, immutable";
     }
 
     location /api/ {
@@ -88,7 +101,7 @@ server {
 }
 ```
 
-生产环境如果对 CSS/JS 使用长缓存，`frontend/index.html` 中的本地 CSS/JS 引用必须带版本查询参数，并在每次前端发布时递增。入口 HTML 应要求浏览器重新验证，`/secretbase-runtime-config.js` 是运行时配置脚本，应单独禁用缓存。
+生产环境如果对 CSS/JS 使用长缓存，`frontend/index.html` 中的本地 CSS/JS 引用必须带版本查询参数，并在每次前端发布时递增。`expires` 指令不会打断服务器级安全头的继承；不要在静态资源 location 中单独添加 `add_header` 后遗漏安全头。入口 HTML 和 `/secretbase-runtime-config.js` 应要求浏览器重新验证。
 
 ## Data Safety
 
@@ -97,6 +110,7 @@ server {
 - In-app automatic backups are stored under `BACKUP_DIR/auto/` and are rotated by the `auto_backup_retention` setting, default 30 and range 5-200. Manual backups are stored under `BACKUP_DIR/manual/` and are not removed by automatic rotation.
 - Existing root-level `secretbase.enc.*.bak` files are migrated into `BACKUP_DIR/auto/` when backup management runs.
 - Do not change vault format or migration behavior without an explicit backup and restore rehearsal.
+- The frontend runtime is vendored. Production and desktop startup do not need to execute JavaScript from a third-party CDN.
 
 ## Health Checks
 

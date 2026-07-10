@@ -10,8 +10,12 @@ import time
 import urllib.request
 from pathlib import Path
 
-
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(PROJECT_ROOT))
+
+from desktop import launcher  # noqa: E402
+
+
 BACKEND_DIR = PROJECT_ROOT / "backend"
 BACKEND_ENV = BACKEND_DIR / ".env"
 LAUNCHER = PROJECT_ROOT / "desktop" / "launcher.py"
@@ -96,6 +100,7 @@ def test_desktop_mode_does_not_load_backend_dotenv() -> None:
 import config
 assert config.APP_MODE == "desktop"
 assert config.RUNTIME_CONFIG.mode == "desktop"
+assert config.CORS_ORIGINS == "http://127.0.0.1:10004"
 assert not any(name.startswith("ai_") for name in config.RUNTIME_CONFIG.__dataclass_fields__)
 """,
             {"SECRETBASE_MODE": "desktop"},
@@ -196,13 +201,16 @@ def test_runtime_config_endpoint_returns_javascript() -> None:
             """
 from fastapi.testclient import TestClient
 import main
-client = TestClient(main.app)
+client = TestClient(main.app, base_url="http://127.0.0.1")
 response = client.get("/secretbase-runtime-config.js")
 assert response.status_code == 200
 assert "javascript" in response.headers["content-type"]
 assert "window.SECRETBASE_RUNTIME_CONFIG" in response.text
 assert '"apiBaseUrl": ""' in response.text
 assert '"mode": "desktop"' in response.text
+assert '"version": "3.0.0"' in response.text
+assert response.headers["x-frame-options"] == "DENY"
+assert response.headers["referrer-policy"] == "no-referrer"
 """,
             {
                 "SECRETBASE_MODE": "desktop",
@@ -222,13 +230,16 @@ def test_desktop_mode_serves_frontend_index() -> None:
             """
 from fastapi.testclient import TestClient
 import main
-client = TestClient(main.app)
+client = TestClient(main.app, base_url="http://127.0.0.1")
 index_response = client.get("/")
 assert index_response.status_code == 200
 assert "text/html" in index_response.headers["content-type"]
 assert '<div id="app"' in index_response.text
 assert 'js/template-loader.js' in index_response.text
 assert 'js/app.js' in index_response.text
+assert 'vendor/vue/vue.global.prod.js' in index_response.text
+assert 'https://unpkg.com' not in index_response.text
+assert 'fonts.googleapis.com' not in index_response.text
 
 settings_response = client.get("/templates/settings-dialog.html")
 assert settings_response.status_code == 200
@@ -280,7 +291,7 @@ def test_api_prefix_aliases_work_in_desktop_mode() -> None:
             """
 from fastapi.testclient import TestClient
 import main
-client = TestClient(main.app)
+client = TestClient(main.app, base_url="http://127.0.0.1")
 status_response = client.get("/api/auth/status")
 assert status_response.status_code == 200
 init_response = client.post("/api/auth/init", json={"password": "desktop-alias-pass"})
@@ -326,6 +337,64 @@ def test_launcher_dry_run_reports_desktop_paths() -> None:
         assert not (root / "data").exists()
 
 
+def test_launcher_data_root_argument_overrides_environment() -> None:
+    with tempfile.TemporaryDirectory() as raw:
+        requested_root = Path(raw) / "requested"
+        ignored_root = Path(raw) / "ignored"
+        result = subprocess.run(
+            [sys.executable, str(LAUNCHER), "--dry-run", "--data-root", str(requested_root)],
+            cwd=PROJECT_ROOT,
+            env={**os.environ, "SECRETBASE_DESKTOP_DATA_ROOT": str(ignored_root)},
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+        if result.returncode != 0:
+            raise AssertionError(f"dry-run failed\nSTDOUT:\n{result.stdout}\nSTDERR:\n{result.stderr}")
+        data = json.loads(result.stdout)
+        assert data["data_root"] == str(requested_root.resolve())
+        assert not requested_root.exists()
+
+
+def test_desktop_launcher_forces_loopback_security() -> None:
+    with tempfile.TemporaryDirectory() as raw:
+        root = Path(raw)
+        original_cors = os.environ.get("CORS_ORIGINS")
+        os.environ["CORS_ORIGINS"] = "*"
+        try:
+            env = launcher.build_desktop_env(root, 45678)
+        finally:
+            if original_cors is None:
+                os.environ.pop("CORS_ORIGINS", None)
+            else:
+                os.environ["CORS_ORIGINS"] = original_cors
+        assert env["HOST"] == "127.0.0.1"
+        assert env["CORS_ORIGINS"] == "http://127.0.0.1:45678"
+        assert env["PYTHONUNBUFFERED"] == "1"
+
+
+def test_desktop_rejects_untrusted_host() -> None:
+    with tempfile.TemporaryDirectory() as raw:
+        root = Path(raw)
+        result = run_config_probe(
+            """
+from fastapi.testclient import TestClient
+import main
+client = TestClient(main.app, base_url="http://malicious.example")
+response = client.get("/health")
+assert response.status_code == 400
+""",
+            {
+                "SECRETBASE_MODE": "desktop",
+                "DATA_DIR": str(root / "data"),
+                "BACKUP_DIR": str(root / "data" / "backups"),
+                "LOG_DIR": str(root / "logs"),
+                "SETTINGS_PATH": str(root / "settings.json"),
+            },
+        )
+        assert_probe_ok(result)
+
+
 def test_launcher_no_browser_starts_health_endpoint() -> None:
     with tempfile.TemporaryDirectory() as raw:
         root = Path(raw)
@@ -360,6 +429,8 @@ def test_launcher_no_browser_starts_health_endpoint() -> None:
             assert '"healthy"' in body
             assert (root / "data").is_dir()
             assert (root / "logs").is_dir()
+            if os.name != "nt":
+                assert root.stat().st_mode & 0o077 == 0
         finally:
             process.terminate()
             try:
@@ -404,6 +475,9 @@ def main() -> None:
         test_desktop_mode_serves_frontend_index,
         test_api_prefix_aliases_work_in_desktop_mode,
         test_launcher_dry_run_reports_desktop_paths,
+        test_launcher_data_root_argument_overrides_environment,
+        test_desktop_launcher_forces_loopback_security,
+        test_desktop_rejects_untrusted_host,
         test_launcher_no_browser_starts_health_endpoint,
         test_dev_test_backend_script_uses_isolated_runtime,
     ]

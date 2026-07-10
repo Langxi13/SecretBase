@@ -149,13 +149,11 @@
                                 @click.stop
                                 @change="toggleEntrySelection(entry.id)"
                             >
-                            <img
-                                v-if="entry.url"
-                                :src="getFavicon(entry.url)"
-                                class="favicon"
-                                @error="e => e.target.style.display='none'"
-                            >
-                            <span v-else class="favicon-placeholder">🔗</span>
+                            <span
+                                class="favicon-placeholder entry-site-icon"
+                                :style="{ '--site-accent': getTagColor(entry.url || entry.title) }"
+                                aria-hidden="true"
+                            >{{ getEntryIconText(entry) }}</span>
                             <h3 class="entry-title">{{ entry.title }}</h3>
                             <button
                                 class="star-btn"

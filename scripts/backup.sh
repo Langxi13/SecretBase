@@ -22,11 +22,14 @@ if [ -f "$APP_DIR/backend/.env" ]; then
     echo "备份配置文件: env.$DATE"
 fi
 
-# 备份设置文件
-if [ -f "$APP_DIR/backend/settings.json" ]; then
-    cp "$APP_DIR/backend/settings.json" "$BACKUP_DIR/settings.json.$DATE"
-    echo "备份设置文件: settings.json.$DATE"
-fi
+# 备份设置文件，兼容旧版根目录路径和新版 data/ 路径。
+for SETTINGS_FILE in "$APP_DIR/backend/data/settings.json" "$APP_DIR/backend/settings.json"; do
+    if [ -f "$SETTINGS_FILE" ]; then
+        cp "$SETTINGS_FILE" "$BACKUP_DIR/settings.json.$DATE"
+        echo "备份设置文件: settings.json.$DATE"
+        break
+    fi
+done
 
 # 清理 30 天前的备份
 find "$BACKUP_DIR" -type f -mtime +30 -delete 2>/dev/null || true

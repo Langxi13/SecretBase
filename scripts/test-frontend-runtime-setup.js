@@ -10,6 +10,10 @@ const scriptPaths = [...indexHtml.matchAll(/<script src="([^"]+)"/g)]
 
 let setupBindings = null;
 
+class BrowserURL extends URL {}
+BrowserURL.createObjectURL = () => 'blob:test';
+BrowserURL.revokeObjectURL = () => {};
+
 function ref(value) {
     return { value };
 }
@@ -62,12 +66,17 @@ const sandbox = {
         removeItem() {}
     },
     location: {
+        href: 'http://127.0.0.1:10014/',
         protocol: 'http:',
         hostname: '127.0.0.1',
         port: '10014',
         origin: 'http://127.0.0.1:10014'
     },
+    history: {
+        replaceState() {}
+    },
     document: {
+        title: 'SecretBase',
         documentElement: {
             setAttribute() {}
         },
@@ -89,10 +98,7 @@ const sandbox = {
             async writeText() {}
         }
     },
-    URL: {
-        createObjectURL() { return 'blob:test'; },
-        revokeObjectURL() {}
-    },
+    URL: BrowserURL,
     fetch: async () => ({
         ok: true,
         status: 200,

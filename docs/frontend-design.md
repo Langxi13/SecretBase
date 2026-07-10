@@ -2,7 +2,7 @@
 
 ## 0. 文档状态与阶段边界
 
-本文档定义前端目标交互和实现边界。SecretBase 当前采用 Vue 3 CDN 单页应用，不引入构建步骤。
+本文档定义前端目标交互和实现边界。SecretBase 当前采用本地 vendored Vue 3 global build 的单页应用，不引入构建步骤，也不在运行时执行第三方 CDN 代码。
 
 | 阶段 | 前端实现目标 |
 |------|--------------|
@@ -38,7 +38,7 @@ V2.0 只调整认证 token 存储：前端使用 `sessionStorage`，不再使用
 
 ### 技术栈
 
-- **框架**: Vue 3 (CDN，无构建步骤)
+- **框架**: Vue 3.5.39 global production build（本地 vendored，无构建步骤）
 - **样式**: 原生 CSS + CSS 变量
 - **图标**: 语义化 Unicode 图标，无新增外部图标依赖
 - **HTTP**: Fetch API
@@ -86,7 +86,7 @@ frontend/
     ├── store-entry-methods.js # 条目读写和批量操作
     ├── store-taxonomy-methods.js # 标签和密码组 API 方法
     ├── store-trash-methods.js # 回收站 API 方法
-    ├── utils.js            # 通用工具函数、复制、favicon、日期格式化
+    ├── utils.js            # 通用工具函数、复制和日期格式化
     ├── pagination.js       # 分页条数归一化和本地偏好读写
     ├── auto-lock.js        # 自动锁定计时器和活动监听
     ├── theme-controller.js # 主题状态、时间跟随主题和主题图标
@@ -366,7 +366,7 @@ const EntryCard = {
           :checked="selected"
           @change="$emit('select', entry.id)"
         />
-        <img :src="faviconUrl" class="favicon" />
+        <span class="entry-site-icon">{{ entryIconText }}</span>
         <h3 class="title">{{ entry.title }}</h3>
         <button 
           class="star-btn" 
@@ -417,16 +417,9 @@ const EntryCard = {
     </div>
   `,
   setup(props, { emit }) {
-    const faviconUrl = computed(() => {
-      if (props.entry.url) {
-        try {
-          const domain = new URL(props.entry.url).hostname;
-          return `https://favicon.im/${domain}`;
-        } catch {
-          return '';
-        }
-      }
-       return '';
+    const entryIconText = computed(() => {
+      const source = props.entry.url || props.entry.title || '密';
+      return Array.from(source)[0].toUpperCase();
     });
 
     const getTagColor = (tag) => {
@@ -452,7 +445,7 @@ const EntryCard = {
     };
 
     return {
-      faviconUrl,
+      entryIconText,
       getTagColor,
       toggleStar,
       copyField,
@@ -1219,47 +1212,13 @@ const VirtualList = {
 };
 ```
 
-### 10.2 图片懒加载
+### 10.2 本地条目图标
 
 ```javascript
-// 懒加载 favicon
-const LazyFavicon = {
-  props: {
-    url: String
-  },
-  template: `
-    <img 
-      v-if="loaded"
-      :src="src"
-      class="favicon"
-      @error="onError"
-    />
-    <div v-else class="favicon-placeholder"></div>
-  `,
-  setup(props) {
-    const loaded = ref(false);
-    const src = ref('');
-
-    const load = () => {
-      if (props.url) {
-        try {
-          const domain = new URL(props.url).hostname;
-          src.value = `https://favicon.im/${domain}`;
-          loaded.value = true;
-        } catch {
-          src.value = '';
-          loaded.value = true;
-        }
-      }
-    };
-
-    const onError = () => {
-      src.value = '';
-    };
-
-    onMounted(load);
-
-    return { loaded, src, onError };
-  }
-};
+// 条目卡片只从本地标题或域名生成首字符图标。
+// 不请求第三方 favicon 服务，避免泄露用户保存的网站域名。
+const entryIconText = computed(() => {
+  const source = entry.value.url || entry.value.title || '密';
+  return Array.from(source)[0].toUpperCase();
+});
 ```

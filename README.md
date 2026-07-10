@@ -14,7 +14,7 @@
 <p align="center">
   <img alt="Python" src="https://img.shields.io/badge/Python-3.10%2B-111827?style=flat-square">
   <img alt="FastAPI" src="https://img.shields.io/badge/FastAPI-backend-059669?style=flat-square">
-  <img alt="Vue" src="https://img.shields.io/badge/Vue%203-CDN-42b883?style=flat-square">
+  <img alt="Vue" src="https://img.shields.io/badge/Vue%203-vendored-42b883?style=flat-square">
   <img alt="Storage" src="https://img.shields.io/badge/Storage-encrypted%20file-7c3aed?style=flat-square">
   <img alt="License" src="https://img.shields.io/badge/License-MIT-111827?style=flat-square">
 </p>
@@ -62,7 +62,7 @@ The screenshots below use demo-only data. They do not contain real credentials, 
 
 ## 中文
 
-SecretBase 是一个面向个人自托管场景的单用户加密密码库。项目采用 FastAPI 后端和 Vue 3 CDN 前端，不依赖数据库或前端构建链，数据以加密 vault 文件形式保存在本地文件系统中。
+SecretBase 是一个面向个人自托管和本机离线场景的单用户加密密码库。项目采用 FastAPI 后端和本地内置的 Vue 3 前端，不依赖数据库或前端构建链，数据以加密 vault 文件形式保存在本地文件系统中。
 
 项目目标是提供一个结构清晰、易于审计、易于备份恢复的密码管理工具，适用于个人服务器、本地局域网或受访问控制保护的私有部署环境。
 
@@ -88,7 +88,7 @@ SecretBase 是一个面向个人自托管场景的单用户加密密码库。项
 | --- | --- |
 | 使用模型 | 单用户、单 vault、无注册系统。 |
 | 数据存储 | 本地加密文件存储，无数据库依赖。 |
-| 前端形态 | Vue 3 CDN、原生 JavaScript、原生 CSS。 |
+| 前端形态 | 本地内置 Vue 3、原生 JavaScript、原生 CSS，运行时不依赖 CDN。 |
 | 后端形态 | FastAPI 提供认证、条目、标签、导入导出、工具报告和 AI 解析接口。 |
 | 部署方式 | 推荐部署在反向代理、HTTPS 和额外访问控制之后。 |
 | 适用场景 | 个人密码管理、服务器凭据管理、API Key 管理、安全笔记和恢复码存档。 |
@@ -106,7 +106,7 @@ SecretBase 是一个面向个人自托管场景的单用户加密密码库。项
 
 ```text
 Browser
-  Vue 3 CDN + JavaScript + CSS
+  Vendored Vue 3 + JavaScript + CSS
         |
         | X-SecretBase-Token
         v
@@ -166,6 +166,24 @@ SecretBase 的核心安全边界是本地加密 vault 文件。vault 只有在�
 
 ### 本地开发
 
+推荐直接使用桌面基础模式。首次运行会自动创建 `.venv/` 并安装固定版本依赖：
+
+Windows：
+
+```powershell
+.\start-secretbase.cmd
+```
+
+Linux / macOS：
+
+```bash
+./scripts/start-local.sh
+```
+
+运行时的 Vue、字体和条目图标均来自本地，不需要连接前端 CDN。AI 服务和用户主动打开的外部网址仍需要网络。
+
+需要分别调试前后端时，可以使用以下手动方式。
+
 后端：
 
 ```powershell
@@ -191,12 +209,12 @@ http://127.0.0.1:8001
 
 ### 桌面基础模式
 
-V3.0 增加了桌面基础模式，但还不是正式安装包。该模式复用现有前端和 FastAPI 后端，由 `desktop/launcher.py` 启动本机后端、分配随机端口，并让后端同源托管 `frontend/` 页面。
+`v3.0.0` 已完成桌面基础模式，但还不是正式安装包。该模式复用现有前端和 FastAPI 后端，由 `desktop/launcher.py` 启动本机后端、分配随机端口，并让后端同源托管 `frontend/` 页面。
 
 默认启动：
 
-```bash
-python desktop/launcher.py
+```powershell
+.\start-secretbase.cmd
 ```
 
 启动后会自动打开浏览器。控制台会输出本机访问地址、数据目录和日志目录。
@@ -204,13 +222,13 @@ python desktop/launcher.py
 只启动服务、不自动打开浏览器：
 
 ```bash
-python desktop/launcher.py --no-browser
+./scripts/start-local.sh --no-browser
 ```
 
 只查看解析后的运行配置，不启动服务：
 
 ```bash
-python desktop/launcher.py --dry-run
+./scripts/start-local.sh --dry-run
 ```
 
 桌面模式默认使用用户本机目录保存 vault、备份、日志和设置；开发或手动测试时建议显式指定临时目录，避免触碰真实数据：
@@ -219,7 +237,7 @@ python desktop/launcher.py --dry-run
 SECRETBASE_DESKTOP_DATA_ROOT=/tmp/secretbase-v3-manual-test python desktop/launcher.py
 ```
 
-桌面模式不会读取仓库内的 `backend/.env`。AI 接入请在解锁后进入“设置 -> AI”填写 Base URL、API Key 并获取模型列表。
+也可以使用 `--data-root PATH` 显式指定本次运行的数据目录。桌面模式不会读取仓库内的 `backend/.env`，只接受当前回环地址的 Host 和 CORS 来源。AI 接入请在解锁后进入“设置 -> AI”填写 Base URL、API Key 并获取模型列表。
 
 详细设计和验收边界见 `docs/v3-desktop-foundation.md`。
 
@@ -232,6 +250,7 @@ HOST=127.0.0.1
 PORT=10004
 VAULT_PATH=./data/secretbase.enc
 BACKUP_DIR=./data/backups/
+SETTINGS_PATH=./data/settings.json
 CORS_ORIGINS=https://your-domain.example
 ```
 
@@ -242,6 +261,7 @@ CORS_ORIGINS=https://your-domain.example
 | `AI_CHAT_TIMEOUT_SECONDS` | AI 对话请求超时秒数，默认 `120`。 |
 | `VAULT_PATH` | 加密 vault 文件路径。 |
 | `BACKUP_DIR` | 备份根目录，内部区分 `auto/` 自动备份和 `manual/` 手动备份。 |
+| `SETTINGS_PATH` | 非敏感偏好设置文件，推荐放在受限的 `data/` 目录。 |
 | `CORS_ORIGINS` | 允许访问 API 的前端来源。 |
 
 ### AI 解析与整理
@@ -257,6 +277,14 @@ AI 解析是可选功能。用户需要在解锁后进入“设置 -> AI”填�
 后端会要求模型返回结构化 JSON，并对常见响应格式差异执行归一化处理。AI 解析结果仍应由用户确认后再保存。AI 整理分为条目标签整理、密码组整理、标签系统管理三类，三类能力分开执行，用户确认后才会应用；整理请求不会向 AI 发送任何字段值。
 
 ### 验证命令
+
+推荐使用统一发布检查：
+
+```powershell
+python scripts\run-release-checks.py
+```
+
+以下命令可用于单独定位问题：
 
 ```powershell
 python -m compileall backend
@@ -277,6 +305,7 @@ node scripts\test-frontend-ai-organize.js
 node scripts\test-frontend-tag-management.js
 node scripts\test-frontend-password-groups.js
 node scripts\test-frontend-sidebar-labels.js
+node scripts\test-frontend-offline-security.js
 node scripts\test-frontend-module-split.js
 node scripts\test-frontend-feature-modules.js
 node scripts\test-frontend-template-split.js
@@ -362,7 +391,8 @@ backend/
   ai_services/         AI prompts, client, parsing, organization and action services
   routes/              thin auth, entries, tags, trash, transfer, tools and AI routers
 frontend/
-  index.html           轻量 Vue CDN 入口、资源清单和加载壳
+  index.html           轻量入口、资源清单和加载壳
+  vendor/vue/          固定版本的本地 Vue 运行时与许可证
   templates/           同源加载的页面与弹窗模板片段
   js/                  组合根、状态、Store 资源域、视图工厂、领域控制器和工具
     controllers/       条目、密码组、标签、AI、备份、导入、回收站、维护、列表控制器
@@ -378,7 +408,7 @@ docs/
   roadmap.md
   security-design.md
 scripts/
-  local development, smoke test, deployment and maintenance helpers
+  本地一键启动、完整回归、部署和维护脚本
 ```
 
 ### 文档
@@ -388,8 +418,9 @@ scripts/
 - `docs/frontend-design.md`：前端结构、状态管理和交互说明。
 - `docs/deployment.md`：通用生产部署步骤。
 - `docs/app-roadmap.md`：桌面和手机 App 长期路线。
-- `docs/v3-desktop-foundation.md`：V3.0 桌面基础模式规划、边界和验收。
+- `docs/v3-desktop-foundation.md`：已实现的 V3.0 桌面基础模式、边界和验收。
 - `docs/v3.1-windows-desktop-mvp.md`：V3.1 Windows 桌面便携版规划。
+- `docs/release-assessment-v3.0.0.md`：V3.0.0 完备性、风险和发布结论。
 - `docs/release-safety-checklist.md`：发布前安全检查清单。
 - `docs/roadmap.md`：路线图。
 
@@ -401,7 +432,7 @@ MIT License. See `LICENSE`.
 
 ## English
 
-SecretBase is a self-hosted, single-user encrypted password vault. It uses a FastAPI backend and a Vue 3 CDN frontend, does not require a database or frontend build chain, and stores vault data as an encrypted file on the local filesystem.
+SecretBase is a self-hosted and locally runnable single-user encrypted password vault. It uses a FastAPI backend and a vendored Vue 3 frontend, does not require a database or frontend build chain, and stores vault data as an encrypted file on the local filesystem.
 
 The project is intended to provide a clear, auditable, and backup-friendly password management tool for personal servers, local networks, and private deployments protected by external access controls.
 
@@ -427,7 +458,7 @@ The project is intended to provide a clear, auditable, and backup-friendly passw
 | --- | --- |
 | Usage model | Single user, single vault, no registration system. |
 | Storage | Local encrypted file storage, no database dependency. |
-| Frontend | Vue 3 CDN, plain JavaScript, plain CSS. |
+| Frontend | Vendored Vue 3, plain JavaScript, plain CSS, with no runtime CDN dependency. |
 | Backend | FastAPI APIs for authentication, entries, tags, transfer, reporting, and AI parsing. |
 | Deployment | Recommended behind a reverse proxy, HTTPS, and external access control. |
 | Use cases | Personal password management, server credentials, API keys, secure notes, and recovery codes. |
@@ -445,7 +476,7 @@ The project is intended to provide a clear, auditable, and backup-friendly passw
 
 ```text
 Browser
-  Vue 3 CDN + JavaScript + CSS
+  Vendored Vue 3 + JavaScript + CSS
         |
         | X-SecretBase-Token
         v
@@ -505,6 +536,24 @@ See `docs/security-design.md` for the full design.
 
 ### Local Development
 
+The recommended path is the desktop foundation bootstrap. The first run creates `.venv/` and installs pinned dependencies.
+
+Windows:
+
+```powershell
+.\start-secretbase.cmd
+```
+
+Linux / macOS:
+
+```bash
+./scripts/start-local.sh
+```
+
+Vue, fonts, and entry icons are local at runtime. AI providers and external URLs opened by the user still require network access.
+
+Use the manual split frontend/backend workflow below only when debugging those layers separately.
+
 Backend:
 
 ```powershell
@@ -530,12 +579,12 @@ http://127.0.0.1:8001
 
 ### Desktop Foundation Mode
 
-V3.0 adds a desktop foundation mode, but it is not a packaged desktop app yet. It reuses the existing frontend and FastAPI backend. `desktop/launcher.py` starts a local backend, allocates a random port, and lets FastAPI serve `frontend/` from the same origin.
+`v3.0.0` completes the desktop foundation mode, but it is not a packaged desktop app yet. It reuses the existing frontend and FastAPI backend. `desktop/launcher.py` starts a local backend, allocates a random port, and lets FastAPI serve `frontend/` from the same origin.
 
 Default startup:
 
-```bash
-python desktop/launcher.py
+```powershell
+.\start-secretbase.cmd
 ```
 
 The launcher opens the browser automatically and prints the local URL, data directory, and log directory.
@@ -543,13 +592,13 @@ The launcher opens the browser automatically and prints the local URL, data dire
 Start the service without opening a browser:
 
 ```bash
-python desktop/launcher.py --no-browser
+./scripts/start-local.sh --no-browser
 ```
 
 Print resolved runtime configuration without starting the service:
 
 ```bash
-python desktop/launcher.py --dry-run
+./scripts/start-local.sh --dry-run
 ```
 
 Desktop mode stores vault, backups, logs, and settings under the local user data directory by default. For development or manual testing, use a temporary data root to avoid touching real data:
@@ -558,7 +607,7 @@ Desktop mode stores vault, backups, logs, and settings under the local user data
 SECRETBASE_DESKTOP_DATA_ROOT=/tmp/secretbase-v3-manual-test python desktop/launcher.py
 ```
 
-Desktop mode does not read `backend/.env`. Configure AI after unlocking from Settings -> AI by entering Base URL, API Key, and fetching the provider model list.
+Use `--data-root PATH` to override the data directory for one launch. Desktop mode does not read `backend/.env` and only accepts the current loopback Host and CORS origin. Configure AI after unlocking from Settings -> AI.
 
 See `docs/v3-desktop-foundation.md` for design details and acceptance boundaries.
 
@@ -571,6 +620,7 @@ HOST=127.0.0.1
 PORT=10004
 VAULT_PATH=./data/secretbase.enc
 BACKUP_DIR=./data/backups/
+SETTINGS_PATH=./data/settings.json
 CORS_ORIGINS=https://your-domain.example
 ```
 
@@ -581,6 +631,7 @@ CORS_ORIGINS=https://your-domain.example
 | `AI_CHAT_TIMEOUT_SECONDS` | AI chat request timeout in seconds. Default is `120`. |
 | `VAULT_PATH` | Encrypted vault file path. |
 | `BACKUP_DIR` | Backup root directory containing `auto/` automatic backups and `manual/` manual backups. |
+| `SETTINGS_PATH` | Non-sensitive preferences file; keep it inside the restricted `data/` directory. |
 | `CORS_ORIGINS` | Allowed frontend origins for API access. |
 
 ### AI Parsing
@@ -596,6 +647,14 @@ Demo mail demo@example.com password demo-mail-pass; demo server IP 192.0.2.10 po
 The backend requests structured JSON from the model and normalizes common response-format variations. AI-generated entries should be reviewed before they are saved.
 
 ### Verification
+
+Run the complete cross-platform release checks with:
+
+```powershell
+python scripts\run-release-checks.py
+```
+
+The individual commands below are useful for isolating a failure:
 
 ```powershell
 python -m compileall backend
@@ -616,6 +675,7 @@ node scripts\test-frontend-ai-organize.js
 node scripts\test-frontend-tag-management.js
 node scripts\test-frontend-password-groups.js
 node scripts\test-frontend-sidebar-labels.js
+node scripts\test-frontend-offline-security.js
 node scripts\test-frontend-module-split.js
 node scripts\test-frontend-feature-modules.js
 node scripts\test-frontend-template-split.js
@@ -701,7 +761,8 @@ backend/
   ai_services/         AI prompts, client, parsing, organization, and action services
   routes/              thin auth, entries, tags, trash, transfer, tools, and AI routers
 frontend/
-  index.html           lightweight Vue CDN entry, asset manifest, and loading shell
+  index.html           lightweight entry, asset manifest, and loading shell
+  vendor/vue/          pinned local Vue runtime and license
   templates/           same-origin page and dialog template fragments
   js/                  composition root, state, Store resource domains, view factories, domain controllers, and utilities
     controllers/       entry, group, tag, AI, backup, transfer, trash, maintenance, list controllers
@@ -717,7 +778,7 @@ docs/
   roadmap.md
   security-design.md
 scripts/
-  local development, smoke test, deployment and maintenance helpers
+  local bootstrap, release checks, deployment, and maintenance helpers
 ```
 
 ### Documentation
@@ -727,8 +788,9 @@ scripts/
 - `docs/frontend-design.md`: frontend structure, state management, and UX notes.
 - `docs/deployment.md`: generic production deployment steps.
 - `docs/app-roadmap.md`: long-term desktop and mobile app roadmap.
-- `docs/v3-desktop-foundation.md`: V3.0 desktop foundation plan, boundaries, and acceptance checks.
+- `docs/v3-desktop-foundation.md`: implemented V3.0 desktop foundation, boundaries, and acceptance checks.
 - `docs/v3.1-windows-desktop-mvp.md`: V3.1 Windows desktop portable package plan.
+- `docs/release-assessment-v3.0.0.md`: V3.0.0 completeness, risk, and release assessment.
 - `docs/release-safety-checklist.md`: release safety checklist.
 - `docs/roadmap.md`: roadmap.
 

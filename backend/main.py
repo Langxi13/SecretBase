@@ -4,6 +4,7 @@ from logging.handlers import TimedRotatingFileHandler
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.responses import JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.exceptions import RequestValidationError
@@ -27,6 +28,7 @@ from config import (
 from models import Settings
 from storage import ConflictError, VaultLockTimeoutError, enforce_auto_lock, is_unlocked, touch_activity, validate_session_token
 from routes import auth, entries, trash, tags, groups, ai, settings, health, transfer, tools
+from version import APP_VERSION
 
 
 SENSITIVE_LOG_PATTERN = re.compile(r"(?i)(password|token|api[_-]?key|secret|authorization)=([^\s,]+)")
@@ -54,6 +56,15 @@ def redact_sensitive(value):
     if isinstance(value, list):
         return [redact_sensitive(item) for item in value]
     return value
+
+
+def apply_security_headers(response):
+    """为反向代理和桌面模式统一补充浏览器安全头。"""
+    response.headers.setdefault("X-Content-Type-Options", "nosniff")
+    response.headers.setdefault("X-Frame-Options", "DENY")
+    response.headers.setdefault("Referrer-Policy", "no-referrer")
+    response.headers.setdefault("Permissions-Policy", "camera=(), microphone=(), geolocation=()")
+    return response
 
 
 class RedactingFormatter(logging.Formatter):
@@ -173,7 +184,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="SecretBase",
     description="密码/密钥/重要信息管理工具",
-    version="1.0.0",
+    version=APP_VERSION,
     lifespan=lifespan
 )
 
@@ -187,35 +198,35 @@ async def log_requests(request: Request, call_next):
     if content_length and content_length.isdigit():
         limit = IMPORT_BODY_LIMIT_BYTES if is_import_request(request.url.path) else NORMAL_BODY_LIMIT_BYTES
         if int(content_length) > limit:
-            return JSONResponse(
+            return apply_security_headers(JSONResponse(
                 status_code=413,
                 content={
                     "success": False,
                     "error": "REQUEST_TOO_LARGE",
                     "message": "请求体过大"
                 }
-            )
+            ))
 
     if request.method != "OPTIONS" and not is_public_request(request):
         if is_unlocked() and enforce_auto_lock(get_auto_lock_minutes()):
-            return JSONResponse(
+            return apply_security_headers(JSONResponse(
                 status_code=401,
                 content={
                     "success": False,
                     "error": "UNAUTHORIZED",
                     "message": "已自动锁定，请重新解锁"
                 }
-            )
+            ))
 
         if not is_unlocked() or not validate_session_token(session_token(request)):
-            return JSONResponse(
+            return apply_security_headers(JSONResponse(
                 status_code=401,
                 content={
                     "success": False,
                     "error": "UNAUTHORIZED",
                     "message": "请先解锁"
                 }
-            )
+            ))
     
     response = await call_next(request)
 
@@ -229,7 +240,7 @@ async def log_requests(request: Request, call_next):
         f"duration={process_time:.3f}s"
     )
     
-    return response
+    return apply_security_headers(response)
 
 
 # 配置 CORS。保持在自定义中间件之后注册，确保提前返回的 401/413 也带 CORS 响应头。
@@ -241,6 +252,12 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+if is_desktop_mode():
+    app.add_middleware(
+        TrustedHostMiddleware,
+        allowed_hosts=["127.0.0.1", "localhost"],
+    )
+
 
 @app.get("/secretbase-runtime-config.js", include_in_schema=False)
 async def runtime_config_js():
@@ -248,6 +265,7 @@ async def runtime_config_js():
     config = {
         "mode": "desktop" if is_desktop_mode() else "server",
         "apiBaseUrl": api_base_url,
+        "version": APP_VERSION,
     }
     script = (
         f"window.SECRETBASE_RUNTIME_CONFIG = {json.dumps(config, ensure_ascii=False)};\n"

@@ -3,8 +3,20 @@
  * These functions are intentionally framework-free so app.js can stay focused on state and workflows.
  */
 (function () {
-    function getFavicon(url) {
-        return window.getFaviconUrl(url);
+    function getEntryIconText(entry = {}) {
+        const url = String(entry.url || '').trim();
+        if (url) {
+            try {
+                const hostname = new URL(url).hostname.replace(/^www\./i, '');
+                const firstHostnameCharacter = Array.from(hostname)[0];
+                if (firstHostnameCharacter) return firstHostnameCharacter.toUpperCase();
+            } catch {
+                // 旧数据中的网址格式异常时回退到条目标题。
+            }
+        }
+
+        const firstTitleCharacter = Array.from(String(entry.title || '').trim())[0];
+        return firstTitleCharacter ? firstTitleCharacter.toUpperCase() : '密';
     }
 
     function getTagColor(tagName) {
@@ -223,7 +235,7 @@
     }
 
     window.SecretBaseViewHelpers = {
-        getFavicon,
+        getEntryIconText,
         getTagColor,
         groupAccentColor,
         groupCardStyle,

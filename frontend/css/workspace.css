@@ -417,13 +417,6 @@
     margin-bottom: 12px;
 }
 
-.favicon {
-    width: 24px;
-    height: 24px;
-    border-radius: 4px;
-    flex-shrink: 0;
-}
-
 .favicon-placeholder {
     width: 24px;
     height: 24px;
@@ -432,6 +425,16 @@
     justify-content: center;
     font-size: 16px;
     flex-shrink: 0;
+}
+
+.entry-site-icon {
+    border: 1px solid color-mix(in srgb, var(--site-accent) 34%, var(--border-color));
+    border-radius: 6px;
+    background: color-mix(in srgb, var(--site-accent) 14%, var(--surface-1));
+    color: var(--site-accent);
+    font-size: 12px;
+    font-weight: 800;
+    text-transform: uppercase;
 }
 
 .entry-title {

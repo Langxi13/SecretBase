@@ -71,20 +71,6 @@ function debounce(func, wait) {
 }
 
 /**
- * 获取网站 favicon
- */
-function getFaviconUrl(url) {
-    if (!url) return '';
-    try {
-        const domain = new URL(url).hostname;
-        // 使用多个 favicon 服务作为备选
-        return `https://favicon.im/${domain}`;
-    } catch {
-        return '';
-    }
-}
-
-/**
  * 复制到剪贴板
  */
 async function copyToClipboard(text) {
@@ -108,15 +94,4 @@ async function copyToClipboard(text) {
             document.body.removeChild(textArea);
         }
     }
-}
-
-/**
- * 生成 UUID
- */
-function generateUUID() {
-    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
-        const r = Math.random() * 16 | 0;
-        const v = c === 'x' ? r : (r & 0x3 | 0x8);
-        return v.toString(16);
-    });
 }
