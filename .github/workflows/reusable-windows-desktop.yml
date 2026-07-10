@@ -123,6 +123,8 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: secretbase-windows-2025-self-test
-          path: ${{ runner.temp }}/secretbase-desktop-*-self-test.json
+          path: |
+            ${{ runner.temp }}/secretbase-desktop-self-test.json
+            ${{ runner.temp }}/secretbase-desktop-runtime*-self-test.json
           if-no-files-found: warn
           retention-days: ${{ inputs.retention-days }}

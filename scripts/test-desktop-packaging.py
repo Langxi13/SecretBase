@@ -105,6 +105,8 @@ def test_windows_workflows_build_once_and_retest_downloaded_artifact() -> None:
     assert "--desktop-runtime-self-test" in reusable
     assert "Zone.Identifier" in reusable
     assert "Python.Runtime.dll" in reusable
+    assert "secretbase-desktop-self-test.json" in reusable
+    assert "secretbase-desktop-runtime*-self-test.json" in reusable
     assert "retention-days: 14" in desktop
     assert "uses: ./.github/workflows/reusable-windows-desktop.yml" in desktop
     assert "needs: [verify, desktop]" in release
