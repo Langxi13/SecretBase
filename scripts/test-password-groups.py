@@ -3,6 +3,8 @@ import sys
 import tempfile
 from pathlib import Path
 
+from test_runtime_support import close_logging_before_temp_cleanup
+
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 BACKEND_DIR = PROJECT_ROOT / "backend"
 sys.path.insert(0, str(BACKEND_DIR))
@@ -16,7 +18,7 @@ def expect_success(response, label: str):
 
 
 def main() -> None:
-    with tempfile.TemporaryDirectory() as tmpdir:
+    with tempfile.TemporaryDirectory() as tmpdir, close_logging_before_temp_cleanup():
         os.environ["DATA_DIR"] = tmpdir
         os.environ["BACKUP_DIR"] = str(Path(tmpdir) / "backups")
         os.environ["LOG_DIR"] = str(Path(tmpdir) / "logs")
