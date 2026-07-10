@@ -69,6 +69,8 @@ def test_build_script_is_ascii_and_runs_post_build_checks() -> None:
     assert "verify_desktop_package.py" in text
     assert "SHA256SUMS.txt" in text
     assert re.search(r"sys\.version_info\[:2\].*\(3, 11\)", text)
+    assert "sys.maxsize > 2**32" in text
+    assert "struct.calcsize" not in text
 
 
 def test_windows_workflows_build_once_and_retest_downloaded_artifact() -> None:

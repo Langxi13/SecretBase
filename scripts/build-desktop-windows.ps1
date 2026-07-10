@@ -19,7 +19,7 @@ if (-not $BootstrapCommand) {
     throw "Python 3.11 x64 was not found."
 }
 
-& $BootstrapCommand.Source -c 'import struct,sys; raise SystemExit(0 if sys.version_info[:2] == (3, 11) and struct.calcsize("P") == 8 else 1)'
+& $BootstrapCommand.Source -c "import sys; raise SystemExit(0 if sys.version_info[:2] == (3, 11) and sys.maxsize > 2**32 else 1)"
 if ($LASTEXITCODE -ne 0) {
     throw "SecretBase desktop builds require Python 3.11 x64."
 }
