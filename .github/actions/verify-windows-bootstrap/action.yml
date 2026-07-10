@@ -20,11 +20,15 @@ runs:
       shell: powershell
       run: |
         $entrypoint = Join-Path $env:SECRETBASE_ARCHIVE_ROOT "start-secretbase.cmd"
-        $commandLine = "call `"$entrypoint`" -DryRun -DataRoot `"$env:SECRETBASE_TEST_DATA_ROOT`""
+        $commandLine = "chcp 65001 >NUL && call `"$entrypoint`" -DryRun -DataRoot `"$env:SECRETBASE_TEST_DATA_ROOT`""
+        $previousErrorActionPreference = $ErrorActionPreference
+        $ErrorActionPreference = "Continue"
         $output = @(& cmd.exe /d /s /c $commandLine 2>&1 | ForEach-Object { "$_" })
+        $exitCode = $LASTEXITCODE
+        $ErrorActionPreference = $previousErrorActionPreference
         $output | ForEach-Object { Write-Host $_ }
-        if ($LASTEXITCODE -ne 0) {
-          throw "Windows PowerShell 5.1 bootstrap failed with exit code $LASTEXITCODE"
+        if ($exitCode -ne 0) {
+          throw "Windows PowerShell 5.1 bootstrap failed with exit code $exitCode"
         }
         $jsonStart = -1
         for ($index = 0; $index -lt $output.Count; $index++) {
