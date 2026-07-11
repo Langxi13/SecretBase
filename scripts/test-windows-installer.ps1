@@ -69,7 +69,47 @@ if (-not $Result.success -or -not $Result.frontend_loaded) {
 New-Item -ItemType Directory -Force -Path $DataRoot | Out-Null
 $PreserveSentinel = Join-Path $DataRoot "preserve-after-uninstall.txt"
 Set-Content -LiteralPath $PreserveSentinel -Encoding Ascii -Value "preserve"
-Uninstall-SecretBase
+$ShutdownReport = Join-Path $env:TEMP "secretbase-installer-shutdown-self-test.json"
+if (Test-Path $ShutdownReport) { Remove-Item -Force $ShutdownReport }
+$ShutdownArguments = "--wait-for-shutdown-self-test --report `"$ShutdownReport`""
+$ShutdownProcess = Start-Process `
+    -FilePath $Executable `
+    -ArgumentList $ShutdownArguments `
+    -WorkingDirectory $env:TEMP `
+    -PassThru
+$ShutdownReady = $false
+for ($Attempt = 0; $Attempt -lt 100; $Attempt++) {
+    $ShutdownProcess.Refresh()
+    if ($ShutdownProcess.HasExited) {
+        throw "The shutdown test instance exited before uninstall started."
+    }
+    if (Test-Path $ShutdownReport) {
+        $ShutdownState = Get-Content -Raw $ShutdownReport | ConvertFrom-Json
+        if ($ShutdownState.ready) {
+            $ShutdownReady = $true
+            break
+        }
+    }
+    Start-Sleep -Milliseconds 100
+}
+if (-not $ShutdownReady) {
+    Stop-Process -Id $ShutdownProcess.Id -Force -ErrorAction SilentlyContinue
+    throw "The shutdown test instance did not become ready."
+}
+
+try {
+    Uninstall-SecretBase
+} finally {
+    $ShutdownProcess.Refresh()
+    if (-not $ShutdownProcess.HasExited -and -not $ShutdownProcess.WaitForExit(10000)) {
+        Stop-Process -Id $ShutdownProcess.Id -Force -ErrorAction SilentlyContinue
+        throw "The uninstaller did not stop the running SecretBase instance."
+    }
+}
+$ShutdownResult = Get-Content -Raw $ShutdownReport | ConvertFrom-Json
+if (-not $ShutdownResult.success -or $ShutdownProcess.ExitCode -ne 0) {
+    throw "The running SecretBase instance did not exit cleanly during uninstall."
+}
 if (-not (Test-Path $PreserveSentinel)) {
     throw "Default uninstall removed SecretBase user data."
 }
@@ -86,4 +126,4 @@ if (Get-Process -Name "SecretBase" -ErrorAction SilentlyContinue) {
     throw "SecretBase process remained after installer tests."
 }
 
-Write-Host "PASS Windows installer install, preserve, and purge tests"
+Write-Host "PASS Windows installer running-instance, preserve, and purge tests"

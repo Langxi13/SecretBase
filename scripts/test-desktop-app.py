@@ -13,10 +13,11 @@ from unittest.mock import patch
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from desktop.app import desktop_window_failure, selected_file_path  # noqa: E402
+from desktop.app import desktop_window_failure, run_shutdown_wait_self_test, selected_file_path  # noqa: E402
 from desktop.bridge import DesktopApi, safe_filename, validate_download_request  # noqa: E402
 from desktop.diagnostics import DesktopDiagnostics, detect_package_type  # noqa: E402
-from desktop.instance import SingleInstanceCoordinator  # noqa: E402
+import desktop.instance as desktop_instance  # noqa: E402
+from desktop.instance import SingleInstanceCoordinator, request_existing_process_exit  # noqa: E402
 from desktop.runtime import desktop_paths, prepare_data_root  # noqa: E402
 from desktop.tray import DesktopLifecycle, load_close_to_tray  # noqa: E402
 from desktop.update import check_for_updates, parse_version, validate_release_url  # noqa: E402
@@ -297,6 +298,8 @@ def test_desktop_bridge_productization_methods() -> None:
 
 
 def test_desktop_lifecycle_locks_before_hiding() -> None:
+    events = []
+
     class FakeServer:
         url = "http://127.0.0.1:12345"
 
@@ -305,17 +308,25 @@ def test_desktop_lifecycle_locks_before_hiding() -> None:
 
         def lock_vault(self) -> None:
             self.lock_count += 1
+            events.append("backend-lock")
 
     class FakeWindow:
         def __init__(self) -> None:
             self.hidden = False
             self.destroyed = False
             self.loaded_urls = []
+            self.evaluated_scripts = []
             self.shown = 0
             self.restored = 0
 
         def hide(self) -> None:
             self.hidden = True
+            events.append("hide")
+
+        def evaluate_js(self, script: str) -> bool:
+            self.evaluated_scripts.append(script)
+            events.append("frontend-lock")
+            return True
 
         def load_url(self, url: str) -> None:
             self.loaded_urls.append(url)
@@ -352,16 +363,24 @@ def test_desktop_lifecycle_locks_before_hiding() -> None:
     assert lifecycle.on_closing() is False
     assert server.lock_count == 1
     assert window.hidden is True
-    assert window.loaded_urls == [server.url]
+    assert events[:3] == ["backend-lock", "frontend-lock", "hide"]
+    assert "secretbase:desktop-lock" in window.evaluated_scripts[0]
+    assert window.loaded_urls == []
 
     lifecycle.restore()
     assert window.hidden is False
     assert window.shown == 1
     assert window.restored == 1
-    assert window.loaded_urls == [server.url, server.url]
+    assert len(window.evaluated_scripts) == 2
+    assert window.loaded_urls == []
+
+    lifecycle.lock()
+    assert server.lock_count == 2
+    assert len(window.evaluated_scripts) == 3
+    assert window.loaded_urls == []
 
     lifecycle.exit()
-    assert server.lock_count == 2
+    assert server.lock_count == 3
     assert window.destroyed is True
     assert lifecycle.tray.stopped >= 1
 
@@ -376,11 +395,62 @@ def test_close_to_tray_preference_defaults_safely() -> None:
         assert load_close_to_tray(settings) is False
 
 
+def test_shutdown_wait_self_test_protocol() -> None:
+    class FakeCoordinator:
+        def acquire(self) -> bool:
+            return True
+
+        def start_listener(self, _activate_callback, exit_callback) -> None:
+            exit_callback()
+
+        def close(self) -> None:
+            return None
+
+    with tempfile.TemporaryDirectory() as raw:
+        report = Path(raw) / "shutdown-report.json"
+        with patch("desktop.app.SingleInstanceCoordinator", FakeCoordinator):
+            assert run_shutdown_wait_self_test(str(report), timeout=0.1) == 0
+        payload = json.loads(report.read_text(encoding="utf-8"))
+        assert payload == {"success": True, "mode": "shutdown-wait", "ready": True}
+
+
+def test_existing_process_exit_protocol_handles_windows_races() -> None:
+    with (
+        patch.object(desktop_instance.os, "name", "nt"),
+        patch.object(desktop_instance, "_named_mutex_exists", side_effect=[True, True, False]),
+        patch.object(desktop_instance, "_signal_named_event", return_value=True) as signal,
+        patch.object(desktop_instance.time, "sleep"),
+    ):
+        assert request_existing_process_exit(timeout=0.1) is True
+        signal.assert_called_once_with(desktop_instance.DEFAULT_EXIT_EVENT_NAME)
+
+    with (
+        patch.object(desktop_instance.os, "name", "nt"),
+        patch.object(desktop_instance, "_named_mutex_exists", side_effect=[True, False]),
+        patch.object(desktop_instance, "_signal_named_event", return_value=False),
+    ):
+        assert request_existing_process_exit(timeout=0.1) is True
+
+    with (
+        patch.object(desktop_instance.os, "name", "nt"),
+        patch.object(desktop_instance, "_named_mutex_exists", side_effect=[True, True]),
+        patch.object(desktop_instance, "_signal_named_event", return_value=False),
+    ):
+        assert request_existing_process_exit(timeout=0.1) is False
+
+
 def test_non_windows_single_instance_fallback() -> None:
     coordinator = SingleInstanceCoordinator()
     assert coordinator.acquire() is True
     coordinator.start_listener(lambda: None)
     coordinator.close()
+    assert request_existing_process_exit() is True
+    result = subprocess.run(
+        [sys.executable, "desktop/app.py", "--shutdown-existing"],
+        cwd=ROOT,
+        check=False,
+    )
+    assert result.returncode == 0
 
 
 def main() -> None:
@@ -398,6 +468,8 @@ def main() -> None:
         test_desktop_bridge_productization_methods,
         test_desktop_lifecycle_locks_before_hiding,
         test_close_to_tray_preference_defaults_safely,
+        test_shutdown_wait_self_test_protocol,
+        test_existing_process_exit_protocol_handles_windows_races,
         test_non_windows_single_instance_fallback,
     )
     for test in tests:

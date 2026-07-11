@@ -17,8 +17,13 @@
     }) {
         let aiNowTimer = null;
 
+        function clearDesktopLockCover() {
+            document.documentElement.removeAttribute('data-secretbase-desktop-locking');
+        }
+
         function applyLockedState() {
             api.setToken(null);
+            store.setState({ locked: true });
             state.locked.value = true;
             state.password.value = '';
             state.entries.value = [];
@@ -53,6 +58,15 @@
             autoLock.clearAutoLockTimer();
         }
 
+        function handleDesktopLockRequest() {
+            applyLockedState();
+            if (typeof window.requestAnimationFrame === 'function') {
+                window.requestAnimationFrame(clearDesktopLockCover);
+            } else {
+                Promise.resolve().then(clearDesktopLockCover);
+            }
+        }
+
         const autoLock = autoLockFactory({
             settingsForm: state.settingsForm,
             locked: state.locked,
@@ -77,6 +91,7 @@
                 await store.initPassword(state.password.value);
                 state.initialized.value = true;
                 state.locked.value = false;
+                clearDesktopLockCover();
                 state.password.value = '';
                 state.confirmPassword.value = '';
                 await data.applySettings(await store.loadSettings(), theme);
@@ -102,6 +117,7 @@
             try {
                 await store.unlock(state.password.value);
                 state.locked.value = false;
+                clearDesktopLockCover();
                 state.password.value = '';
                 await data.applySettings(await store.loadSettings(), theme);
                 await data.loadAllData();
@@ -189,6 +205,8 @@
 
         function registerLifecycle({ onMounted, onUnmounted }) {
             onMounted(async () => {
+                window.SECRETBASE_DESKTOP_LOCK_READY = true;
+                window.addEventListener('secretbase:desktop-lock', handleDesktopLockRequest);
                 try {
                     const authStatus = await store.checkAuth();
                     state.initialized.value = authStatus.initialized;
@@ -228,6 +246,8 @@
             });
 
             onUnmounted(() => {
+                window.SECRETBASE_DESKTOP_LOCK_READY = false;
+                window.removeEventListener('secretbase:desktop-lock', handleDesktopLockRequest);
                 window.removeEventListener('secretbase:unauthorized', autoLock.handleUnauthorizedLock);
                 document.removeEventListener('click', handleDocumentClick);
                 autoLock.unbindActivityListeners();

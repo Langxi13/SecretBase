@@ -15,6 +15,15 @@ except ImportError:
 
 logger = logging.getLogger(__name__)
 
+FRONTEND_LOCK_SCRIPT = """
+(() => {
+    document.documentElement.setAttribute('data-secretbase-desktop-locking', 'true');
+    const ready = window.SECRETBASE_DESKTOP_LOCK_READY === true;
+    window.dispatchEvent(new CustomEvent('secretbase:desktop-lock'));
+    return ready;
+})()
+"""
+
 
 def load_close_to_tray(settings_path: Path) -> bool:
     try:
@@ -133,6 +142,15 @@ class DesktopLifecycle:
     def _lock_vault(self) -> None:
         self.server.lock_vault()
 
+    def _apply_frontend_lock(self) -> bool:
+        if self.window is None:
+            return False
+        try:
+            return self.window.evaluate_js(FRONTEND_LOCK_SCRIPT) is True
+        except Exception as error:
+            logger.warning("通知前端锁定失败: %s", error)
+            return False
+
     def _reload_locked_page(self) -> None:
         if self.window is not None:
             self.window.load_url(self.server.url)
@@ -145,9 +163,11 @@ class DesktopLifecycle:
                 self.close_to_tray = False
                 return None
             self._lock_vault()
+            frontend_locked = self._apply_frontend_lock()
             self.window.hide()
             self.hidden_to_tray = True
-            self._reload_locked_page()
+            if not frontend_locked:
+                self._reload_locked_page()
             return False
 
     def restore(self) -> None:
@@ -155,32 +175,40 @@ class DesktopLifecycle:
             if self.window is None:
                 return
             if self.hidden_to_tray:
-                self._reload_locked_page()
+                if not self._apply_frontend_lock():
+                    self._reload_locked_page()
                 self.hidden_to_tray = False
             focus_current_process_window(self.window)
 
     def lock(self) -> None:
         with self._lock:
             self._lock_vault()
-            self._reload_locked_page()
+            if not self._apply_frontend_lock():
+                self._reload_locked_page()
 
     def exit(self) -> None:
         with self._lock:
             if self.exit_requested:
                 return
             self.exit_requested = True
+            tray = self.tray
+            window = self.window
+        try:
             self._lock_vault()
-            if self.tray is not None:
-                self.tray.stop()
-            if self.window is not None:
-                self.window.destroy()
+        except Exception as error:
+            logger.warning("退出前锁定密码库失败: %s", error)
+        if tray is not None:
+            tray.stop()
+        if window is not None:
+            window.destroy()
 
     def shutdown(self) -> None:
         with self._lock:
             self.exit_requested = True
-            try:
-                self._lock_vault()
-            except Exception:
-                pass
-            if self.tray is not None:
-                self.tray.stop()
+            tray = self.tray
+        try:
+            self._lock_vault()
+        except Exception:
+            pass
+        if tray is not None:
+            tray.stop()

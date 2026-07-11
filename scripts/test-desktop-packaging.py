@@ -104,6 +104,11 @@ def test_build_script_is_ascii_and_runs_post_build_checks() -> None:
     assert "sys.maxsize > 2**32" in text
     assert "struct.calcsize" not in text
 
+    app_source = (ROOT / "desktop" / "app.py").read_text(encoding="utf-8")
+    assert '"--shutdown-existing"' in app_source
+    assert '"--wait-for-shutdown-self-test"' in app_source
+    assert "request_existing_process_exit" in app_source
+
 
 def test_windows_workflows_build_once_and_retest_downloaded_artifact() -> None:
     reusable = (ROOT / ".github" / "workflows" / "reusable-windows-desktop.yml").read_text(encoding="utf-8")
@@ -127,6 +132,7 @@ def test_windows_workflows_build_once_and_retest_downloaded_artifact() -> None:
     assert "test-windows-installer.ps1" in reusable
     assert "secretbase-desktop-self-test.json" in reusable
     assert "secretbase-desktop-runtime*-self-test.json" in reusable
+    assert "secretbase-installer*-self-test.json" in reusable
     assert "retention-days: 14" in desktop
     assert "uses: ./.github/workflows/reusable-windows-desktop.yml" in desktop
     assert "needs: [verify, desktop]" in release
@@ -139,6 +145,13 @@ def test_installer_preserves_data_unless_delete_is_confirmed() -> None:
     assert 'MessagesFile: "{#MyLanguageFile}"' in installer
     assert "DefaultDirName={localappdata}\\Programs\\SecretBase" in installer
     assert "PrivilegesRequired=lowest" in installer
+    assert "AppMutex=" not in installer
+    assert "[UninstallRun]" in installer
+    assert 'Parameters: "--shutdown-existing"' in installer
+    assert 'Filename: "{sys}\\taskkill.exe"' in installer
+    assert "Check: IsSecretBaseRunning" in installer
+    assert "CheckForMutexes('Local\\SecretBase.Desktop.Mutex')" in installer
+    assert "function PrepareToInstall" in installer
     assert "PurgeCheckBox.Checked := False" in installer
     assert "CompareText(Trim(ConfirmationEdit.Text), 'DELETE') = 0" in installer
     assert "{param:PURGEDATA|0}" in installer
@@ -157,6 +170,8 @@ def test_installer_preserves_data_unless_delete_is_confirmed() -> None:
     text = installer_test.decode("ascii")
     assert "Default uninstall removed SecretBase user data" in text
     assert "/PURGEDATA=1 /CONFIRMDELETE=DELETE" in text
+    assert "--wait-for-shutdown-self-test" in text
+    assert "did not stop the running SecretBase instance" in text
     assert "Confirmed uninstall did not remove" in text
 
     signing = (ROOT / "scripts" / "sign-windows-artifacts.ps1").read_bytes()

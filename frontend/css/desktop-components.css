@@ -13,6 +13,20 @@
     text-decoration: underline;
 }
 
+html[data-secretbase-desktop-locking="true"] body::after {
+    content: "密码库已锁定";
+    position: fixed;
+    inset: 0;
+    z-index: 100000;
+    display: grid;
+    place-items: center;
+    background: var(--bg-primary, #f5f7fb);
+    color: var(--text-primary, #172033);
+    font-size: 18px;
+    font-weight: 600;
+    pointer-events: auto;
+}
+
 .settings-tabs {
     flex-wrap: wrap;
     overflow-x: visible;

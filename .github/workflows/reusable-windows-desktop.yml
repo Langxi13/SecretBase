@@ -145,6 +145,6 @@ jobs:
           path: |
             ${{ runner.temp }}/secretbase-desktop-self-test.json
             ${{ runner.temp }}/secretbase-desktop-runtime*-self-test.json
-            ${{ runner.temp }}/secretbase-installer-self-test.json
+            ${{ runner.temp }}/secretbase-installer*-self-test.json
           if-no-files-found: warn
           retention-days: ${{ inputs.retention-days }}

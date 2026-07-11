@@ -41,7 +41,6 @@ SolidCompression=yes
 WizardStyle=modern
 CloseApplications=force
 RestartApplications=no
-AppMutex=Local\SecretBase.Desktop.Mutex
 UsePreviousAppDir=yes
 VersionInfoVersion={#MyAppVersion}
 VersionInfoProductName={#MyAppName}
@@ -71,9 +70,18 @@ Filename: "{app}\{#MyAppExeName}"; Description: "启动 SecretBase"; Flags: nowa
 Root: HKCU; Subkey: "Software\SecretBase"; ValueType: string; ValueName: "InstallPath"; ValueData: "{app}"; Flags: uninsdeletekey
 Root: HKCU; Subkey: "Software\SecretBase"; ValueType: string; ValueName: "Version"; ValueData: "{#MyAppVersion}"; Flags: uninsdeletekey
 
+[UninstallRun]
+Filename: "{app}\{#MyAppExeName}"; Parameters: "--shutdown-existing"; Flags: runhidden waituntilterminated skipifdoesntexist
+Filename: "{sys}\taskkill.exe"; Parameters: "/IM {#MyAppExeName} /T /F"; Flags: runhidden waituntilterminated; Check: IsSecretBaseRunning
+
 [Code]
 var
   PurgeLocalData: Boolean;
+
+function IsSecretBaseRunning: Boolean;
+begin
+  Result := CheckForMutexes('Local\SecretBase.Desktop.Mutex');
+end;
 
 function ConfirmUninstallOptions: Boolean;
 var
@@ -173,6 +181,28 @@ begin
     until False;
   finally
     Form.Free;
+  end;
+end;
+
+function PrepareToInstall(var NeedsRestart: Boolean): String;
+var
+  ExistingExecutable: String;
+  ExitCode: Integer;
+begin
+  Result := '';
+  ExistingExecutable := ExpandConstant('{app}\{#MyAppExeName}');
+  if FileExists(ExistingExecutable) then
+  begin
+    if not Exec(ExistingExecutable, '--shutdown-existing', '', SW_HIDE, ewWaitUntilTerminated, ExitCode) then
+      Log('无法请求已有 SecretBase 实例退出。')
+    else if ExitCode <> 0 then
+      Log('旧版 SecretBase 未响应退出信号。');
+
+    if IsSecretBaseRunning then
+    begin
+      Log('SecretBase 仍在运行，将使用系统进程终止作为兼容兜底。');
+      Exec(ExpandConstant('{sys}\taskkill.exe'), '/IM {#MyAppExeName} /T /F', '', SW_HIDE, ewWaitUntilTerminated, ExitCode);
+    end;
   end;
 end;
 

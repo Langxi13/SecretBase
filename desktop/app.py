@@ -7,6 +7,7 @@ import logging
 import os
 import sys
 import tempfile
+import threading
 import urllib.request
 import webbrowser
 from pathlib import Path
@@ -14,14 +15,14 @@ from pathlib import Path
 try:
     from .bridge import DesktopApi
     from .diagnostics import DesktopDiagnostics
-    from .instance import SingleInstanceCoordinator
+    from .instance import SingleInstanceCoordinator, request_existing_process_exit
     from .runtime import InProcessDesktopServer, application_root, desktop_paths, resolve_data_root
     from .tray import DesktopLifecycle, load_close_to_tray
     from .update import check_for_updates
 except ImportError:
     from bridge import DesktopApi
     from diagnostics import DesktopDiagnostics
-    from instance import SingleInstanceCoordinator
+    from instance import SingleInstanceCoordinator, request_existing_process_exit
     from runtime import InProcessDesktopServer, application_root, desktop_paths, resolve_data_root
     from tray import DesktopLifecycle, load_close_to_tray
     from update import check_for_updates
@@ -41,6 +42,8 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Load the packaged Windows desktop runtime without creating a window.",
     )
+    test_mode.add_argument("--wait-for-shutdown-self-test", action="store_true", help=argparse.SUPPRESS)
+    test_mode.add_argument("--shutdown-existing", action="store_true", help=argparse.SUPPRESS)
     parser.add_argument("--report", help="Write the self-test result as JSON.")
     return parser.parse_args()
 
@@ -142,6 +145,29 @@ def run_desktop_runtime_self_test(report_path: str | None) -> int:
     return 0 if result["success"] else 1
 
 
+def run_shutdown_wait_self_test(report_path: str | None, timeout: float = 30.0) -> int:
+    coordinator = SingleInstanceCoordinator()
+    result = {"success": False, "mode": "shutdown-wait", "ready": False}
+    exit_requested = threading.Event()
+    try:
+        if not coordinator.acquire():
+            raise RuntimeError("已有 SecretBase 实例占用单实例互斥量")
+        coordinator.start_listener(lambda: None, exit_requested.set)
+        result["ready"] = True
+        write_report(report_path, result)
+        if not exit_requested.wait(timeout):
+            raise RuntimeError("等待退出信号超时")
+        result["success"] = True
+        return 0
+    except Exception as error:
+        result["error"] = str(error)
+        return 1
+    finally:
+        coordinator.close()
+        write_report(report_path, result)
+        logging.shutdown()
+
+
 def desktop_window_failure(error: Exception) -> tuple[str, bool]:
     message = str(error)
     normalized = message.lower()
@@ -236,7 +262,7 @@ def run_window(data_root_value: str | None) -> int:
         window_holder["window"] = window
         lifecycle.attach_window(window)
         window.events.closing += lifecycle.on_closing
-        coordinator.start_listener(lifecycle.restore)
+        coordinator.start_listener(lifecycle.restore, lifecycle.exit)
         if load_close_to_tray(paths.settings) and not lifecycle.set_close_to_tray(True):
             logging.getLogger(__name__).warning("已保存托盘设置，但本次无法启动系统托盘")
         webview.start(
@@ -271,6 +297,12 @@ def main() -> int:
         return run_self_test(args.data_root, args.report)
     if args.desktop_runtime_self_test:
         return run_desktop_runtime_self_test(args.report)
+    if args.wait_for_shutdown_self_test:
+        return run_shutdown_wait_self_test(args.report)
+    if args.shutdown_existing:
+        if args.report:
+            raise SystemExit("--shutdown-existing 不接受 --report")
+        return 0 if request_existing_process_exit() else 1
     if args.report:
         raise SystemExit("--report 只能与自检参数一起使用")
     return run_window(args.data_root)
