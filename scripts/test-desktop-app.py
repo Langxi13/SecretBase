@@ -493,7 +493,9 @@ def test_tray_start_failure_keeps_window_open() -> None:
     lifecycle = DesktopLifecycle(server, Path("icon.ico"), tray_factory=FailingTray)
     lifecycle.attach_window(window)
     lifecycle.set_close_preferences(True, False)
-    assert lifecycle.on_closing() is False
+    with patch("desktop.tray.show_tray_failure_message") as show_failure:
+        assert lifecycle.on_closing() is False
+        show_failure.assert_called_once_with()
     assert window.hidden is False
     assert server.lock_count == 0
     assert lifecycle.exit_requested is False
