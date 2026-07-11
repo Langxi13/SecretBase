@@ -8,7 +8,8 @@ SecretBase is intentionally scoped as a single-user encrypted vault. The priorit
 - Preserve safe backup, export, import, and restore flows.
 - Maintain a simple FastAPI backend and vendored Vue frontend with no runtime CDN dependency.
 - Keep production deployment practical behind nginx or another reverse proxy.
-- Complete CI and Windows hardware acceptance for the implemented V3.2 installer, diagnostics, and optional tray described in [App Roadmap](app-roadmap.md).
+- Maintain the stable V3.2 Windows installer, diagnostics, tray, and data-safety behavior described in [App Roadmap](app-roadmap.md).
+- Plan V3.3 macOS packaging, lifecycle, signing, and notarization without forking the shared application core.
 
 ## Implemented
 
@@ -23,6 +24,7 @@ SecretBase is intentionally scoped as a single-user encrypted vault. The priorit
 - Offline-capable local desktop foundation with loopback-only startup and isolated user data paths.
 - One-command Windows/Linux/macOS source startup and cross-platform release checks.
 - PyInstaller/pywebview Windows one-folder packaging with native export dialogs, single-instance activation, artifact scanning, and two-version Windows CI.
+- Windows V3.2 per-user installer, desktop diagnostics, optional tray, safe uninstall flow, native zoom feedback, and Windows 10/11 hardware acceptance.
 
 ## Later, If Needed
 
@@ -30,7 +32,7 @@ SecretBase is intentionally scoped as a single-user encrypted vault. The priorit
 - Better large-vault performance if real usage outgrows pagination.
 - More compact and modular frontend organization.
 - Additional production health check automation.
-- Windows V3.2 installer, diagnostics, optional tray, and signing hooks, followed by macOS and mobile work as staged in [App Roadmap](app-roadmap.md).
+- macOS desktop packaging, signing, and notarization, followed by mobile work as staged in [App Roadmap](app-roadmap.md).
 
 ## Out of Scope
 
