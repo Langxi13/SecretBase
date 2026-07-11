@@ -149,7 +149,7 @@ try {
 
     $ArchiveHash = (Get-FileHash -Algorithm SHA256 $ArchivePath).Hash.ToLowerInvariant()
     $InstallerHash = (Get-FileHash -Algorithm SHA256 $InstallerPath).Hash.ToLowerInvariant()
-    $Checksum = "$ArchiveHash  $ArchiveName`r`n$InstallerHash  $InstallerName`r`n"
+    $Checksum = "$ArchiveHash  $ArchiveName`n$InstallerHash  $InstallerName`n"
     [System.IO.File]::WriteAllText($ChecksumPath, $Checksum, [System.Text.UTF8Encoding]::new($false))
 } finally {
     Pop-Location
