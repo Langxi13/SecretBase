@@ -100,22 +100,58 @@
         }
 
         async function saveCloseToTraySetting() {
-            const desired = Boolean(state.settingsForm.closeToTray);
-            const previous = Boolean(store.state.settings.closeToTray);
+            if (state.desktopCloseSettingsSaving.value) return;
+            state.desktopCloseSettingsSaving.value = true;
+            const desired = {
+                closeToTray: Boolean(state.settingsForm.closeToTray),
+                confirmClose: state.settingsForm.confirmClose !== false
+            };
+            const previous = {
+                closeToTray: Boolean(store.state.settings.closeToTray),
+                confirmClose: store.state.settings.confirmClose !== false
+            };
             try {
-                const api = requireDesktopApi('set_close_to_tray');
-                await api.set_close_to_tray(desired);
-                await store.updateSettings({ closeToTray: desired });
-                showToast(desired ? '已启用关闭到托盘' : '关闭窗口将直接退出', 'success');
+                const api = requireDesktopApi('set_close_preferences');
+                await api.set_close_preferences(desired.closeToTray, desired.confirmClose);
+                await store.updateSettings(desired);
+                const message = desired.confirmClose
+                    ? '关闭窗口时将先询问'
+                    : (desired.closeToTray ? '关闭窗口将隐藏到托盘' : '关闭窗口将直接退出');
+                showToast(message, 'success');
             } catch (error) {
-                state.settingsForm.closeToTray = previous;
+                state.settingsForm.closeToTray = previous.closeToTray;
+                state.settingsForm.confirmClose = previous.confirmClose;
                 try {
-                    const api = requireDesktopApi('set_close_to_tray');
-                    await api.set_close_to_tray(previous);
+                    const api = requireDesktopApi('set_close_preferences');
+                    await api.set_close_preferences(previous.closeToTray, previous.confirmClose);
                 } catch (_rollbackError) {
                     // 原始错误更有助于用户处理。
                 }
-                showToast(error.message || '保存托盘设置失败', 'error');
+                showToast(error.message || '保存关闭设置失败', 'error');
+            } finally {
+                state.desktopCloseSettingsSaving.value = false;
+            }
+        }
+
+        function cancelDesktopClose() {
+            if (state.desktopCloseSubmitting.value) return;
+            state.showDesktopCloseConfirm.value = false;
+            state.desktopCloseRemember.value = false;
+            state.desktopCloseError.value = '';
+        }
+
+        async function resolveDesktopClose(action) {
+            if (!['tray', 'exit'].includes(action) || state.desktopCloseSubmitting.value) return;
+            state.desktopCloseSubmitting.value = true;
+            state.desktopCloseError.value = '';
+            try {
+                const api = requireDesktopApi('resolve_close_request');
+                await api.resolve_close_request(action, Boolean(state.desktopCloseRemember.value));
+            } catch (error) {
+                state.desktopCloseError.value = error.message || '无法完成关闭操作';
+                state.showDesktopCloseConfirm.value = true;
+            } finally {
+                state.desktopCloseSubmitting.value = false;
             }
         }
 
@@ -138,6 +174,8 @@
                 checkDesktopUpdates,
                 openDesktopRelease,
                 saveCloseToTraySetting,
+                cancelDesktopClose,
+                resolveDesktopClose,
                 desktopCheckStatusLabel
             }
         };

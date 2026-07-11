@@ -385,6 +385,7 @@ class Settings(BaseModel):
     auto_lock_minutes: int = Field(default=5, ge=0, le=1440)
     auto_backup_retention: int = Field(default=30, ge=5, le=200)
     close_to_tray: bool = False
+    confirm_close: bool = True
     language: str = Field(default="zh-CN")
 
 

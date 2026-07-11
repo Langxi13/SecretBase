@@ -47,7 +47,8 @@ class DesktopApi:
         diagnostics_provider: Callable[[], dict] | None = None,
         directory_opener: Callable[[str], dict] | None = None,
         update_checker: Callable[[], dict] | None = None,
-        tray_setter: Callable[[bool], bool] | None = None,
+        close_preferences_setter: Callable[[bool, bool], bool] | None = None,
+        close_request_resolver: Callable[[str, bool], dict] | None = None,
     ) -> None:
         self.backend_url = backend_url.rstrip("/")
         self.save_dialog = save_dialog
@@ -55,7 +56,8 @@ class DesktopApi:
         self.diagnostics_provider = diagnostics_provider
         self.directory_opener = directory_opener
         self.update_checker = update_checker
-        self.tray_setter = tray_setter
+        self.close_preferences_setter = close_preferences_setter
+        self.close_request_resolver = close_request_resolver
         self.opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
 
     def save_download(self, request: dict) -> dict[str, str]:
@@ -131,11 +133,24 @@ class DesktopApi:
             raise RuntimeError("当前运行环境不支持更新检查")
         return self.update_checker()
 
-    def set_close_to_tray(self, enabled: bool) -> dict[str, str | bool]:
-        if type(enabled) is not bool:
-            raise ValueError("托盘设置必须是布尔值")
-        if self.tray_setter is None:
-            raise RuntimeError("当前运行环境不支持系统托盘")
-        if not self.tray_setter(enabled):
-            raise RuntimeError("系统托盘启动失败，已保持直接退出模式")
-        return {"status": "updated", "enabled": enabled}
+    def set_close_preferences(self, close_to_tray: bool, confirm_close: bool) -> dict[str, str | bool]:
+        if type(close_to_tray) is not bool or type(confirm_close) is not bool:
+            raise ValueError("关闭设置必须是布尔值")
+        if self.close_preferences_setter is None:
+            raise RuntimeError("当前运行环境不支持关闭设置")
+        if not self.close_preferences_setter(close_to_tray, confirm_close):
+            raise RuntimeError("无法更新关闭设置")
+        return {
+            "status": "updated",
+            "close_to_tray": close_to_tray,
+            "confirm_close": confirm_close,
+        }
+
+    def resolve_close_request(self, action: str, remember: bool) -> dict:
+        if action not in {"tray", "exit"}:
+            raise ValueError("不支持的关闭操作")
+        if type(remember) is not bool:
+            raise ValueError("记住选择必须是布尔值")
+        if self.close_request_resolver is None:
+            raise RuntimeError("当前运行环境不支持关闭操作")
+        return self.close_request_resolver(action, remember)

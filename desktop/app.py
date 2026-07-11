@@ -17,14 +17,14 @@ try:
     from .diagnostics import DesktopDiagnostics
     from .instance import SingleInstanceCoordinator, request_existing_process_exit
     from .runtime import InProcessDesktopServer, application_root, desktop_paths, resolve_data_root
-    from .tray import DesktopLifecycle, load_close_to_tray
+    from .tray import DesktopLifecycle, load_close_preferences
     from .update import check_for_updates
 except ImportError:
     from bridge import DesktopApi
     from diagnostics import DesktopDiagnostics
     from instance import SingleInstanceCoordinator, request_existing_process_exit
     from runtime import InProcessDesktopServer, application_root, desktop_paths, resolve_data_root
-    from tray import DesktopLifecycle, load_close_to_tray
+    from tray import DesktopLifecycle, load_close_preferences
     from update import check_for_updates
 
 
@@ -237,14 +237,17 @@ def run_window(data_root_value: str | None) -> int:
             backend_running=lambda: server.is_running,
         )
         icon_path = application_root() / "desktop" / "assets" / "secretbase.ico"
-        lifecycle = DesktopLifecycle(server, icon_path)
+        lifecycle = DesktopLifecycle(server, icon_path, settings_path=paths.settings)
+        close_to_tray, confirm_close = load_close_preferences(paths.settings)
+        lifecycle.set_close_preferences(close_to_tray, confirm_close)
         bridge = DesktopApi(
             url,
             save_dialog,
             diagnostics_provider=diagnostics.collect,
             directory_opener=diagnostics.open_directory,
             update_checker=lambda: check_for_updates(APP_VERSION),
-            tray_setter=lifecycle.set_close_to_tray,
+            close_preferences_setter=lifecycle.set_close_preferences,
+            close_request_resolver=lifecycle.resolve_close_request,
         )
         window = webview.create_window(
             WINDOW_TITLE,
@@ -252,7 +255,7 @@ def run_window(data_root_value: str | None) -> int:
             js_api=bridge,
             width=1280,
             height=820,
-            min_size=(960, 640),
+            min_size=(360, 320),
             resizable=True,
             background_color="#111827",
             text_select=True,
@@ -263,8 +266,6 @@ def run_window(data_root_value: str | None) -> int:
         lifecycle.attach_window(window)
         window.events.closing += lifecycle.on_closing
         coordinator.start_listener(lifecycle.restore, lifecycle.exit)
-        if load_close_to_tray(paths.settings) and not lifecycle.set_close_to_tray(True):
-            logging.getLogger(__name__).warning("已保存托盘设置，但本次无法启动系统托盘")
         webview.start(
             gui="edgechromium",
             debug=False,

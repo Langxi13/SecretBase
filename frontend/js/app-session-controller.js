@@ -38,6 +38,11 @@
             state.showAiParse.value = false;
             state.showSettings.value = false;
             state.showDesktopStatus.value = false;
+            state.showDesktopCloseConfirm.value = false;
+            state.desktopCloseRemember.value = false;
+            state.desktopCloseSubmitting.value = false;
+            state.desktopCloseError.value = '';
+            state.desktopCloseSettingsSaving.value = false;
             state.showTrash.value = false;
             state.showTagManager.value = false;
             state.showTagEditorModal.value = false;
@@ -65,6 +70,13 @@
             } else {
                 Promise.resolve().then(clearDesktopLockCover);
             }
+        }
+
+        function handleDesktopCloseRequest() {
+            state.desktopCloseRemember.value = false;
+            state.desktopCloseSubmitting.value = false;
+            state.desktopCloseError.value = '';
+            state.showDesktopCloseConfirm.value = true;
         }
 
         const autoLock = autoLockFactory({
@@ -206,7 +218,9 @@
         function registerLifecycle({ onMounted, onUnmounted }) {
             onMounted(async () => {
                 window.SECRETBASE_DESKTOP_LOCK_READY = true;
+                window.SECRETBASE_DESKTOP_CLOSE_READY = true;
                 window.addEventListener('secretbase:desktop-lock', handleDesktopLockRequest);
+                window.addEventListener('secretbase:desktop-close-request', handleDesktopCloseRequest);
                 try {
                     const authStatus = await store.checkAuth();
                     state.initialized.value = authStatus.initialized;
@@ -247,7 +261,9 @@
 
             onUnmounted(() => {
                 window.SECRETBASE_DESKTOP_LOCK_READY = false;
+                window.SECRETBASE_DESKTOP_CLOSE_READY = false;
                 window.removeEventListener('secretbase:desktop-lock', handleDesktopLockRequest);
+                window.removeEventListener('secretbase:desktop-close-request', handleDesktopCloseRequest);
                 window.removeEventListener('secretbase:unauthorized', autoLock.handleUnauthorizedLock);
                 document.removeEventListener('click', handleDocumentClick);
                 autoLock.unbindActivityListeners();

@@ -36,7 +36,8 @@
                 pageSize: 20,
                 autoLockMinutes: 5,
                 autoBackupRetention: 30,
-                closeToTray: false
+                closeToTray: false,
+                confirmClose: true
             },
             pagination: {
                 page: 1,
@@ -55,6 +56,7 @@
             autoLockMinutes: settings.autoLockMinutes ?? settings.auto_lock_minutes ?? 5,
             autoBackupRetention: settings.autoBackupRetention ?? settings.auto_backup_retention ?? 30,
             closeToTray: settings.closeToTray ?? settings.close_to_tray ?? false,
+            confirmClose: settings.confirmClose ?? settings.confirm_close ?? true,
             language: settings.language || 'zh-CN'
         };
     }
@@ -66,6 +68,7 @@
             auto_lock_minutes: settings.autoLockMinutes ?? settings.auto_lock_minutes,
             auto_backup_retention: settings.autoBackupRetention ?? settings.auto_backup_retention,
             close_to_tray: settings.closeToTray ?? settings.close_to_tray,
+            confirm_close: settings.confirmClose ?? settings.confirm_close,
             language: settings.language
         };
     }

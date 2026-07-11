@@ -163,13 +163,28 @@
 
                             <div class="setting-item desktop-tray-setting">
                                 <div>
-                                    <label for="close_to_tray">关闭窗口时最小化到托盘</label>
-                                    <p>进入托盘前会立即锁定密码库；最小化按钮仍保留在任务栏。</p>
+                                    <label for="close_to_tray">不询问时隐藏到托盘</label>
+                                    <p>关闭提醒关闭后采用此方式；进入托盘前会立即锁定密码库。</p>
                                 </div>
                                 <input
                                     id="close_to_tray"
                                     type="checkbox"
                                     v-model="settingsForm.closeToTray"
+                                    :disabled="desktopCloseSettingsSaving"
+                                    @change="saveCloseToTraySetting"
+                                >
+                            </div>
+
+                            <div class="setting-item desktop-tray-setting">
+                                <div>
+                                    <label for="confirm_close">关闭窗口时询问</label>
+                                    <p>关闭时可选择隐藏到托盘、完全退出或取消操作。</p>
+                                </div>
+                                <input
+                                    id="confirm_close"
+                                    type="checkbox"
+                                    v-model="settingsForm.confirmClose"
+                                    :disabled="desktopCloseSettingsSaving"
                                     @change="saveCloseToTraySetting"
                                 >
                             </div>

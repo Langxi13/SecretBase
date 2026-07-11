@@ -70,6 +70,11 @@ const state = {
     showAiParse: ref(true),
     showSettings: ref(true),
     showDesktopStatus: ref(true),
+    showDesktopCloseConfirm: ref(false),
+    desktopCloseRemember: ref(true),
+    desktopCloseSubmitting: ref(true),
+    desktopCloseError: ref('stale-error'),
+    desktopCloseSettingsSaving: ref(true),
     showTrash: ref(true),
     showTagManager: ref(true),
     showTagEditorModal: ref(true),
@@ -162,6 +167,15 @@ controller.registerLifecycle({
     if (sandbox.window.SECRETBASE_DESKTOP_LOCK_READY !== true) {
         throw new Error('桌面锁定监听器未就绪');
     }
+    if (sandbox.window.SECRETBASE_DESKTOP_CLOSE_READY !== true) {
+        throw new Error('桌面关闭确认监听器未就绪');
+    }
+
+    windowListeners.get('secretbase:desktop-close-request')();
+    if (!state.showDesktopCloseConfirm.value || state.desktopCloseRemember.value
+        || state.desktopCloseSubmitting.value || state.desktopCloseError.value) {
+        throw new Error('桌面关闭确认没有初始化为可交互状态');
+    }
 
     attributes.add('data-secretbase-desktop-locking');
     windowListeners.get('secretbase:desktop-lock')();
@@ -172,8 +186,12 @@ controller.registerLifecycle({
     if (state.entries.value.length || state.tags.value.length || state.groups.value.length) {
         throw new Error('桌面锁定没有立即清除敏感列表');
     }
-    if (state.showSettings.value || state.showEditModal.value || state.restoreWizard.visible) {
+    if (state.showSettings.value || state.showEditModal.value || state.restoreWizard.visible
+        || state.showDesktopCloseConfirm.value) {
         throw new Error('桌面锁定没有关闭敏感弹窗');
+    }
+    if (state.desktopCloseSettingsSaving.value) {
+        throw new Error('桌面锁定没有清理关闭设置保存状态');
     }
     if (state.revealedFields.value.length || state.selectedEntry.value !== null) {
         throw new Error('桌面锁定没有清除已显示字段或选中条目');
@@ -189,8 +207,10 @@ controller.registerLifecycle({
 
     unmounted();
     if (sandbox.window.SECRETBASE_DESKTOP_LOCK_READY !== false
-        || windowListeners.has('secretbase:desktop-lock')) {
-        throw new Error('桌面锁定监听器没有在卸载时清理');
+        || sandbox.window.SECRETBASE_DESKTOP_CLOSE_READY !== false
+        || windowListeners.has('secretbase:desktop-lock')
+        || windowListeners.has('secretbase:desktop-close-request')) {
+        throw new Error('桌面生命周期监听器没有在卸载时清理');
     }
     console.log('PASS frontend desktop immediate lock');
 })().catch(error => {

@@ -81,3 +81,37 @@
                 </div>
             </div>
         </div>
+
+        <div
+            v-if="showDesktopCloseConfirm && isDesktopMode"
+            class="modal-overlay desktop-close-overlay"
+            role="presentation"
+            @click.self="cancelDesktopClose"
+        >
+            <div class="modal-content desktop-close-modal" role="dialog" aria-modal="true" aria-labelledby="desktop-close-title">
+                <div class="modal-header">
+                    <h2 id="desktop-close-title">关闭 SecretBase</h2>
+                    <button class="modal-close" type="button" title="取消关闭" @click="cancelDesktopClose">✕</button>
+                </div>
+                <div class="modal-body desktop-close-body">
+                    <p>你可以将窗口隐藏到系统托盘，也可以完全退出应用。隐藏前会立即锁定密码库。</p>
+                    <label class="desktop-close-remember" for="desktop_close_remember">
+                        <input
+                            id="desktop_close_remember"
+                            type="checkbox"
+                            v-model="desktopCloseRemember"
+                            :disabled="desktopCloseSubmitting"
+                        >
+                        <span>不再提醒，记住本次选择</span>
+                    </label>
+                    <p v-if="desktopCloseError" class="error-message">{{ desktopCloseError }}</p>
+                </div>
+                <div class="modal-footer desktop-close-actions">
+                    <button class="btn-secondary" type="button" :disabled="desktopCloseSubmitting" @click="cancelDesktopClose">取消</button>
+                    <button class="btn-danger" type="button" :disabled="desktopCloseSubmitting" @click="resolveDesktopClose('exit')">退出应用</button>
+                    <button class="btn-primary inline" type="button" :disabled="desktopCloseSubmitting" @click="resolveDesktopClose('tray')">
+                        {{ desktopCloseSubmitting ? '处理中...' : '隐藏到托盘' }}
+                    </button>
+                </div>
+            </div>
+        </div>

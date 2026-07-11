@@ -108,6 +108,10 @@ def test_build_script_is_ascii_and_runs_post_build_checks() -> None:
     assert '"--shutdown-existing"' in app_source
     assert '"--wait-for-shutdown-self-test"' in app_source
     assert "request_existing_process_exit" in app_source
+    assert "min_size=(360, 320)" in app_source
+    assert "min_size=(960, 640)" not in app_source
+    assert "close_preferences_setter=lifecycle.set_close_preferences" in app_source
+    assert "close_request_resolver=lifecycle.resolve_close_request" in app_source
 
 
 def test_windows_workflows_build_once_and_retest_downloaded_artifact() -> None:

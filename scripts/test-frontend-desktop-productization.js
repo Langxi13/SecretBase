@@ -18,21 +18,31 @@ function assertIncludes(content, needle, message) {
     if (!content.includes(needle)) throw new Error(message);
 }
 
-assertIncludes(indexHtml, 'js/controllers/desktop-controller.js?v=20260711-ui-v76', '入口页必须加载桌面控制器');
-assertIncludes(indexHtml, 'css/desktop-components.css?v=20260711-ui-v76', '入口页必须加载桌面样式');
+assertIncludes(indexHtml, 'js/controllers/desktop-controller.js?v=20260711-ui-v77', '入口页必须加载桌面控制器');
+assertIncludes(indexHtml, 'css/desktop-components.css?v=20260711-ui-v77', '入口页必须加载桌面样式');
 assertIncludes(stateSource, "runtimeConfig.mode === 'desktop'", '桌面入口必须由运行模式控制');
 assertIncludes(stateSource, "{ key: 'desktop', label: '桌面' }", '桌面模式必须增加设置页签');
 assertIncludes(storeStateSource, 'closeToTray: settings.closeToTray ?? settings.close_to_tray ?? false', '旧设置必须安全默认关闭托盘');
 assertIncludes(storeStateSource, 'close_to_tray: settings.closeToTray ?? settings.close_to_tray', '托盘设置必须写回后端字段');
+assertIncludes(storeStateSource, 'confirmClose: settings.confirmClose ?? settings.confirm_close ?? true', '关闭确认必须默认开启');
+assertIncludes(storeStateSource, 'confirm_close: settings.confirmClose ?? settings.confirm_close', '关闭确认必须写回后端字段');
 assertIncludes(settingsTemplate, '@change="saveCloseToTraySetting"', '托盘开关必须调用专用保存逻辑');
+assertIncludes(settingsTemplate, 'v-model="settingsForm.confirmClose"', '桌面设置必须允许恢复关闭提醒');
 assertIncludes(settingsTemplate, '@click="checkDesktopUpdates"', '桌面设置必须提供手动更新检查');
 assertIncludes(desktopTemplate, '@click="copyDesktopDiagnostics"', '诊断弹窗必须支持复制脱敏摘要');
 assertIncludes(desktopTemplate, 'openDesktopDirectory(kind)', '诊断弹窗必须使用目录白名单桥');
+assertIncludes(desktopTemplate, '不再提醒，记住本次选择', '关闭确认必须提供记住选择选项');
+assertIncludes(desktopTemplate, "resolveDesktopClose('tray')", '关闭确认必须支持隐藏到托盘');
+assertIncludes(desktopTemplate, "resolveDesktopClose('exit')", '关闭确认必须支持完全退出');
 assertIncludes(appLayout, 'v-if="isDesktopMode" type="button" class="auth-desktop-status"', '初始化和锁定页必须提供桌面状态入口');
 assertIncludes(sessionSource, "window.addEventListener('secretbase:desktop-lock'", '桌面壳锁定必须立即通知前端清空解锁态');
 assertIncludes(sessionSource, 'window.SECRETBASE_DESKTOP_LOCK_READY = true', '前端必须向桌面壳声明锁定事件已就绪');
+assertIncludes(sessionSource, "window.addEventListener('secretbase:desktop-close-request'", '桌面壳必须能请求前端显示关闭确认');
 assertIncludes(sessionSource, 'store.setState({ locked: true })', '桌面锁定必须同步更新 store 状态');
 assertIncludes(desktopStyles, 'data-secretbase-desktop-locking="true"', '桌面锁定切换期间必须覆盖敏感画面');
+if (controllerSource.includes('set_close_to_tray')) {
+    throw new Error('设置开关不能再调用会立即启动托盘的旧桥');
+}
 
 function ref(value) {
     return { value };
@@ -65,9 +75,13 @@ const sandbox = {
                         release_url: 'https://github.com/Langxi13/SecretBase/releases/tag/v3.2.1'
                     };
                 },
-                async set_close_to_tray(enabled) {
-                    nativeCalls.push(['tray', enabled]);
-                    return { status: 'updated', enabled };
+                async set_close_preferences(closeToTray, confirmClose) {
+                    nativeCalls.push(['close-preferences', closeToTray, confirmClose]);
+                    return { status: 'updated', close_to_tray: closeToTray, confirm_close: confirmClose };
+                },
+                async resolve_close_request(action, remember) {
+                    nativeCalls.push(['close-request', action, remember]);
+                    return { status: action === 'tray' ? 'hidden' : 'exiting' };
                 }
             }
         }
@@ -85,14 +99,20 @@ const state = {
     desktopUpdateResult: ref(null),
     desktopUpdateError: ref(''),
     showDesktopStatus: ref(false),
-    settingsForm: { closeToTray: true }
+    showDesktopCloseConfirm: ref(true),
+    desktopCloseRemember: ref(true),
+    desktopCloseSubmitting: ref(false),
+    desktopCloseError: ref(''),
+    desktopCloseSettingsSaving: ref(false),
+    settingsForm: { closeToTray: true, confirmClose: true }
 };
 const storeUpdates = [];
 const store = {
-    state: { settings: { closeToTray: false } },
+    state: { settings: { closeToTray: false, confirmClose: true } },
     async updateSettings(update) {
         storeUpdates.push(update);
         this.state.settings.closeToTray = update.closeToTray;
+        this.state.settings.confirmClose = update.confirmClose;
     }
 };
 const desktop = sandbox.window.SecretBaseDesktopController.createDesktopController({
@@ -116,10 +136,18 @@ const desktop = sandbox.window.SecretBaseDesktopController.createDesktopControll
     await desktop.actions.checkDesktopUpdates();
     await desktop.actions.openDesktopRelease();
     await desktop.actions.saveCloseToTraySetting();
+    await desktop.actions.resolveDesktopClose('tray');
 
     if (!nativeCalls.some(call => call[0] === 'directory' && call[1] === 'logs')) throw new Error('目录桥未调用');
-    if (!nativeCalls.some(call => call[0] === 'tray' && call[1] === true)) throw new Error('托盘桥未调用');
-    if (storeUpdates.length !== 1 || storeUpdates[0].closeToTray !== true) throw new Error('托盘设置未持久化');
+    if (!nativeCalls.some(call => call[0] === 'close-preferences' && call[1] === true && call[2] === true)) {
+        throw new Error('关闭偏好桥未调用');
+    }
+    if (!nativeCalls.some(call => call[0] === 'close-request' && call[1] === 'tray' && call[2] === true)) {
+        throw new Error('关闭确认结果未传给桌面壳');
+    }
+    if (storeUpdates.length !== 1 || storeUpdates[0].closeToTray !== true || storeUpdates[0].confirmClose !== true) {
+        throw new Error('关闭设置未持久化');
+    }
     if (openedUrls.length !== 1 || !openedUrls[0].includes('/releases/tag/v3.2.1')) throw new Error('更新下载页未打开');
     if (!toasts.some(item => item[0] === '诊断信息已复制')) throw new Error('复制诊断提示缺失');
     console.log('PASS frontend desktop productization');

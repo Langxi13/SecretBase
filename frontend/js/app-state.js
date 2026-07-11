@@ -71,6 +71,11 @@
         const showBackupCenter = ref(false);
         const showAdvancedFilters = ref(false);
         const showDesktopStatus = ref(false);
+        const showDesktopCloseConfirm = ref(false);
+        const desktopCloseRemember = ref(false);
+        const desktopCloseSubmitting = ref(false);
+        const desktopCloseError = ref('');
+        const desktopCloseSettingsSaving = ref(false);
         const selectedEntry = ref(null);
         const editingEntry = ref(null);
         const copyMenuEntryId = ref(null);
@@ -199,7 +204,8 @@
             pageSize: 20,
             autoLockMinutes: 5,
             autoBackupRetention: 30,
-            closeToTray: false
+            closeToTray: false,
+            confirmClose: true
         });
         const activeSettingsTab = ref('general');
         const settingsTabs = [
@@ -331,6 +337,11 @@
             showBackupCenter,
             showAdvancedFilters,
             showDesktopStatus,
+            showDesktopCloseConfirm,
+            desktopCloseRemember,
+            desktopCloseSubmitting,
+            desktopCloseError,
+            desktopCloseSettingsSaving,
             selectedEntry,
             editingEntry,
             copyMenuEntryId,
