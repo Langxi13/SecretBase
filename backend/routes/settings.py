@@ -69,6 +69,8 @@ async def update_settings(updates: dict):
         'pageSize': 'page_size',
         'autoLockMinutes': 'auto_lock_minutes',
         'autoBackupRetention': 'auto_backup_retention',
+        'closeToTray': 'close_to_tray',
+        'confirmClose': 'confirm_close',
         'theme': 'theme',
         'language': 'language'
     }

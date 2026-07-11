@@ -208,9 +208,17 @@ def run():
 
     settings = expect_success(client.get("/settings"), "get settings")["data"]
     assert settings["theme"] == "system"
-    settings = expect_success(client.put("/settings", json={"theme": "dark", "page_size": 2, "auto_lock_minutes": 1}), "update settings")["data"]
+    settings = expect_success(client.put("/settings", json={
+        "theme": "dark",
+        "page_size": 2,
+        "auto_lock_minutes": 1,
+        "close_to_tray": True,
+        "confirm_close": False,
+    }), "update settings")["data"]
     assert settings["theme"] == "dark"
     assert settings["page_size"] == 2
+    assert settings["close_to_tray"] is True
+    assert settings["confirm_close"] is False
 
     ai_status = expect_success(client.get("/ai/status"), "ai status unconfigured")["data"]
     assert ai_status == {"configured": False, "base_url": "", "model": "", "api_key_mask": ""}

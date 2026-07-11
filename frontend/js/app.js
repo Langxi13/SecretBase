@@ -63,6 +63,7 @@ const app = createApp({
             data,
             loadSavedAdvancedFilters: features.actions.loadSavedAdvancedFilters,
             loadAiSettingsStatus: features.actions.loadAiSettingsStatus,
+            loadDesktopDiagnostics: features.actions.loadDesktopDiagnostics,
             handleDocumentClick: features.actions.handleDocumentClick
         });
         Object.assign(settingsActions, session);

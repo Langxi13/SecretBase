@@ -395,6 +395,15 @@
             loadAllData: data.loadAllData
         });
 
+        const desktop = window.SecretBaseDesktopController.createDesktopController({
+            computed,
+            copyToClipboard,
+            openExternalUrl,
+            store,
+            showToast,
+            state
+        });
+
         const groupActions = window.SecretBaseGroupController.createGroupController({
             api,
             store,
@@ -486,7 +495,8 @@
                 visiblePages,
                 allCurrentPageSelected,
                 selectedImportPreviewCount,
-                selectedImportConflictCount
+                selectedImportConflictCount,
+                ...desktop.views
             },
             actions: {
                 ...aiActions,
@@ -498,6 +508,7 @@
                 ...listControllerActions,
                 ...maintenanceActions,
                 ...groupActions,
+                ...desktop.actions,
                 resetAdvancedFilterForm,
                 removeAdvancedFilterChip,
                 loadSavedAdvancedFilters,

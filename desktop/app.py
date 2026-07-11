@@ -7,18 +7,27 @@ import logging
 import os
 import sys
 import tempfile
+import threading
 import urllib.request
 import webbrowser
 from pathlib import Path
 
 try:
     from .bridge import DesktopApi
-    from .instance import SingleInstanceCoordinator, focus_current_process_window
-    from .runtime import InProcessDesktopServer, desktop_paths, resolve_data_root
+    from .diagnostics import DesktopDiagnostics
+    from .instance import SingleInstanceCoordinator, request_existing_process_exit
+    from .runtime import InProcessDesktopServer, application_root, desktop_paths, resolve_data_root
+    from .tray import DesktopLifecycle, load_close_preferences
+    from .update import check_for_updates
+    from .zoom import DesktopZoomMonitor
 except ImportError:
     from bridge import DesktopApi
-    from instance import SingleInstanceCoordinator, focus_current_process_window
-    from runtime import InProcessDesktopServer, desktop_paths, resolve_data_root
+    from diagnostics import DesktopDiagnostics
+    from instance import SingleInstanceCoordinator, request_existing_process_exit
+    from runtime import InProcessDesktopServer, application_root, desktop_paths, resolve_data_root
+    from tray import DesktopLifecycle, load_close_preferences
+    from update import check_for_updates
+    from zoom import DesktopZoomMonitor
 
 
 WINDOW_TITLE = "SecretBase"
@@ -35,6 +44,8 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Load the packaged Windows desktop runtime without creating a window.",
     )
+    test_mode.add_argument("--wait-for-shutdown-self-test", action="store_true", help=argparse.SUPPRESS)
+    test_mode.add_argument("--shutdown-existing", action="store_true", help=argparse.SUPPRESS)
     parser.add_argument("--report", help="Write the self-test result as JSON.")
     return parser.parse_args()
 
@@ -108,16 +119,23 @@ def run_desktop_runtime_self_test(report_path: str | None) -> int:
             raise RuntimeError("桌面运行时自检只支持 Windows")
 
         import clr
+        import pystray
 
         clr.AddReference("System")
         import System
+        from PIL import Image
         from webview.platforms import winforms
 
         renderer = str(getattr(winforms, "renderer", ""))
+        icon_path = application_root() / "desktop" / "assets" / "secretbase.ico"
+        with Image.open(icon_path) as icon:
+            tray_icon_size = list(icon.size)
         result.update({
-            "success": renderer == "edgechromium",
+            "success": renderer == "edgechromium" and bool(pystray.Icon) and tray_icon_size[0] > 0,
             "renderer": renderer,
             "dotnet_version": str(System.Environment.Version),
+            "tray_available": True,
+            "tray_icon_size": tray_icon_size,
         })
         if not result["success"]:
             result["error"] = f"未加载 Edge WebView2 渲染器：{renderer or 'unknown'}"
@@ -127,6 +145,29 @@ def run_desktop_runtime_self_test(report_path: str | None) -> int:
         write_report(report_path, result)
         logging.shutdown()
     return 0 if result["success"] else 1
+
+
+def run_shutdown_wait_self_test(report_path: str | None, timeout: float = 30.0) -> int:
+    coordinator = SingleInstanceCoordinator()
+    result = {"success": False, "mode": "shutdown-wait", "ready": False}
+    exit_requested = threading.Event()
+    try:
+        if not coordinator.acquire():
+            raise RuntimeError("已有 SecretBase 实例占用单实例互斥量")
+        coordinator.start_listener(lambda: None, exit_requested.set)
+        result["ready"] = True
+        write_report(report_path, result)
+        if not exit_requested.wait(timeout):
+            raise RuntimeError("等待退出信号超时")
+        result["success"] = True
+        return 0
+    except Exception as error:
+        result["error"] = str(error)
+        return 1
+    finally:
+        coordinator.close()
+        write_report(report_path, result)
+        logging.shutdown()
 
 
 def desktop_window_failure(error: Exception) -> tuple[str, bool]:
@@ -160,6 +201,8 @@ def run_window(data_root_value: str | None) -> int:
     data_root = resolve_data_root(data_root_value)
     paths = desktop_paths(data_root)
     server = InProcessDesktopServer(data_root)
+    lifecycle = None
+    zoom_monitor = None
     try:
         url = server.start()
     except Exception as error:
@@ -187,22 +230,48 @@ def run_window(data_root_value: str | None) -> int:
             )
             return selected_file_path(selected)
 
-        bridge = DesktopApi(url, save_dialog)
+        from version import APP_VERSION
+
+        diagnostics = DesktopDiagnostics(
+            paths=paths,
+            backend_url=url,
+            version=APP_VERSION,
+            renderer="edgechromium",
+            backend_running=lambda: server.is_running,
+        )
+        icon_path = application_root() / "desktop" / "assets" / "secretbase.ico"
+        lifecycle = DesktopLifecycle(server, icon_path, settings_path=paths.settings)
+        close_to_tray, confirm_close = load_close_preferences(paths.settings)
+        lifecycle.set_close_preferences(close_to_tray, confirm_close)
+        bridge = DesktopApi(
+            url,
+            save_dialog,
+            diagnostics_provider=diagnostics.collect,
+            directory_opener=diagnostics.open_directory,
+            update_checker=lambda: check_for_updates(APP_VERSION),
+            close_preferences_setter=lifecycle.set_close_preferences,
+            close_request_resolver=lifecycle.resolve_close_request,
+        )
         window = webview.create_window(
             WINDOW_TITLE,
             url,
             js_api=bridge,
             width=1280,
             height=820,
-            min_size=(960, 640),
+            min_size=(360, 320),
             resizable=True,
+            zoomable=True,
             background_color="#111827",
             text_select=True,
         )
         if window is None:
             raise RuntimeError("无法创建 SecretBase 桌面窗口")
         window_holder["window"] = window
-        coordinator.start_listener(lambda: focus_current_process_window(window))
+        lifecycle.attach_window(window)
+        zoom_monitor = DesktopZoomMonitor(window)
+        window.events.loaded += zoom_monitor.attach
+        window.events.closing += lifecycle.on_closing
+        coordinator.start_listener(lifecycle.restore, lifecycle.exit)
         webview.start(
             gui="edgechromium",
             debug=False,
@@ -222,6 +291,10 @@ def run_window(data_root_value: str | None) -> int:
             webbrowser.open(WEBVIEW2_DOWNLOAD_URL)
         return 1
     finally:
+        if zoom_monitor is not None:
+            zoom_monitor.detach()
+        if lifecycle is not None:
+            lifecycle.shutdown()
         coordinator.close()
         server.stop()
         logging.shutdown()
@@ -233,6 +306,12 @@ def main() -> int:
         return run_self_test(args.data_root, args.report)
     if args.desktop_runtime_self_test:
         return run_desktop_runtime_self_test(args.report)
+    if args.wait_for_shutdown_self_test:
+        return run_shutdown_wait_self_test(args.report)
+    if args.shutdown_existing:
+        if args.report:
+            raise SystemExit("--shutdown-existing 不接受 --report")
+        return 0 if request_existing_process_exit() else 1
     if args.report:
         raise SystemExit("--report 只能与自检参数一起使用")
     return run_window(args.data_root)

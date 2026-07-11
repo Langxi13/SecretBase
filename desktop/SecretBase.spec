@@ -15,6 +15,9 @@ if os.name == "nt":
     expected_desktop_dependencies = {
         "pythonnet": "3.0.5",
         "clr-loader": "0.2.10",
+        "pystray": "0.19.5",
+        "Pillow": "12.3.0",
+        "six": "1.17.0",
     }
     for package, expected_version in expected_desktop_dependencies.items():
         installed_version = metadata.version(package)
@@ -26,6 +29,8 @@ if os.name == "nt":
 
 hidden_imports = [
     "main",
+    "PIL.Image",
+    "pystray._win32",
     "webview.platforms.edgechromium",
     "webview.platforms.win32",
     "webview.platforms.winforms",
@@ -36,7 +41,10 @@ a = Analysis(
     [str(DESKTOP_DIR / "app.py")],
     pathex=[str(DESKTOP_DIR), str(BACKEND_DIR), str(ROOT)],
     binaries=[],
-    datas=[(str(ROOT / "frontend"), "frontend")],
+    datas=[
+        (str(ROOT / "frontend"), "frontend"),
+        (str(DESKTOP_DIR / "assets" / "secretbase.ico"), "desktop/assets"),
+    ],
     hiddenimports=hidden_imports,
     hookspath=[],
     hooksconfig={},

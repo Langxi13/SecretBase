@@ -35,6 +35,9 @@ def test_desktop_dependency_pins() -> None:
     assert "-r ../backend/requirements.txt" in requirements
     assert "pywebview==6.2.1" in requirements
     assert "pyinstaller==6.21.0" in requirements
+    assert "pystray==0.19.5" in requirements
+    assert "Pillow==12.3.0" in requirements
+    assert "six==1.17.0" in requirements
     assert 'pythonnet==3.0.5; sys_platform == "win32"' in requirements
     assert 'clr_loader==0.2.10; sys_platform == "win32"' in requirements
 
@@ -49,6 +52,12 @@ def test_spec_only_collects_public_runtime_assets() -> None:
     assert 'icon=str(DESKTOP_DIR / "assets" / "secretbase.ico")' in spec
     assert '"pythonnet": "3.0.5"' in spec
     assert '"clr-loader": "0.2.10"' in spec
+    assert '"pystray": "0.19.5"' in spec
+    assert '"Pillow": "12.3.0"' in spec
+    assert '"six": "1.17.0"' in spec
+    assert '"pystray._win32"' in spec
+    assert '"PIL.Image"' in spec
+    assert '(str(DESKTOP_DIR / "assets" / "secretbase.ico"), "desktop/assets")' in spec
 
 
 def test_version_resources_match_application_version() -> None:
@@ -83,10 +92,30 @@ def test_build_script_is_ascii_and_runs_post_build_checks() -> None:
     assert "-WorkingDirectory $BuildRoot" in text
     assert "SecretBase.exe.config" in text
     assert "verify_desktop_package.py" in text
+    assert "SecretBase.generated.iss" in text
+    assert "ChineseSimplified.isl" in text
+    assert "/DMyLanguageFile" in text
+    assert "sign-windows-artifacts.ps1" in text
+    assert "windows-x64-setup.exe" in text
+    assert "ISCC.exe" in text
     assert "SHA256SUMS.txt" in text
+    assert '$Checksum = "$ArchiveHash  $ArchiveName`n$InstallerHash  $InstallerName`n"' in text
     assert re.search(r"sys\.version_info\[:2\].*\(3, 11\)", text)
     assert "sys.maxsize > 2**32" in text
     assert "struct.calcsize" not in text
+
+    app_source = (ROOT / "desktop" / "app.py").read_text(encoding="utf-8")
+    assert '"--shutdown-existing"' in app_source
+    assert '"--wait-for-shutdown-self-test"' in app_source
+    assert "request_existing_process_exit" in app_source
+    assert "min_size=(360, 320)" in app_source
+    assert "min_size=(960, 640)" not in app_source
+    assert "resizable=True" in app_source
+    assert "zoomable=True" in app_source
+    assert "DesktopZoomMonitor" in app_source
+    assert "window.events.loaded += zoom_monitor.attach" in app_source
+    assert "close_preferences_setter=lifecycle.set_close_preferences" in app_source
+    assert "close_request_resolver=lifecycle.resolve_close_request" in app_source
 
 
 def test_windows_workflows_build_once_and_retest_downloaded_artifact() -> None:
@@ -98,19 +127,70 @@ def test_windows_workflows_build_once_and_retest_downloaded_artifact() -> None:
     assert "runs-on: windows-2025" in reusable
     assert "actions/upload-artifact@v7" in reusable
     assert "actions/download-artifact@v8" in reusable
+    assert "choco install innosetup --version=6.7.1" in reusable
     assert "build-desktop-windows.ps1 -SkipDependencyInstall" in reusable
     assert "SecretBase\\SecretBase.exe" in reusable
     assert "Start-Process -FilePath $Executable" in reusable
     assert "-Wait -PassThru" in reusable
     assert "--desktop-runtime-self-test" in reusable
     assert "Zone.Identifier" in reusable
+    assert "Unblock-File -LiteralPath $InstallerPath" in reusable
     assert "Python.Runtime.dll" in reusable
+    assert "SecretBase-v*-windows-x64-setup.exe" in reusable
+    assert "test-windows-installer.ps1" in reusable
     assert "secretbase-desktop-self-test.json" in reusable
     assert "secretbase-desktop-runtime*-self-test.json" in reusable
+    assert "secretbase-installer*-self-test.json" in reusable
     assert "retention-days: 14" in desktop
     assert "uses: ./.github/workflows/reusable-windows-desktop.yml" in desktop
     assert "needs: [verify, desktop]" in release
+    assert "path: release-assets" in release
+    assert 'gh release create "$GITHUB_REF_NAME" release-assets/*' in release
     assert "gh release upload" in release
+
+
+def test_installer_preserves_data_unless_delete_is_confirmed() -> None:
+    installer = (ROOT / "desktop" / "installer" / "SecretBase.iss").read_text(encoding="utf-8")
+    assert "AppId={{D03B47A4-2BF0-4891-B7A0-A792A5462978}" in installer
+    assert 'MessagesFile: "{#MyLanguageFile}"' in installer
+    assert "DefaultDirName={localappdata}\\Programs\\SecretBase" in installer
+    assert "PrivilegesRequired=lowest" in installer
+    assert "AppMutex=" not in installer
+    assert "[UninstallRun]" in installer
+    assert 'Parameters: "--shutdown-existing"' in installer
+    assert 'Filename: "{sys}\\taskkill.exe"' in installer
+    assert "Check: IsSecretBaseRunning" in installer
+    assert "CheckForMutexes('Local\\SecretBase.Desktop.Mutex')" in installer
+    assert "function PrepareToInstall" in installer
+    assert "PurgeCheckBox.Checked := False" in installer
+    assert "CompareText(Trim(ConfirmationEdit.Text), 'DELETE') = 0" in installer
+    assert "{param:PURGEDATA|0}" in installer
+    assert "{param:CONFIRMDELETE|}" in installer
+    assert "DelTree(DataPath, True, True, True)" in installer
+    assert "[UninstallDelete]" not in installer
+
+    language = (ROOT / "desktop" / "installer" / "languages" / "ChineseSimplified.isl").read_text(
+        encoding="utf-8"
+    )
+    assert "LanguageName=简体中文" in language
+    assert "LanguageID=$0804" in language
+
+    installer_test = (ROOT / "scripts" / "test-windows-installer.ps1").read_bytes()
+    installer_test.decode("ascii")
+    text = installer_test.decode("ascii")
+    assert "Default uninstall removed SecretBase user data" in text
+    assert "/PURGEDATA=1 /CONFIRMDELETE=DELETE" in text
+    assert "--wait-for-shutdown-self-test" in text
+    assert "did not stop the running SecretBase instance" in text
+    assert "Confirmed uninstall did not remove" in text
+
+    signing = (ROOT / "scripts" / "sign-windows-artifacts.ps1").read_bytes()
+    signing.decode("ascii")
+    signing_text = signing.decode("ascii")
+    assert "WINDOWS_SIGNING_CERT_BASE64" in signing_text
+    assert "WINDOWS_SIGNING_CERT_PASSWORD" in signing_text
+    assert "Import-PfxCertificate" in signing_text
+    assert "signtool.exe" in signing_text
 
 
 def test_package_validator_accepts_clean_directory_and_archive() -> None:
@@ -165,6 +245,7 @@ def main() -> None:
         test_windows_app_config_allows_downloaded_managed_runtime,
         test_build_script_is_ascii_and_runs_post_build_checks,
         test_windows_workflows_build_once_and_retest_downloaded_artifact,
+        test_installer_preserves_data_unless_delete_is_confirmed,
         test_package_validator_accepts_clean_directory_and_archive,
         test_package_validator_rejects_private_runtime_files,
         test_package_validator_rejects_archive_traversal,

@@ -226,3 +226,9 @@ class InProcessDesktopServer:
         if self._thread is not None and self._thread.is_alive() and self._server is not None:
             self._server.force_exit = True
             self._thread.join(timeout=2)
+
+    def lock_vault(self) -> None:
+        if self._main_module is None:
+            return
+        storage = importlib.import_module("storage")
+        storage.lock_vault()

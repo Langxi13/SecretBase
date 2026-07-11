@@ -1857,6 +1857,8 @@ GET /settings
     "page_size": 20,
     "auto_lock_minutes": 5,
     "auto_backup_retention": 30,
+    "close_to_tray": false,
+    "confirm_close": true,
     "language": "zh-CN"
   }
 }
@@ -1874,7 +1876,9 @@ PUT /settings
 {
   "theme": "light",
   "page_size": 30,
-  "auto_backup_retention": 60
+  "auto_backup_retention": 60,
+  "close_to_tray": true,
+  "confirm_close": false
 }
 ```
 
@@ -1888,6 +1892,8 @@ PUT /settings
     "page_size": 30,
     "auto_lock_minutes": 5,
     "auto_backup_retention": 60,
+    "close_to_tray": true,
+    "confirm_close": false,
     "language": "zh-CN"
   },
   "message": "设置已更新"
@@ -1897,6 +1903,8 @@ PUT /settings
 **错误情况：**
 
 - 422: 设置值无效（如 page_size 不是正整数）
+
+`close_to_tray` 只影响 Windows 桌面壳，默认 `false`；`confirm_close` 默认 `true`，控制点击关闭按钮时是否显示隐藏到托盘/退出确认。服务端模式会保存这两个字段，但不会启动系统托盘或显示桌面关闭确认。
 
 ## 10. 认证中间件
 

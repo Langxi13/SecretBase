@@ -62,9 +62,16 @@ $PackageDir = Join-Path $DistRoot "SecretBase"
 $ArtifactsDir = Join-Path $ProjectRoot "artifacts"
 $ArchiveName = "SecretBase-v$Version-windows-x64.zip"
 $ArchivePath = Join-Path $ArtifactsDir $ArchiveName
+$InstallerName = "SecretBase-v$Version-windows-x64-setup.exe"
+$InstallerPath = Join-Path $ArtifactsDir $InstallerName
 $ChecksumPath = Join-Path $ArtifactsDir "SHA256SUMS.txt"
+$InstallerScript = Join-Path $ProjectRoot "desktop\installer\SecretBase.iss"
+$InstallerLanguage = Join-Path $ProjectRoot "desktop\installer\languages\ChineseSimplified.isl"
+$GeneratedInstallerScript = Join-Path $BuildRoot "SecretBase.generated.iss"
+$GeneratedInstallerLanguage = Join-Path $BuildRoot "ChineseSimplified.isl"
+$SigningScript = Join-Path $ProjectRoot "scripts\sign-windows-artifacts.ps1"
 
-foreach ($Path in @($DistRoot, $WorkRoot, $SelfTestRoot, $SelfTestReport, $RuntimeSelfTestReport, $ArchivePath, $ChecksumPath)) {
+foreach ($Path in @($DistRoot, $WorkRoot, $SelfTestRoot, $SelfTestReport, $RuntimeSelfTestReport, $ArchivePath, $InstallerPath, $ChecksumPath, $GeneratedInstallerScript, $GeneratedInstallerLanguage)) {
     if (Test-Path $Path) { Remove-Item -Recurse -Force $Path }
 }
 New-Item -ItemType Directory -Force -Path $DistRoot, $WorkRoot, $ArtifactsDir | Out-Null
@@ -76,10 +83,14 @@ try {
 
     Copy-Item (Join-Path $ProjectRoot "LICENSE") (Join-Path $PackageDir "LICENSE.txt")
     Copy-Item (Join-Path $ProjectRoot "desktop\SecretBase.exe.config") (Join-Path $PackageDir "SecretBase.exe.config")
+
+    $Executable = Join-Path $PackageDir "SecretBase.exe"
+    & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $SigningScript -Path $Executable
+    if ($LASTEXITCODE -ne 0) { throw "Signing the desktop executable failed." }
+
     & $BuildPython "scripts\verify_desktop_package.py" $PackageDir
     if ($LASTEXITCODE -ne 0) { throw "The unpacked desktop package failed validation." }
 
-    $Executable = Join-Path $PackageDir "SecretBase.exe"
     $SelfTestArguments = "--self-test --data-root self-test-data --report self-test-report.json"
     $SelfTestProcess = Start-Process -FilePath $Executable -ArgumentList $SelfTestArguments -WorkingDirectory $BuildRoot -Wait -PassThru
     if ($SelfTestProcess.ExitCode -ne 0) {
@@ -108,12 +119,42 @@ try {
     & $BuildPython "scripts\verify_desktop_package.py" $ArchivePath
     if ($LASTEXITCODE -ne 0) { throw "The desktop ZIP archive failed validation." }
 
-    $Hash = (Get-FileHash -Algorithm SHA256 $ArchivePath).Hash.ToLowerInvariant()
-    $Checksum = "$Hash  $ArchiveName`r`n"
+    $IsccCommand = Get-Command "ISCC.exe" -ErrorAction SilentlyContinue
+    $IsccPath = if ($IsccCommand) {
+        $IsccCommand.Source
+    } else {
+        Join-Path ${env:ProgramFiles(x86)} "Inno Setup 6\ISCC.exe"
+    }
+    if (-not (Test-Path $IsccPath)) {
+        throw "Inno Setup 6.7.1 was not found. Install it before building the Windows installer."
+    }
+
+    $InstallerSource = [System.IO.File]::ReadAllText($InstallerScript, [System.Text.Encoding]::UTF8)
+    $LanguageSource = [System.IO.File]::ReadAllText($InstallerLanguage, [System.Text.Encoding]::UTF8)
+    [System.IO.File]::WriteAllText($GeneratedInstallerScript, $InstallerSource, [System.Text.UTF8Encoding]::new($true))
+    [System.IO.File]::WriteAllText($GeneratedInstallerLanguage, $LanguageSource, [System.Text.UTF8Encoding]::new($true))
+    & $IsccPath `
+        "/DMyAppVersion=$Version" `
+        "/DMySourceDir=$PackageDir" `
+        "/DMyOutputDir=$ArtifactsDir" `
+        "/DMyProjectRoot=$ProjectRoot" `
+        "/DMyLanguageFile=$GeneratedInstallerLanguage" `
+        $GeneratedInstallerScript
+    if ($LASTEXITCODE -ne 0 -or -not (Test-Path $InstallerPath)) {
+        throw "Inno Setup failed to build the Windows installer."
+    }
+
+    & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $SigningScript -Path $InstallerPath
+    if ($LASTEXITCODE -ne 0) { throw "Signing the Windows installer failed." }
+
+    $ArchiveHash = (Get-FileHash -Algorithm SHA256 $ArchivePath).Hash.ToLowerInvariant()
+    $InstallerHash = (Get-FileHash -Algorithm SHA256 $InstallerPath).Hash.ToLowerInvariant()
+    $Checksum = "$ArchiveHash  $ArchiveName`n$InstallerHash  $InstallerName`n"
     [System.IO.File]::WriteAllText($ChecksumPath, $Checksum, [System.Text.UTF8Encoding]::new($false))
 } finally {
     Pop-Location
 }
 
 Write-Host "Desktop package: $ArchivePath"
+Write-Host "Desktop installer: $InstallerPath"
 Write-Host "Checksums: $ChecksumPath"

@@ -143,6 +143,67 @@
                             </div>
                             <button class="btn-secondary" @click="openBackupCenter">打开备份中心</button>
                         </div>
+
+                        <div v-if="activeSettingsTab === 'desktop' && isDesktopMode" class="settings-section desktop-settings-section">
+                            <h3>Windows 桌面</h3>
+                            <dl class="desktop-settings-meta">
+                                <div>
+                                    <dt>当前版本</dt>
+                                    <dd>{{ desktopVersion }}</dd>
+                                </div>
+                                <div>
+                                    <dt>运行方式</dt>
+                                    <dd>{{ desktopPackageLabel }}</dd>
+                                </div>
+                                <div>
+                                    <dt>运行状态</dt>
+                                    <dd>{{ desktopStatusLabel }}</dd>
+                                </div>
+                            </dl>
+
+                            <div class="setting-item desktop-tray-setting">
+                                <div>
+                                    <label for="close_to_tray">不询问时隐藏到托盘</label>
+                                    <p>关闭提醒关闭后采用此方式；进入托盘前会立即锁定密码库。</p>
+                                </div>
+                                <input
+                                    id="close_to_tray"
+                                    type="checkbox"
+                                    v-model="settingsForm.closeToTray"
+                                    :disabled="desktopCloseSettingsSaving"
+                                    @change="saveCloseToTraySetting"
+                                >
+                            </div>
+
+                            <div class="setting-item desktop-tray-setting">
+                                <div>
+                                    <label for="confirm_close">关闭窗口时询问</label>
+                                    <p>关闭时可选择隐藏到托盘、完全退出或取消操作。</p>
+                                </div>
+                                <input
+                                    id="confirm_close"
+                                    type="checkbox"
+                                    v-model="settingsForm.confirmClose"
+                                    :disabled="desktopCloseSettingsSaving"
+                                    @change="saveCloseToTraySetting"
+                                >
+                            </div>
+
+                            <div class="setting-actions desktop-settings-actions">
+                                <button class="btn-secondary" @click="openDesktopStatus">查看状态与诊断</button>
+                                <button class="btn-secondary" @click="checkDesktopUpdates" :disabled="desktopUpdateChecking">
+                                    {{ desktopUpdateChecking ? '检查中...' : '检查更新' }}
+                                </button>
+                            </div>
+                            <p v-if="desktopUpdateResult && desktopUpdateResult.status === 'up_to_date'" class="info-message">
+                                当前已是最新正式版本。
+                            </p>
+                            <div v-if="desktopUpdateResult && desktopUpdateResult.status === 'available'" class="info-panel desktop-update-result">
+                                <span>发现新版本 {{ desktopUpdateResult.latest_version }}</span>
+                                <button class="btn-small" @click="openDesktopRelease">打开下载页面</button>
+                            </div>
+                            <p v-if="desktopUpdateError" class="error-message">{{ desktopUpdateError }}</p>
+                        </div>
                     </div>
                 </div>
             </div>

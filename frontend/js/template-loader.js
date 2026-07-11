@@ -5,7 +5,7 @@
  * 但入口页不再承担全部页面和弹窗的标记。
  */
 (function () {
-    const TEMPLATE_VERSION = '20260710-ui-v73';
+    const TEMPLATE_VERSION = '20260711-ui-v78';
     const templatePaths = [
         'templates/app-layout.html',
         'templates/workspace-list.html',
@@ -13,6 +13,7 @@
         'templates/ai-dialog.html',
         'templates/tag-browser-dialog.html',
         'templates/settings-dialog.html',
+        'templates/desktop-dialog.html',
         'templates/backup-dialogs.html',
         'templates/management-dialogs.html',
         'templates/transfer-dialogs.html'

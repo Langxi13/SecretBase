@@ -213,22 +213,25 @@ http://127.0.0.1:8001
 
 `v3.0.0` 已完成由浏览器承载界面的桌面基础模式。`v3.1.0` 在此基础上增加 Windows 独立桌面窗口：使用 PyInstaller one-folder、pywebview 和 Edge WebView2，用户双击 `SecretBase.exe` 即可使用，不需要单独打开浏览器或安装 Python 依赖。
 
-V3.1 Windows 包已通过 Windows 10/11 真机验收并正式发布。GitHub Release 包含：
+V3.2 是当前稳定版本，已通过 Windows Server 2022/2025 CI 和 Windows 10/11 x64 真机验收。GitHub Release 包含：
 
 ```text
-SecretBase-v3.1.0-windows-x64.zip
+SecretBase-v3.2.0-windows-x64-setup.exe
+SecretBase-v3.2.0-windows-x64.zip
 SHA256SUMS.txt
 ```
 
 Windows 独立版默认将 vault、备份、日志、设置和 WebView 数据保存在 `%LOCALAPPDATA%\SecretBase\`。发布包只包含程序资源，构建时会扫描并拒绝 `.env`、vault、备份、日志和本地设置文件。桌面导出使用 Windows 原生“另存为”，外部网址交给系统默认浏览器打开；重复启动会恢复并聚焦已有窗口。
 
-在 Windows 3.11 x64 开发环境构建测试包：
+V3.2 增加了当前用户免管理员安装器、桌面状态与诊断、目录入口、手动更新检查和可选系统托盘。安装器作为独立 `.exe` 资产发布，普通用户直接下载安装即可，不需要解压；便携 ZIP 仅作为备用。桌面窗口支持自由调整大小、窄屏布局和 WebView2 原生 `Ctrl + 滚轮` 缩放，缩放时会在顶部短暂显示当前比例。关闭时可选择隐藏到托盘、完全退出或取消，并可记住选择。安装版与便携版共用现有数据目录；默认卸载保留数据，只有勾选删除并输入 `DELETE` 才清除整个本地数据目录。V3.1 作为历史便携版本继续保留。
+
+在 Windows Python 3.11 x64 与 Inno Setup 6.7.1 环境构建测试包：
 
 ```powershell
 .\scripts\build-desktop-windows.ps1
 ```
 
-构建脚本会创建隔离构建环境、运行 PyInstaller、执行后端与桌面运行时自检、校验发布目录并生成 SHA-256。详细实现与验收记录见 `docs/v3.1-windows-desktop-mvp.md` 和 `docs/manual-qa-checklist.md`。
+构建脚本会生成 V3.2 安装器、便携 ZIP 和统一 SHA-256，并执行后端、前端及桌面运行时自检；Windows CI 还会安装同一产物，验证默认卸载保留数据和双确认清除策略。详细实现与验收记录见 `docs/v3.2-windows-productization.md` 和 `docs/manual-qa-checklist-v3.2.md`；V3.1 发布记录仍保留在原文档中。
 
 源码浏览器模式继续保留，由 `desktop/launcher.py` 启动本机后端、分配随机端口，并让后端同源托管 `frontend/` 页面。
 
@@ -444,7 +447,9 @@ scripts/
 - `docs/app-roadmap.md`：桌面和手机 App 长期路线。
 - `docs/v3-desktop-foundation.md`：已实现的 V3.0 桌面基础模式、边界和验收。
 - `docs/v3.1-windows-desktop-mvp.md`：V3.1 Windows 桌面便携版实现与验收状态。
-- `docs/manual-qa-checklist.md`：Windows 桌面真机验收清单。
+- `docs/v3.2-windows-productization.md`：V3.2 Windows 安装器、诊断、托盘和发布状态。
+- `docs/manual-qa-checklist-v3.2.md`：V3.2 Windows 桌面真机验收清单。
+- `docs/manual-qa-checklist.md`：V3.1 Windows 桌面真机验收清单。
 - `docs/release-assessment-v3.0.0.md`：V3.0.0 完备性、风险和发布结论。
 - `docs/release-safety-checklist.md`：发布前安全检查清单。
 - `docs/roadmap.md`：路线图。
@@ -608,15 +613,19 @@ http://127.0.0.1:8001
 
 `v3.0.0` completes the browser-hosted desktop foundation. `v3.1.0` adds an independent Windows window built with PyInstaller one-folder, pywebview, and Edge WebView2. Users launch `SecretBase.exe` directly without opening a separate browser or installing Python dependencies.
 
-The V3.1 package has passed Windows 10/11 hardware acceptance and is formally released. GitHub Release provides `SecretBase-v3.1.0-windows-x64.zip` plus `SHA256SUMS.txt`.
+V3.2 is the current stable release. It has passed Windows Server 2022/2025 CI and Windows 10/11 x64 hardware acceptance. GitHub Release provides the standalone `SecretBase-v3.2.0-windows-x64-setup.exe`, the optional portable ZIP, and `SHA256SUMS.txt`.
 
 Desktop data is stored under `%LOCALAPPDATA%\SecretBase\`. Build validation rejects `.env`, vault, backup, log, and local settings files. Native exports use the Windows Save As dialog, external URLs open in the system browser, and a second launch activates the existing window.
 
-Build on Windows with Python 3.11 x64:
+V3.2 adds a per-user installer, desktop diagnostics, fixed directory shortcuts, manual update checks, narrow-window resizing, native WebView2 `Ctrl + wheel` zoom with transient percentage feedback, and an opt-in system tray. The installer is published as a standalone asset, so normal installation does not require extracting the portable ZIP. Closing the window can prompt to hide, exit, or cancel and can remember the selected action. Installed and portable builds share the existing data directory. Default uninstall preserves all data; full removal requires selecting the purge option and typing `DELETE`. V3.1 remains available as the historical portable release.
+
+Build on Windows with Python 3.11 x64 and Inno Setup 6.7.1:
 
 ```powershell
 .\scripts\build-desktop-windows.ps1
 ```
+
+The build script produces the installer, portable ZIP, and shared SHA-256 file while running packaged backend, frontend, and desktop runtime checks. Windows CI installs the same artifact and verifies both data-preserving uninstall and explicitly confirmed data removal.
 
 The browser-based source mode remains available through `desktop/launcher.py` and the commands below.
 
@@ -832,7 +841,9 @@ scripts/
 - `docs/app-roadmap.md`: long-term desktop and mobile app roadmap.
 - `docs/v3-desktop-foundation.md`: implemented V3.0 desktop foundation, boundaries, and acceptance checks.
 - `docs/v3.1-windows-desktop-mvp.md`: V3.1 Windows desktop implementation and acceptance status.
-- `docs/manual-qa-checklist.md`: Windows desktop hardware acceptance checklist.
+- `docs/v3.2-windows-productization.md`: V3.2 Windows installer, diagnostics, tray, and release status.
+- `docs/manual-qa-checklist-v3.2.md`: V3.2 Windows hardware acceptance checklist.
+- `docs/manual-qa-checklist.md`: V3.1 Windows hardware acceptance checklist.
 - `docs/release-assessment-v3.0.0.md`: V3.0.0 completeness, risk, and release assessment.
 - `docs/release-safety-checklist.md`: release safety checklist.
 - `docs/roadmap.md`: roadmap.

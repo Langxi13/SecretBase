@@ -42,6 +42,9 @@
                         {{ submitting ? '设置中...' : '设置主密码' }}
                     </button>
                 </form>
+                <button v-if="isDesktopMode" type="button" class="auth-desktop-status" @click="openDesktopStatus">
+                    查看桌面状态
+                </button>
             </div>
         </div>
 
@@ -70,6 +73,9 @@
                         {{ submitting ? '解锁中...' : '解锁' }}
                     </button>
                 </form>
+                <button v-if="isDesktopMode" type="button" class="auth-desktop-status" @click="openDesktopStatus">
+                    查看桌面状态
+                </button>
             </div>
         </div>
 
