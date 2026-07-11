@@ -112,6 +112,8 @@ def test_build_script_is_ascii_and_runs_post_build_checks() -> None:
     assert "min_size=(960, 640)" not in app_source
     assert "resizable=True" in app_source
     assert "zoomable=True" in app_source
+    assert "DesktopZoomMonitor" in app_source
+    assert "window.events.loaded += zoom_monitor.attach" in app_source
     assert "close_preferences_setter=lifecycle.set_close_preferences" in app_source
     assert "close_request_resolver=lifecycle.resolve_close_request" in app_source
 

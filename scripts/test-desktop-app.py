@@ -26,6 +26,7 @@ from desktop.tray import (  # noqa: E402
     save_close_preferences,
 )
 from desktop.update import check_for_updates, parse_version, validate_release_url  # noqa: E402
+from desktop.zoom import DesktopZoomMonitor  # noqa: E402
 
 
 class DownloadHandler(BaseHTTPRequestHandler):
@@ -312,6 +313,73 @@ def test_desktop_bridge_productization_methods() -> None:
     assert close_preferences == [(True, False)]
     assert api.resolve_close_request("tray", True) == {"status": "hidden"}
     assert close_requests == [("tray", True)]
+
+
+def test_desktop_zoom_monitor_defers_and_coalesces_notifications() -> None:
+    class FakeNativeEvent:
+        def __init__(self) -> None:
+            self.handlers = []
+
+        def __iadd__(self, handler):
+            self.handlers.append(handler)
+            return self
+
+        def __isub__(self, handler):
+            self.handlers.remove(handler)
+            return self
+
+        def fire(self, sender) -> None:
+            for handler in list(self.handlers):
+                handler(sender, None)
+
+    class FakeNativeWebView:
+        def __init__(self) -> None:
+            self.ZoomFactor = 1.0
+            self.ZoomFactorChanged = FakeNativeEvent()
+
+    class FakeWindow:
+        def __init__(self) -> None:
+            self.native = type("NativeWindow", (), {"webview": FakeNativeWebView()})()
+            self.evaluated_scripts = []
+
+        def evaluate_js(self, script: str) -> None:
+            self.evaluated_scripts.append(script)
+
+    scheduled_actions = []
+    window = FakeWindow()
+    monitor = DesktopZoomMonitor(window, action_scheduler=scheduled_actions.append)
+    assert monitor.attach() is True
+    assert monitor.attach() is True
+    assert len(window.native.webview.ZoomFactorChanged.handlers) == 1
+
+    window.native.webview.ZoomFactor = 1.1
+    window.native.webview.ZoomFactorChanged.fire(window.native.webview)
+    assert window.evaluated_scripts == []
+    assert len(scheduled_actions) == 1
+    scheduled_actions.pop(0)()
+    assert '"percent":110' in window.evaluated_scripts[-1]
+
+    window.native.webview.ZoomFactor = 0.9
+    window.native.webview.ZoomFactorChanged.fire(window.native.webview)
+    window.native.webview.ZoomFactor = 0.8
+    window.native.webview.ZoomFactorChanged.fire(window.native.webview)
+    assert len(scheduled_actions) == 2
+    evaluated_count = len(window.evaluated_scripts)
+    scheduled_actions.pop(0)()
+    assert len(window.evaluated_scripts) == evaluated_count
+    scheduled_actions.pop(0)()
+    assert len(window.evaluated_scripts) == evaluated_count + 1
+    assert '"percent":80' in window.evaluated_scripts[-1]
+
+    with patch("desktop.zoom.logger.warning") as warning:
+        window.native.webview.ZoomFactor = 0.1
+        window.native.webview.ZoomFactorChanged.fire(window.native.webview)
+        warning.assert_called_once()
+    assert scheduled_actions == []
+
+    monitor.detach()
+    assert window.native.webview.ZoomFactorChanged.handlers == []
+    assert monitor.attach() is False
 
 
 def test_desktop_lifecycle_locks_before_hiding() -> None:
@@ -616,6 +684,7 @@ def main() -> None:
         test_desktop_diagnostics_and_directory_allowlist,
         test_desktop_update_check_validation,
         test_desktop_bridge_productization_methods,
+        test_desktop_zoom_monitor_defers_and_coalesces_notifications,
         test_desktop_lifecycle_locks_before_hiding,
         test_close_to_tray_preference_defaults_safely,
         test_tray_start_failure_keeps_window_open,

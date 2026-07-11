@@ -13,6 +13,36 @@
     text-decoration: underline;
 }
 
+.desktop-zoom-indicator {
+    position: fixed;
+    top: 14px;
+    left: 50%;
+    z-index: 100100;
+    min-width: 58px;
+    padding: 7px 12px;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    background: var(--text-primary, #172033);
+    box-shadow: var(--shadow-md);
+    color: var(--bg-primary, #ffffff);
+    font-size: 14px;
+    font-variant-numeric: tabular-nums;
+    font-weight: 700;
+    line-height: 1.2;
+    text-align: center;
+    transform: translate(-50%, -8px);
+    visibility: hidden;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.16s ease, transform 0.16s ease, visibility 0.16s ease;
+}
+
+.desktop-zoom-indicator.is-visible {
+    transform: translate(-50%, 0);
+    visibility: visible;
+    opacity: 1;
+}
+
 html[data-secretbase-desktop-locking="true"] body::after {
     content: "密码库已锁定";
     position: fixed;

@@ -18,8 +18,8 @@ function assertIncludes(content, needle, message) {
     if (!content.includes(needle)) throw new Error(message);
 }
 
-assertIncludes(indexHtml, 'js/controllers/desktop-controller.js?v=20260711-ui-v77', '入口页必须加载桌面控制器');
-assertIncludes(indexHtml, 'css/desktop-components.css?v=20260711-ui-v77', '入口页必须加载桌面样式');
+assertIncludes(indexHtml, 'js/controllers/desktop-controller.js?v=20260711-ui-v78', '入口页必须加载桌面控制器');
+assertIncludes(indexHtml, 'css/desktop-components.css?v=20260711-ui-v78', '入口页必须加载桌面样式');
 assertIncludes(stateSource, "runtimeConfig.mode === 'desktop'", '桌面入口必须由运行模式控制');
 assertIncludes(stateSource, "{ key: 'desktop', label: '桌面' }", '桌面模式必须增加设置页签');
 assertIncludes(storeStateSource, 'closeToTray: settings.closeToTray ?? settings.close_to_tray ?? false', '旧设置必须安全默认关闭托盘');

@@ -29,22 +29,22 @@ function assertLessThan(actual, expected, message) {
 }
 
 [
-    'css/base.css?v=20260711-ui-v77',
-    'css/workspace.css?v=20260711-ui-v77',
-    'css/workspace-responsive.css?v=20260711-ui-v77',
-    'css/workspace-polish.css?v=20260711-ui-v77',
-    'css/modals.css?v=20260711-ui-v77',
-    'css/form-controls.css?v=20260711-ui-v77',
-    'css/ai-components.css?v=20260711-ui-v77',
-    'css/management-components.css?v=20260711-ui-v77',
-    'css/component-responsive.css?v=20260711-ui-v77',
-    'css/visual-polish.css?v=20260711-ui-v77',
-    'css/component-polish.css?v=20260711-ui-v77'
+    'css/base.css?v=20260711-ui-v78',
+    'css/workspace.css?v=20260711-ui-v78',
+    'css/workspace-responsive.css?v=20260711-ui-v78',
+    'css/workspace-polish.css?v=20260711-ui-v78',
+    'css/modals.css?v=20260711-ui-v78',
+    'css/form-controls.css?v=20260711-ui-v78',
+    'css/ai-components.css?v=20260711-ui-v78',
+    'css/management-components.css?v=20260711-ui-v78',
+    'css/component-responsive.css?v=20260711-ui-v78',
+    'css/visual-polish.css?v=20260711-ui-v78',
+    'css/component-polish.css?v=20260711-ui-v78'
 ].forEach(asset => assertIncludes(indexHtml, asset, `入口页必须加载 ${asset}`));
 assertNotIncludes(indexHtml, 'css/style.css', '入口页不应继续加载巨型 style.css');
 assertNotIncludes(indexHtml, 'css/components.css', '入口页不应继续加载巨型 components.css');
-assertIncludes(indexHtml, 'js/pagination.js?v=20260711-ui-v77', '分页偏好工具必须拆到独立 JS 模块');
-assertIncludes(indexHtml, 'js/toast.js?v=20260711-ui-v77', 'Toast 工具必须拆到独立 JS 模块');
+assertIncludes(indexHtml, 'js/pagination.js?v=20260711-ui-v78', '分页偏好工具必须拆到独立 JS 模块');
+assertIncludes(indexHtml, 'js/toast.js?v=20260711-ui-v78', 'Toast 工具必须拆到独立 JS 模块');
 
 assertIncludes(appJs, 'window.SecretBasePagination', 'app.js 必须复用分页偏好工具模块');
 assertNotIncludes(appJs, 'function normalizeUniversalPageSize', 'app.js 不应继续内联通用分页归一化函数');

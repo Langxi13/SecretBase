@@ -19,6 +19,7 @@ try:
     from .runtime import InProcessDesktopServer, application_root, desktop_paths, resolve_data_root
     from .tray import DesktopLifecycle, load_close_preferences
     from .update import check_for_updates
+    from .zoom import DesktopZoomMonitor
 except ImportError:
     from bridge import DesktopApi
     from diagnostics import DesktopDiagnostics
@@ -26,6 +27,7 @@ except ImportError:
     from runtime import InProcessDesktopServer, application_root, desktop_paths, resolve_data_root
     from tray import DesktopLifecycle, load_close_preferences
     from update import check_for_updates
+    from zoom import DesktopZoomMonitor
 
 
 WINDOW_TITLE = "SecretBase"
@@ -200,6 +202,7 @@ def run_window(data_root_value: str | None) -> int:
     paths = desktop_paths(data_root)
     server = InProcessDesktopServer(data_root)
     lifecycle = None
+    zoom_monitor = None
     try:
         url = server.start()
     except Exception as error:
@@ -265,6 +268,8 @@ def run_window(data_root_value: str | None) -> int:
             raise RuntimeError("无法创建 SecretBase 桌面窗口")
         window_holder["window"] = window
         lifecycle.attach_window(window)
+        zoom_monitor = DesktopZoomMonitor(window)
+        window.events.loaded += zoom_monitor.attach
         window.events.closing += lifecycle.on_closing
         coordinator.start_listener(lifecycle.restore, lifecycle.exit)
         webview.start(
@@ -286,6 +291,8 @@ def run_window(data_root_value: str | None) -> int:
             webbrowser.open(WEBVIEW2_DOWNLOAD_URL)
         return 1
     finally:
+        if zoom_monitor is not None:
+            zoom_monitor.detach()
         if lifecycle is not None:
             lifecycle.shutdown()
         coordinator.close()
