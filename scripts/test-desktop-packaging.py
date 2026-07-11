@@ -120,6 +120,7 @@ def test_windows_workflows_build_once_and_retest_downloaded_artifact() -> None:
     assert "-Wait -PassThru" in reusable
     assert "--desktop-runtime-self-test" in reusable
     assert "Zone.Identifier" in reusable
+    assert "Unblock-File -LiteralPath $InstallerPath" in reusable
     assert "Python.Runtime.dll" in reusable
     assert "SecretBase-v*-windows-x64-setup.exe" in reusable
     assert "test-windows-installer.ps1" in reusable

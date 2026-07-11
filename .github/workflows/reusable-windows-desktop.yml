@@ -129,6 +129,11 @@ jobs:
           }
 
           Set-Content -LiteralPath $InstallerPath -Stream "Zone.Identifier" -Encoding Ascii -Value "[ZoneTransfer]`r`nZoneId=3"
+          $InstallerZone = Get-Content -LiteralPath $InstallerPath -Stream "Zone.Identifier" -Raw
+          if ($InstallerZone -notmatch '(?m)^ZoneId=3\s*$') {
+            throw "Installer Mark-of-the-Web metadata is invalid."
+          }
+          Unblock-File -LiteralPath $InstallerPath
           .\scripts\test-windows-installer.ps1 -InstallerPath $InstallerPath
           Start-Sleep -Seconds 1
           if (Get-Process -Name "SecretBase" -ErrorAction SilentlyContinue) { throw "SecretBase process remained after self-test." }
