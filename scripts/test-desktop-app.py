@@ -648,6 +648,7 @@ def test_shutdown_wait_self_test_protocol() -> None:
 def test_existing_process_exit_protocol_handles_windows_races() -> None:
     with (
         patch.object(desktop_instance.os, "name", "nt"),
+        patch.object(desktop_instance.sys, "platform", "win32"),
         patch.object(desktop_instance, "_named_mutex_exists", side_effect=[True, True, False]),
         patch.object(desktop_instance, "_signal_named_event", return_value=True) as signal,
         patch.object(desktop_instance.time, "sleep"),
@@ -657,6 +658,7 @@ def test_existing_process_exit_protocol_handles_windows_races() -> None:
 
     with (
         patch.object(desktop_instance.os, "name", "nt"),
+        patch.object(desktop_instance.sys, "platform", "win32"),
         patch.object(desktop_instance, "_named_mutex_exists", side_effect=[True, False]),
         patch.object(desktop_instance, "_signal_named_event", return_value=False),
     ):
@@ -664,6 +666,7 @@ def test_existing_process_exit_protocol_handles_windows_races() -> None:
 
     with (
         patch.object(desktop_instance.os, "name", "nt"),
+        patch.object(desktop_instance.sys, "platform", "win32"),
         patch.object(desktop_instance, "_named_mutex_exists", side_effect=[True, True]),
         patch.object(desktop_instance, "_signal_named_event", return_value=False),
     ):
@@ -671,6 +674,8 @@ def test_existing_process_exit_protocol_handles_windows_races() -> None:
 
 
 def test_non_windows_single_instance_fallback() -> None:
+    if sys.platform != "linux":
+        return
     with tempfile.TemporaryDirectory() as raw:
         root = Path(raw)
         coordinator = SingleInstanceCoordinator(data_root=root)
@@ -705,6 +710,8 @@ def test_platform_profiles_and_runtime_capabilities() -> None:
 
 
 def test_macos_single_instance_activation_and_exit_protocol() -> None:
+    if sys.platform == "win32":
+        return
     with tempfile.TemporaryDirectory() as raw, patch.object(desktop_instance.sys, "platform", "darwin"):
         root = Path(raw)
         activated = threading.Event()

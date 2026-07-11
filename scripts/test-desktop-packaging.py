@@ -3,6 +3,7 @@ from __future__ import annotations
 import ast
 import plistlib
 import re
+import shutil
 import sys
 import tempfile
 import zipfile
@@ -31,7 +32,11 @@ def create_valid_macos_app(root: Path) -> Path:
     (app / "Contents" / "MacOS").mkdir(parents=True)
     (app / "Contents" / "Frameworks" / "frontend").mkdir(parents=True)
     (app / "Contents" / "Resources").mkdir(parents=True)
-    (app / "Contents" / "MacOS" / "SecretBase").write_bytes(b"macos-test")
+    executable = app / "Contents" / "MacOS" / "SecretBase"
+    if sys.platform == "darwin":
+        shutil.copy2(sys.executable, executable)
+    else:
+        executable.write_bytes(b"macos-test")
     (app / "Contents" / "Frameworks" / "frontend" / "index.html").write_text(
         '<div id="app"></div>', encoding="utf-8"
     )
