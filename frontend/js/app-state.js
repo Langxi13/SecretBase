@@ -17,6 +17,16 @@
         const runtimeConfig = window.SECRETBASE_RUNTIME_CONFIG || {};
         const isDesktopMode = runtimeConfig.mode === 'desktop';
         const desktopVersion = runtimeConfig.version || '未知';
+        const desktopPlatform = runtimeConfig.desktopPlatform || '';
+        const desktopArchitecture = runtimeConfig.desktopArchitecture || '';
+        const desktopRuntimeCapabilities = reactive({
+            single_instance: false,
+            directory_open: false,
+            close_confirmation: false,
+            tray: false,
+            native_zoom_feedback: false,
+            ...(runtimeConfig.desktopCapabilities || {})
+        });
 
         const entries = ref([]);
         const tags = ref([]);
@@ -293,6 +303,9 @@
             isSidebarCollapsed,
             isDesktopMode,
             desktopVersion,
+            desktopPlatform,
+            desktopArchitecture,
+            desktopRuntimeCapabilities,
             entries,
             tags,
             groups,

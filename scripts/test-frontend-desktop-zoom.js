@@ -95,7 +95,7 @@ if (server.listeners.has('secretbase:desktop-zoom-changed')) {
 }
 
 if (!styles.includes('.desktop-zoom-indicator.is-visible')) throw new Error('缩放提示可见样式缺失');
-if (!indexHtml.includes('js/desktop-zoom-indicator.js?v=20260711-ui-v78')) {
+if (!indexHtml.includes('js/desktop-zoom-indicator.js?v=20260711-ui-v79')) {
     throw new Error('入口页没有加载桌面缩放提示脚本');
 }
 

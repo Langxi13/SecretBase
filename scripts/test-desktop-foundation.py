@@ -228,12 +228,20 @@ assert "javascript" in response.headers["content-type"]
 assert "window.SECRETBASE_RUNTIME_CONFIG" in response.text
 assert '"apiBaseUrl": ""' in response.text
 assert '"mode": "desktop"' in response.text
-assert '"version": "3.2.0"' in response.text
+assert '"version": "3.3.0"' in response.text
+assert '"desktopShell": true' in response.text
+assert '"desktopPlatform": "macos"' in response.text
+assert '"desktopArchitecture": "arm64"' in response.text
+assert '"tray": false' in response.text
 assert response.headers["x-frame-options"] == "DENY"
 assert response.headers["referrer-policy"] == "no-referrer"
 """,
             {
                 "SECRETBASE_MODE": "desktop",
+                "SECRETBASE_DESKTOP_SHELL": "true",
+                "SECRETBASE_DESKTOP_PLATFORM": "macos",
+                "SECRETBASE_DESKTOP_ARCHITECTURE": "arm64",
+                "SECRETBASE_DESKTOP_CAPABILITIES": '{"tray":false,"directory_open":true}',
                 "DATA_DIR": str(root / "data"),
                 "BACKUP_DIR": str(root / "data" / "backups"),
                 "LOG_DIR": str(root / "logs"),
@@ -390,6 +398,10 @@ def test_desktop_launcher_forces_loopback_security() -> None:
                 os.environ["CORS_ORIGINS"] = original_cors
         assert env["HOST"] == "127.0.0.1"
         assert env["CORS_ORIGINS"] == "http://127.0.0.1:45678"
+        assert env["SECRETBASE_DESKTOP_SHELL"] == "false"
+        assert env["SECRETBASE_DESKTOP_PLATFORM"] == ""
+        shell_env = launcher.build_desktop_env(root, 45678, desktop_shell=True)
+        assert shell_env["SECRETBASE_DESKTOP_SHELL"] == "true"
         assert env["PYTHONUNBUFFERED"] == "1"
         assert env["PYTHONUTF8"] == "1"
         assert env["PYTHONIOENCODING"] == "utf-8"

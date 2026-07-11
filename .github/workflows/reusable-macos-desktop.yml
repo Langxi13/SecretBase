@@ -1,0 +1,102 @@
+name: Reusable macOS Desktop Build
+
+on:
+  workflow_call:
+    inputs:
+      retention-days:
+        description: Artifact retention period in days
+        required: false
+        type: number
+        default: 14
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build on macOS 15 arm64
+    runs-on: macos-15
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: |
+            backend/requirements.txt
+            desktop/requirements.txt
+      - name: Verify Apple Silicon runner
+        run: test "$(uname -m)" = "arm64"
+      - name: Install desktop build dependencies
+        run: python -m pip install --disable-pip-version-check --progress-bar off -r desktop/requirements.txt
+      - name: Run desktop packaging checks
+        run: python scripts/test-desktop-packaging.py
+      - name: Build macOS desktop package
+        run: scripts/build-desktop-macos.sh --skip-dependency-install
+      - name: Upload macOS desktop package
+        uses: actions/upload-artifact@v7
+        with:
+          name: secretbase-macos-arm64
+          path: |
+            artifacts/SecretBase-v*-macos-arm64.dmg
+            artifacts/SecretBase-v*-macos-arm64.zip
+            artifacts/SHA256SUMS.txt
+          if-no-files-found: error
+          retention-days: ${{ inputs.retention-days }}
+
+  packaged-self-test:
+    name: Test downloaded package on macOS 15 arm64
+    needs: build
+    runs-on: macos-15
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+      - name: Verify Apple Silicon runner
+        run: test "$(uname -m)" = "arm64"
+      - name: Download package built in the previous job
+        uses: actions/download-artifact@v8
+        with:
+          name: secretbase-macos-arm64
+          path: artifacts
+      - name: Verify checksums and packaged runtime
+        run: |
+          cd artifacts
+          shasum -a 256 -c SHA256SUMS.txt
+          cd ..
+          archive=$(find artifacts -maxdepth 1 -name 'SecretBase-v*-macos-arm64.zip' -print -quit)
+          dmg=$(find artifacts -maxdepth 1 -name 'SecretBase-v*-macos-arm64.dmg' -print -quit)
+          test -n "$archive"
+          test -n "$dmg"
+          extract_root="$RUNNER_TEMP/secretbase-macos-package"
+          mkdir -p "$extract_root"
+          ditto -x -k "$archive" "$extract_root"
+          app="$extract_root/SecretBase.app"
+          python scripts/verify_macos_package.py "$app"
+          "$app/Contents/MacOS/SecretBase" \
+            --self-test \
+            --data-root "$RUNNER_TEMP/secretbase-macos-data" \
+            --report "$RUNNER_TEMP/secretbase-macos-self-test.json"
+          "$app/Contents/MacOS/SecretBase" \
+            --desktop-runtime-self-test \
+            --report "$RUNNER_TEMP/secretbase-macos-runtime-self-test.json"
+          mount_root="$RUNNER_TEMP/secretbase-macos-dmg"
+          mkdir -p "$mount_root"
+          hdiutil attach -quiet -readonly -nobrowse -mountpoint "$mount_root" "$dmg"
+          trap 'hdiutil detach -quiet "$mount_root" >/dev/null 2>&1 || true' EXIT
+          python scripts/verify_macos_package.py "$mount_root/SecretBase.app"
+          hdiutil detach -quiet "$mount_root"
+          trap - EXIT
+      - name: Upload packaged self-test reports
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: secretbase-macos-self-test
+          path: |
+            ${{ runner.temp }}/secretbase-macos-self-test.json
+            ${{ runner.temp }}/secretbase-macos-runtime-self-test.json
+          if-no-files-found: warn
+          retention-days: ${{ inputs.retention-days }}

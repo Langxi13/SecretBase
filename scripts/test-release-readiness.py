@@ -6,7 +6,7 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
-RELEASE_VERSION = "3.2.0"
+RELEASE_VERSION = "3.3.0"
 
 
 def read(relative_path: str) -> str:
@@ -40,6 +40,10 @@ def test_local_and_remote_release_entrypoints_exist() -> None:
         "scripts/run-release-checks.py",
         ".github/workflows/ci.yml",
         ".github/workflows/release.yml",
+        ".github/workflows/macos-desktop.yml",
+        "scripts/build-desktop-macos.sh",
+        "docs/v3.3-macos-desktop.md",
+        "docs/manual-qa-checklist-v3.3.md",
         "docs/release-assessment-v3.0.0.md",
     )
     for relative_path in required_paths:

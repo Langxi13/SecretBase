@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import ast
+import plistlib
 import re
 import sys
 import tempfile
@@ -12,6 +13,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
 
 from verify_desktop_package import PackageValidationError, verify_package  # noqa: E402
+from verify_macos_package import MacPackageValidationError, verify_macos_package  # noqa: E402
 
 
 def create_valid_package(root: Path) -> Path:
@@ -22,6 +24,27 @@ def create_valid_package(root: Path) -> Path:
     (package / "SecretBase.exe.config").write_text("<configuration />", encoding="ascii")
     (package / "_internal" / "frontend" / "index.html").write_text("<div id=\"app\"></div>", encoding="utf-8")
     return package
+
+
+def create_valid_macos_app(root: Path) -> Path:
+    app = root / "SecretBase.app"
+    (app / "Contents" / "MacOS").mkdir(parents=True)
+    (app / "Contents" / "Frameworks" / "frontend").mkdir(parents=True)
+    (app / "Contents" / "Resources").mkdir(parents=True)
+    (app / "Contents" / "MacOS" / "SecretBase").write_bytes(b"macos-test")
+    (app / "Contents" / "Frameworks" / "frontend" / "index.html").write_text(
+        '<div id="app"></div>', encoding="utf-8"
+    )
+    (app / "Contents" / "Resources" / "LICENSE.txt").write_text("test license", encoding="ascii")
+    with (app / "Contents" / "Info.plist").open("wb") as file:
+        plistlib.dump(
+            {
+                "CFBundleIdentifier": "io.github.langxi13.secretbase",
+                "LSMinimumSystemVersion": "13.0",
+            },
+            file,
+        )
+    return app
 
 
 def app_version() -> str:
@@ -35,11 +58,14 @@ def test_desktop_dependency_pins() -> None:
     assert "-r ../backend/requirements.txt" in requirements
     assert "pywebview==6.2.1" in requirements
     assert "pyinstaller==6.21.0" in requirements
-    assert "pystray==0.19.5" in requirements
+    assert 'pystray==0.19.5; sys_platform == "win32"' in requirements
     assert "Pillow==12.3.0" in requirements
     assert "six==1.17.0" in requirements
     assert 'pythonnet==3.0.5; sys_platform == "win32"' in requirements
     assert 'clr_loader==0.2.10; sys_platform == "win32"' in requirements
+    assert 'pyobjc-core==12.2.1; sys_platform == "darwin"' in requirements
+    assert 'pyobjc-framework-Cocoa==12.2.1; sys_platform == "darwin"' in requirements
+    assert 'pyobjc-framework-WebKit==12.2.1; sys_platform == "darwin"' in requirements
 
 
 def test_spec_only_collects_public_runtime_assets() -> None:
@@ -49,13 +75,18 @@ def test_spec_only_collects_public_runtime_assets() -> None:
     assert "backend/data" not in spec
     assert 'console=False' in spec
     assert '"webview.platforms.mshtml"' in spec
-    assert 'icon=str(DESKTOP_DIR / "assets" / "secretbase.ico")' in spec
+    assert "icon=str(executable_icon)" in spec
     assert '"pythonnet": "3.0.5"' in spec
     assert '"clr-loader": "0.2.10"' in spec
     assert '"pystray": "0.19.5"' in spec
     assert '"Pillow": "12.3.0"' in spec
     assert '"six": "1.17.0"' in spec
     assert '"pystray._win32"' in spec
+    assert '"webview.platforms.cocoa"' in spec
+    assert '"pyobjc-core": "12.2.1"' in spec
+    assert 'bundle_identifier="io.github.langxi13.secretbase"' in spec
+    assert '"LSMinimumSystemVersion": "13.0"' in spec
+    assert "target_arch=target_arch" in spec
     assert '"PIL.Image"' in spec
     assert '(str(DESKTOP_DIR / "assets" / "secretbase.ico"), "desktop/assets")' in spec
 
@@ -143,10 +174,69 @@ def test_windows_workflows_build_once_and_retest_downloaded_artifact() -> None:
     assert "secretbase-installer*-self-test.json" in reusable
     assert "retention-days: 14" in desktop
     assert "uses: ./.github/workflows/reusable-windows-desktop.yml" in desktop
-    assert "needs: [verify, desktop]" in release
-    assert "path: release-assets" in release
+    assert "needs: [verify, windows-desktop, macos-desktop]" in release
+    assert "path: release-input/windows" in release
+    assert "path: release-input/macos" in release
+    assert "Prepare unified release assets" in release
     assert 'gh release create "$GITHUB_REF_NAME" release-assets/*' in release
     assert "gh release upload" in release
+
+
+def test_macos_build_and_workflows_are_arm64_and_reproducible() -> None:
+    build_script = (ROOT / "scripts" / "build-desktop-macos.sh").read_bytes()
+    build_script.decode("ascii")
+    text = build_script.decode("ascii")
+    assert '"$(uname -m)" != "arm64"' in text
+    assert 'MACOSX_DEPLOYMENT_TARGET="13.0"' in text
+    assert 'SECRETBASE_TARGET_ARCH="arm64"' in text
+    assert "iconutil -c icns" in text
+    assert "--self-test" in text
+    assert "--desktop-runtime-self-test" in text
+    assert "verify_macos_package.py" in text
+    assert "ditto -c -k --keepParent" in text
+    assert "hdiutil create" in text
+    assert "macos-arm64.dmg" in text
+    assert "macos-arm64.zip" in text
+    assert "SHA256SUMS.txt" in text
+
+    reusable = (ROOT / ".github" / "workflows" / "reusable-macos-desktop.yml").read_text(encoding="utf-8")
+    entry = (ROOT / ".github" / "workflows" / "macos-desktop.yml").read_text(encoding="utf-8")
+    ci = (ROOT / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
+    release = (ROOT / ".github" / "workflows" / "release.yml").read_text(encoding="utf-8")
+    assert "runs-on: macos-15" in reusable
+    assert 'test "$(uname -m)" = "arm64"' in reusable
+    assert "build-desktop-macos.sh --skip-dependency-install" in reusable
+    assert "actions/upload-artifact@v7" in reusable
+    assert "actions/download-artifact@v8" in reusable
+    assert "secretbase-macos-arm64" in reusable
+    assert "verify_macos_package.py" in reusable
+    assert "uses: ./.github/workflows/reusable-macos-desktop.yml" in entry
+    assert "macos-15" in ci
+    assert "macos-desktop:" in release
+
+
+def test_macos_package_validator_accepts_public_app_and_rejects_private_data() -> None:
+    with tempfile.TemporaryDirectory() as raw:
+        root = Path(raw)
+        app = create_valid_macos_app(root)
+        assert len(verify_macos_package(app).files) == 4
+
+        archive = root / "SecretBase.zip"
+        with zipfile.ZipFile(archive, "w") as bundle:
+            for path in app.rglob("*"):
+                if path.is_file():
+                    bundle.write(path, Path("SecretBase.app") / path.relative_to(app))
+        assert len(verify_macos_package(archive).files) == 4
+
+        private_file = app / "Contents" / "Frameworks" / "data" / "secretbase.enc"
+        private_file.parent.mkdir(parents=True)
+        private_file.write_bytes(b"private")
+        try:
+            verify_macos_package(app)
+        except MacPackageValidationError as error:
+            assert "secretbase.enc" in str(error)
+        else:
+            raise AssertionError("Private macOS app data must fail validation")
 
 
 def test_installer_preserves_data_unless_delete_is_confirmed() -> None:
@@ -245,6 +335,8 @@ def main() -> None:
         test_windows_app_config_allows_downloaded_managed_runtime,
         test_build_script_is_ascii_and_runs_post_build_checks,
         test_windows_workflows_build_once_and_retest_downloaded_artifact,
+        test_macos_build_and_workflows_are_arm64_and_reproducible,
+        test_macos_package_validator_accepts_public_app_and_rejects_private_data,
         test_installer_preserves_data_unless_delete_is_confirmed,
         test_package_validator_accepts_clean_directory_and_archive,
         test_package_validator_rejects_private_runtime_files,

@@ -145,11 +145,15 @@
                         </div>
 
                         <div v-if="activeSettingsTab === 'desktop' && isDesktopMode" class="settings-section desktop-settings-section">
-                            <h3>Windows 桌面</h3>
+                            <h3>{{ desktopPlatformLabel }} 桌面</h3>
                             <dl class="desktop-settings-meta">
                                 <div>
                                     <dt>当前版本</dt>
                                     <dd>{{ desktopVersion }}</dd>
+                                </div>
+                                <div>
+                                    <dt>平台</dt>
+                                    <dd>{{ desktopPlatformLabel }} {{ desktopArchitecture }}</dd>
                                 </div>
                                 <div>
                                     <dt>运行方式</dt>
@@ -161,7 +165,7 @@
                                 </div>
                             </dl>
 
-                            <div class="setting-item desktop-tray-setting">
+                            <div v-if="desktopSupportsTray" class="setting-item desktop-tray-setting">
                                 <div>
                                     <label for="close_to_tray">不询问时隐藏到托盘</label>
                                     <p>关闭提醒关闭后采用此方式；进入托盘前会立即锁定密码库。</p>
@@ -178,7 +182,8 @@
                             <div class="setting-item desktop-tray-setting">
                                 <div>
                                     <label for="confirm_close">关闭窗口时询问</label>
-                                    <p>关闭时可选择隐藏到托盘、完全退出或取消操作。</p>
+                                    <p v-if="desktopSupportsTray">关闭时可选择隐藏到托盘、完全退出或取消操作。</p>
+                                    <p v-else>关闭时确认是否完全退出应用；macOS 首版不驻留菜单栏。</p>
                                 </div>
                                 <input
                                     id="confirm_close"

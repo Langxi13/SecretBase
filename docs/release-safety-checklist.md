@@ -34,7 +34,11 @@ SecretBase 已进入真实生产使用阶段。后续任何迭代默认不得破
 - [ ] 关闭确认是否支持隐藏、退出、取消和“不再提醒”，设置切换是否不会立即启动托盘或锁死界面。
 - [ ] Windows 窗口缩小到 `360 × 320` 时，关键操作是否仍可通过响应式布局和滚动访问。
 - [ ] `SHA256SUMS.txt` 是否同时对应本次实际发布的 ZIP 和安装器。
+- [ ] macOS DMG 和 ZIP 是否只包含 arm64 `SecretBase.app`、公开运行资源和许可证。
+- [ ] macOS 应用 Bundle ID、最低系统版本、WKWebView 自检和 Gatekeeper 真机流程是否已验证。
+- [ ] 统一 Release 是否同时包含当前版本的 Windows 与 macOS 资产，避免更新入口缺少对应平台下载。
 - [ ] 是否在 Windows 10/11 x64 真机完成独立窗口、原生导出和单实例验收。
+- [ ] 是否在 Apple Silicon macOS 13+ 真机完成安装、导入导出、单实例、退出和数据保留验收。
 - [ ] 正式标签是否与 `backend/version.py` 完全一致。
 
 ## 需要备份的情况

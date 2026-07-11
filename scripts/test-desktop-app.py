@@ -13,11 +13,19 @@ from unittest.mock import patch
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
+import desktop.app as desktop_app  # noqa: E402
 from desktop.app import desktop_window_failure, run_shutdown_wait_self_test, selected_file_path  # noqa: E402
 from desktop.bridge import DesktopApi, safe_filename, validate_download_request  # noqa: E402
 from desktop.diagnostics import DesktopDiagnostics, detect_package_type  # noqa: E402
 import desktop.instance as desktop_instance  # noqa: E402
 from desktop.instance import SingleInstanceCoordinator, request_existing_process_exit  # noqa: E402
+import desktop.platform_support as platform_support  # noqa: E402
+from desktop.platform_support import (  # noqa: E402
+    WINDOWS_PROFILE,
+    current_platform_profile,
+    desktop_runtime_environment,
+    normalized_architecture,
+)
 from desktop.runtime import desktop_paths, prepare_data_root  # noqa: E402
 from desktop.tray import (  # noqa: E402
     DesktopLifecycle,
@@ -167,16 +175,17 @@ def test_desktop_file_dialog_result_compatibility() -> None:
 
 
 def test_desktop_runtime_error_does_not_mislabel_webview2() -> None:
-    message, offer_webview2 = desktop_window_failure(
-        RuntimeError("Failed to resolve Python.Runtime.Loader.Initialize from Python.Runtime.dll")
-    )
-    assert offer_webview2 is False
-    assert "桌面运行组件无法加载" in message
-    assert "解除锁定" in message
+    with patch.object(desktop_app, "current_platform_profile", return_value=WINDOWS_PROFILE):
+        message, offer_webview2 = desktop_window_failure(
+            RuntimeError("Failed to resolve Python.Runtime.Loader.Initialize from Python.Runtime.dll")
+        )
+        assert offer_webview2 is False
+        assert "桌面运行组件无法加载" in message
+        assert "解除锁定" in message
 
-    generic_message, generic_offer = desktop_window_failure(RuntimeError("WebView2 runtime unavailable"))
-    assert generic_offer is True
-    assert "WebView2 官方下载页面" in generic_message
+        generic_message, generic_offer = desktop_window_failure(RuntimeError("WebView2 runtime unavailable"))
+        assert generic_offer is True
+        assert "WebView2 官方下载页面" in generic_message
 
 
 def test_desktop_bridge_rejects_unsafe_requests() -> None:
@@ -224,19 +233,23 @@ def test_desktop_diagnostics_and_directory_allowlist() -> None:
         diagnostics = DesktopDiagnostics(
             paths=paths,
             backend_url="http://127.0.0.1:12345",
-            version="3.2.0",
+            version="3.3.0",
             renderer="edgechromium",
+            platform_key="windows",
+            capabilities={"tray": True, "directory_open": True},
             backend_running=lambda: True,
             directory_opener=lambda path: opened.append(path),
         )
         diagnostics.health_opener = StaticOpener({
             "success": True,
-            "data": {"status": "healthy", "version": "3.2.0"},
+            "data": {"status": "healthy", "version": "3.3.0"},
         })
 
         result = diagnostics.collect()
         assert result["status"] == "ok"
         assert result["package_type"] == "source"
+        assert result["platform"] == "windows"
+        assert result["capabilities"]["tray"] is True
         assert detect_package_type() == "source"
         assert str(paths.root) not in result["support_summary"]
         assert result["directories"]["data"]["path"] == str(paths.root)
@@ -658,17 +671,90 @@ def test_existing_process_exit_protocol_handles_windows_races() -> None:
 
 
 def test_non_windows_single_instance_fallback() -> None:
-    coordinator = SingleInstanceCoordinator()
-    assert coordinator.acquire() is True
-    coordinator.start_listener(lambda: None)
-    coordinator.close()
-    assert request_existing_process_exit() is True
-    result = subprocess.run(
-        [sys.executable, "desktop/app.py", "--shutdown-existing"],
-        cwd=ROOT,
-        check=False,
-    )
-    assert result.returncode == 0
+    with tempfile.TemporaryDirectory() as raw:
+        root = Path(raw)
+        coordinator = SingleInstanceCoordinator(data_root=root)
+        assert coordinator.acquire() is True
+        coordinator.start_listener(lambda: None)
+        coordinator.close()
+        assert request_existing_process_exit(data_root=root) is True
+        result = subprocess.run(
+            [sys.executable, "desktop/app.py", "--shutdown-existing", "--data-root", str(root)],
+            cwd=ROOT,
+            check=False,
+        )
+        assert result.returncode == 0
+
+
+def test_platform_profiles_and_runtime_capabilities() -> None:
+    with (
+        patch.object(platform_support.sys, "platform", "darwin"),
+        patch.object(platform_support.platform, "machine", return_value="arm64"),
+    ):
+        profile = current_platform_profile()
+        assert profile.key == "macos"
+        assert profile.renderer == "wkwebview"
+        assert profile.gui == "cocoa"
+        assert profile.capabilities["tray"] is False
+        assert profile.capabilities["single_instance"] is True
+        assert normalized_architecture() == "arm64"
+        environment = desktop_runtime_environment(shell=True)
+        assert environment["SECRETBASE_DESKTOP_PLATFORM"] == "macos"
+        assert environment["SECRETBASE_DESKTOP_ARCHITECTURE"] == "arm64"
+        assert json.loads(environment["SECRETBASE_DESKTOP_CAPABILITIES"])["tray"] is False
+
+
+def test_macos_single_instance_activation_and_exit_protocol() -> None:
+    with tempfile.TemporaryDirectory() as raw, patch.object(desktop_instance.sys, "platform", "darwin"):
+        root = Path(raw)
+        activated = threading.Event()
+        exit_requested = threading.Event()
+        first = SingleInstanceCoordinator(data_root=root)
+        assert first.acquire() is True
+        first.start_listener(activated.set, exit_requested.set)
+
+        duplicate = SingleInstanceCoordinator(data_root=root)
+        assert duplicate.acquire() is False
+        assert activated.wait(2)
+        duplicate.close()
+
+        result = []
+        requester = threading.Thread(
+            target=lambda: result.append(request_existing_process_exit(timeout=2, data_root=root)),
+            daemon=True,
+        )
+        requester.start()
+        assert exit_requested.wait(2)
+        first.close()
+        requester.join(timeout=3)
+        assert result == [True]
+
+        replacement = SingleInstanceCoordinator(data_root=root)
+        assert replacement.acquire() is True
+        replacement.close()
+
+
+def test_macos_lifecycle_rejects_tray_preferences() -> None:
+    class FakeServer:
+        def lock_vault(self) -> None:
+            return None
+
+    lifecycle = DesktopLifecycle(FakeServer(), ROOT / "desktop" / "assets" / "secretbase.ico", supports_tray=False)
+    assert lifecycle.set_close_preferences(False, False) is True
+    try:
+        lifecycle.set_close_preferences(True, True)
+    except ValueError as error:
+        assert "不支持系统托盘" in str(error)
+    else:
+        raise AssertionError("macOS lifecycle must reject tray preferences")
+    try:
+        lifecycle.resolve_close_request("tray", False)
+    except ValueError as error:
+        assert "不支持系统托盘" in str(error)
+    else:
+        raise AssertionError("macOS lifecycle must reject tray close actions")
+    assert lifecycle.on_closing() is None
+    assert lifecycle.exit_requested is True
 
 
 def main() -> None:
@@ -691,6 +777,9 @@ def main() -> None:
         test_shutdown_wait_self_test_protocol,
         test_existing_process_exit_protocol_handles_windows_races,
         test_non_windows_single_instance_fallback,
+        test_platform_profiles_and_runtime_capabilities,
+        test_macos_single_instance_activation_and_exit_protocol,
+        test_macos_lifecycle_rejects_tray_preferences,
     )
     for test in tests:
         test()

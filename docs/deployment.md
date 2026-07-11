@@ -23,19 +23,31 @@ Build with Windows Python 3.11 x64:
 .\scripts\build-desktop-windows.ps1
 ```
 
-The current build writes `SecretBase-v3.2.0-windows-x64.zip`, `SecretBase-v3.2.0-windows-x64-setup.exe`, and `SHA256SUMS.txt` under `artifacts/`. The build script runs packaged backend/frontend and desktop runtime tests and rejects release directories containing `.env`, vault, backup, log, settings, test, documentation, or Git metadata files. Windows CI separately installs the generated setup executable and verifies both uninstall data policies.
+The current build writes `SecretBase-v3.3.0-windows-x64.zip`, `SecretBase-v3.3.0-windows-x64-setup.exe`, and `SHA256SUMS.txt` under `artifacts/`. The build script runs packaged backend/frontend and desktop runtime tests and rejects release directories containing `.env`, vault, backup, log, settings, test, documentation, or Git metadata files. Windows CI separately installs the generated setup executable and verifies both uninstall data policies.
 
 The target machine must have the Microsoft Edge WebView2 Runtime. Windows 10/11 normally includes it; when unavailable, SecretBase shows a startup error with the official runtime download option. Do not move files out of the extracted `SecretBase/` directory because `SecretBase.exe` depends on its `_internal/` contents.
 
 `SecretBase.exe.config` must remain next to `SecretBase.exe`. It enables the bundled pythonnet managed runtime to load when browser-downloaded ZIP contents inherit Windows Mark-of-the-Web. Desktop dependencies pin `pythonnet==3.0.5` and `clr_loader==0.2.10`; builds with other versions are rejected by the PyInstaller spec.
 
-Formal release assets are built on Windows Server 2022 and retested after artifact download on Windows Server 2025. A release tag must match `backend/version.py` before GitHub Release uploads the installer, portable ZIP, and checksum file.
+Windows assets are built on Windows Server 2022 and retested after artifact download on Windows Server 2025. A release tag must match `backend/version.py`; V3.3 uploads Windows and macOS assets only after both platform workflows pass.
 
 V3.2 additionally builds `SecretBase-v3.2.0-windows-x64-setup.exe` with Inno Setup 6.7.1 while retaining the portable ZIP. The installer runs per-user without elevation and installs under `%LOCALAPPDATA%\Programs\SecretBase`. Installed and portable builds both use `%LOCALAPPDATA%\SecretBase` for runtime data.
 
 Default uninstall never deletes the runtime data directory. Interactive data removal requires selecting the purge option and typing `DELETE`; silent removal requires both `/PURGEDATA=1` and `/CONFIRMDELETE=DELETE`. Upgrades must never invoke data removal.
 
 Windows signing is optional. Set `WINDOWS_SIGNING_CERT_BASE64`, `WINDOWS_SIGNING_CERT_PASSWORD`, and optionally `WINDOWS_SIGNING_TIMESTAMP_URL` in the trusted release environment. Missing certificate and password means an unsigned build; a partial signing configuration fails the build. Never store a PFX or certificate password in the repository.
+
+## macOS arm64 Desktop Build
+
+V3.3 uses Apple Silicon Python 3.11, PyInstaller and pywebview Cocoa/WKWebView. Build on macOS 13 or later:
+
+```bash
+scripts/build-desktop-macos.sh
+```
+
+The script produces `SecretBase-v3.3.0-macos-arm64.dmg`, `SecretBase-v3.3.0-macos-arm64.zip`, and `SHA256SUMS.txt`. Runtime data stays under `~/Library/Application Support/SecretBase`; deleting the app does not delete the vault or backups.
+
+Unsigned test builds may require approval through System Settings -> Privacy & Security -> Open Anyway. Do not disable Gatekeeper as part of the normal installation flow. Developer ID signing and notarization remain deferred until an Apple Developer account is available.
 
 ## Recommended Layout
 

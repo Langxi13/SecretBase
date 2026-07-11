@@ -18,6 +18,10 @@
                                 <strong>{{ desktopDiagnostics.version }}</strong>
                             </div>
                             <div>
+                                <span>平台</span>
+                                <strong>{{ desktopPlatformLabel }} {{ desktopDiagnostics.architecture }}</strong>
+                            </div>
+                            <div>
                                 <span>运行方式</span>
                                 <strong>{{ desktopPackageLabel }}</strong>
                             </div>
@@ -54,7 +58,7 @@
                                         <strong>{{ directory.label }}</strong>
                                         <code>{{ directory.path }}</code>
                                     </div>
-                                    <button class="btn-small" @click="openDesktopDirectory(kind)">打开</button>
+                                    <button v-if="desktopCapabilities.directory_open" class="btn-small" @click="openDesktopDirectory(kind)">打开</button>
                                 </div>
                             </div>
                         </section>
@@ -94,7 +98,8 @@
                     <button class="modal-close" type="button" title="取消关闭" @click="cancelDesktopClose">✕</button>
                 </div>
                 <div class="modal-body desktop-close-body">
-                    <p>你可以将窗口隐藏到系统托盘，也可以完全退出应用。隐藏前会立即锁定密码库。</p>
+                    <p v-if="desktopSupportsTray">你可以将窗口隐藏到系统托盘，也可以完全退出应用。隐藏前会立即锁定密码库。</p>
+                    <p v-else>关闭窗口将完全退出应用并停止本地服务，也可以取消并继续使用。</p>
                     <label class="desktop-close-remember" for="desktop_close_remember">
                         <input
                             id="desktop_close_remember"
@@ -102,14 +107,14 @@
                             v-model="desktopCloseRemember"
                             :disabled="desktopCloseSubmitting"
                         >
-                        <span>不再提醒，记住本次选择</span>
+                        <span>{{ desktopSupportsTray ? '不再提醒，记住本次选择' : '不再提醒，以后直接退出' }}</span>
                     </label>
                     <p v-if="desktopCloseError" class="error-message">{{ desktopCloseError }}</p>
                 </div>
                 <div class="modal-footer desktop-close-actions">
                     <button class="btn-secondary" type="button" :disabled="desktopCloseSubmitting" @click="cancelDesktopClose">取消</button>
                     <button class="btn-danger" type="button" :disabled="desktopCloseSubmitting" @click="resolveDesktopClose('exit')">退出应用</button>
-                    <button class="btn-primary inline" type="button" :disabled="desktopCloseSubmitting" @click="resolveDesktopClose('tray')">
+                    <button v-if="desktopSupportsTray" class="btn-primary inline" type="button" :disabled="desktopCloseSubmitting" @click="resolveDesktopClose('tray')">
                         {{ desktopCloseSubmitting ? '处理中...' : '隐藏到托盘' }}
                     </button>
                 </div>

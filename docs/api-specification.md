@@ -1904,7 +1904,7 @@ PUT /settings
 
 - 422: 设置值无效（如 page_size 不是正整数）
 
-`close_to_tray` 只影响 Windows 桌面壳，默认 `false`；`confirm_close` 默认 `true`，控制点击关闭按钮时是否显示隐藏到托盘/退出确认。服务端模式会保存这两个字段，但不会启动系统托盘或显示桌面关闭确认。
+`close_to_tray` 只影响支持托盘的 Windows 桌面壳，默认 `false`；macOS 会忽略并强制关闭该能力。`confirm_close` 默认 `true`：Windows 显示隐藏到托盘/退出/取消，macOS 首版只显示退出/取消。服务端模式会保存这两个字段，但不会启动系统托盘或显示桌面关闭确认。
 
 ## 10. 认证中间件
 

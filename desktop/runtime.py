@@ -13,6 +13,11 @@ from pathlib import Path
 from types import ModuleType
 from typing import Callable
 
+try:
+    from .platform_support import desktop_runtime_environment
+except ImportError:
+    from platform_support import desktop_runtime_environment
+
 
 SOURCE_ROOT = Path(__file__).resolve().parents[1]
 LOCAL_URL_OPENER = urllib.request.build_opener(urllib.request.ProxyHandler({}))
@@ -104,7 +109,7 @@ def prepare_data_root(data_root: Path, *, include_webview: bool = False) -> Desk
     return paths
 
 
-def build_desktop_env(data_root: Path, port: int) -> dict[str, str]:
+def build_desktop_env(data_root: Path, port: int, *, desktop_shell: bool = False) -> dict[str, str]:
     paths = desktop_paths(data_root)
     env = os.environ.copy()
     env.update({
@@ -123,11 +128,12 @@ def build_desktop_env(data_root: Path, port: int) -> dict[str, str]:
         "PYTHONUTF8": "1",
         "PYTHONIOENCODING": "utf-8",
     })
+    env.update(desktop_runtime_environment(shell=desktop_shell))
     return env
 
 
-def apply_desktop_env(data_root: Path, port: int) -> dict[str, str]:
-    env = build_desktop_env(data_root, port)
+def apply_desktop_env(data_root: Path, port: int, *, desktop_shell: bool = False) -> dict[str, str]:
+    env = build_desktop_env(data_root, port, desktop_shell=desktop_shell)
     os.environ.update(env)
     backend_dir = str(bundled_backend_dir())
     if backend_dir not in sys.path:
@@ -175,10 +181,11 @@ def wait_for_health(
 
 
 class InProcessDesktopServer:
-    def __init__(self, data_root: Path, port: int | None = None) -> None:
+    def __init__(self, data_root: Path, port: int | None = None, *, desktop_shell: bool = False) -> None:
         self.paths = desktop_paths(data_root)
         self.port = port or choose_free_port()
         self.url = f"http://127.0.0.1:{self.port}"
+        self.desktop_shell = desktop_shell
         self._server = None
         self._thread: threading.Thread | None = None
         self._main_module: ModuleType | None = None
@@ -192,7 +199,7 @@ class InProcessDesktopServer:
             return self.url
 
         prepare_data_root(self.paths.root, include_webview=True)
-        apply_desktop_env(self.paths.root, self.port)
+        apply_desktop_env(self.paths.root, self.port, desktop_shell=self.desktop_shell)
 
         import uvicorn
 

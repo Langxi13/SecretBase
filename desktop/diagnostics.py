@@ -10,8 +10,10 @@ from pathlib import Path
 from typing import Callable
 
 try:
+    from .platform_support import current_platform_profile, normalized_architecture, open_directory
     from .runtime import DesktopPaths
 except ImportError:
+    from platform_support import current_platform_profile, normalized_architecture, open_directory
     from runtime import DesktopPaths
 
 
@@ -70,8 +72,10 @@ def _redact_path(path: Path) -> str:
             relative = resolved.relative_to(base)
         except ValueError:
             continue
-        suffix = str(relative).replace("/", "\\")
-        return replacement if not suffix or suffix == "." else f"{replacement}\\{suffix}"
+        suffix = relative.as_posix()
+        separator = "\\" if sys.platform.startswith("win") else "/"
+        suffix = suffix.replace("/", separator)
+        return replacement if not suffix or suffix == "." else f"{replacement}{separator}{suffix}"
     return "<自定义数据目录>"
 
 
@@ -95,13 +99,17 @@ def detect_package_type(executable: Path | None = None) -> str:
     installed_path = _installed_path()
     if installed_path is not None and executable_path.parent == installed_path:
         return "installed"
+    if sys.platform == "darwin":
+        app_bundle = next((parent for parent in executable_path.parents if parent.suffix == ".app"), None)
+        if app_bundle is not None:
+            applications = [Path("/Applications").resolve(), (Path.home() / "Applications").resolve()]
+            if any(app_bundle.parent == directory for directory in applications):
+                return "installed"
     return "portable"
 
 
 def default_directory_opener(path: Path) -> None:
-    if os.name != "nt":
-        raise RuntimeError("目录快捷入口只支持 Windows 桌面版")
-    os.startfile(str(path))  # type: ignore[attr-defined]
+    open_directory(path)
 
 
 class DesktopDiagnostics:
@@ -113,12 +121,17 @@ class DesktopDiagnostics:
         version: str,
         renderer: str,
         backend_running: Callable[[], bool],
+        platform_key: str | None = None,
+        capabilities: dict[str, bool] | None = None,
         directory_opener: Callable[[Path], None] = default_directory_opener,
     ) -> None:
         self.paths = paths
         self.backend_url = backend_url.rstrip("/")
         self.version = version
         self.renderer = renderer
+        profile = current_platform_profile()
+        self.platform_key = platform_key or profile.key
+        self.capabilities = dict(capabilities or profile.capabilities)
         self.backend_running = backend_running
         self.directory_opener = directory_opener
         self.health_opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
@@ -173,12 +186,17 @@ class DesktopDiagnostics:
     def collect(self) -> dict:
         directories = _directory_map(self.paths)
         checks = [self._backend_check()]
-        renderer_ok = self.renderer == "edgechromium"
+        expected_renderer = "wkwebview" if self.platform_key == "macos" else "edgechromium"
+        renderer_ok = self.renderer == expected_renderer
+        renderer_message = {
+            "edgechromium": "Edge WebView2 已加载",
+            "wkwebview": "WKWebView 已加载",
+        }.get(self.renderer, f"当前渲染器：{self.renderer or '未知'}")
         checks.append({
             "key": "renderer",
             "label": "桌面渲染器",
             "status": "ok" if renderer_ok else "error",
-            "message": "Edge WebView2 已加载" if renderer_ok else f"当前渲染器：{self.renderer or '未知'}",
+            "message": renderer_message,
         })
 
         directory_payload = {}
@@ -198,14 +216,19 @@ class DesktopDiagnostics:
 
         package_type = detect_package_type()
         status = "error" if any(item["status"] == "error" for item in checks) else "ok"
+        system_name = {
+            "windows": "Windows",
+            "macos": "macOS",
+        }.get(self.platform_key, platform.system() or "未知")
         system = {
-            "name": platform.system() or "Windows",
+            "name": system_name,
             "release": platform.release() or "未知",
-            "architecture": platform.machine() or "未知",
+            "architecture": normalized_architecture(),
         }
         support_lines = [
             f"SecretBase {self.version}",
             f"运行方式：{package_type}",
+            f"平台：{self.platform_key} {system['architecture']}",
             f"系统：{system['name']} {system['release']} {system['architecture']}",
             f"渲染器：{self.renderer or '未知'}",
             f"数据目录：{_redact_path(self.paths.root)}",
@@ -218,6 +241,9 @@ class DesktopDiagnostics:
             "version": self.version,
             "package_type": package_type,
             "renderer": self.renderer,
+            "platform": self.platform_key,
+            "architecture": system["architecture"],
+            "capabilities": self.capabilities,
             "system": system,
             "vault_initialized": self.paths.vault.exists(),
             "directories": directory_payload,

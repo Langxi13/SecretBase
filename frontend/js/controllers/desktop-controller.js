@@ -1,5 +1,5 @@
 /**
- * Windows 桌面状态、目录入口、更新检查与托盘偏好。
+ * 跨平台桌面状态、目录入口、更新检查与关闭偏好。
  */
 (function () {
     function nativeDesktopApi() {
@@ -17,6 +17,16 @@
         const desktopStatusLabel = computed(() => {
             if (!state.desktopDiagnostics.value) return '尚未检查';
             return state.desktopDiagnostics.value.status === 'ok' ? '运行正常' : '需要处理';
+        });
+        const desktopCapabilities = computed(() => {
+            return state.desktopDiagnostics.value?.capabilities || state.desktopRuntimeCapabilities || {};
+        });
+        const desktopSupportsTray = computed(() => desktopCapabilities.value.tray === true);
+        const desktopPlatformLabel = computed(() => {
+            const platform = state.desktopDiagnostics.value?.platform || state.desktopPlatform;
+            if (platform === 'windows') return 'Windows';
+            if (platform === 'macos') return 'macOS';
+            return '桌面';
         });
 
         function requireDesktopApi(method) {
@@ -103,7 +113,7 @@
             if (state.desktopCloseSettingsSaving.value) return;
             state.desktopCloseSettingsSaving.value = true;
             const desired = {
-                closeToTray: Boolean(state.settingsForm.closeToTray),
+                closeToTray: desktopSupportsTray.value && Boolean(state.settingsForm.closeToTray),
                 confirmClose: state.settingsForm.confirmClose !== false
             };
             const previous = {
@@ -142,6 +152,7 @@
 
         async function resolveDesktopClose(action) {
             if (!['tray', 'exit'].includes(action) || state.desktopCloseSubmitting.value) return;
+            if (action === 'tray' && !desktopSupportsTray.value) return;
             state.desktopCloseSubmitting.value = true;
             state.desktopCloseError.value = '';
             try {
@@ -164,7 +175,10 @@
         return {
             views: {
                 desktopPackageLabel,
-                desktopStatusLabel
+                desktopStatusLabel,
+                desktopCapabilities,
+                desktopSupportsTray,
+                desktopPlatformLabel
             },
             actions: {
                 loadDesktopDiagnostics,

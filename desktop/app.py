@@ -1,11 +1,9 @@
 from __future__ import annotations
 
 import argparse
-import ctypes
 import json
 import logging
 import os
-import sys
 import tempfile
 import threading
 import urllib.request
@@ -16,6 +14,7 @@ try:
     from .bridge import DesktopApi
     from .diagnostics import DesktopDiagnostics
     from .instance import SingleInstanceCoordinator, request_existing_process_exit
+    from .platform_support import current_platform_profile, normalized_architecture, show_native_message
     from .runtime import InProcessDesktopServer, application_root, desktop_paths, resolve_data_root
     from .tray import DesktopLifecycle, load_close_preferences
     from .update import check_for_updates
@@ -24,6 +23,7 @@ except ImportError:
     from bridge import DesktopApi
     from diagnostics import DesktopDiagnostics
     from instance import SingleInstanceCoordinator, request_existing_process_exit
+    from platform_support import current_platform_profile, normalized_architecture, show_native_message
     from runtime import InProcessDesktopServer, application_root, desktop_paths, resolve_data_root
     from tray import DesktopLifecycle, load_close_preferences
     from update import check_for_updates
@@ -35,14 +35,14 @@ WEBVIEW2_DOWNLOAD_URL = "https://developer.microsoft.com/microsoft-edge/webview2
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Start SecretBase as a Windows desktop application.")
+    parser = argparse.ArgumentParser(description="Start SecretBase as a desktop application.")
     parser.add_argument("--data-root", help="Override the local SecretBase data directory.")
     test_mode = parser.add_mutually_exclusive_group()
     test_mode.add_argument("--self-test", action="store_true", help="Run a packaged backend/resource test without a window.")
     test_mode.add_argument(
         "--desktop-runtime-self-test",
         action="store_true",
-        help="Load the packaged Windows desktop runtime without creating a window.",
+        help="Load the packaged desktop runtime without creating a window.",
     )
     test_mode.add_argument("--wait-for-shutdown-self-test", action="store_true", help=argparse.SUPPRESS)
     test_mode.add_argument("--shutdown-existing", action="store_true", help=argparse.SUPPRESS)
@@ -51,12 +51,7 @@ def parse_args() -> argparse.Namespace:
 
 
 def show_message(title: str, message: str, *, error: bool = False, yes_no: bool = False) -> bool:
-    if os.name != "nt":
-        print(f"{title}: {message}", file=sys.stderr if error else sys.stdout)
-        return False
-    flags = 0x00000004 if yes_no else 0x00000000
-    flags |= 0x00000010 if error else 0x00000040
-    return ctypes.windll.user32.MessageBoxW(None, message, title, flags) == 6
+    return show_native_message(title, message, error=error, yes_no=yes_no)
 
 
 def write_report(path: str | None, payload: dict) -> None:
@@ -115,30 +110,43 @@ def run_self_test(data_root_value: str | None, report_path: str | None) -> int:
 def run_desktop_runtime_self_test(report_path: str | None) -> int:
     result = {"success": False, "mode": "desktop-runtime"}
     try:
-        if os.name != "nt":
-            raise RuntimeError("桌面运行时自检只支持 Windows")
+        profile = current_platform_profile()
+        if profile.key == "windows":
+            import clr
+            import pystray
 
-        import clr
-        import pystray
+            clr.AddReference("System")
+            import System
+            from PIL import Image
+            from webview.platforms import winforms
 
-        clr.AddReference("System")
-        import System
-        from PIL import Image
-        from webview.platforms import winforms
+            renderer = str(getattr(winforms, "renderer", ""))
+            icon_path = application_root() / "desktop" / "assets" / "secretbase.ico"
+            with Image.open(icon_path) as icon:
+                tray_icon_size = list(icon.size)
+            result.update({
+                "success": renderer == profile.renderer and bool(pystray.Icon) and tray_icon_size[0] > 0,
+                "platform": profile.key,
+                "architecture": normalized_architecture(),
+                "renderer": renderer,
+                "dotnet_version": str(System.Environment.Version),
+                "tray_available": True,
+                "tray_icon_size": tray_icon_size,
+            })
+        elif profile.key == "macos":
+            from webview.platforms import cocoa
 
-        renderer = str(getattr(winforms, "renderer", ""))
-        icon_path = application_root() / "desktop" / "assets" / "secretbase.ico"
-        with Image.open(icon_path) as icon:
-            tray_icon_size = list(icon.size)
-        result.update({
-            "success": renderer == "edgechromium" and bool(pystray.Icon) and tray_icon_size[0] > 0,
-            "renderer": renderer,
-            "dotnet_version": str(System.Environment.Version),
-            "tray_available": True,
-            "tray_icon_size": tray_icon_size,
-        })
+            result.update({
+                "success": bool(getattr(cocoa, "BrowserView", None)),
+                "platform": profile.key,
+                "architecture": normalized_architecture(),
+                "renderer": profile.renderer,
+                "tray_available": False,
+            })
+        else:
+            raise RuntimeError("当前系统不支持打包桌面运行时自检")
         if not result["success"]:
-            result["error"] = f"未加载 Edge WebView2 渲染器：{renderer or 'unknown'}"
+            result["error"] = f"未加载桌面渲染器：{result.get('renderer') or 'unknown'}"
     except Exception as error:
         result["error"] = str(error)
     finally:
@@ -171,6 +179,7 @@ def run_shutdown_wait_self_test(report_path: str | None, timeout: float = 30.0) 
 
 
 def desktop_window_failure(error: Exception) -> tuple[str, bool]:
+    profile = current_platform_profile()
     message = str(error)
     normalized = message.lower()
     runtime_markers = (
@@ -179,7 +188,7 @@ def desktop_window_failure(error: Exception) -> tuple[str, bool]:
         "clr_loader",
         "null pointer pointer",
     )
-    if any(marker in normalized for marker in runtime_markers):
+    if profile.key == "windows" and any(marker in normalized for marker in runtime_markers):
         return (
             "Windows 桌面运行组件无法加载。\n\n"
             f"{message}\n\n"
@@ -187,20 +196,29 @@ def desktop_window_failure(error: Exception) -> tuple[str, bool]:
             "如果仍使用旧测试包，请右键原始 ZIP，打开“属性”，勾选“解除锁定”后重新解压。",
             False,
         )
-    return (
-        f"无法启动 Windows 桌面窗口。\n\n{message}\n\n是否打开 WebView2 官方下载页面？",
-        True,
-    )
+    if profile.key == "windows":
+        return (
+            f"无法启动 Windows 桌面窗口。\n\n{message}\n\n是否打开 WebView2 官方下载页面？",
+            True,
+        )
+    if profile.key == "macos":
+        return (f"无法启动 macOS 桌面窗口。\n\n{message}\n\n请查看日志目录后重试。", False)
+    return (f"当前系统不支持 SecretBase 桌面窗口。\n\n{message}", False)
 
 
 def run_window(data_root_value: str | None) -> int:
-    coordinator = SingleInstanceCoordinator()
+    profile = current_platform_profile()
+    if profile.gui is None:
+        show_message("SecretBase 启动失败", "当前系统不支持独立桌面窗口。", error=True)
+        return 1
+
+    data_root = resolve_data_root(data_root_value)
+    coordinator = SingleInstanceCoordinator(data_root=data_root)
     if not coordinator.acquire():
         return 0
 
-    data_root = resolve_data_root(data_root_value)
     paths = desktop_paths(data_root)
-    server = InProcessDesktopServer(data_root)
+    server = InProcessDesktopServer(data_root, desktop_shell=True)
     lifecycle = None
     zoom_monitor = None
     try:
@@ -236,12 +254,21 @@ def run_window(data_root_value: str | None) -> int:
             paths=paths,
             backend_url=url,
             version=APP_VERSION,
-            renderer="edgechromium",
+            renderer=profile.renderer,
+            platform_key=profile.key,
+            capabilities=profile.capabilities,
             backend_running=lambda: server.is_running,
         )
         icon_path = application_root() / "desktop" / "assets" / "secretbase.ico"
-        lifecycle = DesktopLifecycle(server, icon_path, settings_path=paths.settings)
+        lifecycle = DesktopLifecycle(
+            server,
+            icon_path,
+            settings_path=paths.settings,
+            supports_tray=profile.tray,
+        )
         close_to_tray, confirm_close = load_close_preferences(paths.settings)
+        if not profile.tray:
+            close_to_tray = False
         lifecycle.set_close_preferences(close_to_tray, confirm_close)
         bridge = DesktopApi(
             url,
@@ -268,12 +295,13 @@ def run_window(data_root_value: str | None) -> int:
             raise RuntimeError("无法创建 SecretBase 桌面窗口")
         window_holder["window"] = window
         lifecycle.attach_window(window)
-        zoom_monitor = DesktopZoomMonitor(window)
-        window.events.loaded += zoom_monitor.attach
+        if profile.native_zoom_feedback:
+            zoom_monitor = DesktopZoomMonitor(window)
+            window.events.loaded += zoom_monitor.attach
         window.events.closing += lifecycle.on_closing
         coordinator.start_listener(lifecycle.restore, lifecycle.exit)
         webview.start(
-            gui="edgechromium",
+            gui=profile.gui,
             debug=False,
             private_mode=False,
             storage_path=str(paths.webview),
@@ -311,7 +339,7 @@ def main() -> int:
     if args.shutdown_existing:
         if args.report:
             raise SystemExit("--shutdown-existing 不接受 --report")
-        return 0 if request_existing_process_exit() else 1
+        return 0 if request_existing_process_exit(data_root=resolve_data_root(args.data_root)) else 1
     if args.report:
         raise SystemExit("--report 只能与自检参数一起使用")
     return run_window(args.data_root)
