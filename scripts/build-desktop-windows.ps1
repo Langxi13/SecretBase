@@ -66,10 +66,12 @@ $InstallerName = "SecretBase-v$Version-windows-x64-setup.exe"
 $InstallerPath = Join-Path $ArtifactsDir $InstallerName
 $ChecksumPath = Join-Path $ArtifactsDir "SHA256SUMS.txt"
 $InstallerScript = Join-Path $ProjectRoot "desktop\installer\SecretBase.iss"
+$InstallerLanguage = Join-Path $ProjectRoot "desktop\installer\languages\ChineseSimplified.isl"
 $GeneratedInstallerScript = Join-Path $BuildRoot "SecretBase.generated.iss"
+$GeneratedInstallerLanguage = Join-Path $BuildRoot "ChineseSimplified.isl"
 $SigningScript = Join-Path $ProjectRoot "scripts\sign-windows-artifacts.ps1"
 
-foreach ($Path in @($DistRoot, $WorkRoot, $SelfTestRoot, $SelfTestReport, $RuntimeSelfTestReport, $ArchivePath, $InstallerPath, $ChecksumPath, $GeneratedInstallerScript)) {
+foreach ($Path in @($DistRoot, $WorkRoot, $SelfTestRoot, $SelfTestReport, $RuntimeSelfTestReport, $ArchivePath, $InstallerPath, $ChecksumPath, $GeneratedInstallerScript, $GeneratedInstallerLanguage)) {
     if (Test-Path $Path) { Remove-Item -Recurse -Force $Path }
 }
 New-Item -ItemType Directory -Force -Path $DistRoot, $WorkRoot, $ArtifactsDir | Out-Null
@@ -128,12 +130,15 @@ try {
     }
 
     $InstallerSource = [System.IO.File]::ReadAllText($InstallerScript, [System.Text.Encoding]::UTF8)
+    $LanguageSource = [System.IO.File]::ReadAllText($InstallerLanguage, [System.Text.Encoding]::UTF8)
     [System.IO.File]::WriteAllText($GeneratedInstallerScript, $InstallerSource, [System.Text.UTF8Encoding]::new($true))
+    [System.IO.File]::WriteAllText($GeneratedInstallerLanguage, $LanguageSource, [System.Text.UTF8Encoding]::new($true))
     & $IsccPath `
         "/DMyAppVersion=$Version" `
         "/DMySourceDir=$PackageDir" `
         "/DMyOutputDir=$ArtifactsDir" `
         "/DMyProjectRoot=$ProjectRoot" `
+        "/DMyLanguageFile=$GeneratedInstallerLanguage" `
         $GeneratedInstallerScript
     if ($LASTEXITCODE -ne 0 -or -not (Test-Path $InstallerPath)) {
         throw "Inno Setup failed to build the Windows installer."

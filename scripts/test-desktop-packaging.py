@@ -93,6 +93,8 @@ def test_build_script_is_ascii_and_runs_post_build_checks() -> None:
     assert "SecretBase.exe.config" in text
     assert "verify_desktop_package.py" in text
     assert "SecretBase.generated.iss" in text
+    assert "ChineseSimplified.isl" in text
+    assert "/DMyLanguageFile" in text
     assert "sign-windows-artifacts.ps1" in text
     assert "windows-x64-setup.exe" in text
     assert "ISCC.exe" in text
@@ -132,6 +134,7 @@ def test_windows_workflows_build_once_and_retest_downloaded_artifact() -> None:
 def test_installer_preserves_data_unless_delete_is_confirmed() -> None:
     installer = (ROOT / "desktop" / "installer" / "SecretBase.iss").read_text(encoding="utf-8")
     assert "AppId={{D03B47A4-2BF0-4891-B7A0-A792A5462978}" in installer
+    assert 'MessagesFile: "{#MyLanguageFile}"' in installer
     assert "DefaultDirName={localappdata}\\Programs\\SecretBase" in installer
     assert "PrivilegesRequired=lowest" in installer
     assert "PurgeCheckBox.Checked := False" in installer
@@ -140,6 +143,12 @@ def test_installer_preserves_data_unless_delete_is_confirmed() -> None:
     assert "{param:CONFIRMDELETE|}" in installer
     assert "DelTree(DataPath, True, True, True)" in installer
     assert "[UninstallDelete]" not in installer
+
+    language = (ROOT / "desktop" / "installer" / "languages" / "ChineseSimplified.isl").read_text(
+        encoding="utf-8"
+    )
+    assert "LanguageName=简体中文" in language
+    assert "LanguageID=$0804" in language
 
     installer_test = (ROOT / "scripts" / "test-windows-installer.ps1").read_bytes()
     installer_test.decode("ascii")

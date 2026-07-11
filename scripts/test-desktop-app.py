@@ -231,16 +231,16 @@ def test_desktop_diagnostics_and_directory_allowlist() -> None:
         assert result["status"] == "ok"
         assert result["package_type"] == "source"
         assert detect_package_type() == "source"
-        assert str(root) not in result["support_summary"]
-        assert result["directories"]["data"]["path"] == str(root)
+        assert str(paths.root) not in result["support_summary"]
+        assert result["directories"]["data"]["path"] == str(paths.root)
 
         with patch(
             "desktop.diagnostics.tempfile.NamedTemporaryFile",
-            side_effect=PermissionError(13, "Permission denied", str(root)),
+            side_effect=PermissionError(13, "Permission denied", str(paths.root)),
         ):
             failed = diagnostics.collect()
         assert failed["status"] == "error"
-        assert str(root) not in failed["support_summary"]
+        assert str(paths.root) not in failed["support_summary"]
         assert "系统错误 13" in failed["support_summary"]
 
         assert diagnostics.open_directory("logs") == {"status": "opened", "kind": "logs"}

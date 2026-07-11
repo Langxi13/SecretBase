@@ -10,6 +10,9 @@
 #ifndef MyProjectRoot
   #error MyProjectRoot is required
 #endif
+#ifndef MyLanguageFile
+  #error MyLanguageFile is required
+#endif
 
 #define MyAppName "SecretBase"
 #define MyAppExeName "SecretBase.exe"
@@ -49,7 +52,7 @@ VersionInfoCopyright=SecretBase Contributors
 MinVersion=10.0
 
 [Languages]
-Name: "chinesesimp"; MessagesFile: "compiler:Languages\ChineseSimplified.isl"
+Name: "chinesesimp"; MessagesFile: "{#MyLanguageFile}"
 
 [Tasks]
 Name: "desktopicon"; Description: "创建桌面快捷方式"; GroupDescription: "快捷方式"; Flags: checkedonce
