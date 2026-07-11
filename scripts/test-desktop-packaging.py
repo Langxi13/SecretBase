@@ -3,7 +3,7 @@ from __future__ import annotations
 import ast
 import plistlib
 import re
-import shutil
+import subprocess
 import sys
 import tempfile
 import zipfile
@@ -34,7 +34,10 @@ def create_valid_macos_app(root: Path) -> Path:
     (app / "Contents" / "Resources").mkdir(parents=True)
     executable = app / "Contents" / "MacOS" / "SecretBase"
     if sys.platform == "darwin":
-        shutil.copy2(sys.executable, executable)
+        subprocess.run(
+            ["lipo", sys.executable, "-thin", "arm64", "-output", str(executable)],
+            check=True,
+        )
     else:
         executable.write_bytes(b"macos-test")
     (app / "Contents" / "Frameworks" / "frontend" / "index.html").write_text(
