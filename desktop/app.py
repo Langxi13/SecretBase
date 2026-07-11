@@ -13,12 +13,18 @@ from pathlib import Path
 
 try:
     from .bridge import DesktopApi
-    from .instance import SingleInstanceCoordinator, focus_current_process_window
-    from .runtime import InProcessDesktopServer, desktop_paths, resolve_data_root
+    from .diagnostics import DesktopDiagnostics
+    from .instance import SingleInstanceCoordinator
+    from .runtime import InProcessDesktopServer, application_root, desktop_paths, resolve_data_root
+    from .tray import DesktopLifecycle, load_close_to_tray
+    from .update import check_for_updates
 except ImportError:
     from bridge import DesktopApi
-    from instance import SingleInstanceCoordinator, focus_current_process_window
-    from runtime import InProcessDesktopServer, desktop_paths, resolve_data_root
+    from diagnostics import DesktopDiagnostics
+    from instance import SingleInstanceCoordinator
+    from runtime import InProcessDesktopServer, application_root, desktop_paths, resolve_data_root
+    from tray import DesktopLifecycle, load_close_to_tray
+    from update import check_for_updates
 
 
 WINDOW_TITLE = "SecretBase"
@@ -108,16 +114,23 @@ def run_desktop_runtime_self_test(report_path: str | None) -> int:
             raise RuntimeError("桌面运行时自检只支持 Windows")
 
         import clr
+        import pystray
 
         clr.AddReference("System")
         import System
+        from PIL import Image
         from webview.platforms import winforms
 
         renderer = str(getattr(winforms, "renderer", ""))
+        icon_path = application_root() / "desktop" / "assets" / "secretbase.ico"
+        with Image.open(icon_path) as icon:
+            tray_icon_size = list(icon.size)
         result.update({
-            "success": renderer == "edgechromium",
+            "success": renderer == "edgechromium" and bool(pystray.Icon) and tray_icon_size[0] > 0,
             "renderer": renderer,
             "dotnet_version": str(System.Environment.Version),
+            "tray_available": True,
+            "tray_icon_size": tray_icon_size,
         })
         if not result["success"]:
             result["error"] = f"未加载 Edge WebView2 渲染器：{renderer or 'unknown'}"
@@ -160,6 +173,7 @@ def run_window(data_root_value: str | None) -> int:
     data_root = resolve_data_root(data_root_value)
     paths = desktop_paths(data_root)
     server = InProcessDesktopServer(data_root)
+    lifecycle = None
     try:
         url = server.start()
     except Exception as error:
@@ -187,7 +201,25 @@ def run_window(data_root_value: str | None) -> int:
             )
             return selected_file_path(selected)
 
-        bridge = DesktopApi(url, save_dialog)
+        from version import APP_VERSION
+
+        diagnostics = DesktopDiagnostics(
+            paths=paths,
+            backend_url=url,
+            version=APP_VERSION,
+            renderer="edgechromium",
+            backend_running=lambda: server.is_running,
+        )
+        icon_path = application_root() / "desktop" / "assets" / "secretbase.ico"
+        lifecycle = DesktopLifecycle(server, icon_path)
+        bridge = DesktopApi(
+            url,
+            save_dialog,
+            diagnostics_provider=diagnostics.collect,
+            directory_opener=diagnostics.open_directory,
+            update_checker=lambda: check_for_updates(APP_VERSION),
+            tray_setter=lifecycle.set_close_to_tray,
+        )
         window = webview.create_window(
             WINDOW_TITLE,
             url,
@@ -202,7 +234,11 @@ def run_window(data_root_value: str | None) -> int:
         if window is None:
             raise RuntimeError("无法创建 SecretBase 桌面窗口")
         window_holder["window"] = window
-        coordinator.start_listener(lambda: focus_current_process_window(window))
+        lifecycle.attach_window(window)
+        window.events.closing += lifecycle.on_closing
+        coordinator.start_listener(lifecycle.restore)
+        if load_close_to_tray(paths.settings) and not lifecycle.set_close_to_tray(True):
+            logging.getLogger(__name__).warning("已保存托盘设置，但本次无法启动系统托盘")
         webview.start(
             gui="edgechromium",
             debug=False,
@@ -222,6 +258,8 @@ def run_window(data_root_value: str | None) -> int:
             webbrowser.open(WEBVIEW2_DOWNLOAD_URL)
         return 1
     finally:
+        if lifecycle is not None:
+            lifecycle.shutdown()
         coordinator.close()
         server.stop()
         logging.shutdown()

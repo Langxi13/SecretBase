@@ -44,10 +44,18 @@ class DesktopApi:
         backend_url: str,
         save_dialog: Callable[[str], str | None],
         external_opener: Callable[[str], bool] = webbrowser.open,
+        diagnostics_provider: Callable[[], dict] | None = None,
+        directory_opener: Callable[[str], dict] | None = None,
+        update_checker: Callable[[], dict] | None = None,
+        tray_setter: Callable[[bool], bool] | None = None,
     ) -> None:
         self.backend_url = backend_url.rstrip("/")
         self.save_dialog = save_dialog
         self.external_opener = external_opener
+        self.diagnostics_provider = diagnostics_provider
+        self.directory_opener = directory_opener
+        self.update_checker = update_checker
+        self.tray_setter = tray_setter
         self.opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
 
     def save_download(self, request: dict) -> dict[str, str]:
@@ -107,3 +115,27 @@ class DesktopApi:
         if parsed.scheme not in {"http", "https"} or not parsed.netloc:
             raise ValueError("仅允许打开 HTTP 或 HTTPS 链接")
         return bool(self.external_opener(parsed.geturl()))
+
+    def get_diagnostics(self) -> dict:
+        if self.diagnostics_provider is None:
+            raise RuntimeError("当前运行环境不支持桌面诊断")
+        return self.diagnostics_provider()
+
+    def open_directory(self, kind: str) -> dict:
+        if self.directory_opener is None:
+            raise RuntimeError("当前运行环境不支持目录快捷入口")
+        return self.directory_opener(kind)
+
+    def check_for_updates(self) -> dict:
+        if self.update_checker is None:
+            raise RuntimeError("当前运行环境不支持更新检查")
+        return self.update_checker()
+
+    def set_close_to_tray(self, enabled: bool) -> dict[str, str | bool]:
+        if type(enabled) is not bool:
+            raise ValueError("托盘设置必须是布尔值")
+        if self.tray_setter is None:
+            raise RuntimeError("当前运行环境不支持系统托盘")
+        if not self.tray_setter(enabled):
+            raise RuntimeError("系统托盘启动失败，已保持直接退出模式")
+        return {"status": "updated", "enabled": enabled}

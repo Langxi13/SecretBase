@@ -1857,6 +1857,7 @@ GET /settings
     "page_size": 20,
     "auto_lock_minutes": 5,
     "auto_backup_retention": 30,
+    "close_to_tray": false,
     "language": "zh-CN"
   }
 }
@@ -1874,7 +1875,8 @@ PUT /settings
 {
   "theme": "light",
   "page_size": 30,
-  "auto_backup_retention": 60
+  "auto_backup_retention": 60,
+  "close_to_tray": true
 }
 ```
 
@@ -1888,6 +1890,7 @@ PUT /settings
     "page_size": 30,
     "auto_lock_minutes": 5,
     "auto_backup_retention": 60,
+    "close_to_tray": true,
     "language": "zh-CN"
   },
   "message": "设置已更新"
@@ -1897,6 +1900,8 @@ PUT /settings
 **错误情况：**
 
 - 422: 设置值无效（如 page_size 不是正整数）
+
+`close_to_tray` 只影响 Windows 桌面壳，默认 `false`；服务端模式会保存该字段但不会启动系统托盘。
 
 ## 10. 认证中间件
 

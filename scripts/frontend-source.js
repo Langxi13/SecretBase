@@ -9,6 +9,7 @@ const templatePaths = [
     'frontend/templates/ai-dialog.html',
     'frontend/templates/tag-browser-dialog.html',
     'frontend/templates/settings-dialog.html',
+    'frontend/templates/desktop-dialog.html',
     'frontend/templates/backup-dialogs.html',
     'frontend/templates/management-dialogs.html',
     'frontend/templates/transfer-dialogs.html'
@@ -22,6 +23,7 @@ const cssPaths = [
     'frontend/css/form-controls.css',
     'frontend/css/ai-components.css',
     'frontend/css/management-components.css',
+    'frontend/css/desktop-components.css',
     'frontend/css/component-responsive.css',
     'frontend/css/themes/variables.css',
     'frontend/css/themes/dark.css',

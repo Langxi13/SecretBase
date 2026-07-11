@@ -222,13 +222,15 @@ SHA256SUMS.txt
 
 Windows 独立版默认将 vault、备份、日志、设置和 WebView 数据保存在 `%LOCALAPPDATA%\SecretBase\`。发布包只包含程序资源，构建时会扫描并拒绝 `.env`、vault、备份、日志和本地设置文件。桌面导出使用 Windows 原生“另存为”，外部网址交给系统默认浏览器打开；重复启动会恢复并聚焦已有窗口。
 
-在 Windows 3.11 x64 开发环境构建测试包：
+V3.2 正在此基础上增加当前用户免管理员安装器、桌面状态与诊断、目录入口、手动更新检查和可选系统托盘。安装版与便携版共用现有数据目录；默认卸载保留数据，只有勾选删除并输入 `DELETE` 才清除整个本地数据目录。V3.2 当前仍处于 CI 与真机验收阶段，不替代已发布的 V3.1 稳定版本。
+
+在 Windows Python 3.11 x64 与 Inno Setup 6.7.1 环境构建测试包：
 
 ```powershell
 .\scripts\build-desktop-windows.ps1
 ```
 
-构建脚本会创建隔离构建环境、运行 PyInstaller、执行后端与桌面运行时自检、校验发布目录并生成 SHA-256。详细实现与验收记录见 `docs/v3.1-windows-desktop-mvp.md` 和 `docs/manual-qa-checklist.md`。
+构建脚本会生成 V3.2 安装器、便携 ZIP 和统一 SHA-256，并执行后端、前端及桌面运行时自检；Windows CI 还会安装同一产物，验证默认卸载保留数据和双确认清除策略。详细实现与验收门禁见 `docs/v3.2-windows-productization.md` 和 `docs/manual-qa-checklist-v3.2.md`；V3.1 发布记录仍保留在原文档中。
 
 源码浏览器模式继续保留，由 `desktop/launcher.py` 启动本机后端、分配随机端口，并让后端同源托管 `frontend/` 页面。
 
@@ -612,11 +614,15 @@ The V3.1 package has passed Windows 10/11 hardware acceptance and is formally re
 
 Desktop data is stored under `%LOCALAPPDATA%\SecretBase\`. Build validation rejects `.env`, vault, backup, log, and local settings files. Native exports use the Windows Save As dialog, external URLs open in the system browser, and a second launch activates the existing window.
 
-Build on Windows with Python 3.11 x64:
+V3.2 is adding a per-user installer, desktop diagnostics, fixed directory shortcuts, manual update checks, and an opt-in system tray. Installed and portable builds share the existing data directory. Default uninstall preserves all data; full removal requires selecting the purge option and typing `DELETE`. V3.2 remains under CI and hardware acceptance, while V3.1 is the current stable release.
+
+Build on Windows with Python 3.11 x64 and Inno Setup 6.7.1:
 
 ```powershell
 .\scripts\build-desktop-windows.ps1
 ```
+
+The build script produces the installer, portable ZIP, and shared SHA-256 file while running packaged backend, frontend, and desktop runtime checks. Windows CI installs the same artifact and verifies both data-preserving uninstall and explicitly confirmed data removal.
 
 The browser-based source mode remains available through `desktop/launcher.py` and the commands below.
 

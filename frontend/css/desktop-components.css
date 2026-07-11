@@ -1,0 +1,322 @@
+.auth-desktop-status {
+    display: block;
+    margin: 18px auto 0;
+    padding: 6px 10px;
+    border: 0;
+    background: transparent;
+    color: var(--color-primary);
+    font-size: var(--font-size-sm);
+    cursor: pointer;
+}
+
+.auth-desktop-status:hover {
+    text-decoration: underline;
+}
+
+.settings-tabs {
+    flex-wrap: wrap;
+    overflow-x: visible;
+}
+
+.desktop-settings-section {
+    gap: 16px;
+}
+
+.desktop-settings-meta {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    margin: 0;
+    border-block: 1px solid var(--border-color);
+}
+
+.desktop-settings-meta div {
+    min-width: 0;
+    padding: 12px 14px;
+}
+
+.desktop-settings-meta div + div {
+    border-left: 1px solid var(--border-color);
+}
+
+.desktop-settings-meta dt {
+    color: var(--text-secondary);
+    font-size: var(--font-size-xs);
+}
+
+.desktop-settings-meta dd {
+    margin: 4px 0 0;
+    color: var(--text-primary);
+    font-weight: 600;
+    overflow-wrap: anywhere;
+}
+
+.desktop-tray-setting {
+    gap: 18px;
+}
+
+.desktop-tray-setting > div {
+    min-width: 0;
+}
+
+.desktop-tray-setting label {
+    color: var(--text-primary);
+    font-weight: 600;
+}
+
+.desktop-tray-setting p {
+    margin: 5px 0 0;
+    color: var(--text-secondary);
+    font-size: var(--font-size-sm);
+    line-height: 1.55;
+}
+
+.desktop-tray-setting input[type="checkbox"] {
+    flex: 0 0 auto;
+    width: 16px;
+    height: 16px;
+    margin: 0;
+}
+
+.desktop-settings-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.desktop-update-result,
+.desktop-update-available {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.desktop-status-modal {
+    width: min(960px, calc(100vw - 40px));
+    max-width: 960px;
+}
+
+.desktop-status-body {
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+    max-height: min(72vh, 760px);
+    overflow-y: auto;
+}
+
+.desktop-status-loading {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    min-height: 160px;
+    color: var(--text-secondary);
+}
+
+.desktop-status-loading .loading-spinner {
+    width: 24px;
+    height: 24px;
+}
+
+.desktop-status-overview {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    border-block: 1px solid var(--border-color);
+}
+
+.desktop-status-overview div {
+    min-width: 0;
+    padding: 14px 16px;
+}
+
+.desktop-status-overview div + div {
+    border-left: 1px solid var(--border-color);
+}
+
+.desktop-status-overview span {
+    display: block;
+    color: var(--text-secondary);
+    font-size: var(--font-size-xs);
+}
+
+.desktop-status-overview strong {
+    display: block;
+    margin-top: 5px;
+    color: var(--text-primary);
+    font-size: var(--font-size-sm);
+    overflow-wrap: anywhere;
+}
+
+.desktop-status-section {
+    padding-top: 2px;
+}
+
+.desktop-status-section + .desktop-status-section {
+    padding-top: 20px;
+    border-top: 1px solid var(--border-color);
+}
+
+.desktop-status-section h3 {
+    margin: 0;
+    font-size: 15px;
+}
+
+.desktop-section-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 10px;
+}
+
+.desktop-check-list,
+.desktop-directory-list {
+    border-top: 1px solid var(--border-color);
+}
+
+.desktop-check-row {
+    display: grid;
+    grid-template-columns: 10px minmax(120px, 0.45fr) minmax(180px, 1fr) auto;
+    align-items: center;
+    gap: 12px;
+    min-height: 48px;
+    padding: 9px 4px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.desktop-check-row strong,
+.desktop-check-row span {
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
+.desktop-check-row span {
+    color: var(--text-secondary);
+    font-size: var(--font-size-sm);
+}
+
+.desktop-check-row em {
+    padding: 3px 7px;
+    border-radius: 6px;
+    font-size: var(--font-size-xs);
+    font-style: normal;
+    white-space: nowrap;
+}
+
+.desktop-check-indicator {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--color-error);
+}
+
+.desktop-check-row.status-ok .desktop-check-indicator {
+    background: var(--color-success);
+}
+
+.desktop-check-row.status-warning .desktop-check-indicator {
+    background: var(--color-warning);
+}
+
+.desktop-check-row.status-ok em {
+    color: var(--color-success);
+    background: var(--status-success-bg);
+}
+
+.desktop-check-row.status-warning em {
+    color: var(--color-warning);
+    background: var(--status-warning-bg);
+}
+
+.desktop-check-row.status-error em {
+    color: var(--color-error);
+    background: var(--status-error-bg);
+}
+
+.desktop-directory-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    min-height: 58px;
+    padding: 10px 4px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.desktop-directory-row > div {
+    min-width: 0;
+}
+
+.desktop-directory-row strong,
+.desktop-directory-row code {
+    display: block;
+}
+
+.desktop-directory-row code {
+    margin-top: 5px;
+    color: var(--text-secondary);
+    font-family: Consolas, 'Courier New', monospace;
+    font-size: var(--font-size-xs);
+    overflow-wrap: anywhere;
+}
+
+.desktop-status-footer {
+    justify-content: space-between;
+}
+
+@media (max-width: 720px) {
+    .setting-item.desktop-tray-setting {
+        align-items: flex-start;
+        flex-direction: row;
+        flex-wrap: nowrap;
+    }
+
+    .desktop-tray-setting input[type="checkbox"] {
+        margin-top: 3px;
+    }
+
+    .desktop-settings-meta,
+    .desktop-status-overview {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .desktop-settings-meta div:nth-child(3),
+    .desktop-status-overview div:nth-child(n + 3) {
+        border-top: 1px solid var(--border-color);
+    }
+
+    .desktop-status-overview div:nth-child(3) {
+        border-left: 0;
+    }
+
+    .desktop-check-row {
+        grid-template-columns: 10px 1fr auto;
+    }
+
+    .desktop-check-row > span:not(.desktop-check-indicator) {
+        grid-column: 2 / -1;
+    }
+
+    .desktop-directory-row,
+    .desktop-update-available {
+        align-items: stretch;
+        flex-direction: column;
+    }
+}
+
+@media (max-width: 480px) {
+    .desktop-status-modal {
+        width: 100%;
+    }
+
+    .desktop-settings-meta,
+    .desktop-status-overview {
+        grid-template-columns: 1fr;
+    }
+
+    .desktop-settings-meta div + div,
+    .desktop-status-overview div + div {
+        border-top: 1px solid var(--border-color);
+        border-left: 0;
+    }
+}

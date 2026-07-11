@@ -12,6 +12,7 @@
         data,
         loadSavedAdvancedFilters,
         loadAiSettingsStatus,
+        loadDesktopDiagnostics,
         handleDocumentClick
     }) {
         let aiNowTimer = null;
@@ -31,6 +32,7 @@
             state.showEditModal.value = false;
             state.showAiParse.value = false;
             state.showSettings.value = false;
+            state.showDesktopStatus.value = false;
             state.showTrash.value = false;
             state.showTagManager.value = false;
             state.showTagEditorModal.value = false;
@@ -131,6 +133,8 @@
             state.activeSettingsTab.value = tabKey;
             if (tabKey === 'ai') {
                 await loadAiSettingsStatus();
+            } else if (tabKey === 'desktop') {
+                await loadDesktopDiagnostics();
             }
         }
 

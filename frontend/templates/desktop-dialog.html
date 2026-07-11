@@ -1,0 +1,83 @@
+        <div v-if="showDesktopStatus && isDesktopMode" class="modal-overlay" @click.self="showDesktopStatus = false">
+            <div class="modal-content desktop-status-modal">
+                <div class="modal-header">
+                    <h2>桌面状态</h2>
+                    <button class="modal-close" @click="showDesktopStatus = false">✕</button>
+                </div>
+                <div class="modal-body desktop-status-body">
+                    <div v-if="desktopDiagnosticsLoading" class="desktop-status-loading">
+                        <div class="loading-spinner"></div>
+                        <span>正在检查桌面环境...</span>
+                    </div>
+                    <p v-if="desktopDiagnosticsError" class="error-message">{{ desktopDiagnosticsError }}</p>
+
+                    <template v-if="desktopDiagnostics">
+                        <section class="desktop-status-overview">
+                            <div>
+                                <span>版本</span>
+                                <strong>{{ desktopDiagnostics.version }}</strong>
+                            </div>
+                            <div>
+                                <span>运行方式</span>
+                                <strong>{{ desktopPackageLabel }}</strong>
+                            </div>
+                            <div>
+                                <span>系统</span>
+                                <strong>{{ desktopDiagnostics.system.name }} {{ desktopDiagnostics.system.release }}</strong>
+                            </div>
+                            <div>
+                                <span>渲染器</span>
+                                <strong>{{ desktopDiagnostics.renderer }}</strong>
+                            </div>
+                        </section>
+
+                        <section class="desktop-status-section">
+                            <div class="desktop-section-heading">
+                                <h3>运行检查</h3>
+                                <button class="btn-small" @click="loadDesktopDiagnostics" :disabled="desktopDiagnosticsLoading">刷新</button>
+                            </div>
+                            <div class="desktop-check-list">
+                                <div v-for="check in desktopDiagnostics.checks" :key="check.key" class="desktop-check-row" :class="`status-${check.status}`">
+                                    <span class="desktop-check-indicator" aria-hidden="true"></span>
+                                    <strong>{{ check.label }}</strong>
+                                    <span>{{ check.message }}</span>
+                                    <em>{{ desktopCheckStatusLabel(check.status) }}</em>
+                                </div>
+                            </div>
+                        </section>
+
+                        <section class="desktop-status-section">
+                            <h3>本地目录</h3>
+                            <div class="desktop-directory-list">
+                                <div v-for="(directory, kind) in desktopDiagnostics.directories" :key="kind" class="desktop-directory-row">
+                                    <div>
+                                        <strong>{{ directory.label }}</strong>
+                                        <code>{{ directory.path }}</code>
+                                    </div>
+                                    <button class="btn-small" @click="openDesktopDirectory(kind)">打开</button>
+                                </div>
+                            </div>
+                        </section>
+
+                        <section class="desktop-status-section desktop-update-section">
+                            <div class="desktop-section-heading">
+                                <h3>版本更新</h3>
+                                <button class="btn-small" @click="checkDesktopUpdates" :disabled="desktopUpdateChecking">
+                                    {{ desktopUpdateChecking ? '检查中...' : '手动检查' }}
+                                </button>
+                            </div>
+                            <p v-if="desktopUpdateResult && desktopUpdateResult.status === 'up_to_date'" class="info-message">当前已是最新正式版本。</p>
+                            <div v-if="desktopUpdateResult && desktopUpdateResult.status === 'available'" class="desktop-update-available">
+                                <span>可更新到 {{ desktopUpdateResult.latest_version }}</span>
+                                <button class="btn-secondary" @click="openDesktopRelease">打开下载页面</button>
+                            </div>
+                            <p v-if="desktopUpdateError" class="error-message">{{ desktopUpdateError }}</p>
+                        </section>
+                    </template>
+                </div>
+                <div class="modal-footer desktop-status-footer">
+                    <button class="btn-secondary" @click="copyDesktopDiagnostics" :disabled="!desktopDiagnostics">复制诊断信息</button>
+                    <button class="btn-primary inline" @click="showDesktopStatus = false">完成</button>
+                </div>
+            </div>
+        </div>

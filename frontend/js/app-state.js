@@ -14,6 +14,9 @@
         const unlockError = ref('');
         const submitting = ref(false);
         const isSidebarCollapsed = ref(localStorage.getItem('secretbase.sidebarCollapsed') === 'true');
+        const runtimeConfig = window.SECRETBASE_RUNTIME_CONFIG || {};
+        const isDesktopMode = runtimeConfig.mode === 'desktop';
+        const desktopVersion = runtimeConfig.version || '未知';
 
         const entries = ref([]);
         const tags = ref([]);
@@ -67,6 +70,7 @@
         const showTools = ref(false);
         const showBackupCenter = ref(false);
         const showAdvancedFilters = ref(false);
+        const showDesktopStatus = ref(false);
         const selectedEntry = ref(null);
         const editingEntry = ref(null);
         const copyMenuEntryId = ref(null);
@@ -124,6 +128,12 @@
         const maintenanceReport = ref(null);
         const securityReport = ref(null);
         const savedAdvancedFilters = ref([]);
+        const desktopDiagnostics = ref(null);
+        const desktopDiagnosticsLoading = ref(false);
+        const desktopDiagnosticsError = ref('');
+        const desktopUpdateChecking = ref(false);
+        const desktopUpdateResult = ref(null);
+        const desktopUpdateError = ref('');
 
         const entryForm = reactive({
             id: null,
@@ -188,14 +198,16 @@
             theme: 'system',
             pageSize: 20,
             autoLockMinutes: 5,
-            autoBackupRetention: 30
+            autoBackupRetention: 30,
+            closeToTray: false
         });
         const activeSettingsTab = ref('general');
         const settingsTabs = [
             { key: 'general', label: '通用' },
             { key: 'security', label: '安全' },
             { key: 'ai', label: 'AI' },
-            { key: 'data', label: '数据' }
+            { key: 'data', label: '数据' },
+            ...(isDesktopMode ? [{ key: 'desktop', label: '桌面' }] : [])
         ];
         const aiSettingsForm = reactive({
             baseUrl: '',
@@ -273,6 +285,8 @@
             unlockError,
             submitting,
             isSidebarCollapsed,
+            isDesktopMode,
+            desktopVersion,
             entries,
             tags,
             groups,
@@ -316,6 +330,7 @@
             showTools,
             showBackupCenter,
             showAdvancedFilters,
+            showDesktopStatus,
             selectedEntry,
             editingEntry,
             copyMenuEntryId,
@@ -358,6 +373,12 @@
             maintenanceReport,
             securityReport,
             savedAdvancedFilters,
+            desktopDiagnostics,
+            desktopDiagnosticsLoading,
+            desktopDiagnosticsError,
+            desktopUpdateChecking,
+            desktopUpdateResult,
+            desktopUpdateError,
             entryForm,
             newTag,
             newGroup,

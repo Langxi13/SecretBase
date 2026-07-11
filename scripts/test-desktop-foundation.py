@@ -228,7 +228,7 @@ assert "javascript" in response.headers["content-type"]
 assert "window.SECRETBASE_RUNTIME_CONFIG" in response.text
 assert '"apiBaseUrl": ""' in response.text
 assert '"mode": "desktop"' in response.text
-assert '"version": "3.1.0"' in response.text
+assert '"version": "3.2.0"' in response.text
 assert response.headers["x-frame-options"] == "DENY"
 assert response.headers["referrer-policy"] == "no-referrer"
 """,

@@ -66,6 +66,7 @@
             }
             state.settingsForm.autoLockMinutes = settings.autoLockMinutes;
             state.settingsForm.autoBackupRetention = settings.autoBackupRetention;
+            state.settingsForm.closeToTray = Boolean(settings.closeToTray);
         }
 
         return {

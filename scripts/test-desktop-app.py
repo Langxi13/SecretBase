@@ -7,6 +7,7 @@ import tempfile
 import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+from unittest.mock import patch
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -14,7 +15,11 @@ sys.path.insert(0, str(ROOT))
 
 from desktop.app import desktop_window_failure, selected_file_path  # noqa: E402
 from desktop.bridge import DesktopApi, safe_filename, validate_download_request  # noqa: E402
+from desktop.diagnostics import DesktopDiagnostics, detect_package_type  # noqa: E402
 from desktop.instance import SingleInstanceCoordinator  # noqa: E402
+from desktop.runtime import desktop_paths, prepare_data_root  # noqa: E402
+from desktop.tray import DesktopLifecycle, load_close_to_tray  # noqa: E402
+from desktop.update import check_for_updates, parse_version, validate_release_url  # noqa: E402
 
 
 class DownloadHandler(BaseHTTPRequestHandler):
@@ -28,6 +33,30 @@ class DownloadHandler(BaseHTTPRequestHandler):
 
     def log_message(self, _format: str, *_args) -> None:
         return
+
+
+class JsonResponse:
+    def __init__(self, payload: dict) -> None:
+        self.payload = payload
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *_args) -> None:
+        return None
+
+    def read(self, _limit: int | None = None) -> bytes:
+        return json.dumps(self.payload).encode("utf-8")
+
+
+class StaticOpener:
+    def __init__(self, payload: dict) -> None:
+        self.payload = payload
+        self.requests = []
+
+    def open(self, request, timeout: float):
+        self.requests.append((request, timeout))
+        return JsonResponse(self.payload)
 
 
 def test_desktop_app_self_test() -> None:
@@ -180,6 +209,173 @@ def test_desktop_external_link_validation() -> None:
             raise AssertionError(url)
 
 
+def test_desktop_diagnostics_and_directory_allowlist() -> None:
+    with tempfile.TemporaryDirectory() as raw:
+        root = Path(raw)
+        paths = prepare_data_root(root, include_webview=True)
+        opened = []
+        diagnostics = DesktopDiagnostics(
+            paths=paths,
+            backend_url="http://127.0.0.1:12345",
+            version="3.2.0",
+            renderer="edgechromium",
+            backend_running=lambda: True,
+            directory_opener=lambda path: opened.append(path),
+        )
+        diagnostics.health_opener = StaticOpener({
+            "success": True,
+            "data": {"status": "healthy", "version": "3.2.0"},
+        })
+
+        result = diagnostics.collect()
+        assert result["status"] == "ok"
+        assert result["package_type"] == "source"
+        assert detect_package_type() == "source"
+        assert str(root) not in result["support_summary"]
+        assert result["directories"]["data"]["path"] == str(root)
+
+        with patch(
+            "desktop.diagnostics.tempfile.NamedTemporaryFile",
+            side_effect=PermissionError(13, "Permission denied", str(root)),
+        ):
+            failed = diagnostics.collect()
+        assert failed["status"] == "error"
+        assert str(root) not in failed["support_summary"]
+        assert "系统错误 13" in failed["support_summary"]
+
+        assert diagnostics.open_directory("logs") == {"status": "opened", "kind": "logs"}
+        assert opened == [paths.logs]
+        try:
+            diagnostics.open_directory("../private")
+        except ValueError:
+            pass
+        else:
+            raise AssertionError("Desktop directory bridge must reject arbitrary paths")
+
+
+def test_desktop_update_check_validation() -> None:
+    assert parse_version("v3.2.0") == (3, 2, 0)
+    release_url = "https://github.com/Langxi13/SecretBase/releases/tag/v3.2.0"
+    assert validate_release_url(release_url) == release_url
+    opener = StaticOpener({
+        "tag_name": "v3.2.0",
+        "html_url": release_url,
+        "draft": False,
+        "prerelease": False,
+        "published_at": "2026-07-11T00:00:00Z",
+    })
+    available = check_for_updates("3.1.0", opener=opener)
+    assert available["status"] == "available"
+    assert available["latest_version"] == "3.2.0"
+    current = check_for_updates("3.2.0", opener=opener)
+    assert current["status"] == "up_to_date"
+
+    unsafe = StaticOpener({
+        "tag_name": "v9.0.0",
+        "html_url": "https://example.com/download",
+        "draft": False,
+        "prerelease": False,
+    })
+    assert check_for_updates("3.2.0", opener=unsafe)["status"] == "error"
+
+
+def test_desktop_bridge_productization_methods() -> None:
+    tray_values = []
+    api = DesktopApi(
+        "http://127.0.0.1:1",
+        lambda _filename: None,
+        diagnostics_provider=lambda: {"status": "ok"},
+        directory_opener=lambda kind: {"status": "opened", "kind": kind},
+        update_checker=lambda: {"status": "up_to_date"},
+        tray_setter=lambda enabled: not tray_values.append(enabled),
+    )
+    assert api.get_diagnostics() == {"status": "ok"}
+    assert api.open_directory("data") == {"status": "opened", "kind": "data"}
+    assert api.check_for_updates() == {"status": "up_to_date"}
+    assert api.set_close_to_tray(True) == {"status": "updated", "enabled": True}
+    assert tray_values == [True]
+
+
+def test_desktop_lifecycle_locks_before_hiding() -> None:
+    class FakeServer:
+        url = "http://127.0.0.1:12345"
+
+        def __init__(self) -> None:
+            self.lock_count = 0
+
+        def lock_vault(self) -> None:
+            self.lock_count += 1
+
+    class FakeWindow:
+        def __init__(self) -> None:
+            self.hidden = False
+            self.destroyed = False
+            self.loaded_urls = []
+            self.shown = 0
+            self.restored = 0
+
+        def hide(self) -> None:
+            self.hidden = True
+
+        def load_url(self, url: str) -> None:
+            self.loaded_urls.append(url)
+
+        def show(self) -> None:
+            self.shown += 1
+            self.hidden = False
+
+        def restore(self) -> None:
+            self.restored += 1
+
+        def destroy(self) -> None:
+            self.destroyed = True
+
+    class FakeTray:
+        def __init__(self, _path, **callbacks) -> None:
+            self.callbacks = callbacks
+            self.running = False
+            self.stopped = 0
+
+        def start(self) -> bool:
+            self.running = True
+            return True
+
+        def stop(self) -> None:
+            self.running = False
+            self.stopped += 1
+
+    server = FakeServer()
+    window = FakeWindow()
+    lifecycle = DesktopLifecycle(server, Path("icon.ico"), tray_factory=FakeTray)
+    lifecycle.attach_window(window)
+    assert lifecycle.set_close_to_tray(True) is True
+    assert lifecycle.on_closing() is False
+    assert server.lock_count == 1
+    assert window.hidden is True
+    assert window.loaded_urls == [server.url]
+
+    lifecycle.restore()
+    assert window.hidden is False
+    assert window.shown == 1
+    assert window.restored == 1
+    assert window.loaded_urls == [server.url, server.url]
+
+    lifecycle.exit()
+    assert server.lock_count == 2
+    assert window.destroyed is True
+    assert lifecycle.tray.stopped >= 1
+
+
+def test_close_to_tray_preference_defaults_safely() -> None:
+    with tempfile.TemporaryDirectory() as raw:
+        settings = Path(raw) / "settings.json"
+        assert load_close_to_tray(settings) is False
+        settings.write_text('{"close_to_tray": true}', encoding="utf-8")
+        assert load_close_to_tray(settings) is True
+        settings.write_text('{"close_to_tray": "true"}', encoding="utf-8")
+        assert load_close_to_tray(settings) is False
+
+
 def test_non_windows_single_instance_fallback() -> None:
     coordinator = SingleInstanceCoordinator()
     assert coordinator.acquire() is True
@@ -197,6 +393,11 @@ def main() -> None:
         test_desktop_runtime_error_does_not_mislabel_webview2,
         test_desktop_bridge_rejects_unsafe_requests,
         test_desktop_external_link_validation,
+        test_desktop_diagnostics_and_directory_allowlist,
+        test_desktop_update_check_validation,
+        test_desktop_bridge_productization_methods,
+        test_desktop_lifecycle_locks_before_hiding,
+        test_close_to_tray_preference_defaults_safely,
         test_non_windows_single_instance_fallback,
     )
     for test in tests:
