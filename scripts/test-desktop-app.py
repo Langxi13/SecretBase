@@ -380,19 +380,38 @@ def test_desktop_lifecycle_locks_before_hiding() -> None:
         settings.write_text('{"theme": "dark"}', encoding="utf-8")
         server = FakeServer()
         window = FakeWindow()
-        lifecycle = DesktopLifecycle(server, Path("icon.ico"), settings, tray_factory=FakeTray)
+        scheduled_actions = []
+        lifecycle = DesktopLifecycle(
+            server,
+            Path("icon.ico"),
+            settings,
+            tray_factory=FakeTray,
+            action_scheduler=scheduled_actions.append,
+        )
         lifecycle.attach_window(window)
         assert lifecycle.set_close_preferences(True, True) is True
         assert lifecycle.tray is None
 
         assert lifecycle.on_closing() is False
+        assert lifecycle.on_closing() is False
         assert server.lock_count == 0
         assert window.hidden is False
+        assert events == []
+        assert window.evaluated_scripts == []
+        assert len(scheduled_actions) == 1
+
+        scheduled_actions.pop(0)()
         assert events == ["close-prompt"]
         assert "secretbase:desktop-close-request" in window.evaluated_scripts[0]
 
         result = lifecycle.resolve_close_request("tray", True)
-        assert result == {"status": "hidden", "action": "tray", "remembered": True}
+        assert result == {"status": "hiding", "action": "tray", "remembered": False}
+        assert server.lock_count == 0
+        assert window.hidden is False
+        assert len(scheduled_actions) == 1
+        assert load_close_preferences(settings) == (False, True)
+
+        scheduled_actions.pop(0)()
         assert server.lock_count == 1
         assert window.hidden is True
         assert events[1:4] == ["backend-lock", "frontend-lock", "hide"]
@@ -409,6 +428,11 @@ def test_desktop_lifecycle_locks_before_hiding() -> None:
 
         evaluated_before_close = len(window.evaluated_scripts)
         assert lifecycle.on_closing() is False
+        assert server.lock_count == 1
+        assert window.hidden is False
+        assert len(scheduled_actions) == 1
+
+        scheduled_actions.pop(0)()
         assert server.lock_count == 2
         assert window.hidden is True
         assert "desktop-close-request" not in window.evaluated_scripts[evaluated_before_close]
@@ -426,23 +450,24 @@ def test_desktop_lifecycle_locks_before_hiding() -> None:
         exit_server = FakeServer()
         exit_window = FakeWindow()
         exit_settings = Path(raw) / "exit-settings.json"
-        scheduled_actions = []
+        exit_actions = []
         exit_lifecycle = DesktopLifecycle(
             exit_server,
             Path("icon.ico"),
             exit_settings,
             tray_factory=FakeTray,
-            action_scheduler=scheduled_actions.append,
+            action_scheduler=exit_actions.append,
         )
         exit_lifecycle.attach_window(exit_window)
         assert exit_lifecycle.resolve_close_request("exit", True) == {
             "status": "exiting",
             "action": "exit",
-            "remembered": True,
+            "remembered": False,
         }
         assert exit_window.destroyed is False
-        assert len(scheduled_actions) == 1
-        scheduled_actions[0]()
+        assert len(exit_actions) == 1
+        assert load_close_preferences(exit_settings) == (False, True)
+        exit_actions[0]()
         assert exit_window.destroyed is True
         assert load_close_preferences(exit_settings) == (False, False)
 
@@ -488,17 +513,36 @@ def test_tray_start_failure_keeps_window_open() -> None:
         def stop(self) -> None:
             return None
 
-    server = FakeServer()
-    window = FakeWindow()
-    lifecycle = DesktopLifecycle(server, Path("icon.ico"), tray_factory=FailingTray)
-    lifecycle.attach_window(window)
-    lifecycle.set_close_preferences(True, False)
-    with patch("desktop.tray.show_tray_failure_message") as show_failure:
-        assert lifecycle.on_closing() is False
-        show_failure.assert_called_once_with()
-    assert window.hidden is False
-    assert server.lock_count == 0
-    assert lifecycle.exit_requested is False
+    with tempfile.TemporaryDirectory() as raw:
+        settings = Path(raw) / "settings.json"
+        server = FakeServer()
+        window = FakeWindow()
+        scheduled_actions = []
+        lifecycle = DesktopLifecycle(
+            server,
+            Path("icon.ico"),
+            settings,
+            tray_factory=FailingTray,
+            action_scheduler=scheduled_actions.append,
+        )
+        lifecycle.attach_window(window)
+        with patch("desktop.tray.show_tray_failure_message") as show_failure:
+            assert lifecycle.resolve_close_request("tray", True) == {
+                "status": "hiding",
+                "action": "tray",
+                "remembered": False,
+            }
+            show_failure.assert_not_called()
+            assert len(scheduled_actions) == 1
+            assert load_close_preferences(settings) == (False, True)
+            scheduled_actions[0]()
+            show_failure.assert_called_once_with()
+        assert window.hidden is False
+        assert server.lock_count == 0
+        assert lifecycle.exit_requested is False
+        assert lifecycle.close_to_tray is False
+        assert lifecycle.confirm_close is True
+        assert load_close_preferences(settings) == (False, True)
 
 
 def test_shutdown_wait_self_test_protocol() -> None:

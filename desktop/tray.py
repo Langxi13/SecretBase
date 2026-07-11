@@ -204,6 +204,7 @@ class DesktopLifecycle:
         self.confirm_close = True
         self.hidden_to_tray = False
         self.exit_requested = False
+        self._close_action_pending = False
         self._lock = threading.RLock()
 
     @staticmethod
@@ -256,23 +257,54 @@ class DesktopLifecycle:
             logger.warning("显示前端关闭确认失败: %s", error)
             return False
 
+    def _schedule_close_action(self, callback: Callable[[], None]) -> bool:
+        with self._lock:
+            if self.exit_requested or self._close_action_pending:
+                return False
+            self._close_action_pending = True
+
+        def run() -> None:
+            try:
+                callback()
+            except Exception:
+                logger.exception("执行桌面关闭操作失败")
+            finally:
+                with self._lock:
+                    self._close_action_pending = False
+
+        try:
+            self.action_scheduler(run)
+            return True
+        except Exception:
+            with self._lock:
+                self._close_action_pending = False
+            raise
+
     def _reload_locked_page(self) -> None:
         if self.window is not None:
             self.window.load_url(self.server.url)
 
     def _hide_to_tray(self) -> bool:
         with self._lock:
-            if self.window is None:
+            if self.window is None or self.exit_requested:
                 return False
-            if not self._ensure_tray():
+            window = self.window
+
+        if not self._ensure_tray():
+            return False
+
+        with self._lock:
+            if self.exit_requested or self.window is not window:
                 return False
-            self._lock_vault()
-            frontend_locked = self._apply_frontend_lock()
-            self.window.hide()
+
+        self._lock_vault()
+        frontend_locked = self._apply_frontend_lock()
+        window.hide()
+        with self._lock:
             self.hidden_to_tray = True
-            if not frontend_locked:
-                self._reload_locked_page()
-            return True
+        if not frontend_locked:
+            self._reload_locked_page()
+        return True
 
     def _remember_close_action(self, action: str) -> bool:
         close_to_tray = action == "tray"
@@ -288,6 +320,43 @@ class DesktopLifecycle:
             logger.warning("保存关闭偏好失败: %s", error)
             return False
 
+    def _hide_to_tray_or_notify(self, *, remember: bool = False) -> bool:
+        try:
+            hidden = self._hide_to_tray()
+        except Exception:
+            logger.exception("隐藏到系统托盘失败")
+            hidden = False
+
+        if hidden:
+            if remember:
+                self._remember_close_action("tray")
+            return True
+
+        with self._lock:
+            exiting = self.exit_requested
+        if not exiting:
+            show_tray_failure_message()
+        return False
+
+    def _exit_after_request(self, remember: bool) -> None:
+        if remember:
+            self._remember_close_action("exit")
+        self.exit()
+
+    def _show_close_confirmation_after_cancel(self, default_to_tray: bool) -> None:
+        with self._lock:
+            if self.exit_requested:
+                return
+
+        if self._request_frontend_close_confirmation():
+            return
+
+        action = fallback_close_action(default_to_tray)
+        if action == "tray":
+            self._hide_to_tray_or_notify()
+        elif action == "exit":
+            self.exit()
+
     def on_closing(self):
         with self._lock:
             if self.exit_requested:
@@ -296,18 +365,15 @@ class DesktopLifecycle:
             close_to_tray = self.close_to_tray
 
         if confirm_close:
-            if self._request_frontend_close_confirmation():
-                return False
-            action = fallback_close_action(close_to_tray)
-            if action == "cancel":
-                return False
-        else:
-            action = "tray" if close_to_tray else "exit"
+            # pywebview 的 closing 回调运行在 GUI 生命周期中，必须先返回，
+            # 再从后台任务调用 JavaScript 或原生窗口 API，避免桥接重入死锁。
+            self._schedule_close_action(
+                lambda: self._show_close_confirmation_after_cancel(close_to_tray)
+            )
+            return False
 
-        if action == "tray":
-            if self._hide_to_tray():
-                return False
-            show_tray_failure_message()
+        if close_to_tray:
+            self._schedule_close_action(self._hide_to_tray_or_notify)
             return False
 
         with self._lock:
@@ -321,14 +387,15 @@ class DesktopLifecycle:
             raise ValueError("记住选择必须是布尔值")
 
         if action == "tray":
-            if not self._hide_to_tray():
-                raise RuntimeError("系统托盘启动失败，窗口已保持打开")
-            remembered = self._remember_close_action(action) if remember else False
-            return {"status": "hidden", "action": action, "remembered": remembered}
+            if not self._schedule_close_action(
+                lambda: self._hide_to_tray_or_notify(remember=remember)
+            ):
+                raise RuntimeError("关闭操作正在处理中")
+            return {"status": "hiding", "action": action, "remembered": False}
 
-        remembered = self._remember_close_action(action) if remember else False
-        self.action_scheduler(self.exit)
-        return {"status": "exiting", "action": action, "remembered": remembered}
+        if not self._schedule_close_action(lambda: self._exit_after_request(remember)):
+            raise RuntimeError("关闭操作正在处理中")
+        return {"status": "exiting", "action": action, "remembered": False}
 
     def restore(self) -> None:
         with self._lock:

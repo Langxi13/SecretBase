@@ -140,6 +140,8 @@ def test_windows_workflows_build_once_and_retest_downloaded_artifact() -> None:
     assert "retention-days: 14" in desktop
     assert "uses: ./.github/workflows/reusable-windows-desktop.yml" in desktop
     assert "needs: [verify, desktop]" in release
+    assert "path: release-assets" in release
+    assert 'gh release create "$GITHUB_REF_NAME" release-assets/*' in release
     assert "gh release upload" in release
 
 
