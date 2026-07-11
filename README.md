@@ -222,7 +222,7 @@ SHA256SUMS.txt
 
 Windows 独立版默认将 vault、备份、日志、设置和 WebView 数据保存在 `%LOCALAPPDATA%\SecretBase\`。发布包只包含程序资源，构建时会扫描并拒绝 `.env`、vault、备份、日志和本地设置文件。桌面导出使用 Windows 原生“另存为”，外部网址交给系统默认浏览器打开；重复启动会恢复并聚焦已有窗口。
 
-V3.2 正在此基础上增加当前用户免管理员安装器、桌面状态与诊断、目录入口、手动更新检查和可选系统托盘。正式 GitHub Release 会把 `SecretBase-v3.2.0-windows-x64-setup.exe` 作为独立资产，普通用户直接下载安装即可，不需要解压；便携 ZIP 仅作为备用。桌面窗口支持窄屏缩放，关闭时可选择隐藏到托盘、完全退出或取消，并可记住选择。安装版与便携版共用现有数据目录；默认卸载保留数据，只有勾选删除并输入 `DELETE` 才清除整个本地数据目录。V3.2 当前仍处于 CI 与真机验收阶段，不替代已发布的 V3.1 稳定版本。
+V3.2 正在此基础上增加当前用户免管理员安装器、桌面状态与诊断、目录入口、手动更新检查和可选系统托盘。正式 GitHub Release 会把 `SecretBase-v3.2.0-windows-x64-setup.exe` 作为独立资产，普通用户直接下载安装即可，不需要解压；便携 ZIP 仅作为备用。桌面窗口支持自由调整大小、窄屏布局和 WebView2 原生 `Ctrl + 滚轮` 缩放，关闭时可选择隐藏到托盘、完全退出或取消，并可记住选择。安装版与便携版共用现有数据目录；默认卸载保留数据，只有勾选删除并输入 `DELETE` 才清除整个本地数据目录。V3.2 当前仍处于 CI 与真机验收阶段，不替代已发布的 V3.1 稳定版本。
 
 在 Windows Python 3.11 x64 与 Inno Setup 6.7.1 环境构建测试包：
 
@@ -614,7 +614,7 @@ The V3.1 package has passed Windows 10/11 hardware acceptance and is formally re
 
 Desktop data is stored under `%LOCALAPPDATA%\SecretBase\`. Build validation rejects `.env`, vault, backup, log, and local settings files. Native exports use the Windows Save As dialog, external URLs open in the system browser, and a second launch activates the existing window.
 
-V3.2 is adding a per-user installer, desktop diagnostics, fixed directory shortcuts, manual update checks, narrow-window resizing, and an opt-in system tray. The formal GitHub Release publishes `SecretBase-v3.2.0-windows-x64-setup.exe` as a standalone asset, so normal installation does not require extracting the portable ZIP. Closing the window can prompt to hide, exit, or cancel and can remember the selected action. Installed and portable builds share the existing data directory. Default uninstall preserves all data; full removal requires selecting the purge option and typing `DELETE`. V3.2 remains under CI and hardware acceptance, while V3.1 is the current stable release.
+V3.2 is adding a per-user installer, desktop diagnostics, fixed directory shortcuts, manual update checks, narrow-window resizing, native WebView2 `Ctrl + wheel` zoom, and an opt-in system tray. The formal GitHub Release publishes `SecretBase-v3.2.0-windows-x64-setup.exe` as a standalone asset, so normal installation does not require extracting the portable ZIP. Closing the window can prompt to hide, exit, or cancel and can remember the selected action. Installed and portable builds share the existing data directory. Default uninstall preserves all data; full removal requires selecting the purge option and typing `DELETE`. V3.2 remains under CI and hardware acceptance, while V3.1 is the current stable release.
 
 Build on Windows with Python 3.11 x64 and Inno Setup 6.7.1:
 

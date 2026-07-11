@@ -257,6 +257,7 @@ def run_window(data_root_value: str | None) -> int:
             height=820,
             min_size=(360, 320),
             resizable=True,
+            zoomable=True,
             background_color="#111827",
             text_select=True,
         )
