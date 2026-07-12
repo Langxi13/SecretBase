@@ -98,10 +98,12 @@ def main() -> int:
     (FIXTURE_DIR / "manifest.json").write_text(
         json.dumps(manifest, ensure_ascii=False, indent=2) + "\n",
         encoding="utf-8",
+        newline="\n",
     )
     (FIXTURE_DIR / "SHA256SUMS.txt").write_text(
         "\n".join(sorted(checksum_lines)) + "\n",
         encoding="ascii",
+        newline="\n",
     )
     print(f"Generated {len(manifest_vectors)} Vault V1 vectors in {FIXTURE_DIR}")
     return 0

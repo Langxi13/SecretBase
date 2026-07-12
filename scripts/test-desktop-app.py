@@ -43,9 +43,15 @@ class DownloadHandler(BaseHTTPRequestHandler):
 
     def do_POST(self) -> None:  # noqa: N802
         self.__class__.received_token = self.headers.get("X-SecretBase-Token")
+        content_length = int(self.headers.get("Content-Length") or 0)
+        if content_length:
+            self.rfile.read(content_length)
+        payload = b"encrypted-test-backup"
         self.send_response(200)
+        self.send_header("Content-Length", str(len(payload)))
+        self.send_header("Connection", "close")
         self.end_headers()
-        self.wfile.write(b"encrypted-test-backup")
+        self.wfile.write(payload)
 
     def log_message(self, _format: str, *_args) -> None:
         return
