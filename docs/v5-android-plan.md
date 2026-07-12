@@ -1,0 +1,81 @@
+# SecretBase V5 Android 实施计划
+
+本文档定义 V5.0 Android 首版的架构、阶段、功能边界和验收标准。状态：规划完成，尚未开始实现。
+
+## 1. 产品目标
+
+V5.0 首先提供一个真正离线、脱离浏览器和 FastAPI 的 Android 密码库。它必须读取和写入与 Web、Windows、macOS 相同的 Vault V1 数据，并通过手动加密备份完成跨设备迁移。
+
+首版优先保证数据兼容、安全生命周期和核心条目操作，不追求一次复刻桌面端全部功能。
+
+## 2. 技术架构
+
+- Flutter 负责 Android UI、导航、系统生命周期、文件选择、剪贴板和平台能力。
+- Rust 负责 Vault V1 加解密、payload 校验、会话状态和密码库领域操作。
+- 优先使用 `flutter_rust_bridge` 生成 Dart/Rust 绑定；第一阶段必须先用黄金向量验证字节、错误码和 UTF-8 往返，再锁定依赖版本。
+- Rust API 保持平台无关，不直接依赖 Android Context、外部存储路径或 Flutter UI 类型。
+- Vault 默认保存在 Android 应用私有目录；导入导出使用 Storage Access Framework，不申请宽泛的外部存储权限。
+- 移动端不启动本地 HTTP 服务，也不打包 Python、FastAPI 或现有 Web 前端。
+
+建议目录边界：
+
+```text
+mobile/secretbase_app/     Flutter Android/iOS 工程
+vault-core/                共享 Rust 格式与领域核心
+tests/fixtures/vault-v1/   Python、Rust、Flutter 共用黄金向量
+```
+
+## 3. 分阶段实施
+
+### 阶段 A：工具链与 FFI 证明
+
+- 固定 Flutter、Dart、Android Gradle Plugin、NDK、Rust 和 Android Rust target 版本。
+- 创建最小 Flutter 工程和 Android CI，不引入业务 UI。
+- 打通 Dart 到 Rust 的字节数组、结构化结果和稳定错误码。
+- 在 Linux 主机测试、Android 模拟器和至少一台 arm64 真机上运行 V4 黄金向量。
+- 确认 release 构建不依赖网络、Python 或本地开发绝对路径。
+
+退出条件：Flutter 可以调用 Rust 解密公开测试 Vault，并得到与 Python 完全一致的 payload；错误密码返回 `AUTHENTICATION_FAILED`。
+
+### 阶段 B：Vault 会话与本地持久化
+
+- 扩展 Rust 核心，提供创建、解锁、锁定、读取、修改和重新加密会话。
+- 主密码和派生密钥只保存在当前进程内存中，锁定时主动清理。
+- 实现应用私有目录中的临时文件、刷盘和原子替换，禁止直接覆盖唯一 Vault。
+- 实现应用进入后台、超时和系统回收后的锁定策略。
+- 实现 Vault V1 加密文件的导入、导出、冲突确认和失败回滚。
+
+退出条件：强制结束应用、模拟写入中断和导入损坏文件后，原 Vault 仍可恢复且不会静默丢失数据。
+
+### 阶段 C：Android 核心体验
+
+- 首次启动、设置主密码、解锁和锁定。
+- 条目列表、分页或渐进加载、搜索、详情、复制、新建、编辑和删除。
+- 自定义字段的隐藏与可复制语义。
+- 标签和密码组的浏览、筛选及基础成员关系编辑。
+- 回收站查看、恢复和彻底删除。
+- 加密备份导入导出及明确的数据覆盖确认。
+- 中文界面、明暗主题、窄屏与横屏适配、无障碍语义和稳定返回导航。
+
+退出条件：用户可以完全离线完成日常密码库工作，并在桌面版与 Android 之间通过加密文件双向迁移。
+
+### 阶段 D：安全与发布验收
+
+- 默认阻止系统最近任务缩略图泄露敏感页面，并评估截图开关策略。
+- 复制敏感值后提供可配置的剪贴板自动清理。
+- 日志、崩溃信息和 CI 产物不得包含主密码、字段值、Vault、备份或本机路径。
+- 增加 Rust 单元测试、Dart 单元测试、Widget 测试和 Android 集成测试。
+- 覆盖至少两个 Android API 级别、arm64 真机、安装升级、卸载保留/删除数据和低存储空间场景。
+- 建立由项目密钥签名的 APK/AAB 流程；签名密钥不得提交到仓库。
+
+退出条件：自动化门禁全部通过，完成真机清单和跨桌面备份迁移验收后，才允许创建 `v5.0.0` 发布标签。
+
+## 4. Android MVP 范围
+
+首版包含：本地 Vault、条目、搜索、自定义字段、标签、密码组、回收站、加密导入导出、主题和生命周期锁定。
+
+首版不包含：AI 整理、云同步、账号系统、团队共享、浏览器自动填充、生物识别代管主密码、Wear OS、平板专属双栏、Play 商店发布和 iOS 包。
+
+## 5. 后续顺序
+
+Android MVP 稳定后再启动 iOS 适配。iOS 应复用同一 Flutter 页面和 Rust API，只新增 Keychain/文件选择/应用生命周期等平台实现，不分叉 Vault 数据模型或业务规则。
