@@ -38,6 +38,9 @@ SecretBase 已进入真实生产使用阶段。后续任何迭代默认不得破
 - [ ] macOS 应用 Bundle ID、最低系统版本、WKWebView 自检和 Gatekeeper 真机流程是否已验证。
 - [ ] Windows/macOS 键盘缩放、100% 重置、比例提示和重启恢复是否已真机验证。
 - [ ] macOS 删除 `.app` 后是否保留应用支持目录，文档是否未暗示存在独立卸载器。
+- [ ] Vault V1 Python 黄金向量和 Rust `fmt`、Clippy、release 测试是否全部通过。
+- [ ] Rust 参考核心是否仍与 FastAPI、桌面打包和用户数据目录隔离。
+- [ ] Vault envelope 是否保持 V1，未知根字段、条目字段和自定义字段是否能往返保留。
 - [ ] 统一 Release 是否同时包含当前版本的 Windows 与 macOS 资产，避免更新入口缺少对应平台下载。
 - [ ] 是否在 Windows 10/11 x64 真机完成独立窗口、原生导出和单实例验收。
 - [ ] 是否在 Apple Silicon macOS 13+ 真机完成安装、导入导出、单实例、退出和数据保留验收。

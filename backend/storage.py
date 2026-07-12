@@ -21,6 +21,7 @@ from crypto import (
 )
 from models import VaultData, Settings
 from secure_settings import AI_SETTINGS_PURPOSE, derive_purpose_key, prepare_rekey, replace_file_atomically
+from vault_document import decode_vault_document, encode_vault_document
 
 logger = logging.getLogger(__name__)
 
@@ -297,7 +298,7 @@ def import_encrypted_vault(content: bytes) -> int:
         raise ValueError("Vault 未解锁")
 
     plaintext = _decrypt_with_current_key(content)
-    data = VaultData(**json.loads(plaintext.decode('utf-8')))
+    data = decode_vault_document(plaintext)
     save_vault(content)
     _vault_data = data
     logger.info("导入加密 vault 成功")
@@ -312,7 +313,7 @@ def import_encrypted_vault_with_password(content: bytes, password: str) -> int:
         raise ValueError("Vault 未解锁")
 
     plaintext = decrypt_vault(password, content)
-    data = VaultData(**json.loads(plaintext.decode('utf-8')))
+    data = decode_vault_document(plaintext)
     save_vault(_encrypt_with_current_key(plaintext))
     _vault_data = data
     logger.info("导入旧加密 vault 成功")
@@ -322,13 +323,13 @@ def import_encrypted_vault_with_password(content: bytes, password: str) -> int:
 def read_encrypted_vault_with_current_key(content: bytes) -> VaultData:
     """读取使用当前解锁密钥可验证的加密 vault 内容。"""
     plaintext = _decrypt_with_current_key(content)
-    return VaultData(**json.loads(plaintext.decode('utf-8')))
+    return decode_vault_document(plaintext)
 
 
 def read_encrypted_vault_with_password(content: bytes, password: str) -> VaultData:
     """用指定主密码读取加密 vault 内容。"""
     plaintext = decrypt_vault(password, content)
-    return VaultData(**json.loads(plaintext.decode('utf-8')))
+    return decode_vault_document(plaintext)
 
 
 def touch_activity():
@@ -358,7 +359,7 @@ def enforce_auto_lock(auto_lock_minutes: int) -> bool:
 
 def export_plain_vault() -> str:
     """导出当前明文 vault JSON。"""
-    return get_vault_data().model_dump_json()
+    return encode_vault_document(get_vault_data()).decode("utf-8")
 
 
 def _create_backup_unlocked(strict: bool = False, backup_type: str = AUTO_BACKUP_TYPE):
@@ -417,8 +418,7 @@ def unlock_vault(password: str) -> bool:
         header = parse_vault_header(content)
         key = derive_key(password, header["salt"])
         plaintext = decrypt_vault_with_key(key, content)
-        data = json.loads(plaintext.decode('utf-8'))
-        _vault_data = VaultData(**data)
+        _vault_data = decode_vault_document(plaintext)
         if _vault_key is not None:
             _vault_key.lock()
         _vault_key = SecureKey(key, header["salt"])
@@ -463,7 +463,7 @@ def _restore_cached_vault_from_disk() -> None:
         content = get_vault_content()
         if content is None:
             raise ValueError("数据文件不存在")
-        _vault_data = VaultData(**json.loads(_decrypt_with_current_key(content).decode("utf-8")))
+        _vault_data = decode_vault_document(_decrypt_with_current_key(content))
         _set_vault_fingerprint_from_content(content)
     except Exception as error:
         logger.warning("无法从磁盘恢复 vault 缓存，将锁定会话: %s", error)
@@ -478,7 +478,7 @@ def save_vault_data(vault: VaultData):
         raise ValueError("Vault 未解锁")
     
     try:
-        plaintext = vault.model_dump_json().encode('utf-8')
+        plaintext = encode_vault_document(vault)
         encrypted = _encrypt_with_current_key(plaintext)
         save_vault(encrypted)
         _vault_data = vault
@@ -498,7 +498,7 @@ def init_vault(password: str) -> bool:
     
     try:
         vault = VaultData()
-        plaintext = vault.model_dump_json().encode('utf-8')
+        plaintext = encode_vault_document(vault)
         salt = generate_salt()
         key = derive_key(password, salt)
         encrypted = encrypt_vault_with_key(key, salt, plaintext)

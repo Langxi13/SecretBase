@@ -1,0 +1,26 @@
+name: Reusable Vault Core
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: Verify Rust reference core
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install pinned Rust toolchain
+        working-directory: vault-core
+        run: rustup show active-toolchain
+      - name: Check formatting
+        working-directory: vault-core
+        run: cargo fmt --check
+      - name: Run Clippy
+        working-directory: vault-core
+        run: cargo clippy --locked --all-targets --all-features -- -D warnings
+      - name: Verify Python-compatible golden vectors
+        working-directory: vault-core
+        run: cargo test --locked --release --all-features

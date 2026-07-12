@@ -6,7 +6,7 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
-RELEASE_VERSION = "3.3.0"
+RELEASE_VERSION = "4.0.0"
 
 
 def read(relative_path: str) -> str:
@@ -44,6 +44,11 @@ def test_local_and_remote_release_entrypoints_exist() -> None:
         "scripts/build-desktop-macos.sh",
         "docs/v3.3-macos-desktop.md",
         "docs/manual-qa-checklist-v3.3.md",
+        "docs/vault-format-v1.md",
+        "tests/fixtures/vault-v1/manifest.json",
+        "vault-core/Cargo.toml",
+        "vault-core/Cargo.lock",
+        ".github/workflows/reusable-vault-core.yml",
         "docs/release-assessment-v3.0.0.md",
     )
     for relative_path in required_paths:

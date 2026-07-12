@@ -18,8 +18,8 @@ function assertIncludes(content, needle, message) {
     if (!content.includes(needle)) throw new Error(message);
 }
 
-assertIncludes(indexHtml, 'js/controllers/desktop-controller.js?v=20260712-ui-v80', '入口页必须加载桌面控制器');
-assertIncludes(indexHtml, 'css/desktop-components.css?v=20260712-ui-v80', '入口页必须加载桌面样式');
+assertIncludes(indexHtml, 'js/controllers/desktop-controller.js?v=20260712-ui-v81', '入口页必须加载桌面控制器');
+assertIncludes(indexHtml, 'css/desktop-components.css?v=20260712-ui-v81', '入口页必须加载桌面样式');
 assertIncludes(stateSource, "runtimeConfig.mode === 'desktop'", '桌面入口必须由运行模式控制');
 assertIncludes(stateSource, 'desktopRuntimeCapabilities', '桌面运行时必须提供平台能力');
 assertIncludes(controllerSource, 'desktopSupportsTray', '桌面控制器必须按能力决定托盘 UI');
@@ -70,7 +70,7 @@ const sandbox = {
                         platform: 'windows',
                         architecture: 'x64',
                         capabilities: { tray: true, directory_open: true },
-                        support_summary: 'SecretBase 3.3.0'
+                        support_summary: 'SecretBase 4.0.0'
                     };
                 },
                 async open_directory(kind) {
@@ -130,7 +130,7 @@ const store = {
 };
 const desktop = sandbox.window.SecretBaseDesktopController.createDesktopController({
     computed: getter => ({ get value() { return getter(); } }),
-    copyToClipboard: async text => text === 'SecretBase 3.3.0',
+    copyToClipboard: async text => text === 'SecretBase 4.0.0',
     openExternalUrl: async url => openedUrls.push(url),
     store,
     showToast: (...args) => toasts.push(args),

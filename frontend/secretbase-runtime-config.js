@@ -2,7 +2,7 @@ window.SECRETBASE_RUNTIME_CONFIG = {
     ...(window.SECRETBASE_RUNTIME_CONFIG || {}),
     mode: 'server',
     apiBaseUrl: null,
-    version: '3.3.0',
+    version: '4.0.0',
     desktopShell: false,
     desktopPlatform: '',
     desktopArchitecture: '',

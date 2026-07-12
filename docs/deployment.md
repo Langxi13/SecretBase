@@ -23,7 +23,7 @@ Build with Windows Python 3.11 x64:
 .\scripts\build-desktop-windows.ps1
 ```
 
-The current build writes `SecretBase-v3.3.0-windows-x64.zip`, `SecretBase-v3.3.0-windows-x64-setup.exe`, and `SHA256SUMS.txt` under `artifacts/`. The build script runs packaged backend/frontend and desktop runtime tests and rejects release directories containing `.env`, vault, backup, log, settings, test, documentation, or Git metadata files. Windows CI separately installs the generated setup executable and verifies both uninstall data policies.
+The current build writes `SecretBase-v<version>-windows-x64.zip`, `SecretBase-v<version>-windows-x64-setup.exe`, and `SHA256SUMS.txt` under `artifacts/`. The build script runs packaged backend/frontend and desktop runtime tests and rejects release directories containing `.env`, vault, backup, log, settings, test, documentation, or Git metadata files. Windows CI separately installs the generated setup executable and verifies both uninstall data policies.
 
 The target machine must have the Microsoft Edge WebView2 Runtime. Windows 10/11 normally includes it; when unavailable, SecretBase shows a startup error with the official runtime download option. Do not move files out of the extracted `SecretBase/` directory because `SecretBase.exe` depends on its `_internal/` contents.
 
@@ -45,7 +45,7 @@ V3.3 uses Apple Silicon Python 3.11, PyInstaller and pywebview Cocoa/WKWebView. 
 scripts/build-desktop-macos.sh
 ```
 
-The script produces `SecretBase-v3.3.0-macos-arm64.dmg`, `SecretBase-v3.3.0-macos-arm64.zip`, and `SHA256SUMS.txt`. Runtime data stays under `~/Library/Application Support/SecretBase`. macOS does not use a separate uninstaller: quit the app and move `SecretBase.app` to Trash. Deleting the app does not delete the vault, backups, settings, or logs; remove the application-support directory manually only after verifying an encrypted backup.
+The script produces `SecretBase-v<version>-macos-arm64.dmg`, `SecretBase-v<version>-macos-arm64.zip`, and `SHA256SUMS.txt`. Runtime data stays under `~/Library/Application Support/SecretBase`. macOS does not use a separate uninstaller: quit the app and move `SecretBase.app` to Trash. Deleting the app does not delete the vault, backups, settings, or logs; remove the application-support directory manually only after verifying an encrypted backup.
 
 Unsigned test builds may require approval through System Settings -> Privacy & Security -> Open Anyway. Do not disable Gatekeeper as part of the normal installation flow. Developer ID signing and notarization remain deferred until an Apple Developer account is available.
 

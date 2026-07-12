@@ -9,6 +9,9 @@ permissions:
   contents: read
 
 jobs:
+  vault-core:
+    uses: ./.github/workflows/reusable-vault-core.yml
+
   release-checks:
     strategy:
       fail-fast: false

@@ -26,6 +26,7 @@ SecretBase is intentionally scoped as a single-user encrypted vault. The priorit
 - PyInstaller/pywebview Windows one-folder packaging with native export dialogs, single-instance activation, artifact scanning, and two-version Windows CI.
 - Windows V3.2 per-user installer, desktop diagnostics, optional tray, safe uninstall flow, native zoom feedback, and Windows 10/11 hardware acceptance.
 - macOS V3.3 arm64 DMG/ZIP packaging, WKWebView lifecycle, native zoom controls, CI, and Apple Silicon hardware acceptance.
+- Normative Vault V1 format documentation, public Python-compatible golden vectors, and an isolated Rust reference core.
 
 ## Later, If Needed
 
@@ -34,7 +35,7 @@ SecretBase is intentionally scoped as a single-user encrypted vault. The priorit
 - More compact and modular frontend organization.
 - Additional production health check automation.
 - macOS signing and notarization when an Apple Developer account is available.
-- Flutter Android and iOS clients after the shared Rust vault prototype and compatibility suite are stable.
+- Flutter Android and iOS clients after the shared Rust vault prototype and compatibility suite pass the release gate.
 
 ## Out of Scope
 

@@ -1,0 +1,93 @@
+{
+  "app_name": "SecretBase",
+  "created_at": "2026-02-03T04:05:06+00:00",
+  "deleted_entries": [
+    {
+      "created_at": "2026-02-02T02:02:02+00:00",
+      "deleted": true,
+      "deleted_at": "2026-02-04T05:06:07+00:00",
+      "fields": [],
+      "groups": [],
+      "id": "22222222-2222-4222-8222-222222222222",
+      "remarks": "已删除的公开测试条目",
+      "starred": false,
+      "tags": [
+        "归档"
+      ],
+      "title": "旧账号",
+      "updated_at": "2026-02-04T05:06:07+00:00",
+      "url": ""
+    }
+  ],
+  "entries": [
+    {
+      "created_at": "2026-02-03T04:05:06+00:00",
+      "deleted": false,
+      "deleted_at": null,
+      "fields": [
+        {
+          "copyable": true,
+          "future_field": {
+            "retain": "字段扩展"
+          },
+          "hidden": false,
+          "name": "用户名",
+          "value": "测试用户@example.com"
+        },
+        {
+          "copyable": true,
+          "hidden": true,
+          "name": "密码",
+          "value": "仅用于公开兼容测试-🔐"
+        }
+      ],
+      "future_entry": {
+        "flags": [
+          "alpha",
+          "测试"
+        ]
+      },
+      "groups": [
+        "工作",
+        "云服务"
+      ],
+      "id": "11111111-1111-4111-8111-111111111111",
+      "remarks": "Unicode: 中文、かな、é、🔐",
+      "starred": true,
+      "tags": [
+        "生产",
+        "示例"
+      ],
+      "title": "示例控制台",
+      "updated_at": "2026-02-05T06:07:08+00:00",
+      "url": "https://vault.example.com"
+    }
+  ],
+  "future_root": {
+    "enabled": true,
+    "note": "根扩展必须保留"
+  },
+  "groups_meta": {
+    "云服务": {
+      "created_at": "2026-02-03T04:05:06+00:00",
+      "description": "公开测试密码组",
+      "updated_at": "2026-02-03T04:05:06+00:00"
+    },
+    "工作": {
+      "created_at": "2026-02-03T04:05:06+00:00",
+      "description": "工作相关示例",
+      "updated_at": "2026-02-03T04:05:06+00:00"
+    }
+  },
+  "tags_meta": {
+    "示例": {
+      "color": "#2563eb",
+      "description": "公开测试标签"
+    },
+    "生产": {
+      "color": "#16a34a",
+      "description": "仅为测试名称，不对应真实环境"
+    }
+  },
+  "version": "1.0"
+}

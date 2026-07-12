@@ -43,9 +43,15 @@ class DownloadHandler(BaseHTTPRequestHandler):
 
     def do_POST(self) -> None:  # noqa: N802
         self.__class__.received_token = self.headers.get("X-SecretBase-Token")
+        content_length = int(self.headers.get("Content-Length") or 0)
+        if content_length:
+            self.rfile.read(content_length)
+        payload = b"encrypted-test-backup"
         self.send_response(200)
+        self.send_header("Content-Length", str(len(payload)))
+        self.send_header("Connection", "close")
         self.end_headers()
-        self.wfile.write(b"encrypted-test-backup")
+        self.wfile.write(payload)
 
     def log_message(self, _format: str, *_args) -> None:
         return
@@ -234,7 +240,7 @@ def test_desktop_diagnostics_and_directory_allowlist() -> None:
         diagnostics = DesktopDiagnostics(
             paths=paths,
             backend_url="http://127.0.0.1:12345",
-            version="3.3.0",
+            version="4.0.0",
             renderer="edgechromium",
             platform_key="windows",
             capabilities={"tray": True, "directory_open": True},
@@ -243,7 +249,7 @@ def test_desktop_diagnostics_and_directory_allowlist() -> None:
         )
         diagnostics.health_opener = StaticOpener({
             "success": True,
-            "data": {"status": "healthy", "version": "3.3.0"},
+            "data": {"status": "healthy", "version": "4.0.0"},
         })
 
         result = diagnostics.collect()

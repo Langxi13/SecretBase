@@ -1,4 +1,4 @@
-from pydantic import BaseModel, validator, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator, validator
 from typing import Optional, List
 from datetime import datetime
 import uuid
@@ -19,6 +19,8 @@ def _normalize_entity_names(values: List[str], label: str) -> List[str]:
 
 class FieldItem(BaseModel):
     """自定义字段"""
+    model_config = ConfigDict(extra="allow")
+
     name: str = Field(..., min_length=1, max_length=100)
     value: str = Field(default="", max_length=10000)
     copyable: bool = False
@@ -110,6 +112,8 @@ class EntryUpdate(BaseModel):
 
 class Entry(EntryBase):
     """完整条目模型"""
+    model_config = ConfigDict(extra="allow")
+
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     created_at: str = Field(default_factory=lambda: datetime.now().isoformat())
     updated_at: str = Field(default_factory=lambda: datetime.now().isoformat())
@@ -398,6 +402,8 @@ class PaginationParams(BaseModel):
 
 class VaultData(BaseModel):
     """Vault 数据结构"""
+    model_config = ConfigDict(extra="allow")
+
     version: str = "1.0"
     created_at: str = Field(default_factory=lambda: datetime.now().isoformat())
     app_name: str = "SecretBase"
@@ -405,3 +411,15 @@ class VaultData(BaseModel):
     deleted_entries: List[Entry] = Field(default_factory=list)
     tags_meta: dict = Field(default_factory=dict)
     groups_meta: dict = Field(default_factory=dict)
+
+    @field_validator("version")
+    @classmethod
+    def validate_payload_version(cls, value: str) -> str:
+        normalized = str(value or "").strip()
+        try:
+            major = int(normalized.split(".", 1)[0])
+        except (TypeError, ValueError):
+            raise ValueError("Vault payload 版本无效")
+        if major != 1:
+            raise ValueError(f"不支持的 Vault payload 主版本: {major}")
+        return normalized
