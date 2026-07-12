@@ -50,13 +50,15 @@
 
 ## 验收记录
 
+2026-07-12：GitHub Actions 的 macOS arm64 构建、下载产物复测和跨平台发布检查全部通过。用户在 Apple Silicon Mac 上完成最新测试包安装、配置和功能复测，确认没有剩余阻断问题，并允许创建 `v3.3.0` 标签。Mac 型号、系统小版本和本地 SHA-256 未单独留档；正式 Release 继续以 CI 生成的 `SHA256SUMS.txt` 为准。
+
 ```text
-Mac 型号：
-芯片：
-macOS 版本：
-DMG SHA-256：
-ZIP SHA-256：
-阻断问题：
-非阻断问题：
-是否允许创建 v3.3.0 标签：是 / 否
+Mac 型号：未单独留档
+芯片：Apple Silicon arm64
+macOS 版本：macOS 13 或更高版本，具体小版本未单独留档
+DMG SHA-256：以正式 Release 的 SHA256SUMS.txt 为准
+ZIP SHA-256：以正式 Release 的 SHA256SUMS.txt 为准
+阻断问题：无
+非阻断问题：无
+是否允许创建 v3.3.0 标签：是
 ```

@@ -8,8 +8,8 @@ SecretBase is intentionally scoped as a single-user encrypted vault. The priorit
 - Preserve safe backup, export, import, and restore flows.
 - Maintain a simple FastAPI backend and vendored Vue frontend with no runtime CDN dependency.
 - Keep production deployment practical behind nginx or another reverse proxy.
-- Maintain the stable V3.2 Windows installer, diagnostics, tray, and data-safety behavior described in [App Roadmap](app-roadmap.md).
-- Complete V3.3 macOS 13+ arm64 packaging, lifecycle, CI, and hardware acceptance without forking the shared application core.
+- Maintain the stable Windows and macOS desktop packaging, diagnostics, lifecycle, and data-safety behavior described in [App Roadmap](app-roadmap.md).
+- Freeze the Vault V1 contract and build cross-language compatibility fixtures before starting the Android client.
 
 ## Implemented
 
@@ -25,6 +25,7 @@ SecretBase is intentionally scoped as a single-user encrypted vault. The priorit
 - One-command Windows/Linux/macOS source startup and cross-platform release checks.
 - PyInstaller/pywebview Windows one-folder packaging with native export dialogs, single-instance activation, artifact scanning, and two-version Windows CI.
 - Windows V3.2 per-user installer, desktop diagnostics, optional tray, safe uninstall flow, native zoom feedback, and Windows 10/11 hardware acceptance.
+- macOS V3.3 arm64 DMG/ZIP packaging, WKWebView lifecycle, native zoom controls, CI, and Apple Silicon hardware acceptance.
 
 ## Later, If Needed
 
@@ -32,7 +33,8 @@ SecretBase is intentionally scoped as a single-user encrypted vault. The priorit
 - Better large-vault performance if real usage outgrows pagination.
 - More compact and modular frontend organization.
 - Additional production health check automation.
-- macOS desktop packaging, signing, and notarization, followed by mobile work as staged in [App Roadmap](app-roadmap.md).
+- macOS signing and notarization when an Apple Developer account is available.
+- Flutter Android and iOS clients after the shared Rust vault prototype and compatibility suite are stable.
 
 ## Out of Scope
 

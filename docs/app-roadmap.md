@@ -11,7 +11,7 @@ SecretBase 的长期目标是成为一个以个人本地数据安全为核心的
 - 未来可以打包为手机 App，使用同一套 vault 数据规则和加密规则。
 - 数据迁移优先依赖手动加密备份文件，而不是云同步或账号系统。
 
-V3.0 桌面基础模式、V3.1 Windows MVP 和 V3.2 Windows 产品化已完成。当前实施 V3.3 macOS arm64；手机端在共享 vault 核心准备完成后进入实施。
+V3.0 桌面基础模式、V3.1 Windows MVP、V3.2 Windows 产品化和 V3.3 macOS arm64 已完成。当前进入 V4.0 共享 vault 核心准备；手机端在格式规范和跨语言兼容套件稳定后进入实施。
 
 ## 2. 当前基线
 
@@ -110,7 +110,7 @@ macOS 阶段不先于 Windows MVP，也不单独分叉业务功能实现。
 
 已锁定的首版范围：macOS 13+、Apple Silicon arm64、DMG 与 ZIP、WKWebView、单实例、原生目录与文件选择框。首版不提供菜单栏驻留、签名和公证；Windows 与 macOS 在 `v3.3.0` 使用统一版本并同时发布。
 
-状态：功能分支实现阶段，等待 macOS arm64 CI 和 Apple Silicon 真机验收。
+状态：已完成。V3.3 已通过 macOS arm64 CI、下载产物复测和 Apple Silicon 真机验收，进入正式发布流程。
 
 ### V4.0 共享 vault 核心准备
 
@@ -179,4 +179,4 @@ App 化不能降低当前安全模型：
 
 V3.2 桌面产品化已经完成安装、升级、卸载数据安全、窗口缩放、关闭确认、托盘锁定、单实例、隐私扫描和双版本 Windows CI 验收。
 
-当前推进 V3.3 macOS arm64：完成 `.app`、DMG、ZIP、数据目录、窗口生命周期、跨平台备份和未签名 Gatekeeper 流程验收。移动端不会内嵌 FastAPI，必须先通过 V4.0 固化 vault 格式和跨语言测试样例。
+V3.3 macOS arm64 已完成 `.app`、DMG、ZIP、数据目录、窗口生命周期、跨平台备份和未签名 Gatekeeper 流程验收。当前推进 V4.0：固化 vault 格式、建立跨语言黄金向量并实现不进入生产链路的 Rust 原型。移动端不会内嵌 FastAPI，V5 采用 Flutter + Rust，先支持 Android，再适配 iOS。
