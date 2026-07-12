@@ -9,6 +9,9 @@ permissions:
   contents: write
 
 jobs:
+  vault-core:
+    uses: ./.github/workflows/reusable-vault-core.yml
+
   verify:
     strategy:
       fail-fast: false
@@ -48,7 +51,7 @@ jobs:
       retention-days: 30
 
   release:
-    needs: [verify, windows-desktop, macos-desktop]
+    needs: [vault-core, verify, windows-desktop, macos-desktop]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7

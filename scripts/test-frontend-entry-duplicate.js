@@ -26,7 +26,7 @@ function assertMatches(content, pattern, message) {
 assertIncludes(indexHtml, '在此基础上新建', '编辑条目弹窗必须提供基于当前条目新建的入口');
 assertIncludes(indexHtml, 'v-if="showEditModal"', '基于当前条目新建入口必须只在编辑模式展示');
 assertIncludes(indexHtml, '@click="createEntryFromCurrentEdit"', '基于当前条目新建入口必须调用专用方法');
-assertIncludes(indexHtml, '?v=20260712-ui-v80', '前端资源版本必须随模块拆分更新，避免浏览器继续使用旧 JS');
+assertIncludes(indexHtml, '?v=20260712-ui-v81', '前端资源版本必须随模块拆分更新，避免浏览器继续使用旧 JS');
 assertMatches(
     indexHtml,
     /<div v-if="!showEditModal" class="form-group">[\s\S]*?<label>条目模板<\/label>/,

@@ -63,6 +63,7 @@ def test_git_attributes_define_script_line_endings() -> None:
     assert "*.cmd text eol=crlf" in attributes
     assert "*.bat text eol=crlf" in attributes
     assert "*.sh text eol=lf" in attributes
+    assert "*.vault binary" in attributes
 
 
 def test_workflows_exercise_real_windows_entrypoints() -> None:
@@ -80,7 +81,8 @@ def test_workflows_exercise_real_windows_entrypoints() -> None:
         assert "uses: ./.github/actions/verify-windows-bootstrap" in workflow
 
     release_workflow = (ROOT / ".github" / "workflows" / "release.yml").read_text(encoding="utf-8")
-    assert "needs: [verify, windows-desktop, macos-desktop]" in release_workflow
+    assert "needs: [vault-core, verify, windows-desktop, macos-desktop]" in release_workflow
+    assert "uses: ./.github/workflows/reusable-vault-core.yml" in release_workflow
     assert "uses: ./.github/workflows/reusable-windows-desktop.yml" in release_workflow
     assert "uses: ./.github/workflows/reusable-macos-desktop.yml" in release_workflow
 

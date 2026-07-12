@@ -78,6 +78,7 @@ def test_desktop_dependency_pins() -> None:
 
 def test_spec_only_collects_public_runtime_assets() -> None:
     spec = (ROOT / "desktop" / "SecretBase.spec").read_text(encoding="utf-8")
+    assert "vault-core" not in spec
     assert '(str(ROOT / "frontend"), "frontend")' in spec
     assert "backend/.env" not in spec
     assert "backend/data" not in spec
@@ -183,7 +184,8 @@ def test_windows_workflows_build_once_and_retest_downloaded_artifact() -> None:
     assert "secretbase-installer*-self-test.json" in reusable
     assert "retention-days: 14" in desktop
     assert "uses: ./.github/workflows/reusable-windows-desktop.yml" in desktop
-    assert "needs: [verify, windows-desktop, macos-desktop]" in release
+    assert "needs: [vault-core, verify, windows-desktop, macos-desktop]" in release
+    assert "uses: ./.github/workflows/reusable-vault-core.yml" in release
     assert "path: release-input/windows" in release
     assert "path: release-input/macos" in release
     assert "Prepare unified release assets" in release

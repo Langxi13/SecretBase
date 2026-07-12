@@ -20,6 +20,7 @@ PYTHON_TESTS = [
     "scripts/test-field-hidden-semantics.py",
     "scripts/test-password-groups.py",
     "scripts/test-tag-entities.py",
+    "scripts/test-vault-v1-compatibility.py",
     "scripts/test-backend-module-split.py",
     "scripts/test-release-readiness.py",
     "scripts/test-script-compatibility.py",

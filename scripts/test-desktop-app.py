@@ -234,7 +234,7 @@ def test_desktop_diagnostics_and_directory_allowlist() -> None:
         diagnostics = DesktopDiagnostics(
             paths=paths,
             backend_url="http://127.0.0.1:12345",
-            version="3.3.0",
+            version="4.0.0",
             renderer="edgechromium",
             platform_key="windows",
             capabilities={"tray": True, "directory_open": True},
@@ -243,7 +243,7 @@ def test_desktop_diagnostics_and_directory_allowlist() -> None:
         )
         diagnostics.health_opener = StaticOpener({
             "success": True,
-            "data": {"status": "healthy", "version": "3.3.0"},
+            "data": {"status": "healthy", "version": "4.0.0"},
         })
 
         result = diagnostics.collect()

@@ -38,3 +38,6 @@ Thumbs.db
 # Node tooling cache if used for local static serving
 node_modules/
 npm-debug.log*
+
+# Rust shared vault prototype
+vault-core/target/

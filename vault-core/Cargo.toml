@@ -1,0 +1,31 @@
+[package]
+name = "secretbase-vault-core"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.88"
+license = "MIT"
+description = "Cross-language reference implementation for the SecretBase Vault V1 format"
+
+[features]
+default = []
+test-vectors = []
+
+[dependencies]
+aes-gcm = "=0.10.3"
+pbkdf2 = "=0.12.2"
+rand_core = { version = "=0.6.4", features = ["getrandom"] }
+serde_json = "=1.0.140"
+sha2 = "=0.10.9"
+thiserror = "=2.0.12"
+zeroize = "=1.8.1"
+
+[dev-dependencies]
+hex = "=0.4.3"
+serde = { version = "=1.0.219", features = ["derive"] }
+
+[lints.rust]
+unsafe_code = "forbid"
+
+[lints.clippy]
+unwrap_used = "deny"
+expect_used = "deny"
