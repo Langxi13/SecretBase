@@ -49,6 +49,7 @@ class DesktopApi:
         update_checker: Callable[[], dict] | None = None,
         close_preferences_setter: Callable[[bool, bool], bool] | None = None,
         close_request_resolver: Callable[[str, bool], dict] | None = None,
+        zoom_changer: Callable[[str], int] | None = None,
     ) -> None:
         self.backend_url = backend_url.rstrip("/")
         self.save_dialog = save_dialog
@@ -58,6 +59,7 @@ class DesktopApi:
         self.update_checker = update_checker
         self.close_preferences_setter = close_preferences_setter
         self.close_request_resolver = close_request_resolver
+        self.zoom_changer = zoom_changer
         self.opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
 
     def save_download(self, request: dict) -> dict[str, str]:
@@ -154,3 +156,15 @@ class DesktopApi:
         if self.close_request_resolver is None:
             raise RuntimeError("当前运行环境不支持关闭操作")
         return self.close_request_resolver(action, remember)
+
+    def change_zoom(self, action: str) -> dict[str, str | int]:
+        normalized = str(action or "").strip().lower()
+        if normalized not in {"in", "out", "reset"}:
+            raise ValueError("不支持的缩放操作")
+        if self.zoom_changer is None:
+            raise RuntimeError("当前运行环境不支持桌面缩放")
+        return {
+            "status": "updated",
+            "action": normalized,
+            "percent": self.zoom_changer(normalized),
+        }

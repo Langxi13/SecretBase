@@ -45,7 +45,7 @@ V3.3 uses Apple Silicon Python 3.11, PyInstaller and pywebview Cocoa/WKWebView. 
 scripts/build-desktop-macos.sh
 ```
 
-The script produces `SecretBase-v3.3.0-macos-arm64.dmg`, `SecretBase-v3.3.0-macos-arm64.zip`, and `SHA256SUMS.txt`. Runtime data stays under `~/Library/Application Support/SecretBase`; deleting the app does not delete the vault or backups.
+The script produces `SecretBase-v3.3.0-macos-arm64.dmg`, `SecretBase-v3.3.0-macos-arm64.zip`, and `SHA256SUMS.txt`. Runtime data stays under `~/Library/Application Support/SecretBase`. macOS does not use a separate uninstaller: quit the app and move `SecretBase.app` to Trash. Deleting the app does not delete the vault, backups, settings, or logs; remove the application-support directory manually only after verifying an encrypted backup.
 
 Unsigned test builds may require approval through System Settings -> Privacy & Security -> Open Anyway. Do not disable Gatekeeper as part of the normal installation flow. Developer ID signing and notarization remain deferred until an Apple Developer account is available.
 

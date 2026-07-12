@@ -151,8 +151,9 @@ def test_build_script_is_ascii_and_runs_post_build_checks() -> None:
     assert "min_size=(960, 640)" not in app_source
     assert "resizable=True" in app_source
     assert "zoomable=True" in app_source
-    assert "DesktopZoomMonitor" in app_source
-    assert "window.events.loaded += zoom_monitor.attach" in app_source
+    assert "DesktopZoomController" in app_source
+    assert "window.events.loaded += zoom_controller.attach" in app_source
+    assert "bridge.zoom_changer = zoom_controller.change" in app_source
     assert "close_preferences_setter=lifecycle.set_close_preferences" in app_source
     assert "close_request_resolver=lifecycle.resolve_close_request" in app_source
 
@@ -186,6 +187,7 @@ def test_windows_workflows_build_once_and_retest_downloaded_artifact() -> None:
     assert "path: release-input/windows" in release
     assert "path: release-input/macos" in release
     assert "Prepare unified release assets" in release
+    assert "sha256sum -- *.dmg *.exe *.zip" in release
     assert 'gh release create "$GITHUB_REF_NAME" release-assets/*' in release
     assert "gh release upload" in release
 

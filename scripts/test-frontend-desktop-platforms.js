@@ -20,7 +20,8 @@ const sandbox = {
                             directory_open: true,
                             single_instance: true,
                             close_confirmation: true,
-                            native_zoom_feedback: false
+                            zoom_controls: true,
+                            native_zoom_feedback: true
                         }
                     };
                 },
@@ -44,7 +45,7 @@ const state = {
     isDesktopMode: true,
     desktopPlatform: 'macos',
     desktopArchitecture: 'arm64',
-    desktopRuntimeCapabilities: { tray: false, directory_open: true },
+    desktopRuntimeCapabilities: { tray: false, directory_open: true, zoom_controls: true },
     desktopDiagnostics: ref(null),
     desktopDiagnosticsLoading: ref(false),
     desktopDiagnosticsError: ref(''),
@@ -78,6 +79,7 @@ const desktop = sandbox.window.SecretBaseDesktopController.createDesktopControll
     await desktop.actions.loadDesktopDiagnostics();
     if (desktop.views.desktopPlatformLabel.value !== 'macOS') throw new Error('macOS 平台标签错误');
     if (desktop.views.desktopSupportsTray.value !== false) throw new Error('macOS 不应声明托盘能力');
+    if (desktop.views.desktopCapabilities.value.zoom_controls !== true) throw new Error('macOS 必须声明原生缩放能力');
 
     await desktop.actions.saveCloseToTraySetting();
     if (!nativeCalls.some(call => call[0] === 'preferences' && call[1] === false && call[2] === true)) {

@@ -139,18 +139,6 @@
                         <strong class="nav-count">{{ tag.count }}</strong>
                     </button>
                 </nav>
-                <nav class="sidebar-section sidebar-tools" aria-label="管理工具">
-                    <span class="sidebar-label sidebar-label-tools" aria-label="管理" :title="isSidebarCollapsed ? '管理' : ''">
-                        <span class="sidebar-label-icon" aria-hidden="true">⚙️</span>
-                        <span class="label-text">管理</span>
-                    </span>
-                    <button class="sidebar-nav-item" @click="openAiParse" :title="isSidebarCollapsed ? 'AI 智能录入' : ''"><span class="nav-icon-text"><i class="nav-icon">🤖</i><span class="nav-text">AI 智能录入</span></span><strong class="nav-count">🤖</strong></button>
-                    <button class="sidebar-nav-item" @click="showTagManager = true" :title="isSidebarCollapsed ? '标签管理' : ''"><span class="nav-icon-text"><i class="nav-icon">🏷️</i><span class="nav-text">标签管理</span></span><strong class="nav-count">🏷️</strong></button>
-                    <button class="sidebar-nav-item" @click="showTrash = true" :title="isSidebarCollapsed ? '回收站' : ''"><span class="nav-icon-text"><i class="nav-icon">🗑️</i><span class="nav-text">回收站</span></span><strong class="nav-count">🗑️</strong></button>
-                    <button class="sidebar-nav-item" @click="openBackupCenter" :title="isSidebarCollapsed ? '备份' : ''"><span class="nav-icon-text"><i class="nav-icon">💾</i><span class="nav-text">备份</span></span><strong class="nav-count">💾</strong></button>
-                    <button class="sidebar-nav-item" @click="openToolsModal" :title="isSidebarCollapsed ? '工具' : ''"><span class="nav-icon-text"><i class="nav-icon">🧰</i><span class="nav-text">工具</span></span><strong class="nav-count">🧰</strong></button>
-                    <button class="sidebar-nav-item" @click="openSettings" :title="isSidebarCollapsed ? '设置' : ''"><span class="nav-icon-text"><i class="nav-icon">⚙️</i><span class="nav-text">设置</span></span><strong class="nav-count">⚙️</strong></button>
-                </nav>
             </aside>
             <div class="workspace-shell">
             <!-- 顶部导航 -->

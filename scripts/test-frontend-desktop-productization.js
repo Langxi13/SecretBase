@@ -18,8 +18,8 @@ function assertIncludes(content, needle, message) {
     if (!content.includes(needle)) throw new Error(message);
 }
 
-assertIncludes(indexHtml, 'js/controllers/desktop-controller.js?v=20260711-ui-v79', '入口页必须加载桌面控制器');
-assertIncludes(indexHtml, 'css/desktop-components.css?v=20260711-ui-v79', '入口页必须加载桌面样式');
+assertIncludes(indexHtml, 'js/controllers/desktop-controller.js?v=20260712-ui-v80', '入口页必须加载桌面控制器');
+assertIncludes(indexHtml, 'css/desktop-components.css?v=20260712-ui-v80', '入口页必须加载桌面样式');
 assertIncludes(stateSource, "runtimeConfig.mode === 'desktop'", '桌面入口必须由运行模式控制');
 assertIncludes(stateSource, 'desktopRuntimeCapabilities', '桌面运行时必须提供平台能力');
 assertIncludes(controllerSource, 'desktopSupportsTray', '桌面控制器必须按能力决定托盘 UI');
@@ -28,9 +28,12 @@ assertIncludes(storeStateSource, 'closeToTray: settings.closeToTray ?? settings.
 assertIncludes(storeStateSource, 'close_to_tray: settings.closeToTray ?? settings.close_to_tray', '托盘设置必须写回后端字段');
 assertIncludes(storeStateSource, 'confirmClose: settings.confirmClose ?? settings.confirm_close ?? true', '关闭确认必须默认开启');
 assertIncludes(storeStateSource, 'confirm_close: settings.confirmClose ?? settings.confirm_close', '关闭确认必须写回后端字段');
+assertIncludes(storeStateSource, 'desktopZoomPercent: settings.desktopZoomPercent ?? settings.desktop_zoom_percent ?? 100', '桌面缩放比例必须安全默认到 100%');
+assertIncludes(storeStateSource, 'desktop_zoom_percent: settings.desktopZoomPercent ?? settings.desktop_zoom_percent', '桌面缩放比例必须保留在设置模型中');
 assertIncludes(settingsTemplate, '@change="saveCloseToTraySetting"', '托盘开关必须调用专用保存逻辑');
 assertIncludes(settingsTemplate, 'v-if="desktopSupportsTray"', '不支持托盘的平台必须隐藏托盘设置');
 assertIncludes(settingsTemplate, 'v-model="settingsForm.confirmClose"', '桌面设置必须允许恢复关闭提醒');
+assertIncludes(settingsTemplate, '默认保留本地数据', 'macOS 桌面设置必须说明删除应用后默认保留数据');
 assertIncludes(settingsTemplate, '@click="checkDesktopUpdates"', '桌面设置必须提供手动更新检查');
 assertIncludes(desktopTemplate, '@click="copyDesktopDiagnostics"', '诊断弹窗必须支持复制脱敏摘要');
 assertIncludes(desktopTemplate, 'openDesktopDirectory(kind)', '诊断弹窗必须使用目录白名单桥');

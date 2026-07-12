@@ -68,6 +68,7 @@
             state.settingsForm.autoBackupRetention = settings.autoBackupRetention;
             state.settingsForm.closeToTray = Boolean(settings.closeToTray);
             state.settingsForm.confirmClose = settings.confirmClose !== false;
+            state.settingsForm.desktopZoomPercent = settings.desktopZoomPercent || 100;
         }
 
         return {

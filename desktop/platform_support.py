@@ -26,6 +26,7 @@ class DesktopPlatformProfile:
             "directory_open": supported,
             "close_confirmation": supported,
             "tray": self.tray,
+            "zoom_controls": self.native_zoom_feedback,
             "native_zoom_feedback": self.native_zoom_feedback,
         }
 
@@ -44,7 +45,7 @@ MACOS_PROFILE = DesktopPlatformProfile(
     renderer="wkwebview",
     gui="cocoa",
     tray=False,
-    native_zoom_feedback=False,
+    native_zoom_feedback=True,
 )
 UNSUPPORTED_PROFILE = DesktopPlatformProfile(
     key="unsupported",

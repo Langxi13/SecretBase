@@ -386,6 +386,7 @@ class Settings(BaseModel):
     auto_backup_retention: int = Field(default=30, ge=5, le=200)
     close_to_tray: bool = False
     confirm_close: bool = True
+    desktop_zoom_percent: int = Field(default=100, ge=25, le=500)
     language: str = Field(default="zh-CN")
 
 

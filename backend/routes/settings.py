@@ -71,6 +71,7 @@ async def update_settings(updates: dict):
         'autoBackupRetention': 'auto_backup_retention',
         'closeToTray': 'close_to_tray',
         'confirmClose': 'confirm_close',
+        'desktopZoomPercent': 'desktop_zoom_percent',
         'theme': 'theme',
         'language': 'language'
     }

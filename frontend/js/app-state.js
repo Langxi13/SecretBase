@@ -24,6 +24,7 @@
             directory_open: false,
             close_confirmation: false,
             tray: false,
+            zoom_controls: false,
             native_zoom_feedback: false,
             ...(runtimeConfig.desktopCapabilities || {})
         });
@@ -215,7 +216,8 @@
             autoLockMinutes: 5,
             autoBackupRetention: 30,
             closeToTray: false,
-            confirmClose: true
+            confirmClose: true,
+            desktopZoomPercent: 100
         });
         const activeSettingsTab = ref('general');
         const settingsTabs = [

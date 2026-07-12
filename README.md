@@ -225,7 +225,7 @@ Windows 独立版默认将 vault、备份、日志、设置和 WebView 数据保
 
 V3.2 增加了当前用户免管理员安装器、桌面状态与诊断、目录入口、手动更新检查和可选系统托盘。安装器作为独立 `.exe` 资产发布，普通用户直接下载安装即可，不需要解压；便携 ZIP 仅作为备用。桌面窗口支持自由调整大小、窄屏布局和 WebView2 原生 `Ctrl + 滚轮` 缩放，缩放时会在顶部短暂显示当前比例。关闭时可选择隐藏到托盘、完全退出或取消，并可记住选择。安装版与便携版共用现有数据目录；默认卸载保留数据，只有勾选删除并输入 `DELETE` 才清除整个本地数据目录。V3.1 作为历史便携版本继续保留。
 
-V3.3 正在增加 macOS 13+ Apple Silicon arm64 桌面版，继续复用同一套 FastAPI、Vue 前端和 vault 数据格式。macOS 首版提供 DMG 和 ZIP，使用 WKWebView、单实例和原生目录/文件选择框；关闭窗口时退出本地服务，不提供菜单栏驻留。正式 `v3.3.0` 会同时发布 Windows 与 macOS 产物，当前仍需 macOS CI 和 Apple Silicon 真机验收，不替代 V3.2 稳定版。
+V3.3 正在增加 macOS 13+ Apple Silicon arm64 桌面版，继续复用同一套 FastAPI、Vue 前端和 vault 数据格式。macOS 首版提供 DMG 和 ZIP，使用 WKWebView、单实例和原生目录/文件选择框；关闭窗口时退出本地服务，不提供菜单栏驻留。Windows 使用 `Ctrl + +`、`Ctrl + -`、`Ctrl + 0`，macOS 使用 `Command + +`、`Command + -`、`Command + 0` 调整并重置界面比例，最后比例保存在本机。正式 `v3.3.0` 会同时发布 Windows 与 macOS 产物，当前仍需 Apple Silicon 真机验收，不替代 V3.2 稳定版。
 
 Apple Silicon Mac 使用 Python 3.11 构建测试包：
 
@@ -234,6 +234,8 @@ scripts/build-desktop-macos.sh
 ```
 
 当前 macOS 测试包未签名和公证，首次打开可能需要在“系统设置 -> 隐私与安全性”中选择“仍要打开”。不要通过关闭 Gatekeeper 作为常规安装方式。
+
+macOS 使用系统标准卸载方式：退出 SecretBase 后将 `SecretBase.app` 移入废纸篓。此操作只删除应用，`~/Library/Application Support/SecretBase` 中的 vault、备份和设置默认保留；只有在确认已有可用加密备份后，才应手动删除该目录。
 
 在 Windows Python 3.11 x64 与 Inno Setup 6.7.1 环境构建测试包：
 
@@ -631,7 +633,7 @@ Desktop data is stored under `%LOCALAPPDATA%\SecretBase\`. Build validation reje
 
 V3.2 adds a per-user installer, desktop diagnostics, fixed directory shortcuts, manual update checks, narrow-window resizing, native WebView2 `Ctrl + wheel` zoom with transient percentage feedback, and an opt-in system tray. The installer is published as a standalone asset, so normal installation does not require extracting the portable ZIP. Closing the window can prompt to hide, exit, or cancel and can remember the selected action. Installed and portable builds share the existing data directory. Default uninstall preserves all data; full removal requires selecting the purge option and typing `DELETE`. V3.1 remains available as the historical portable release.
 
-V3.3 is adding a macOS 13+ Apple Silicon arm64 desktop app while preserving the same FastAPI backend, Vue frontend, and vault format. The first macOS build provides DMG and ZIP assets, WKWebView, single-instance activation, and native directory/file dialogs. Closing the window exits the local service; menu-bar residency is deferred. The formal `v3.3.0` release will publish Windows and macOS assets together. Until macOS CI and Apple Silicon hardware acceptance are complete, V3.2 remains the stable release.
+V3.3 is adding a macOS 13+ Apple Silicon arm64 desktop app while preserving the same FastAPI backend, Vue frontend, and vault format. The first macOS build provides DMG and ZIP assets, WKWebView, single-instance activation, and native directory/file dialogs. Closing the window exits the local service; menu-bar residency is deferred. Browser-style zoom shortcuts use `Ctrl + + / - / 0` on Windows and `Command + + / - / 0` on macOS, with the last local zoom level restored on startup. The formal `v3.3.0` release will publish Windows and macOS assets together. Until Apple Silicon hardware acceptance is complete, V3.2 remains the stable release.
 
 Build the macOS test package on Apple Silicon with Python 3.11:
 
@@ -640,6 +642,8 @@ scripts/build-desktop-macos.sh
 ```
 
 The current macOS test package is unsigned and not notarized. First launch may require System Settings -> Privacy & Security -> Open Anyway. Disabling Gatekeeper is not part of the supported installation flow.
+
+To uninstall on macOS, quit SecretBase and move `SecretBase.app` to Trash. This removes the app only; vaults, backups, and settings under `~/Library/Application Support/SecretBase` are retained by default. Delete that directory manually only after confirming that a usable encrypted backup exists.
 
 Build on Windows with Python 3.11 x64 and Inno Setup 6.7.1:
 

@@ -1,17 +1,17 @@
 from __future__ import annotations
 
-import json
 import logging
 import os
-import tempfile
 import threading
 from pathlib import Path
 from typing import Callable
 
 try:
     from .instance import focus_current_process_window
+    from .preferences import load_preferences, update_preferences
 except ImportError:
     from instance import focus_current_process_window
+    from preferences import load_preferences, update_preferences
 
 
 logger = logging.getLogger(__name__)
@@ -36,13 +36,8 @@ FRONTEND_CLOSE_REQUEST_SCRIPT = """
 
 
 def load_close_preferences(settings_path: Path) -> tuple[bool, bool]:
-    try:
-        payload = json.loads(settings_path.read_text(encoding="utf-8"))
-        if not isinstance(payload, dict):
-            raise ValueError("设置文件必须是对象")
-        return payload.get("close_to_tray") is True, payload.get("confirm_close") is not False
-    except (FileNotFoundError, OSError, ValueError, TypeError, json.JSONDecodeError):
-        return False, True
+    payload = load_preferences(settings_path)
+    return payload.get("close_to_tray") is True, payload.get("confirm_close") is not False
 
 
 def load_close_to_tray(settings_path: Path) -> bool:
@@ -50,35 +45,13 @@ def load_close_to_tray(settings_path: Path) -> bool:
 
 
 def save_close_preferences(settings_path: Path, close_to_tray: bool, confirm_close: bool) -> None:
-    try:
-        payload = json.loads(settings_path.read_text(encoding="utf-8"))
-        if not isinstance(payload, dict):
-            payload = {}
-    except (FileNotFoundError, OSError, ValueError, TypeError, json.JSONDecodeError):
-        payload = {}
-
-    payload["close_to_tray"] = close_to_tray
-    payload["confirm_close"] = confirm_close
-    settings_path.parent.mkdir(parents=True, exist_ok=True)
-    temporary_path = None
-    try:
-        with tempfile.NamedTemporaryFile(
-            mode="w",
-            encoding="utf-8",
-            prefix=f".{settings_path.name}.",
-            suffix=".tmp",
-            dir=settings_path.parent,
-            delete=False,
-        ) as temporary:
-            json.dump(payload, temporary, ensure_ascii=False, indent=2)
-            temporary.write("\n")
-            temporary.flush()
-            os.fsync(temporary.fileno())
-            temporary_path = Path(temporary.name)
-        os.replace(temporary_path, settings_path)
-    finally:
-        if temporary_path and temporary_path.exists():
-            temporary_path.unlink()
+    update_preferences(
+        settings_path,
+        {
+            "close_to_tray": close_to_tray,
+            "confirm_close": confirm_close,
+        },
+    )
 
 
 def fallback_close_action(default_to_tray: bool, *, supports_tray: bool = True) -> str:

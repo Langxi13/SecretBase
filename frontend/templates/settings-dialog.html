@@ -163,6 +163,10 @@
                                     <dt>运行状态</dt>
                                     <dd>{{ desktopStatusLabel }}</dd>
                                 </div>
+                                <div v-if="desktopPlatformLabel === 'macOS'">
+                                    <dt>删除应用</dt>
+                                    <dd>默认保留本地数据</dd>
+                                </div>
                             </dl>
 
                             <div v-if="desktopSupportsTray" class="setting-item desktop-tray-setting">

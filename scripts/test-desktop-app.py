@@ -26,6 +26,7 @@ from desktop.platform_support import (  # noqa: E402
     desktop_runtime_environment,
     normalized_architecture,
 )
+from desktop.preferences import load_preferences  # noqa: E402
 from desktop.runtime import desktop_paths, prepare_data_root  # noqa: E402
 from desktop.tray import (  # noqa: E402
     DesktopLifecycle,
@@ -34,7 +35,7 @@ from desktop.tray import (  # noqa: E402
     save_close_preferences,
 )
 from desktop.update import check_for_updates, parse_version, validate_release_url  # noqa: E402
-from desktop.zoom import DesktopZoomMonitor  # noqa: E402
+from desktop.zoom import DesktopZoomController, load_zoom_preference  # noqa: E402
 
 
 class DownloadHandler(BaseHTTPRequestHandler):
@@ -302,6 +303,7 @@ def test_desktop_update_check_validation() -> None:
 def test_desktop_bridge_productization_methods() -> None:
     close_preferences = []
     close_requests = []
+    zoom_actions = []
     api = DesktopApi(
         "http://127.0.0.1:1",
         lambda _filename: None,
@@ -314,6 +316,7 @@ def test_desktop_bridge_productization_methods() -> None:
         close_request_resolver=lambda action, remember: close_requests.append((action, remember)) or {
             "status": "hidden"
         },
+        zoom_changer=lambda action: zoom_actions.append(action) or 110,
     )
     assert api.get_diagnostics() == {"status": "ok"}
     assert api.open_directory("data") == {"status": "opened", "kind": "data"}
@@ -326,9 +329,17 @@ def test_desktop_bridge_productization_methods() -> None:
     assert close_preferences == [(True, False)]
     assert api.resolve_close_request("tray", True) == {"status": "hidden"}
     assert close_requests == [("tray", True)]
+    assert api.change_zoom("in") == {"status": "updated", "action": "in", "percent": 110}
+    assert zoom_actions == ["in"]
+    try:
+        api.change_zoom("invalid")
+    except ValueError as error:
+        assert "不支持的缩放操作" in str(error)
+    else:
+        raise AssertionError("Desktop bridge must reject unknown zoom actions")
 
 
-def test_desktop_zoom_monitor_defers_and_coalesces_notifications() -> None:
+def test_windows_zoom_controller_persists_and_coalesces_notifications() -> None:
     class FakeNativeEvent:
         def __init__(self) -> None:
             self.handlers = []
@@ -358,41 +369,101 @@ def test_desktop_zoom_monitor_defers_and_coalesces_notifications() -> None:
         def evaluate_js(self, script: str) -> None:
             self.evaluated_scripts.append(script)
 
-    scheduled_actions = []
-    window = FakeWindow()
-    monitor = DesktopZoomMonitor(window, action_scheduler=scheduled_actions.append)
-    assert monitor.attach() is True
-    assert monitor.attach() is True
-    assert len(window.native.webview.ZoomFactorChanged.handlers) == 1
+    with tempfile.TemporaryDirectory() as raw:
+        settings = Path(raw) / "settings.json"
+        settings.write_text('{"theme":"dark","desktop_zoom_percent":90}', encoding="utf-8")
+        scheduled_actions = []
+        window = FakeWindow()
+        controller = DesktopZoomController(
+            window,
+            platform_key="windows",
+            settings_path=settings,
+            gui_scheduler=lambda callback: callback(),
+            notification_scheduler=scheduled_actions.append,
+        )
+        assert controller.attach() is True
+        assert controller.attach() is True
+        assert window.native.webview.ZoomFactor == 0.9
+        assert len(window.native.webview.ZoomFactorChanged.handlers) == 1
 
-    window.native.webview.ZoomFactor = 1.1
-    window.native.webview.ZoomFactorChanged.fire(window.native.webview)
-    assert window.evaluated_scripts == []
-    assert len(scheduled_actions) == 1
-    scheduled_actions.pop(0)()
-    assert '"percent":110' in window.evaluated_scripts[-1]
+        assert controller.change("in") == 100
+        assert window.native.webview.ZoomFactor == 1.0
+        assert load_zoom_preference(settings) == 100
+        assert load_preferences(settings)["theme"] == "dark"
+        assert len(scheduled_actions) == 1
+        scheduled_actions.pop(0)()
+        assert '"percent":100' in window.evaluated_scripts[-1]
 
-    window.native.webview.ZoomFactor = 0.9
-    window.native.webview.ZoomFactorChanged.fire(window.native.webview)
-    window.native.webview.ZoomFactor = 0.8
-    window.native.webview.ZoomFactorChanged.fire(window.native.webview)
-    assert len(scheduled_actions) == 2
-    evaluated_count = len(window.evaluated_scripts)
-    scheduled_actions.pop(0)()
-    assert len(window.evaluated_scripts) == evaluated_count
-    scheduled_actions.pop(0)()
-    assert len(window.evaluated_scripts) == evaluated_count + 1
-    assert '"percent":80' in window.evaluated_scripts[-1]
-
-    with patch("desktop.zoom.logger.warning") as warning:
-        window.native.webview.ZoomFactor = 0.1
         window.native.webview.ZoomFactorChanged.fire(window.native.webview)
-        warning.assert_called_once()
-    assert scheduled_actions == []
+        assert scheduled_actions == []
 
-    monitor.detach()
-    assert window.native.webview.ZoomFactorChanged.handlers == []
-    assert monitor.attach() is False
+        window.native.webview.ZoomFactor = 1.1
+        window.native.webview.ZoomFactorChanged.fire(window.native.webview)
+        assert load_zoom_preference(settings) == 110
+        window.native.webview.ZoomFactor = 1.25
+        window.native.webview.ZoomFactorChanged.fire(window.native.webview)
+        assert len(scheduled_actions) == 2
+        evaluated_count = len(window.evaluated_scripts)
+        scheduled_actions.pop(0)()
+        assert len(window.evaluated_scripts) == evaluated_count
+        scheduled_actions.pop(0)()
+        assert len(window.evaluated_scripts) == evaluated_count + 1
+        assert '"percent":125' in window.evaluated_scripts[-1]
+
+        with patch("desktop.zoom.logger.warning") as warning:
+            window.native.webview.ZoomFactor = 0.1
+            window.native.webview.ZoomFactorChanged.fire(window.native.webview)
+            warning.assert_called_once()
+        assert scheduled_actions == []
+
+        controller.detach()
+        assert window.native.webview.ZoomFactorChanged.handlers == []
+        assert controller.attach() is False
+
+
+def test_macos_zoom_controller_uses_wkwebview_and_restores_default() -> None:
+    class FakeMacWebView:
+        def __init__(self) -> None:
+            self.factor = 0.0
+
+        def pageZoom(self) -> float:
+            return self.factor
+
+        def setPageZoom_(self, factor: float) -> None:
+            self.factor = factor
+
+    class FakeMacWindow:
+        def __init__(self) -> None:
+            self.webview = FakeMacWebView()
+            self.native = type("NativeWindow", (), {"contentView": lambda native: self.webview})()
+            self.evaluated_scripts = []
+
+        def evaluate_js(self, script: str) -> None:
+            self.evaluated_scripts.append(script)
+
+    with tempfile.TemporaryDirectory() as raw:
+        settings = Path(raw) / "settings.json"
+        settings.write_text('{"desktop_zoom_percent":900,"confirm_close":true}', encoding="utf-8")
+        scheduled_actions = []
+        window = FakeMacWindow()
+        controller = DesktopZoomController(
+            window,
+            platform_key="macos",
+            settings_path=settings,
+            gui_scheduler=lambda callback: callback(),
+            notification_scheduler=scheduled_actions.append,
+        )
+        assert controller.attach() is True
+        assert window.webview.factor == 1.0
+        assert controller.change("in") == 110
+        assert window.webview.factor == 1.1
+        assert load_zoom_preference(settings) == 110
+        assert load_preferences(settings)["confirm_close"] is True
+        scheduled_actions.pop(0)()
+        assert '"percent":110' in window.evaluated_scripts[-1]
+        assert controller.change("reset") == 100
+        assert window.webview.factor == 1.0
+        controller.detach()
 
 
 def test_desktop_lifecycle_locks_before_hiding() -> None:
@@ -563,8 +634,10 @@ def test_close_to_tray_preference_defaults_safely() -> None:
         assert load_close_preferences(settings) == (True, True)
         settings.write_text('{"close_to_tray": "true"}', encoding="utf-8")
         assert load_close_to_tray(settings) is False
+        settings.write_text('{"desktop_zoom_percent":125,"close_to_tray":"true"}', encoding="utf-8")
         save_close_preferences(settings, True, False)
         assert load_close_preferences(settings) == (True, False)
+        assert load_zoom_preference(settings) == 125
 
 
 def test_tray_start_failure_keeps_window_open() -> None:
@@ -702,6 +775,8 @@ def test_platform_profiles_and_runtime_capabilities() -> None:
         assert profile.gui == "cocoa"
         assert profile.capabilities["tray"] is False
         assert profile.capabilities["single_instance"] is True
+        assert profile.capabilities["zoom_controls"] is True
+        assert profile.capabilities["native_zoom_feedback"] is True
         assert normalized_architecture() == "arm64"
         environment = desktop_runtime_environment(shell=True)
         assert environment["SECRETBASE_DESKTOP_PLATFORM"] == "macos"
@@ -777,7 +852,8 @@ def main() -> None:
         test_desktop_diagnostics_and_directory_allowlist,
         test_desktop_update_check_validation,
         test_desktop_bridge_productization_methods,
-        test_desktop_zoom_monitor_defers_and_coalesces_notifications,
+        test_windows_zoom_controller_persists_and_coalesces_notifications,
+        test_macos_zoom_controller_uses_wkwebview_and_restores_default,
         test_desktop_lifecycle_locks_before_hiding,
         test_close_to_tray_preference_defaults_safely,
         test_tray_start_failure_keeps_window_open,

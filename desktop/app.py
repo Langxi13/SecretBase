@@ -18,7 +18,7 @@ try:
     from .runtime import InProcessDesktopServer, application_root, desktop_paths, resolve_data_root
     from .tray import DesktopLifecycle, load_close_preferences
     from .update import check_for_updates
-    from .zoom import DesktopZoomMonitor
+    from .zoom import DesktopZoomController
 except ImportError:
     from bridge import DesktopApi
     from diagnostics import DesktopDiagnostics
@@ -27,7 +27,7 @@ except ImportError:
     from runtime import InProcessDesktopServer, application_root, desktop_paths, resolve_data_root
     from tray import DesktopLifecycle, load_close_preferences
     from update import check_for_updates
-    from zoom import DesktopZoomMonitor
+    from zoom import DesktopZoomController
 
 
 WINDOW_TITLE = "SecretBase"
@@ -134,10 +134,12 @@ def run_desktop_runtime_self_test(report_path: str | None) -> int:
                 "tray_icon_size": tray_icon_size,
             })
         elif profile.key == "macos":
+            import WebKit
             from webview.platforms import cocoa
 
             result.update({
-                "success": bool(getattr(cocoa, "BrowserView", None)),
+                "success": bool(getattr(cocoa, "BrowserView", None))
+                and callable(getattr(WebKit.WKWebView, "setPageZoom_", None)),
                 "platform": profile.key,
                 "architecture": normalized_architecture(),
                 "renderer": profile.renderer,
@@ -220,7 +222,7 @@ def run_window(data_root_value: str | None) -> int:
     paths = desktop_paths(data_root)
     server = InProcessDesktopServer(data_root, desktop_shell=True)
     lifecycle = None
-    zoom_monitor = None
+    zoom_controller = None
     try:
         url = server.start()
     except Exception as error:
@@ -296,8 +298,13 @@ def run_window(data_root_value: str | None) -> int:
         window_holder["window"] = window
         lifecycle.attach_window(window)
         if profile.native_zoom_feedback:
-            zoom_monitor = DesktopZoomMonitor(window)
-            window.events.loaded += zoom_monitor.attach
+            zoom_controller = DesktopZoomController(
+                window,
+                platform_key=profile.key,
+                settings_path=paths.settings,
+            )
+            bridge.zoom_changer = zoom_controller.change
+            window.events.loaded += zoom_controller.attach
         window.events.closing += lifecycle.on_closing
         coordinator.start_listener(lifecycle.restore, lifecycle.exit)
         webview.start(
@@ -319,8 +326,8 @@ def run_window(data_root_value: str | None) -> int:
             webbrowser.open(WEBVIEW2_DOWNLOAD_URL)
         return 1
     finally:
-        if zoom_monitor is not None:
-            zoom_monitor.detach()
+        if zoom_controller is not None:
+            zoom_controller.detach()
         if lifecycle is not None:
             lifecycle.shutdown()
         coordinator.close()
