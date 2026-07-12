@@ -37,7 +37,8 @@
                 autoLockMinutes: 5,
                 autoBackupRetention: 30,
                 closeToTray: false,
-                confirmClose: true
+                confirmClose: true,
+                desktopZoomPercent: 100
             },
             pagination: {
                 page: 1,
@@ -57,6 +58,7 @@
             autoBackupRetention: settings.autoBackupRetention ?? settings.auto_backup_retention ?? 30,
             closeToTray: settings.closeToTray ?? settings.close_to_tray ?? false,
             confirmClose: settings.confirmClose ?? settings.confirm_close ?? true,
+            desktopZoomPercent: settings.desktopZoomPercent ?? settings.desktop_zoom_percent ?? 100,
             language: settings.language || 'zh-CN'
         };
     }
@@ -69,6 +71,7 @@
             auto_backup_retention: settings.autoBackupRetention ?? settings.auto_backup_retention,
             close_to_tray: settings.closeToTray ?? settings.close_to_tray,
             confirm_close: settings.confirmClose ?? settings.confirm_close,
+            desktop_zoom_percent: settings.desktopZoomPercent ?? settings.desktop_zoom_percent,
             language: settings.language
         };
     }

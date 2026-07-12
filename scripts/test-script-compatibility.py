@@ -80,8 +80,9 @@ def test_workflows_exercise_real_windows_entrypoints() -> None:
         assert "uses: ./.github/actions/verify-windows-bootstrap" in workflow
 
     release_workflow = (ROOT / ".github" / "workflows" / "release.yml").read_text(encoding="utf-8")
-    assert "needs: [verify, desktop]" in release_workflow
+    assert "needs: [verify, windows-desktop, macos-desktop]" in release_workflow
     assert "uses: ./.github/workflows/reusable-windows-desktop.yml" in release_workflow
+    assert "uses: ./.github/workflows/reusable-macos-desktop.yml" in release_workflow
 
 
 def main() -> None:

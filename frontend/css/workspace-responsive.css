@@ -221,10 +221,6 @@
         font-size: 28px;
     }
 
-    .sidebar-label-tools {
-        --sidebar-label-accent: var(--color-warning);
-    }
-
     .sidebar-nav-item {
         display: flex;
         align-items: center;
@@ -313,10 +309,6 @@
     .tag-nav-item .tag-dot {
         display: inline-block;
         flex-shrink: 0;
-    }
-
-    .sidebar-tools {
-        margin-top: auto;
     }
 
     /* ⏭️ 桌面侧边栏收退/折叠状态样式 (.sidebar-collapsed) */
@@ -513,6 +505,44 @@
     .app-footer {
         margin-top: auto;
         border-top-color: color-mix(in srgb, var(--border-color) 72%, transparent);
+    }
+}
+
+@media (min-width: 1181px) and (max-height: 720px) {
+    .desktop-sidebar {
+        gap: 10px;
+        padding-top: 14px;
+        padding-bottom: 14px;
+    }
+
+    .sidebar-brand {
+        padding-bottom: 2px;
+    }
+
+    .sidebar-brand p {
+        display: none;
+    }
+
+    .sidebar-create {
+        min-height: 38px;
+    }
+
+    .sidebar-section {
+        gap: 4px;
+    }
+
+    .sidebar-label {
+        padding-top: 3px;
+        padding-bottom: 3px;
+        margin-top: 3px;
+        margin-bottom: 2px;
+    }
+
+    .sidebar-nav-item,
+    .sidebar-tags .sidebar-nav-item {
+        min-height: 34px;
+        padding-top: 6px;
+        padding-bottom: 6px;
     }
 }
 

@@ -13,11 +13,20 @@ from unittest.mock import patch
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
+import desktop.app as desktop_app  # noqa: E402
 from desktop.app import desktop_window_failure, run_shutdown_wait_self_test, selected_file_path  # noqa: E402
 from desktop.bridge import DesktopApi, safe_filename, validate_download_request  # noqa: E402
 from desktop.diagnostics import DesktopDiagnostics, detect_package_type  # noqa: E402
 import desktop.instance as desktop_instance  # noqa: E402
 from desktop.instance import SingleInstanceCoordinator, request_existing_process_exit  # noqa: E402
+import desktop.platform_support as platform_support  # noqa: E402
+from desktop.platform_support import (  # noqa: E402
+    WINDOWS_PROFILE,
+    current_platform_profile,
+    desktop_runtime_environment,
+    normalized_architecture,
+)
+from desktop.preferences import load_preferences  # noqa: E402
 from desktop.runtime import desktop_paths, prepare_data_root  # noqa: E402
 from desktop.tray import (  # noqa: E402
     DesktopLifecycle,
@@ -26,7 +35,7 @@ from desktop.tray import (  # noqa: E402
     save_close_preferences,
 )
 from desktop.update import check_for_updates, parse_version, validate_release_url  # noqa: E402
-from desktop.zoom import DesktopZoomMonitor  # noqa: E402
+from desktop.zoom import DesktopZoomController, load_zoom_preference  # noqa: E402
 
 
 class DownloadHandler(BaseHTTPRequestHandler):
@@ -167,16 +176,17 @@ def test_desktop_file_dialog_result_compatibility() -> None:
 
 
 def test_desktop_runtime_error_does_not_mislabel_webview2() -> None:
-    message, offer_webview2 = desktop_window_failure(
-        RuntimeError("Failed to resolve Python.Runtime.Loader.Initialize from Python.Runtime.dll")
-    )
-    assert offer_webview2 is False
-    assert "桌面运行组件无法加载" in message
-    assert "解除锁定" in message
+    with patch.object(desktop_app, "current_platform_profile", return_value=WINDOWS_PROFILE):
+        message, offer_webview2 = desktop_window_failure(
+            RuntimeError("Failed to resolve Python.Runtime.Loader.Initialize from Python.Runtime.dll")
+        )
+        assert offer_webview2 is False
+        assert "桌面运行组件无法加载" in message
+        assert "解除锁定" in message
 
-    generic_message, generic_offer = desktop_window_failure(RuntimeError("WebView2 runtime unavailable"))
-    assert generic_offer is True
-    assert "WebView2 官方下载页面" in generic_message
+        generic_message, generic_offer = desktop_window_failure(RuntimeError("WebView2 runtime unavailable"))
+        assert generic_offer is True
+        assert "WebView2 官方下载页面" in generic_message
 
 
 def test_desktop_bridge_rejects_unsafe_requests() -> None:
@@ -224,19 +234,23 @@ def test_desktop_diagnostics_and_directory_allowlist() -> None:
         diagnostics = DesktopDiagnostics(
             paths=paths,
             backend_url="http://127.0.0.1:12345",
-            version="3.2.0",
+            version="3.3.0",
             renderer="edgechromium",
+            platform_key="windows",
+            capabilities={"tray": True, "directory_open": True},
             backend_running=lambda: True,
             directory_opener=lambda path: opened.append(path),
         )
         diagnostics.health_opener = StaticOpener({
             "success": True,
-            "data": {"status": "healthy", "version": "3.2.0"},
+            "data": {"status": "healthy", "version": "3.3.0"},
         })
 
         result = diagnostics.collect()
         assert result["status"] == "ok"
         assert result["package_type"] == "source"
+        assert result["platform"] == "windows"
+        assert result["capabilities"]["tray"] is True
         assert detect_package_type() == "source"
         assert str(paths.root) not in result["support_summary"]
         assert result["directories"]["data"]["path"] == str(paths.root)
@@ -289,6 +303,7 @@ def test_desktop_update_check_validation() -> None:
 def test_desktop_bridge_productization_methods() -> None:
     close_preferences = []
     close_requests = []
+    zoom_actions = []
     api = DesktopApi(
         "http://127.0.0.1:1",
         lambda _filename: None,
@@ -301,6 +316,7 @@ def test_desktop_bridge_productization_methods() -> None:
         close_request_resolver=lambda action, remember: close_requests.append((action, remember)) or {
             "status": "hidden"
         },
+        zoom_changer=lambda action: zoom_actions.append(action) or 110,
     )
     assert api.get_diagnostics() == {"status": "ok"}
     assert api.open_directory("data") == {"status": "opened", "kind": "data"}
@@ -313,9 +329,17 @@ def test_desktop_bridge_productization_methods() -> None:
     assert close_preferences == [(True, False)]
     assert api.resolve_close_request("tray", True) == {"status": "hidden"}
     assert close_requests == [("tray", True)]
+    assert api.change_zoom("in") == {"status": "updated", "action": "in", "percent": 110}
+    assert zoom_actions == ["in"]
+    try:
+        api.change_zoom("invalid")
+    except ValueError as error:
+        assert "不支持的缩放操作" in str(error)
+    else:
+        raise AssertionError("Desktop bridge must reject unknown zoom actions")
 
 
-def test_desktop_zoom_monitor_defers_and_coalesces_notifications() -> None:
+def test_windows_zoom_controller_persists_and_coalesces_notifications() -> None:
     class FakeNativeEvent:
         def __init__(self) -> None:
             self.handlers = []
@@ -345,41 +369,101 @@ def test_desktop_zoom_monitor_defers_and_coalesces_notifications() -> None:
         def evaluate_js(self, script: str) -> None:
             self.evaluated_scripts.append(script)
 
-    scheduled_actions = []
-    window = FakeWindow()
-    monitor = DesktopZoomMonitor(window, action_scheduler=scheduled_actions.append)
-    assert monitor.attach() is True
-    assert monitor.attach() is True
-    assert len(window.native.webview.ZoomFactorChanged.handlers) == 1
+    with tempfile.TemporaryDirectory() as raw:
+        settings = Path(raw) / "settings.json"
+        settings.write_text('{"theme":"dark","desktop_zoom_percent":90}', encoding="utf-8")
+        scheduled_actions = []
+        window = FakeWindow()
+        controller = DesktopZoomController(
+            window,
+            platform_key="windows",
+            settings_path=settings,
+            gui_scheduler=lambda callback: callback(),
+            notification_scheduler=scheduled_actions.append,
+        )
+        assert controller.attach() is True
+        assert controller.attach() is True
+        assert window.native.webview.ZoomFactor == 0.9
+        assert len(window.native.webview.ZoomFactorChanged.handlers) == 1
 
-    window.native.webview.ZoomFactor = 1.1
-    window.native.webview.ZoomFactorChanged.fire(window.native.webview)
-    assert window.evaluated_scripts == []
-    assert len(scheduled_actions) == 1
-    scheduled_actions.pop(0)()
-    assert '"percent":110' in window.evaluated_scripts[-1]
+        assert controller.change("in") == 100
+        assert window.native.webview.ZoomFactor == 1.0
+        assert load_zoom_preference(settings) == 100
+        assert load_preferences(settings)["theme"] == "dark"
+        assert len(scheduled_actions) == 1
+        scheduled_actions.pop(0)()
+        assert '"percent":100' in window.evaluated_scripts[-1]
 
-    window.native.webview.ZoomFactor = 0.9
-    window.native.webview.ZoomFactorChanged.fire(window.native.webview)
-    window.native.webview.ZoomFactor = 0.8
-    window.native.webview.ZoomFactorChanged.fire(window.native.webview)
-    assert len(scheduled_actions) == 2
-    evaluated_count = len(window.evaluated_scripts)
-    scheduled_actions.pop(0)()
-    assert len(window.evaluated_scripts) == evaluated_count
-    scheduled_actions.pop(0)()
-    assert len(window.evaluated_scripts) == evaluated_count + 1
-    assert '"percent":80' in window.evaluated_scripts[-1]
-
-    with patch("desktop.zoom.logger.warning") as warning:
-        window.native.webview.ZoomFactor = 0.1
         window.native.webview.ZoomFactorChanged.fire(window.native.webview)
-        warning.assert_called_once()
-    assert scheduled_actions == []
+        assert scheduled_actions == []
 
-    monitor.detach()
-    assert window.native.webview.ZoomFactorChanged.handlers == []
-    assert monitor.attach() is False
+        window.native.webview.ZoomFactor = 1.1
+        window.native.webview.ZoomFactorChanged.fire(window.native.webview)
+        assert load_zoom_preference(settings) == 110
+        window.native.webview.ZoomFactor = 1.25
+        window.native.webview.ZoomFactorChanged.fire(window.native.webview)
+        assert len(scheduled_actions) == 2
+        evaluated_count = len(window.evaluated_scripts)
+        scheduled_actions.pop(0)()
+        assert len(window.evaluated_scripts) == evaluated_count
+        scheduled_actions.pop(0)()
+        assert len(window.evaluated_scripts) == evaluated_count + 1
+        assert '"percent":125' in window.evaluated_scripts[-1]
+
+        with patch("desktop.zoom.logger.warning") as warning:
+            window.native.webview.ZoomFactor = 0.1
+            window.native.webview.ZoomFactorChanged.fire(window.native.webview)
+            warning.assert_called_once()
+        assert scheduled_actions == []
+
+        controller.detach()
+        assert window.native.webview.ZoomFactorChanged.handlers == []
+        assert controller.attach() is False
+
+
+def test_macos_zoom_controller_uses_wkwebview_and_restores_default() -> None:
+    class FakeMacWebView:
+        def __init__(self) -> None:
+            self.factor = 0.0
+
+        def pageZoom(self) -> float:
+            return self.factor
+
+        def setPageZoom_(self, factor: float) -> None:
+            self.factor = factor
+
+    class FakeMacWindow:
+        def __init__(self) -> None:
+            self.webview = FakeMacWebView()
+            self.native = type("NativeWindow", (), {"contentView": lambda native: self.webview})()
+            self.evaluated_scripts = []
+
+        def evaluate_js(self, script: str) -> None:
+            self.evaluated_scripts.append(script)
+
+    with tempfile.TemporaryDirectory() as raw:
+        settings = Path(raw) / "settings.json"
+        settings.write_text('{"desktop_zoom_percent":900,"confirm_close":true}', encoding="utf-8")
+        scheduled_actions = []
+        window = FakeMacWindow()
+        controller = DesktopZoomController(
+            window,
+            platform_key="macos",
+            settings_path=settings,
+            gui_scheduler=lambda callback: callback(),
+            notification_scheduler=scheduled_actions.append,
+        )
+        assert controller.attach() is True
+        assert window.webview.factor == 1.0
+        assert controller.change("in") == 110
+        assert window.webview.factor == 1.1
+        assert load_zoom_preference(settings) == 110
+        assert load_preferences(settings)["confirm_close"] is True
+        scheduled_actions.pop(0)()
+        assert '"percent":110' in window.evaluated_scripts[-1]
+        assert controller.change("reset") == 100
+        assert window.webview.factor == 1.0
+        controller.detach()
 
 
 def test_desktop_lifecycle_locks_before_hiding() -> None:
@@ -550,8 +634,10 @@ def test_close_to_tray_preference_defaults_safely() -> None:
         assert load_close_preferences(settings) == (True, True)
         settings.write_text('{"close_to_tray": "true"}', encoding="utf-8")
         assert load_close_to_tray(settings) is False
+        settings.write_text('{"desktop_zoom_percent":125,"close_to_tray":"true"}', encoding="utf-8")
         save_close_preferences(settings, True, False)
         assert load_close_preferences(settings) == (True, False)
+        assert load_zoom_preference(settings) == 125
 
 
 def test_tray_start_failure_keeps_window_open() -> None:
@@ -635,6 +721,7 @@ def test_shutdown_wait_self_test_protocol() -> None:
 def test_existing_process_exit_protocol_handles_windows_races() -> None:
     with (
         patch.object(desktop_instance.os, "name", "nt"),
+        patch.object(desktop_instance.sys, "platform", "win32"),
         patch.object(desktop_instance, "_named_mutex_exists", side_effect=[True, True, False]),
         patch.object(desktop_instance, "_signal_named_event", return_value=True) as signal,
         patch.object(desktop_instance.time, "sleep"),
@@ -644,6 +731,7 @@ def test_existing_process_exit_protocol_handles_windows_races() -> None:
 
     with (
         patch.object(desktop_instance.os, "name", "nt"),
+        patch.object(desktop_instance.sys, "platform", "win32"),
         patch.object(desktop_instance, "_named_mutex_exists", side_effect=[True, False]),
         patch.object(desktop_instance, "_signal_named_event", return_value=False),
     ):
@@ -651,6 +739,7 @@ def test_existing_process_exit_protocol_handles_windows_races() -> None:
 
     with (
         patch.object(desktop_instance.os, "name", "nt"),
+        patch.object(desktop_instance.sys, "platform", "win32"),
         patch.object(desktop_instance, "_named_mutex_exists", side_effect=[True, True]),
         patch.object(desktop_instance, "_signal_named_event", return_value=False),
     ):
@@ -658,17 +747,96 @@ def test_existing_process_exit_protocol_handles_windows_races() -> None:
 
 
 def test_non_windows_single_instance_fallback() -> None:
-    coordinator = SingleInstanceCoordinator()
-    assert coordinator.acquire() is True
-    coordinator.start_listener(lambda: None)
-    coordinator.close()
-    assert request_existing_process_exit() is True
-    result = subprocess.run(
-        [sys.executable, "desktop/app.py", "--shutdown-existing"],
-        cwd=ROOT,
-        check=False,
-    )
-    assert result.returncode == 0
+    if sys.platform != "linux":
+        return
+    with tempfile.TemporaryDirectory() as raw:
+        root = Path(raw)
+        coordinator = SingleInstanceCoordinator(data_root=root)
+        assert coordinator.acquire() is True
+        coordinator.start_listener(lambda: None)
+        coordinator.close()
+        assert request_existing_process_exit(data_root=root) is True
+        result = subprocess.run(
+            [sys.executable, "desktop/app.py", "--shutdown-existing", "--data-root", str(root)],
+            cwd=ROOT,
+            check=False,
+        )
+        assert result.returncode == 0
+
+
+def test_platform_profiles_and_runtime_capabilities() -> None:
+    with (
+        patch.object(platform_support.sys, "platform", "darwin"),
+        patch.object(platform_support.platform, "machine", return_value="arm64"),
+    ):
+        profile = current_platform_profile()
+        assert profile.key == "macos"
+        assert profile.renderer == "wkwebview"
+        assert profile.gui == "cocoa"
+        assert profile.capabilities["tray"] is False
+        assert profile.capabilities["single_instance"] is True
+        assert profile.capabilities["zoom_controls"] is True
+        assert profile.capabilities["native_zoom_feedback"] is True
+        assert normalized_architecture() == "arm64"
+        environment = desktop_runtime_environment(shell=True)
+        assert environment["SECRETBASE_DESKTOP_PLATFORM"] == "macos"
+        assert environment["SECRETBASE_DESKTOP_ARCHITECTURE"] == "arm64"
+        assert json.loads(environment["SECRETBASE_DESKTOP_CAPABILITIES"])["tray"] is False
+
+
+def test_macos_single_instance_activation_and_exit_protocol() -> None:
+    if sys.platform == "win32":
+        return
+    with tempfile.TemporaryDirectory() as raw, patch.object(desktop_instance.sys, "platform", "darwin"):
+        root = Path(raw)
+        activated = threading.Event()
+        exit_requested = threading.Event()
+        first = SingleInstanceCoordinator(data_root=root)
+        assert first.acquire() is True
+        first.start_listener(activated.set, exit_requested.set)
+
+        duplicate = SingleInstanceCoordinator(data_root=root)
+        assert duplicate.acquire() is False
+        assert activated.wait(2)
+        duplicate.close()
+
+        result = []
+        requester = threading.Thread(
+            target=lambda: result.append(request_existing_process_exit(timeout=2, data_root=root)),
+            daemon=True,
+        )
+        requester.start()
+        assert exit_requested.wait(2)
+        first.close()
+        requester.join(timeout=3)
+        assert result == [True]
+
+        replacement = SingleInstanceCoordinator(data_root=root)
+        assert replacement.acquire() is True
+        replacement.close()
+
+
+def test_macos_lifecycle_rejects_tray_preferences() -> None:
+    class FakeServer:
+        def lock_vault(self) -> None:
+            return None
+
+    lifecycle = DesktopLifecycle(FakeServer(), ROOT / "desktop" / "assets" / "secretbase.ico", supports_tray=False)
+    assert lifecycle.set_close_preferences(False, False) is True
+    try:
+        lifecycle.set_close_preferences(True, True)
+    except ValueError as error:
+        assert "不支持系统托盘" in str(error)
+    else:
+        raise AssertionError("macOS lifecycle must reject tray preferences")
+    try:
+        lifecycle.resolve_close_request("tray", False)
+    except ValueError as error:
+        assert "不支持系统托盘" in str(error)
+    else:
+        raise AssertionError("macOS lifecycle must reject tray close actions")
+    assert lifecycle.on_closing() is None
+    assert lifecycle.exit_requested is True
 
 
 def main() -> None:
@@ -684,13 +852,17 @@ def main() -> None:
         test_desktop_diagnostics_and_directory_allowlist,
         test_desktop_update_check_validation,
         test_desktop_bridge_productization_methods,
-        test_desktop_zoom_monitor_defers_and_coalesces_notifications,
+        test_windows_zoom_controller_persists_and_coalesces_notifications,
+        test_macos_zoom_controller_uses_wkwebview_and_restores_default,
         test_desktop_lifecycle_locks_before_hiding,
         test_close_to_tray_preference_defaults_safely,
         test_tray_start_failure_keeps_window_open,
         test_shutdown_wait_self_test_protocol,
         test_existing_process_exit_protocol_handles_windows_races,
         test_non_windows_single_instance_fallback,
+        test_platform_profiles_and_runtime_capabilities,
+        test_macos_single_instance_activation_and_exit_protocol,
+        test_macos_lifecycle_rejects_tray_preferences,
     )
     for test in tests:
         test()

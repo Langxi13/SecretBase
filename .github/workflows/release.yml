@@ -13,7 +13,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest]
+        os: [ubuntu-latest, windows-latest, macos-15]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v7
@@ -31,19 +31,24 @@ jobs:
       - run: python -m pip install -r backend/requirements.txt
       - run: python scripts/run-release-checks.py
       - name: Verify Linux local bootstrap
-        if: runner.os == 'Linux'
+        if: runner.os != 'Windows'
         run: scripts/start-local.sh --dry-run --data-root "$RUNNER_TEMP/secretbase-local"
       - name: Verify Windows source bootstrap
         if: runner.os == 'Windows'
         uses: ./.github/actions/verify-windows-bootstrap
 
-  desktop:
+  windows-desktop:
     uses: ./.github/workflows/reusable-windows-desktop.yml
     with:
       retention-days: 30
 
+  macos-desktop:
+    uses: ./.github/workflows/reusable-macos-desktop.yml
+    with:
+      retention-days: 30
+
   release:
-    needs: [verify, desktop]
+    needs: [verify, windows-desktop, macos-desktop]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -53,7 +58,22 @@ jobs:
         uses: actions/download-artifact@v8
         with:
           name: secretbase-windows-x64
-          path: release-assets
+          path: release-input/windows
+      - name: Download macOS desktop release assets
+        uses: actions/download-artifact@v8
+        with:
+          name: secretbase-macos-arm64
+          path: release-input/macos
+      - name: Prepare unified release assets
+        run: |
+          (cd release-input/windows && sha256sum -c SHA256SUMS.txt)
+          (cd release-input/macos && sha256sum -c SHA256SUMS.txt)
+          mkdir -p release-assets
+          cp release-input/windows/SecretBase-v*-windows-x64.zip release-assets/
+          cp release-input/windows/SecretBase-v*-windows-x64-setup.exe release-assets/
+          cp release-input/macos/SecretBase-v*-macos-arm64.dmg release-assets/
+          cp release-input/macos/SecretBase-v*-macos-arm64.zip release-assets/
+          (cd release-assets && sha256sum -- *.dmg *.exe *.zip > SHA256SUMS.txt)
       - name: Validate release tag
         run: |
           version=$(sed -n 's/^APP_VERSION = "\([0-9][0-9.]*\)"/\1/p' backend/version.py)

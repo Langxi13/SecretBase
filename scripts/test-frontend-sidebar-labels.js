@@ -23,8 +23,7 @@ function assertMatches(content, pattern, message) {
 
 [
     ['视图', 'sidebar-label-view', '▦'],
-    ['标签', 'sidebar-label-tags', '🏷️'],
-    ['管理', 'sidebar-label-tools', '⚙️']
+    ['标签', 'sidebar-label-tags', '🏷️']
 ].forEach(([label, className, icon]) => {
     assertIncludes(markup, `class="sidebar-label ${className}"`, `${label}分组标题必须有独立语义类`);
     assertIncludes(markup, `aria-label="${label}"`, `${label}分组标题必须保留无障碍名称`);
@@ -33,6 +32,9 @@ function assertMatches(content, pattern, message) {
 
 assertNotIncludes(markup, 'label-indicator', '侧边栏折叠态不应继续使用难以识别的小圆点');
 assertNotIncludes(css, '.label-indicator', '旧的小圆点样式应删除，避免冗余规则');
+assertNotIncludes(markup, 'sidebar-tools', '左侧栏不应保留与顶部和底部重复的管理区域');
+assertNotIncludes(markup, 'aria-label="管理工具"', '左侧栏管理入口应整组移除');
+assertNotIncludes(css, '.sidebar-tools', '左侧栏管理区域样式应同步删除');
 
 assertMatches(
     css,
@@ -62,6 +64,12 @@ assertMatches(
     css,
     /\.app-container\.sidebar-collapsed\s+\.sidebar-label-tags\s+\.sidebar-label-icon\s*\{[\s\S]*?font-size:\s*32px/,
     '折叠态标签分组图标必须保持最高识别度'
+);
+
+assertMatches(
+    css,
+    /@media\s*\(min-width:\s*1181px\)\s*and\s*\(max-height:\s*720px\)[\s\S]*?\.sidebar-tags\s+\.sidebar-nav-item[\s\S]*?min-height:\s*34px/,
+    '短高度桌面窗口必须压缩侧栏密度，避免常用标签被挤出可视区域'
 );
 
 console.log('PASS frontend sidebar labels');

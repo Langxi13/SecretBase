@@ -2,8 +2,14 @@
 
 pywebview==6.2.1
 pyinstaller==6.21.0
-pystray==0.19.5
+pystray==0.19.5; sys_platform == "win32"
 Pillow==12.3.0
 six==1.17.0
 pythonnet==3.0.5; sys_platform == "win32"
 clr_loader==0.2.10; sys_platform == "win32"
+pyobjc-core==12.2.1; sys_platform == "darwin"
+pyobjc-framework-Cocoa==12.2.1; sys_platform == "darwin"
+pyobjc-framework-Quartz==12.2.1; sys_platform == "darwin"
+pyobjc-framework-WebKit==12.2.1; sys_platform == "darwin"
+pyobjc-framework-Security==12.2.1; sys_platform == "darwin"
+pyobjc-framework-UniformTypeIdentifiers==12.2.1; sys_platform == "darwin"

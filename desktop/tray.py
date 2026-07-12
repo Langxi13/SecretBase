@@ -1,17 +1,17 @@
 from __future__ import annotations
 
-import json
 import logging
 import os
-import tempfile
 import threading
 from pathlib import Path
 from typing import Callable
 
 try:
     from .instance import focus_current_process_window
+    from .preferences import load_preferences, update_preferences
 except ImportError:
     from instance import focus_current_process_window
+    from preferences import load_preferences, update_preferences
 
 
 logger = logging.getLogger(__name__)
@@ -36,13 +36,8 @@ FRONTEND_CLOSE_REQUEST_SCRIPT = """
 
 
 def load_close_preferences(settings_path: Path) -> tuple[bool, bool]:
-    try:
-        payload = json.loads(settings_path.read_text(encoding="utf-8"))
-        if not isinstance(payload, dict):
-            raise ValueError("设置文件必须是对象")
-        return payload.get("close_to_tray") is True, payload.get("confirm_close") is not False
-    except (FileNotFoundError, OSError, ValueError, TypeError, json.JSONDecodeError):
-        return False, True
+    payload = load_preferences(settings_path)
+    return payload.get("close_to_tray") is True, payload.get("confirm_close") is not False
 
 
 def load_close_to_tray(settings_path: Path) -> bool:
@@ -50,40 +45,18 @@ def load_close_to_tray(settings_path: Path) -> bool:
 
 
 def save_close_preferences(settings_path: Path, close_to_tray: bool, confirm_close: bool) -> None:
-    try:
-        payload = json.loads(settings_path.read_text(encoding="utf-8"))
-        if not isinstance(payload, dict):
-            payload = {}
-    except (FileNotFoundError, OSError, ValueError, TypeError, json.JSONDecodeError):
-        payload = {}
-
-    payload["close_to_tray"] = close_to_tray
-    payload["confirm_close"] = confirm_close
-    settings_path.parent.mkdir(parents=True, exist_ok=True)
-    temporary_path = None
-    try:
-        with tempfile.NamedTemporaryFile(
-            mode="w",
-            encoding="utf-8",
-            prefix=f".{settings_path.name}.",
-            suffix=".tmp",
-            dir=settings_path.parent,
-            delete=False,
-        ) as temporary:
-            json.dump(payload, temporary, ensure_ascii=False, indent=2)
-            temporary.write("\n")
-            temporary.flush()
-            os.fsync(temporary.fileno())
-            temporary_path = Path(temporary.name)
-        os.replace(temporary_path, settings_path)
-    finally:
-        if temporary_path and temporary_path.exists():
-            temporary_path.unlink()
+    update_preferences(
+        settings_path,
+        {
+            "close_to_tray": close_to_tray,
+            "confirm_close": confirm_close,
+        },
+    )
 
 
-def fallback_close_action(default_to_tray: bool) -> str:
+def fallback_close_action(default_to_tray: bool, *, supports_tray: bool = True) -> str:
     if os.name != "nt":
-        return "tray" if default_to_tray else "exit"
+        return "tray" if supports_tray and default_to_tray else "exit"
     import ctypes
 
     flags = 0x00000003 | 0x00000020
@@ -192,12 +165,14 @@ class DesktopLifecycle:
         settings_path: Path | None = None,
         tray_factory=TrayIcon,
         action_scheduler: Callable[[Callable[[], None]], None] | None = None,
+        supports_tray: bool | None = None,
     ) -> None:
         self.server = server
         self.icon_path = icon_path
         self.settings_path = settings_path
         self.tray_factory = tray_factory
         self.action_scheduler = action_scheduler or self._schedule_action
+        self.supports_tray = True if supports_tray is None else supports_tray
         self.window = None
         self.tray = None
         self.close_to_tray = False
@@ -217,6 +192,8 @@ class DesktopLifecycle:
         self.window = window
 
     def _ensure_tray(self) -> bool:
+        if not self.supports_tray:
+            return False
         if self.tray is None:
             self.tray = self.tray_factory(
                 self.icon_path,
@@ -229,6 +206,8 @@ class DesktopLifecycle:
     def set_close_preferences(self, close_to_tray: bool, confirm_close: bool) -> bool:
         if type(close_to_tray) is not bool or type(confirm_close) is not bool:
             raise ValueError("关闭设置必须是布尔值")
+        if close_to_tray and not self.supports_tray:
+            raise ValueError("当前桌面平台不支持系统托盘")
         with self._lock:
             self.close_to_tray = close_to_tray
             self.confirm_close = confirm_close
@@ -351,7 +330,7 @@ class DesktopLifecycle:
         if self._request_frontend_close_confirmation():
             return
 
-        action = fallback_close_action(default_to_tray)
+        action = fallback_close_action(default_to_tray, supports_tray=self.supports_tray)
         if action == "tray":
             self._hide_to_tray_or_notify()
         elif action == "exit":
@@ -387,6 +366,8 @@ class DesktopLifecycle:
             raise ValueError("记住选择必须是布尔值")
 
         if action == "tray":
+            if not self.supports_tray:
+                raise ValueError("当前桌面平台不支持系统托盘")
             if not self._schedule_close_action(
                 lambda: self._hide_to_tray_or_notify(remember=remember)
             ):

@@ -265,10 +265,22 @@ if is_desktop_mode():
 @app.get("/secretbase-runtime-config.js", include_in_schema=False)
 async def runtime_config_js():
     api_base_url = "" if is_desktop_mode() else None
+    desktop_capabilities = {}
+    if is_desktop_mode():
+        try:
+            desktop_capabilities = json.loads(os.getenv("SECRETBASE_DESKTOP_CAPABILITIES", "{}"))
+            if not isinstance(desktop_capabilities, dict):
+                desktop_capabilities = {}
+        except (TypeError, ValueError, json.JSONDecodeError):
+            desktop_capabilities = {}
     config = {
         "mode": "desktop" if is_desktop_mode() else "server",
         "apiBaseUrl": api_base_url,
         "version": APP_VERSION,
+        "desktopShell": os.getenv("SECRETBASE_DESKTOP_SHELL", "false").lower() == "true",
+        "desktopPlatform": os.getenv("SECRETBASE_DESKTOP_PLATFORM", ""),
+        "desktopArchitecture": os.getenv("SECRETBASE_DESKTOP_ARCHITECTURE", ""),
+        "desktopCapabilities": desktop_capabilities,
     }
     script = (
         f"window.SECRETBASE_RUNTIME_CONFIG = {json.dumps(config, ensure_ascii=False)};\n"

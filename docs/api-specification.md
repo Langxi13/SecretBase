@@ -1859,6 +1859,7 @@ GET /settings
     "auto_backup_retention": 30,
     "close_to_tray": false,
     "confirm_close": true,
+    "desktop_zoom_percent": 100,
     "language": "zh-CN"
   }
 }
@@ -1878,7 +1879,8 @@ PUT /settings
   "page_size": 30,
   "auto_backup_retention": 60,
   "close_to_tray": true,
-  "confirm_close": false
+  "confirm_close": false,
+  "desktop_zoom_percent": 110
 }
 ```
 
@@ -1894,6 +1896,7 @@ PUT /settings
     "auto_backup_retention": 60,
     "close_to_tray": true,
     "confirm_close": false,
+    "desktop_zoom_percent": 110,
     "language": "zh-CN"
   },
   "message": "设置已更新"
@@ -1904,7 +1907,9 @@ PUT /settings
 
 - 422: 设置值无效（如 page_size 不是正整数）
 
-`close_to_tray` 只影响 Windows 桌面壳，默认 `false`；`confirm_close` 默认 `true`，控制点击关闭按钮时是否显示隐藏到托盘/退出确认。服务端模式会保存这两个字段，但不会启动系统托盘或显示桌面关闭确认。
+`close_to_tray` 只影响支持托盘的 Windows 桌面壳，默认 `false`；macOS 会忽略并强制关闭该能力。`confirm_close` 默认 `true`：Windows 显示隐藏到托盘/退出/取消，macOS 首版只显示退出/取消。服务端模式会保存这两个字段，但不会启动系统托盘或显示桌面关闭确认。
+
+`desktop_zoom_percent` 默认 `100`，有效范围 `25-500`。桌面壳可在 vault 未解锁时直接更新该本机字段；后端设置模型必须保留它，避免保存主题或分页设置时丢失缩放比例。普通浏览器模式不使用该字段覆盖浏览器自身缩放。
 
 ## 10. 认证中间件
 

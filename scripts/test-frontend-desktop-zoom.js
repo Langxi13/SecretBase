@@ -7,10 +7,11 @@ const source = fs.readFileSync(path.join(root, 'frontend/js/desktop-zoom-indicat
 const styles = fs.readFileSync(path.join(root, 'frontend/css/desktop-components.css'), 'utf8');
 const indexHtml = fs.readFileSync(path.join(root, 'frontend/index.html'), 'utf8');
 
-function createRuntime(mode) {
+function createRuntime(mode, platform = 'windows') {
     const listeners = new Map();
     const elements = new Map();
     const timers = new Map();
+    const zoomActions = [];
     let nextTimerId = 1;
 
     function createClassList() {
@@ -47,7 +48,19 @@ function createRuntime(mode) {
     };
 
     const window = {
-        SECRETBASE_RUNTIME_CONFIG: { mode },
+        SECRETBASE_RUNTIME_CONFIG: {
+            mode,
+            desktopPlatform: platform,
+            desktopCapabilities: { zoom_controls: true, native_zoom_feedback: true }
+        },
+        pywebview: {
+            api: {
+                change_zoom(action) {
+                    zoomActions.push(action);
+                    return { status: 'updated', percent: 100 };
+                }
+            }
+        },
         addEventListener(name, handler) { listeners.set(name, handler); },
         clearTimeout(id) { timers.delete(id); },
         setTimeout(callback, delay) {
@@ -58,8 +71,8 @@ function createRuntime(mode) {
     };
     window.window = window;
 
-    vm.runInContext(source, vm.createContext({ window, document, Number, Math }));
-    return { listeners, elements, timers };
+    vm.runInContext(source, vm.createContext({ window, document, Number, Math, Promise, console }));
+    return { listeners, elements, timers, zoomActions };
 }
 
 const desktop = createRuntime('desktop');
@@ -89,13 +102,55 @@ if (indicator.classList.contains('is-visible') || indicator.getAttribute('aria-h
 zoomListener({ detail: { percent: 900 } });
 if (indicator.textContent !== '90%') throw new Error('超出范围的缩放比例不应更新提示');
 
+function keyboardEvent(overrides) {
+    return {
+        key: '',
+        code: '',
+        ctrlKey: false,
+        metaKey: false,
+        shiftKey: false,
+        altKey: false,
+        prevented: false,
+        stopped: false,
+        preventDefault() { this.prevented = true; },
+        stopPropagation() { this.stopped = true; },
+        ...overrides
+    };
+}
+
+const windowsKeydown = desktop.listeners.get('keydown');
+if (typeof windowsKeydown !== 'function') throw new Error('Windows 桌面模式没有注册缩放快捷键');
+const windowsZoomIn = keyboardEvent({ key: '=', ctrlKey: true, shiftKey: true });
+windowsKeydown(windowsZoomIn);
+if (desktop.zoomActions[0] !== 'in' || !windowsZoomIn.prevented || !windowsZoomIn.stopped) {
+    throw new Error('Windows Ctrl+Shift+= 没有触发原生放大');
+}
+windowsKeydown(keyboardEvent({ key: '-', ctrlKey: true }));
+windowsKeydown(keyboardEvent({ key: '0', ctrlKey: true }));
+if (desktop.zoomActions.join(',') !== 'in,out,reset') throw new Error('Windows 缩放快捷键映射不完整');
+
+const mac = createRuntime('desktop', 'macos');
+const macKeydown = mac.listeners.get('keydown');
+const macZoomIn = keyboardEvent({ key: '+', metaKey: true });
+macKeydown(macZoomIn);
+macKeydown(keyboardEvent({ key: '-', metaKey: true }));
+macKeydown(keyboardEvent({ key: '0', metaKey: true }));
+if (mac.zoomActions.join(',') !== 'in,out,reset' || !macZoomIn.prevented) {
+    throw new Error('macOS Command + / - / 0 缩放快捷键映射不完整');
+}
+
+const plainPlus = keyboardEvent({ key: '+' });
+macKeydown(plainPlus);
+if (plainPlus.prevented || mac.zoomActions.length !== 3) throw new Error('普通加号输入不应触发桌面缩放');
+
 const server = createRuntime('server');
 if (server.listeners.has('secretbase:desktop-zoom-changed')) {
     throw new Error('服务端模式不应注册桌面缩放提示');
 }
+if (server.listeners.has('keydown')) throw new Error('服务端模式不应拦截浏览器缩放快捷键');
 
 if (!styles.includes('.desktop-zoom-indicator.is-visible')) throw new Error('缩放提示可见样式缺失');
-if (!indexHtml.includes('js/desktop-zoom-indicator.js?v=20260711-ui-v78')) {
+if (!indexHtml.includes('js/desktop-zoom-indicator.js?v=20260712-ui-v80')) {
     throw new Error('入口页没有加载桌面缩放提示脚本');
 }
 
