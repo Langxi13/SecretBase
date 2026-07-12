@@ -9,7 +9,7 @@ SecretBase is intentionally scoped as a single-user encrypted vault. The priorit
 - Maintain a simple FastAPI backend and vendored Vue frontend with no runtime CDN dependency.
 - Keep production deployment practical behind nginx or another reverse proxy.
 - Maintain the stable Windows and macOS desktop packaging, diagnostics, lifecycle, and data-safety behavior described in [App Roadmap](app-roadmap.md).
-- Freeze the Vault V1 contract and build cross-language compatibility fixtures before starting the Android client.
+- Start the Android-first Flutter client on top of the completed Vault V1 contract and Rust compatibility core.
 
 ## Implemented
 
@@ -35,7 +35,7 @@ SecretBase is intentionally scoped as a single-user encrypted vault. The priorit
 - More compact and modular frontend organization.
 - Additional production health check automation.
 - macOS signing and notarization when an Apple Developer account is available.
-- Flutter Android and iOS clients after the shared Rust vault prototype and compatibility suite pass the release gate.
+- iOS adaptation after the Android Flutter/Rust client reaches a stable encrypted-backup-compatible MVP.
 
 ## Out of Scope
 

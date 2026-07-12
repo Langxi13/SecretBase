@@ -229,7 +229,7 @@ V3.2 增加了当前用户免管理员安装器、桌面状态与诊断、目录
 
 V3.3 已增加 macOS 13+ Apple Silicon arm64 桌面版，继续复用同一套 FastAPI、Vue 前端和 vault 数据格式。macOS 提供 DMG 和 ZIP，使用 WKWebView、单实例和原生目录/文件选择框；关闭窗口时退出本地服务，不提供菜单栏驻留。Windows 使用 `Ctrl + +`、`Ctrl + -`、`Ctrl + 0`，macOS 使用 `Command + +`、`Command + -`、`Command + 0` 调整并重置界面比例，最后比例保存在本机。
 
-V4.0 正在固化 Vault V1 格式和跨语言兼容边界。现有 Web、Windows 和 macOS 继续使用 Python 生产核心；仓库新增公开黄金向量和独立 Rust 参考实现，用于未来 Flutter Android/iOS 客户端。V4 不迁移现有 vault，也不把 Rust 原型打入桌面包。格式规范见 `docs/vault-format-v1.md`，Rust 检查命令如下：
+V4.0 共享 Vault 核心准备已经完成。现有 Web、Windows 和 macOS 继续使用 Python 生产核心；仓库已固化 Vault V1 规范、公开黄金向量和独立 Rust 参考实现，为 Flutter Android/iOS 客户端建立兼容边界。V4 不迁移现有 vault，也不把 Rust 原型打入桌面包。验收记录见 `docs/v4-vault-core.md`，下一阶段 Android 计划见 `docs/v5-android-plan.md`，Rust 检查命令如下：
 
 ```bash
 cd vault-core
@@ -646,7 +646,7 @@ V3.2 adds a per-user installer, desktop diagnostics, fixed directory shortcuts, 
 
 V3.3 adds a macOS 13+ Apple Silicon arm64 desktop app while preserving the same FastAPI backend, Vue frontend, and vault format. It provides DMG and ZIP assets, WKWebView, single-instance activation, and native directory/file dialogs. Closing the window exits the local service; menu-bar residency is deferred. Browser-style zoom shortcuts use `Ctrl + + / - / 0` on Windows and `Command + + / - / 0` on macOS, with the last local zoom level restored on startup.
 
-V4.0 is freezing the Vault V1 format and its cross-language compatibility boundary. Existing Web, Windows, and macOS builds continue to use the Python production core. Public golden vectors and an isolated Rust reference implementation prepare for future Flutter Android and iOS clients without migrating existing vaults or bundling Rust into the current desktop packages. See `docs/vault-format-v1.md` for the normative contract.
+V4.0 shared Vault preparation is complete. Existing Web, Windows, and macOS builds continue to use the Python production core. The normative Vault V1 contract, public golden vectors, and isolated Rust reference implementation now provide the compatibility boundary for future Flutter Android and iOS clients without migrating existing vaults or bundling Rust into current desktop packages. See `docs/v4-vault-core.md` for acceptance and `docs/v5-android-plan.md` for the next implementation phase.
 
 Build the macOS test package on Apple Silicon with Python 3.11:
 
