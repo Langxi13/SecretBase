@@ -187,14 +187,25 @@ jobs:
         with:
           distribution: temurin
           java-version: "17"
-      - name: Enable KVM acceleration
+      - name: Detect KVM acceleration
+        id: kvm
         run: |
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' \
             | sudo tee /etc/udev/rules.d/99-kvm4all.rules
-          sudo udevadm control --reload-rules
-          sudo udevadm trigger --name-match=kvm
-          test -r /dev/kvm
-          test -w /dev/kvm
+          sudo udevadm control --reload-rules || true
+          sudo udevadm trigger --name-match=kvm || true
+
+          available=false
+          if [[ -e /dev/kvm ]]; then
+            sudo chmod 666 /dev/kvm || true
+            if [[ -r /dev/kvm && -w /dev/kvm ]]; then
+              available=true
+            fi
+          fi
+          echo "available=$available" >>"$GITHUB_OUTPUT"
+          if [[ "$available" != true ]]; then
+            echo "::warning::KVM is unavailable; using the slower software emulator."
+          fi
       - name: Download Android package
         uses: actions/download-artifact@v8
         with:
@@ -208,7 +219,8 @@ jobs:
           target: default
           profile: pixel_6
           disable-animations: true
-          disable-linux-hw-accel: false
+          disable-linux-hw-accel: ${{ steps.kvm.outputs.available != 'true' }}
+          emulator-boot-timeout: 1200
           emulator-options: >-
             -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim
             -camera-back none
