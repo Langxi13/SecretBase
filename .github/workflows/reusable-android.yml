@@ -203,27 +203,9 @@ jobs:
           emulator-options: >-
             -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim
             -camera-back none
-          script: |
-            set -eu
-            apk=$(find artifacts/android -maxdepth 1 -type f -name '*.apk' -print -quit)
-            test -n "$apk"
-            adb logcat -c
-            adb install "$apk"
-            launch_output=$(adb shell am start -W \
-              -n io.github.langxi13.secretbase/.MainActivity)
-            printf '%s\n' "$launch_output" \
-              | tee "$RUNNER_TEMP/android-api-${{ matrix.api-level }}-launch.txt"
-            sleep 8
-            pid=$(adb shell pidof io.github.langxi13.secretbase | tr -d '\r')
-            test -n "$pid"
-            adb exec-out screencap -p \
-              >"$RUNNER_TEMP/android-api-${{ matrix.api-level }}.png"
-            adb logcat -d --pid="$pid" \
-              >"$RUNNER_TEMP/android-api-${{ matrix.api-level }}-logcat.txt"
-            if grep -Fq 'FATAL EXCEPTION' \
-              "$RUNNER_TEMP/android-api-${{ matrix.api-level }}-logcat.txt"; then
-              exit 1
-            fi
+          script: >-
+            bash scripts/android_emulator_smoke.sh
+            ${{ matrix.api-level }}
       - name: Upload emulator evidence
         if: always()
         uses: actions/upload-artifact@v7
