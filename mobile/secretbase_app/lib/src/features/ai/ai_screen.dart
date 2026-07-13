@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:secretbase/src/core/mobile_error_presenter.dart';
 import 'package:secretbase/src/core/widgets/async_content.dart';
+import 'package:secretbase/src/core/widgets/paged_scroll.dart';
 import 'package:secretbase/src/core/widgets/page_controls.dart';
 import 'package:secretbase/src/core/widgets/responsive_dialog.dart';
 import 'package:secretbase/src/data/vault_providers.dart';
@@ -116,7 +117,7 @@ class _AiScreenState extends ConsumerState<AiScreen> {
     return Stack(
       children: [
         ListView(
-          padding: const EdgeInsets.fromLTRB(14, 14, 14, 96),
+          padding: const EdgeInsets.fromLTRB(12, 10, 12, 90),
           children: [
             Center(
               child: ConstrainedBox(
@@ -125,7 +126,7 @@ class _AiScreenState extends ConsumerState<AiScreen> {
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     _ToolSelector(selected: _tool, onSelected: _selectTool),
-                    const SizedBox(height: 14),
+                    const SizedBox(height: 10),
                     _RequestPanel(
                       tool: _tool,
                       inputController: _inputController,
@@ -136,11 +137,11 @@ class _AiScreenState extends ConsumerState<AiScreen> {
                       onGenerate: () => _generate(status),
                     ),
                     if (_error != null) ...[
-                      const SizedBox(height: 12),
+                      const SizedBox(height: 9),
                       _ErrorBand(message: _error!),
                     ],
                     if (_preview != null) ...[
-                      const SizedBox(height: 16),
+                      const SizedBox(height: 12),
                       _PreviewPanel(
                         preview: _preview!,
                         selected: _selected,
@@ -441,7 +442,7 @@ class _AiHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 14, 12, 12),
+      padding: const EdgeInsets.fromLTRB(16, 10, 10, 9),
       child: Row(
         children: [
           Expanded(
@@ -449,7 +450,7 @@ class _AiHeader extends StatelessWidget {
               'AI 管理',
               style: Theme.of(
                 context,
-              ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w800),
+              ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
             ),
           ),
           if (status?.configured == true)
@@ -491,8 +492,8 @@ class _ToolSelector extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Wrap(
-      spacing: 8,
-      runSpacing: 8,
+      spacing: 6,
+      runSpacing: 6,
       children: AiTool.values
           .map(
             (tool) => ChoiceChip(
@@ -530,7 +531,7 @@ class _RequestPanel extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     return Container(
-      padding: const EdgeInsets.all(15),
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: scheme.surface,
         borderRadius: BorderRadius.circular(6),
@@ -551,14 +552,14 @@ class _RequestPanel extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: 10),
           if (tool == AiTool.entryTags) ...[
             OutlinedButton.icon(
               onPressed: working ? null : onPickEntry,
               icon: const Icon(Icons.key_outlined),
               label: Text(selectedEntryTitle ?? '选择条目'),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 9),
           ],
           if (tool == AiTool.parse)
             TextField(
@@ -919,6 +920,7 @@ class _AiEntryPickerDialog extends ConsumerStatefulWidget {
 
 class _AiEntryPickerDialogState extends ConsumerState<_AiEntryPickerDialog> {
   final _searchController = TextEditingController();
+  final _scrollController = ScrollController();
   Timer? _debounce;
   int _page = 1;
   String _search = '';
@@ -927,14 +929,18 @@ class _AiEntryPickerDialogState extends ConsumerState<_AiEntryPickerDialog> {
   void dispose() {
     _debounce?.cancel();
     _searchController.dispose();
+    _scrollController.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+    final pageSize = ref.watch(
+      preferencesProvider.select((preferences) => preferences.entryPageSize),
+    );
     final query = EntryQuery(
       page: _page,
-      pageSize: 20,
+      pageSize: pageSize,
       search: _search,
       deleted: false,
     );
@@ -944,7 +950,7 @@ class _AiEntryPickerDialogState extends ConsumerState<_AiEntryPickerDialog> {
       child: Column(
         children: [
           Padding(
-            padding: const EdgeInsets.all(14),
+            padding: const EdgeInsets.all(12),
             child: TextField(
               controller: _searchController,
               onChanged: (value) {
@@ -955,12 +961,18 @@ class _AiEntryPickerDialogState extends ConsumerState<_AiEntryPickerDialog> {
                       _search = value.trim();
                       _page = 1;
                     });
+                    resetPagedScroll(_scrollController);
                   }
                 });
               },
               decoration: const InputDecoration(
+                isDense: true,
                 hintText: '搜索条目名称',
-                prefixIcon: Icon(Icons.search),
+                prefixIcon: Icon(Icons.search, size: 20),
+                prefixIconConstraints: BoxConstraints(
+                  minWidth: 40,
+                  minHeight: 40,
+                ),
               ),
             ),
           ),
@@ -972,6 +984,7 @@ class _AiEntryPickerDialogState extends ConsumerState<_AiEntryPickerDialog> {
                 onRetry: () => ref.invalidate(entryPageProvider(query)),
               ),
               data: (page) => ListView.builder(
+                controller: _scrollController,
                 itemCount: page.items.isEmpty ? 1 : page.items.length + 1,
                 itemBuilder: (context, index) {
                   if (page.items.isEmpty) {
@@ -984,9 +997,12 @@ class _AiEntryPickerDialogState extends ConsumerState<_AiEntryPickerDialog> {
                     return PageControls(
                       page: page.page,
                       totalPages: page.totalPages,
-                      pageSize: 20,
+                      pageSize: pageSize,
                       showPageSize: false,
-                      onPageChanged: (value) => setState(() => _page = value),
+                      onPageChanged: (value) {
+                        setState(() => _page = value);
+                        resetPagedScroll(_scrollController);
+                      },
                       onPageSizeChanged: (_) {},
                     );
                   }

@@ -36,7 +36,12 @@ Future<String?> importVaultBackup({
   }
   final bytes = await file.readAsBytes();
   if (!context.mounted) return null;
-  final password = await _requestPassword(context, title: '输入备份主密码');
+  final password = await _requestPassword(
+    context,
+    title: '输入备份主密码',
+    description: '请输入创建该备份时，备份所属密码库使用的主密码。',
+    fieldLabel: '备份主密码',
+  );
   if (password == null || password.isEmpty) return null;
   final preview = await rust_api.previewImport(
     content: bytes,
@@ -58,7 +63,12 @@ Future<String?> restoreRecoverySnapshot({
   required WidgetRef ref,
   required RecoverySnapshot snapshot,
 }) async {
-  final password = await _requestPassword(context, title: '输入该恢复记录的主密码');
+  final password = await _requestPassword(
+    context,
+    title: '输入恢复记录主密码',
+    description: '请输入创建该恢复记录时，本机密码库使用的主密码。',
+    fieldLabel: '恢复记录主密码',
+  );
   if (password == null || password.isEmpty) return null;
   final preview = await rust_api.previewRecovery(
     id: snapshot.id,
@@ -78,6 +88,8 @@ Future<String?> restoreRecoverySnapshot({
 Future<String?> _requestPassword(
   BuildContext context, {
   required String title,
+  required String description,
+  required String fieldLabel,
 }) async {
   final controller = TextEditingController();
   var obscure = true;
@@ -86,23 +98,36 @@ Future<String?> _requestPassword(
     builder: (context) => StatefulBuilder(
       builder: (context, setState) => AlertDialog(
         title: Text(title),
-        content: TextField(
-          controller: controller,
-          autofocus: true,
-          obscureText: obscure,
-          decoration: InputDecoration(
-            labelText: '主密码',
-            suffixIcon: IconButton(
-              tooltip: obscure ? '显示主密码' : '隐藏主密码',
-              onPressed: () => setState(() => obscure = !obscure),
-              icon: Icon(
-                obscure
-                    ? Icons.visibility_outlined
-                    : Icons.visibility_off_outlined,
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              description,
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
               ),
             ),
-          ),
-          onSubmitted: (value) => Navigator.of(context).pop(value),
+            const SizedBox(height: 14),
+            TextField(
+              controller: controller,
+              autofocus: true,
+              obscureText: obscure,
+              decoration: InputDecoration(
+                labelText: fieldLabel,
+                suffixIcon: IconButton(
+                  tooltip: obscure ? '显示主密码' : '隐藏主密码',
+                  onPressed: () => setState(() => obscure = !obscure),
+                  icon: Icon(
+                    obscure
+                        ? Icons.visibility_outlined
+                        : Icons.visibility_off_outlined,
+                  ),
+                ),
+              ),
+              onSubmitted: (value) => Navigator.of(context).pop(value),
+            ),
+          ],
         ),
         actions: [
           TextButton(

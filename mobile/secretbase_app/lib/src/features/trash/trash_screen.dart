@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:secretbase/src/core/mobile_error_presenter.dart';
 import 'package:secretbase/src/core/widgets/async_content.dart';
+import 'package:secretbase/src/core/widgets/paged_scroll.dart';
 import 'package:secretbase/src/core/widgets/page_controls.dart';
 import 'package:secretbase/src/data/vault_providers.dart';
 import 'package:secretbase/src/features/entries/entry_card.dart';
@@ -20,6 +21,7 @@ class TrashScreen extends ConsumerStatefulWidget {
 
 class _TrashScreenState extends ConsumerState<TrashScreen> {
   final _searchController = TextEditingController();
+  final _scrollController = ScrollController();
   Timer? _debounce;
   int _page = 1;
   String _search = '';
@@ -28,6 +30,7 @@ class _TrashScreenState extends ConsumerState<TrashScreen> {
   void dispose() {
     _debounce?.cancel();
     _searchController.dispose();
+    _scrollController.dispose();
     super.dispose();
   }
 
@@ -50,7 +53,7 @@ class _TrashScreenState extends ConsumerState<TrashScreen> {
           Material(
             color: Theme.of(context).colorScheme.surface,
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(14, 10, 14, 12),
+              padding: const EdgeInsets.fromLTRB(12, 7, 12, 8),
               child: Center(
                 child: ConstrainedBox(
                   constraints: const BoxConstraints(maxWidth: 920),
@@ -58,8 +61,13 @@ class _TrashScreenState extends ConsumerState<TrashScreen> {
                     controller: _searchController,
                     onChanged: _onSearch,
                     decoration: const InputDecoration(
+                      isDense: true,
                       hintText: '筛选已删除条目',
-                      prefixIcon: Icon(Icons.search),
+                      prefixIcon: Icon(Icons.search, size: 20),
+                      prefixIconConstraints: BoxConstraints(
+                        minWidth: 40,
+                        minHeight: 40,
+                      ),
                     ),
                   ),
                 ),
@@ -94,7 +102,8 @@ class _TrashScreenState extends ConsumerState<TrashScreen> {
       );
     }
     return ListView.builder(
-      padding: const EdgeInsets.fromLTRB(14, 14, 14, 34),
+      controller: _scrollController,
+      padding: const EdgeInsets.fromLTRB(12, 10, 12, 30),
       itemCount: page.items.length + 1,
       itemBuilder: (context, index) {
         if (index == page.items.length) {
@@ -102,10 +111,14 @@ class _TrashScreenState extends ConsumerState<TrashScreen> {
             page: page.page,
             totalPages: page.totalPages,
             pageSize: page.pageSize,
-            onPageChanged: (value) => setState(() => _page = value),
+            onPageChanged: (value) {
+              setState(() => _page = value);
+              resetPagedScroll(_scrollController);
+            },
             onPageSizeChanged: (value) {
               ref.read(preferencesProvider.notifier).setEntryPageSize(value);
               setState(() => _page = 1);
+              resetPagedScroll(_scrollController);
             },
           );
         }
@@ -114,7 +127,7 @@ class _TrashScreenState extends ConsumerState<TrashScreen> {
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 920),
             child: Padding(
-              padding: const EdgeInsets.only(bottom: 9),
+              padding: const EdgeInsets.only(bottom: 8),
               child: EntryCard(entry: entry, onTap: () => _openEntry(entry.id)),
             ),
           ),
@@ -131,6 +144,7 @@ class _TrashScreenState extends ConsumerState<TrashScreen> {
           _search = value.trim();
           _page = 1;
         });
+        resetPagedScroll(_scrollController);
       }
     });
   }

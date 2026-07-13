@@ -29,6 +29,13 @@ class EntryCard extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
     final previewFields = entry.fields.take(3).toList();
     final remaining = entry.fields.length - previewFields.length;
+    final visibleGroups = entry.groups.take(1).toList();
+    final visibleTags = entry.tags.take(1).toList();
+    final hiddenCategories =
+        entry.groups.length +
+        entry.tags.length -
+        visibleGroups.length -
+        visibleTags.length;
     return Card(
       clipBehavior: Clip.antiAlias,
       child: InkWell(
@@ -43,8 +50,9 @@ class EntryCard extends StatelessWidget {
               ),
             ),
             Padding(
-              padding: const EdgeInsets.fromLTRB(17, 15, 15, 14),
+              padding: const EdgeInsets.fromLTRB(14, 11, 12, 11),
               child: Column(
+                mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   Row(
@@ -56,13 +64,13 @@ class EntryCard extends StatelessWidget {
                           children: [
                             Text(
                               entry.title,
-                              maxLines: 2,
+                              maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style: Theme.of(context).textTheme.titleMedium
                                   ?.copyWith(fontWeight: FontWeight.w800),
                             ),
                             if (entry.url.isNotEmpty) ...[
-                              const SizedBox(height: 4),
+                              const SizedBox(height: 2),
                               Text(
                                 _displayUrl(entry.url),
                                 maxLines: 1,
@@ -79,7 +87,7 @@ class EntryCard extends StatelessWidget {
                           padding: const EdgeInsets.only(left: 10),
                           child: Icon(
                             Icons.star_rounded,
-                            size: 21,
+                            size: 19,
                             color: scheme.secondary,
                           ),
                         ),
@@ -88,18 +96,18 @@ class EntryCard extends StatelessWidget {
                     ],
                   ),
                   if (previewFields.isNotEmpty) ...[
-                    const SizedBox(height: 13),
+                    const SizedBox(height: 9),
                     Divider(height: 1, color: scheme.outlineVariant),
-                    const SizedBox(height: 10),
+                    const SizedBox(height: 7),
                     ...previewFields.map(
                       (field) => Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 4),
+                        padding: const EdgeInsets.symmetric(vertical: 2),
                         child: _FieldPreviewRow(field: field),
                       ),
                     ),
                     if (remaining > 0)
                       Padding(
-                        padding: const EdgeInsets.only(top: 7),
+                        padding: const EdgeInsets.only(top: 4),
                         child: Align(
                           alignment: Alignment.centerLeft,
                           child: Text(
@@ -114,29 +122,31 @@ class EntryCard extends StatelessWidget {
                       ),
                   ],
                   if (entry.tags.isNotEmpty || entry.groups.isNotEmpty) ...[
-                    const SizedBox(height: 12),
+                    const SizedBox(height: 8),
                     Wrap(
-                      spacing: 6,
-                      runSpacing: 6,
+                      spacing: 5,
+                      runSpacing: 4,
                       children: [
-                        ...entry.groups
-                            .take(2)
-                            .map(
-                              (group) => _MetaLabel(
-                                icon: Icons.folder_outlined,
-                                label: group,
-                                color: scheme.tertiary,
-                              ),
-                            ),
-                        ...entry.tags
-                            .take(3)
-                            .map(
-                              (tag) => _MetaLabel(
-                                icon: Icons.sell_outlined,
-                                label: tag,
-                                color: scheme.primary,
-                              ),
-                            ),
+                        ...visibleGroups.map(
+                          (group) => _MetaLabel(
+                            icon: Icons.folder_outlined,
+                            label: group,
+                            color: scheme.tertiary,
+                          ),
+                        ),
+                        ...visibleTags.map(
+                          (tag) => _MetaLabel(
+                            icon: Icons.sell_outlined,
+                            label: tag,
+                            color: scheme.primary,
+                          ),
+                        ),
+                        if (hiddenCategories > 0)
+                          _MetaLabel(
+                            icon: Icons.more_horiz,
+                            label: '+$hiddenCategories',
+                            color: scheme.onSurfaceVariant,
+                          ),
                       ],
                     ),
                   ],
@@ -165,7 +175,7 @@ class _FieldPreviewRow extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
     return LayoutBuilder(
       builder: (context, constraints) {
-        final keyWidth = (constraints.maxWidth * 0.34).clamp(76.0, 156.0);
+        final keyWidth = (constraints.maxWidth * 0.34).clamp(72.0, 146.0);
         return Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -173,7 +183,7 @@ class _FieldPreviewRow extends StatelessWidget {
               width: keyWidth,
               child: Text(
                 field.name,
-                maxLines: 2,
+                maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
                   color: scheme.onSurfaceVariant,
@@ -181,11 +191,11 @@ class _FieldPreviewRow extends StatelessWidget {
                 ),
               ),
             ),
-            const SizedBox(width: 16),
+            const SizedBox(width: 14),
             Expanded(
               child: Text(
                 field.hidden ? '••••••' : field.value,
-                maxLines: 2,
+                maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                   fontFamily: field.hidden ? null : 'monospace',
@@ -214,8 +224,8 @@ class _MetaLabel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      constraints: const BoxConstraints(maxWidth: 150),
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      constraints: const BoxConstraints(maxWidth: 112),
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.09),
         borderRadius: BorderRadius.circular(5),

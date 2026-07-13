@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:secretbase/src/core/theme/app_theme.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 final sharedPreferencesProvider = Provider<SharedPreferences>(
@@ -9,29 +10,37 @@ final sharedPreferencesProvider = Provider<SharedPreferences>(
 class AppPreferences {
   const AppPreferences({
     required this.themeMode,
+    required this.textSize,
     required this.entryPageSize,
     required this.taxonomyPageSize,
+    required this.groupPageSize,
     required this.clipboardClearSeconds,
     required this.aiPrivacyAccepted,
   });
 
   final ThemeMode themeMode;
+  final AppTextSize textSize;
   final int entryPageSize;
   final int taxonomyPageSize;
+  final int groupPageSize;
   final int clipboardClearSeconds;
   final bool aiPrivacyAccepted;
 
   AppPreferences copyWith({
     ThemeMode? themeMode,
+    AppTextSize? textSize,
     int? entryPageSize,
     int? taxonomyPageSize,
+    int? groupPageSize,
     int? clipboardClearSeconds,
     bool? aiPrivacyAccepted,
   }) {
     return AppPreferences(
       themeMode: themeMode ?? this.themeMode,
+      textSize: textSize ?? this.textSize,
       entryPageSize: entryPageSize ?? this.entryPageSize,
       taxonomyPageSize: taxonomyPageSize ?? this.taxonomyPageSize,
+      groupPageSize: groupPageSize ?? this.groupPageSize,
       clipboardClearSeconds:
           clipboardClearSeconds ?? this.clipboardClearSeconds,
       aiPrivacyAccepted: aiPrivacyAccepted ?? this.aiPrivacyAccepted,
@@ -52,13 +61,18 @@ class PreferencesController extends Notifier<AppPreferences> {
     _preferences = ref.watch(sharedPreferencesProvider);
     return AppPreferences(
       themeMode: _themeFromName(_preferences.getString('theme_mode')),
+      textSize: _textSizeFromName(_preferences.getString('text_size')),
       entryPageSize: _validPageSize(
         _preferences.getInt('entry_page_size'),
-        fallback: 20,
+        fallback: 5,
       ),
       taxonomyPageSize: _validPageSize(
         _preferences.getInt('taxonomy_page_size'),
-        fallback: 20,
+        fallback: 5,
+      ),
+      groupPageSize: _validPageSize(
+        _preferences.getInt('group_page_size'),
+        fallback: 5,
       ),
       clipboardClearSeconds: _validClipboardSeconds(
         _preferences.getInt('clipboard_clear_seconds'),
@@ -72,16 +86,27 @@ class PreferencesController extends Notifier<AppPreferences> {
     await _preferences.setString('theme_mode', mode.name);
   }
 
+  Future<void> setTextSize(AppTextSize value) async {
+    state = state.copyWith(textSize: value);
+    await _preferences.setString('text_size', value.name);
+  }
+
   Future<void> setEntryPageSize(int value) async {
-    final pageSize = _validPageSize(value, fallback: 20);
+    final pageSize = _validPageSize(value, fallback: 5);
     state = state.copyWith(entryPageSize: pageSize);
     await _preferences.setInt('entry_page_size', pageSize);
   }
 
   Future<void> setTaxonomyPageSize(int value) async {
-    final pageSize = _validPageSize(value, fallback: 20);
+    final pageSize = _validPageSize(value, fallback: 5);
     state = state.copyWith(taxonomyPageSize: pageSize);
     await _preferences.setInt('taxonomy_page_size', pageSize);
+  }
+
+  Future<void> setGroupPageSize(int value) async {
+    final pageSize = _validPageSize(value, fallback: 5);
+    state = state.copyWith(groupPageSize: pageSize);
+    await _preferences.setInt('group_page_size', pageSize);
   }
 
   Future<void> setClipboardClearSeconds(int value) async {
@@ -98,6 +123,11 @@ class PreferencesController extends Notifier<AppPreferences> {
   static ThemeMode _themeFromName(String? value) {
     return ThemeMode.values.where((mode) => mode.name == value).firstOrNull ??
         ThemeMode.system;
+  }
+
+  static AppTextSize _textSizeFromName(String? value) {
+    return AppTextSize.values.where((size) => size.name == value).firstOrNull ??
+        AppTextSize.standard;
   }
 
   static int _validPageSize(int? value, {required int fallback}) {

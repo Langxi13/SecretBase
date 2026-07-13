@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:secretbase/src/core/mobile_error_presenter.dart';
 import 'package:secretbase/src/core/widgets/async_content.dart';
+import 'package:secretbase/src/core/widgets/paged_scroll.dart';
 import 'package:secretbase/src/core/widgets/page_controls.dart';
 import 'package:secretbase/src/data/vault_providers.dart';
 import 'package:secretbase/src/features/entries/entry_card.dart';
@@ -31,6 +32,7 @@ class EntriesScreen extends ConsumerStatefulWidget {
 
 class _EntriesScreenState extends ConsumerState<EntriesScreen> {
   final _searchController = TextEditingController();
+  final _scrollController = ScrollController();
   Timer? _searchDebounce;
   int _page = 1;
   String _search = '';
@@ -49,6 +51,7 @@ class _EntriesScreenState extends ConsumerState<EntriesScreen> {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.preset.generation != widget.preset.generation) {
       setState(() => _applyPreset(widget.preset));
+      resetPagedScroll(_scrollController);
     }
   }
 
@@ -56,6 +59,7 @@ class _EntriesScreenState extends ConsumerState<EntriesScreen> {
   void dispose() {
     _searchDebounce?.cancel();
     _searchController.dispose();
+    _scrollController.dispose();
     super.dispose();
   }
 
@@ -106,18 +110,27 @@ class _EntriesScreenState extends ConsumerState<EntriesScreen> {
             tags: tags,
             groups: groups,
             onSearchChanged: _onSearchChanged,
-            onTagChanged: (value) => setState(() {
-              _tag = value;
-              _page = 1;
-            }),
-            onGroupChanged: (value) => setState(() {
-              _group = value;
-              _page = 1;
-            }),
-            onStarredChanged: (value) => setState(() {
-              _starred = value;
-              _page = 1;
-            }),
+            onTagChanged: (value) {
+              setState(() {
+                _tag = value;
+                _page = 1;
+              });
+              resetPagedScroll(_scrollController);
+            },
+            onGroupChanged: (value) {
+              setState(() {
+                _group = value;
+                _page = 1;
+              });
+              resetPagedScroll(_scrollController);
+            },
+            onStarredChanged: (value) {
+              setState(() {
+                _starred = value;
+                _page = 1;
+              });
+              resetPagedScroll(_scrollController);
+            },
             onClear: _hasFilters ? _clearFilters : null,
           ),
           Expanded(
@@ -145,8 +158,9 @@ class _EntriesScreenState extends ConsumerState<EntriesScreen> {
         await ref.read(entryPageProvider(query).future);
       },
       child: ListView.builder(
+        controller: _scrollController,
         physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.fromLTRB(14, 14, 14, 96),
+        padding: const EdgeInsets.fromLTRB(12, 10, 12, 90),
         itemCount: page.items.isEmpty ? 1 : page.items.length + 1,
         itemBuilder: (context, index) {
           if (page.items.isEmpty) {
@@ -174,10 +188,14 @@ class _EntriesScreenState extends ConsumerState<EntriesScreen> {
               page: page.page,
               totalPages: page.totalPages,
               pageSize: page.pageSize,
-              onPageChanged: (value) => setState(() => _page = value),
+              onPageChanged: (value) {
+                setState(() => _page = value);
+                resetPagedScroll(_scrollController);
+              },
               onPageSizeChanged: (value) {
                 ref.read(preferencesProvider.notifier).setEntryPageSize(value);
                 setState(() => _page = 1);
+                resetPagedScroll(_scrollController);
               },
             );
           }
@@ -186,7 +204,7 @@ class _EntriesScreenState extends ConsumerState<EntriesScreen> {
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 980),
               child: Padding(
-                padding: const EdgeInsets.only(bottom: 10),
+                padding: const EdgeInsets.only(bottom: 8),
                 child: EntryCard(
                   entry: entry,
                   onTap: () => _openEntry(entry.id),
@@ -207,6 +225,7 @@ class _EntriesScreenState extends ConsumerState<EntriesScreen> {
           _search = value.trim();
           _page = 1;
         });
+        resetPagedScroll(_scrollController);
       }
     });
   }
@@ -221,6 +240,7 @@ class _EntriesScreenState extends ConsumerState<EntriesScreen> {
       _starred = false;
       _page = 1;
     });
+    resetPagedScroll(_scrollController);
   }
 
   Future<void> _createEntry() async {
@@ -262,7 +282,7 @@ class _EntriesHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 17, 20, 13),
+      padding: const EdgeInsets.fromLTRB(16, 11, 16, 9),
       child: Row(
         children: [
           Expanded(
@@ -270,13 +290,13 @@ class _EntriesHeader extends StatelessWidget {
               '全部条目',
               style: Theme.of(
                 context,
-              ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w800),
+              ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
             ),
           ),
           if (total != null)
             Text(
               '$total 条',
-              style: Theme.of(context).textTheme.labelLarge?.copyWith(
+              style: Theme.of(context).textTheme.labelMedium?.copyWith(
                 color: Theme.of(context).colorScheme.onSurfaceVariant,
               ),
             ),
@@ -318,73 +338,130 @@ class _FilterBar extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
     return Material(
       color: scheme.surface,
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(14, 10, 14, 12),
-        child: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 980),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                TextField(
-                  controller: searchController,
-                  onChanged: onSearchChanged,
-                  decoration: InputDecoration(
-                    hintText: '搜索名称、字段、标签或密码组',
-                    prefixIcon: const Icon(Icons.search),
-                    suffixIcon: searchController.text.isEmpty
-                        ? null
-                        : IconButton(
-                            tooltip: '清空搜索',
-                            onPressed: () {
-                              searchController.clear();
-                              onSearchChanged('');
-                            },
-                            icon: const Icon(Icons.close),
-                          ),
+      child: Container(
+        decoration: BoxDecoration(
+          border: Border(bottom: BorderSide(color: scheme.outlineVariant)),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(12, 7, 12, 8),
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 980),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  ValueListenableBuilder<TextEditingValue>(
+                    valueListenable: searchController,
+                    builder: (context, value, child) => TextField(
+                      controller: searchController,
+                      onChanged: onSearchChanged,
+                      decoration: InputDecoration(
+                        isDense: true,
+                        hintText: '搜索条目、字段或分类',
+                        prefixIcon: const Icon(Icons.search, size: 20),
+                        prefixIconConstraints: const BoxConstraints(
+                          minWidth: 40,
+                          minHeight: 40,
+                        ),
+                        suffixIconConstraints: const BoxConstraints(
+                          minWidth: 40,
+                          minHeight: 40,
+                        ),
+                        suffixIcon: value.text.isEmpty
+                            ? null
+                            : IconButton(
+                                tooltip: '清空搜索',
+                                onPressed: () {
+                                  searchController.clear();
+                                  onSearchChanged('');
+                                },
+                                icon: const Icon(Icons.close, size: 18),
+                              ),
+                      ),
+                    ),
                   ),
-                ),
-                const SizedBox(height: 9),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  crossAxisAlignment: WrapCrossAlignment.center,
-                  children: [
-                    _FilterDropdown(
-                      icon: Icons.sell_outlined,
-                      label: selectedTag ?? '全部标签',
-                      value: selectedTag,
-                      items: tags.map((item) => item.name).toList(),
-                      onChanged: onTagChanged,
-                    ),
-                    _FilterDropdown(
-                      icon: Icons.folder_outlined,
-                      label: selectedGroup ?? '全部密码组',
-                      value: selectedGroup,
-                      items: groups.map((item) => item.name).toList(),
-                      onChanged: onGroupChanged,
-                    ),
-                    FilterChip(
-                      selected: starred,
-                      avatar: Icon(
-                        starred ? Icons.star_rounded : Icons.star_outline,
-                        size: 17,
+                  const SizedBox(height: 7),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _FilterDropdown(
+                          icon: Icons.sell_outlined,
+                          label: selectedTag ?? '标签',
+                          value: selectedTag,
+                          items: tags.map((item) => item.name).toList(),
+                          onChanged: onTagChanged,
+                        ),
                       ),
-                      label: const Text('仅收藏'),
-                      onSelected: onStarredChanged,
-                    ),
-                    if (onClear != null)
-                      TextButton.icon(
-                        onPressed: onClear,
-                        icon: const Icon(Icons.filter_alt_off, size: 17),
-                        label: const Text('清除'),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: _FilterDropdown(
+                          icon: Icons.folder_outlined,
+                          label: selectedGroup ?? '密码组',
+                          value: selectedGroup,
+                          items: groups.map((item) => item.name).toList(),
+                          onChanged: onGroupChanged,
+                        ),
                       ),
-                  ],
-                ),
-              ],
+                      const SizedBox(width: 6),
+                      _FavoriteFilterButton(
+                        selected: starred,
+                        onChanged: onStarredChanged,
+                      ),
+                      if (onClear != null) ...[
+                        const SizedBox(width: 4),
+                        IconButton.outlined(
+                          tooltip: '清除筛选',
+                          onPressed: onClear,
+                          icon: const Icon(Icons.filter_alt_off, size: 18),
+                          style: IconButton.styleFrom(
+                            fixedSize: const Size(38, 38),
+                            minimumSize: const Size(38, 38),
+                            padding: EdgeInsets.zero,
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ],
+              ),
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _FavoriteFilterButton extends StatelessWidget {
+  const _FavoriteFilterButton({
+    required this.selected,
+    required this.onChanged,
+  });
+
+  final bool selected;
+  final ValueChanged<bool> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return IconButton(
+      tooltip: selected ? '显示全部条目' : '仅显示收藏',
+      isSelected: selected,
+      onPressed: () => onChanged(!selected),
+      icon: const Icon(Icons.star_outline, size: 19),
+      selectedIcon: const Icon(Icons.star_rounded, size: 19),
+      color: scheme.onSurfaceVariant,
+      style: IconButton.styleFrom(
+        foregroundColor: selected ? scheme.onSecondaryContainer : null,
+        backgroundColor: selected
+            ? scheme.secondaryContainer
+            : scheme.surfaceContainerLow,
+        side: BorderSide(
+          color: selected ? scheme.secondary : scheme.outlineVariant,
+        ),
+        fixedSize: const Size(38, 38),
+        minimumSize: const Size(38, 38),
+        padding: EdgeInsets.zero,
       ),
     );
   }
@@ -407,9 +484,14 @@ class _FilterDropdown extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final accent = icon == Icons.sell_outlined
+        ? scheme.primary
+        : scheme.tertiary;
     return PopupMenuButton<String?>(
       tooltip: label,
       initialValue: value,
+      position: PopupMenuPosition.under,
       onSelected: onChanged,
       itemBuilder: (context) => [
         PopupMenuItem<String?>(
@@ -421,24 +503,28 @@ class _FilterDropdown extends StatelessWidget {
         ),
       ],
       child: Container(
-        constraints: const BoxConstraints(maxWidth: 190),
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+        height: 38,
+        padding: const EdgeInsets.symmetric(horizontal: 8),
         decoration: BoxDecoration(
+          color: value == null
+              ? scheme.surfaceContainerLow
+              : accent.withValues(alpha: 0.1),
           border: Border.all(
-            color: Theme.of(context).colorScheme.outlineVariant,
+            color: value == null
+                ? scheme.outlineVariant
+                : accent.withValues(alpha: 0.55),
           ),
           borderRadius: BorderRadius.circular(6),
         ),
         child: Row(
-          mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: 17),
-            const SizedBox(width: 6),
+            Icon(icon, size: 16, color: value == null ? null : accent),
+            const SizedBox(width: 5),
             Flexible(
               child: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis),
             ),
-            const SizedBox(width: 5),
-            const Icon(Icons.arrow_drop_down, size: 18),
+            const SizedBox(width: 2),
+            const Icon(Icons.arrow_drop_down, size: 17),
           ],
         ),
       ),

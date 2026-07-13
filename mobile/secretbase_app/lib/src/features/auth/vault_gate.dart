@@ -39,7 +39,7 @@ class _VaultGateState extends ConsumerState<VaultGate> {
       }
       if (mounted) context.go('/vault');
     } catch (error) {
-      if (mounted) setState(() => _error = mobileErrorMessage(error));
+      if (mounted) setState(() => _error = mobileUnlockErrorMessage(error));
     }
   }
 
@@ -69,10 +69,10 @@ class _VaultGateState extends ConsumerState<VaultGate> {
       child: LayoutBuilder(
         builder: (context, constraints) {
           return SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 28),
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 22),
             child: ConstrainedBox(
               constraints: BoxConstraints(
-                minHeight: constraints.maxHeight - 56,
+                minHeight: constraints.maxHeight - 44,
               ),
               child: Center(
                 child: ConstrainedBox(
@@ -88,10 +88,10 @@ class _VaultGateState extends ConsumerState<VaultGate> {
                             alignment: Alignment.centerLeft,
                             child: BrandMark(),
                           ),
-                          const SizedBox(height: 42),
+                          const SizedBox(height: 32),
                           Text(
                             creating ? '创建本机密码库' : '解锁密码库',
-                            style: Theme.of(context).textTheme.headlineMedium
+                            style: Theme.of(context).textTheme.headlineSmall
                                 ?.copyWith(fontWeight: FontWeight.w800),
                           ),
                           const SizedBox(height: 9),
@@ -99,10 +99,10 @@ class _VaultGateState extends ConsumerState<VaultGate> {
                             creating
                                 ? '设置用于本机加密的主密码。主密码无法找回。'
                                 : '输入主密码继续访问本机数据。',
-                            style: Theme.of(context).textTheme.bodyLarge
+                            style: Theme.of(context).textTheme.bodyMedium
                                 ?.copyWith(color: scheme.onSurfaceVariant),
                           ),
-                          const SizedBox(height: 28),
+                          const SizedBox(height: 22),
                           TextFormField(
                             controller: _passwordController,
                             obscureText: _obscurePassword,
@@ -286,7 +286,7 @@ class _InlineError extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     return Container(
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
         color: scheme.errorContainer,
         borderRadius: BorderRadius.circular(6),

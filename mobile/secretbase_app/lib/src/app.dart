@@ -17,8 +17,8 @@ class SecretBaseApp extends ConsumerWidget {
     return MaterialApp.router(
       title: 'SecretBase',
       debugShowCheckedModeBanner: false,
-      theme: AppTheme.light(),
-      darkTheme: AppTheme.dark(),
+      theme: AppTheme.light(textSize: preferences.textSize),
+      darkTheme: AppTheme.dark(textSize: preferences.textSize),
       themeMode: preferences.themeMode,
       locale: const Locale('zh', 'CN'),
       supportedLocales: const [Locale('zh', 'CN')],
