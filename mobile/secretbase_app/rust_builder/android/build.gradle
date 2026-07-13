@@ -1,0 +1,57 @@
+// The Android Gradle Plugin builds the native code with the Android NDK.
+
+group 'com.flutter_rust_bridge.secretbase_mobile'
+version '1.0'
+
+buildscript {
+    repositories {
+        if (System.getenv('SECRETBASE_USE_CN_MIRRORS') == '1') {
+            maven { url 'https://maven.aliyun.com/repository/google' }
+            maven { url 'https://maven.aliyun.com/repository/public' }
+        }
+        google()
+        mavenCentral()
+    }
+
+    dependencies {
+        classpath 'com.android.tools.build:gradle:8.13.1'
+    }
+}
+
+rootProject.allprojects {
+    repositories {
+        if (System.getenv('SECRETBASE_USE_CN_MIRRORS') == '1') {
+            maven { url 'https://maven.aliyun.com/repository/google' }
+            maven { url 'https://maven.aliyun.com/repository/public' }
+        }
+        google()
+        mavenCentral()
+    }
+}
+
+apply plugin: 'com.android.library'
+
+android {
+    if (project.android.hasProperty("namespace")) {
+        namespace 'com.flutter_rust_bridge.secretbase_mobile'
+    }
+
+    compileSdkVersion 36
+
+    ndkVersion android.ndkVersion
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+
+    defaultConfig {
+        minSdkVersion 29
+    }
+}
+
+apply from: "../cargokit/gradle/plugin.gradle"
+cargokit {
+    manifestDir = "../../rust"
+    libname = "secretbase_mobile"
+}

@@ -1,0 +1,298 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:secretbase/src/core/mobile_error_presenter.dart';
+import 'package:secretbase/src/core/widgets/responsive_dialog.dart';
+import 'package:secretbase/src/features/ai/ai_transport.dart';
+import 'package:secretbase/src/rust/api/mobile.dart' as rust_api;
+import 'package:secretbase/src/rust/mobile/models.dart';
+
+Future<AiStatus?> showAiSettingsDialog({
+  required BuildContext context,
+  required WidgetRef ref,
+}) {
+  return showResponsiveDialog<AiStatus>(
+    context: context,
+    dismissible: false,
+    maxWidth: 660,
+    builder: (_) => AiSettingsDialog(ref: ref),
+  );
+}
+
+class AiSettingsDialog extends StatefulWidget {
+  const AiSettingsDialog({required this.ref, super.key});
+
+  final WidgetRef ref;
+
+  @override
+  State<AiSettingsDialog> createState() => _AiSettingsDialogState();
+}
+
+class _AiSettingsDialogState extends State<AiSettingsDialog> {
+  final _baseUrlController = TextEditingController();
+  final _apiKeyController = TextEditingController();
+  AiStatus? _status;
+  List<String> _models = [];
+  String? _model;
+  bool _loading = true;
+  bool _working = false;
+  bool _obscureKey = true;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  @override
+  void dispose() {
+    _baseUrlController.dispose();
+    _apiKeyController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _load() async {
+    try {
+      final status = await rust_api.aiStatus();
+      if (!mounted) return;
+      setState(() {
+        _status = status;
+        _baseUrlController.text = status.configured
+            ? status.baseUrl
+            : 'https://api.openai.com/v1';
+        _model = status.configured ? status.model : null;
+        if (_model != null) _models = [_model!];
+        _loading = false;
+      });
+    } catch (error) {
+      if (mounted) {
+        setState(() {
+          _error = mobileErrorMessage(error);
+          _loading = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _fetchModels() async {
+    setState(() {
+      _working = true;
+      _error = null;
+    });
+    try {
+      final request = await rust_api.prepareAiModelsRequest(
+        baseUrl: _baseUrlController.text,
+        apiKey: _apiKeyController.text,
+      );
+      final response = await AiTransport.send(request);
+      final models = await rust_api.parseAiModelsResponse(content: response);
+      if (!mounted) return;
+      setState(() {
+        _models = models;
+        _model = models.contains(_model) ? _model : models.first;
+        _working = false;
+      });
+    } catch (error) {
+      if (mounted) {
+        setState(() {
+          _working = false;
+          _error = _errorMessage(error);
+        });
+      }
+    }
+  }
+
+  Future<void> _save() async {
+    if (_model == null) {
+      setState(() => _error = '请先获取并选择模型');
+      return;
+    }
+    setState(() {
+      _working = true;
+      _error = null;
+    });
+    try {
+      final request = await rust_api.prepareAiVerifyRequest(
+        baseUrl: _baseUrlController.text,
+        apiKey: _apiKeyController.text,
+        model: _model!,
+      );
+      final response = await AiTransport.send(request);
+      await rust_api.verifyAiResponse(content: response);
+      final status = await rust_api.saveAiSettings(
+        baseUrl: _baseUrlController.text,
+        apiKey: _apiKeyController.text,
+        model: _model!,
+      );
+      if (mounted) Navigator.of(context).pop(status);
+    } catch (error) {
+      if (mounted) {
+        setState(() {
+          _working = false;
+          _error = _errorMessage(error);
+        });
+      }
+    }
+  }
+
+  Future<void> _clear() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('清除 AI 设置'),
+        content: const Text('确认清除本机加密保存的 AI 服务配置？'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('清除'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    final status = await rust_api.clearAiSettings();
+    if (mounted) Navigator.of(context).pop(status);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return DialogFrame(
+      title: 'AI 服务设置',
+      onClose: _working ? () {} : null,
+      child: _loading
+          ? const Center(child: CircularProgressIndicator())
+          : Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Expanded(
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.all(20),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        TextField(
+                          controller: _baseUrlController,
+                          enabled: !_working,
+                          keyboardType: TextInputType.url,
+                          decoration: const InputDecoration(
+                            labelText: 'Base URL',
+                            prefixIcon: Icon(Icons.cloud_outlined),
+                            hintText: 'https://api.example.com/v1',
+                            helperText: '仅支持 OpenAI-compatible HTTPS 接口',
+                          ),
+                        ),
+                        const SizedBox(height: 14),
+                        TextField(
+                          controller: _apiKeyController,
+                          enabled: !_working,
+                          obscureText: _obscureKey,
+                          decoration: InputDecoration(
+                            labelText: 'API Key',
+                            prefixIcon: const Icon(Icons.vpn_key_outlined),
+                            hintText: _status?.configured == true
+                                ? '留空则继续使用 ${_status!.apiKeyMask}'
+                                : null,
+                            suffixIcon: IconButton(
+                              tooltip: _obscureKey
+                                  ? '显示 API Key'
+                                  : '隐藏 API Key',
+                              onPressed: () =>
+                                  setState(() => _obscureKey = !_obscureKey),
+                              icon: Icon(
+                                _obscureKey
+                                    ? Icons.visibility_outlined
+                                    : Icons.visibility_off_outlined,
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 14),
+                        OutlinedButton.icon(
+                          onPressed: _working ? null : _fetchModels,
+                          icon: const Icon(Icons.sync, size: 18),
+                          label: const Text('获取模型列表'),
+                        ),
+                        const SizedBox(height: 14),
+                        DropdownButtonFormField<String>(
+                          initialValue: _models.contains(_model)
+                              ? _model
+                              : null,
+                          isExpanded: true,
+                          decoration: const InputDecoration(
+                            labelText: '模型',
+                            prefixIcon: Icon(Icons.memory_outlined),
+                          ),
+                          items: _models
+                              .map(
+                                (model) => DropdownMenuItem(
+                                  value: model,
+                                  child: Text(
+                                    model,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                              )
+                              .toList(),
+                          onChanged: _working
+                              ? null
+                              : (value) => setState(() => _model = value),
+                        ),
+                        if (_error != null) ...[
+                          const SizedBox(height: 16),
+                          Text(
+                            _error!,
+                            style: TextStyle(
+                              color: Theme.of(context).colorScheme.error,
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                ),
+                if (_working) const LinearProgressIndicator(minHeight: 2),
+                const Divider(height: 1),
+                SafeArea(
+                  top: false,
+                  child: Padding(
+                    padding: const EdgeInsets.all(14),
+                    child: Row(
+                      children: [
+                        if (_status?.configured == true)
+                          TextButton.icon(
+                            onPressed: _working ? null : _clear,
+                            icon: const Icon(Icons.delete_outline, size: 18),
+                            label: const Text('清除设置'),
+                          ),
+                        const Spacer(),
+                        TextButton(
+                          onPressed: _working
+                              ? null
+                              : () => Navigator.of(context).pop(),
+                          child: const Text('取消'),
+                        ),
+                        const SizedBox(width: 8),
+                        FilledButton.icon(
+                          onPressed: _working ? null : _save,
+                          icon: const Icon(Icons.verified_outlined, size: 18),
+                          label: Text(_working ? '验证中' : '验证并保存'),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+    );
+  }
+
+  String _errorMessage(Object error) {
+    if (error is AiTransportException) return error.message;
+    return mobileErrorMessage(error);
+  }
+}

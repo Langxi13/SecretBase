@@ -1,0 +1,236 @@
+name: Reusable Android Build
+
+on:
+  workflow_call:
+    inputs:
+      retention-days:
+        description: Artifact retention period in days
+        required: false
+        type: number
+        default: 14
+      run-emulators:
+        description: Run API 29 and API 36 emulator smoke tests
+        required: false
+        type: boolean
+        default: true
+      require-release-signing:
+        description: Fail unless the persistent Android signing secrets exist
+        required: false
+        type: boolean
+        default: false
+    secrets:
+      ANDROID_KEYSTORE_BASE64:
+        required: false
+      ANDROID_KEYSTORE_PASSWORD:
+        required: false
+      ANDROID_KEY_ALIAS:
+        required: false
+      ANDROID_KEY_PASSWORD:
+        required: false
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Verify and build Android universal APK
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    env:
+      CARGO_BUILD_JOBS: "2"
+      CARGOKIT_RUST_TOOLCHAIN: "1.88.0"
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: gradle
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: 3.44.6
+          channel: stable
+          cache: true
+      - uses: dtolnay/rust-toolchain@1.88.0
+        with:
+          components: clippy, rustfmt
+          targets: aarch64-linux-android,armv7-linux-androideabi,x86_64-linux-android
+      - uses: android-actions/setup-android@v3
+      - name: Install pinned Android build tools
+        run: |
+          yes | sdkmanager --licenses >/dev/null || true
+          sdkmanager \
+            "platforms;android-36" \
+            "build-tools;36.0.0" \
+            "ndk;28.2.13676358" \
+            "cmake;3.22.1"
+      - name: Resolve Flutter dependencies
+        working-directory: mobile/secretbase_app
+        run: flutter pub get
+      - name: Check Flutter formatting and analysis
+        working-directory: mobile/secretbase_app
+        run: |
+          dart format --output=none --set-exit-if-changed lib test
+          flutter analyze
+      - name: Run Flutter tests
+        working-directory: mobile/secretbase_app
+        run: flutter test --concurrency=2
+      - name: Verify vendored Cargokit compatibility layer
+        working-directory: mobile/secretbase_app/rust_builder/cargokit/build_tool
+        run: |
+          dart pub get
+          dart format --output=none --set-exit-if-changed lib
+          dart analyze
+      - name: Verify mobile Rust bridge
+        working-directory: mobile/secretbase_app/rust
+        run: |
+          cargo fmt --all -- --check
+          cargo clippy --locked --all-targets --all-features -- -D warnings
+          cargo test --locked --all-targets --all-features
+      - name: Prepare Android signing
+        id: signing
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          REQUIRE_RELEASE_SIGNING: ${{ inputs.require-release-signing }}
+        run: |
+          set -euo pipefail
+          configured=0
+          for value in "$KEYSTORE_BASE64" "$KEYSTORE_PASSWORD" "$KEY_ALIAS" "$KEY_PASSWORD"; do
+            if [[ -n "$value" ]]; then configured=$((configured + 1)); fi
+          done
+
+          keystore="$RUNNER_TEMP/secretbase-android-release.jks"
+          if [[ $configured -eq 4 ]]; then
+            printf '%s' "$KEYSTORE_BASE64" | base64 --decode >"$keystore"
+            signing_mode=production
+          elif [[ $configured -ne 0 ]]; then
+            echo "Android signing secrets must be configured together." >&2
+            exit 1
+          elif [[ "$REQUIRE_RELEASE_SIGNING" == "true" ]]; then
+            echo "Persistent Android signing is required for this build." >&2
+            exit 1
+          else
+            KEYSTORE_PASSWORD=android
+            KEY_ALIAS=secretbase-ci
+            KEY_PASSWORD=android
+            keytool -genkeypair -noprompt \
+              -keystore "$keystore" \
+              -storepass "$KEYSTORE_PASSWORD" \
+              -alias "$KEY_ALIAS" \
+              -keypass "$KEY_PASSWORD" \
+              -dname "CN=SecretBase CI, OU=CI, O=SecretBase, C=US" \
+              -keyalg RSA -keysize 3072 -validity 30
+            signing_mode=ephemeral-ci
+          fi
+
+          {
+            echo "SECRETBASE_ANDROID_KEYSTORE_FILE=$keystore"
+            echo "SECRETBASE_ANDROID_KEYSTORE_PASSWORD=$KEYSTORE_PASSWORD"
+            echo "SECRETBASE_ANDROID_KEY_ALIAS=$KEY_ALIAS"
+            echo "SECRETBASE_ANDROID_KEY_PASSWORD=$KEY_PASSWORD"
+            echo "SECRETBASE_ANDROID_SIGNING_MODE=$signing_mode"
+          } >>"$GITHUB_ENV"
+          echo "mode=$signing_mode" >>"$GITHUB_OUTPUT"
+      - name: Build signed three-ABI release APK
+        working-directory: mobile/secretbase_app
+        run: >-
+          flutter build apk --release --no-pub
+          --target-platform android-arm,android-arm64,android-x64
+      - name: Prepare and verify Android artifact
+        id: artifact
+        run: |
+          set -euo pipefail
+          source_apk=$(find mobile/secretbase_app/build/app/outputs/flutter-apk \
+            -maxdepth 1 -type f -name 'app-release*.apk' -print -quit)
+          test -n "$source_apk"
+          version=$(sed -n 's/^version: \([^+]*\).*/\1/p' mobile/secretbase_app/pubspec.yaml)
+          test -n "$version"
+          mkdir -p artifacts/android
+          if [[ "$SECRETBASE_ANDROID_SIGNING_MODE" == "production" ]]; then
+            filename="SecretBase-v${version}-android-universal.apk"
+          else
+            filename="SecretBase-v${version}-android-universal-ci.apk"
+          fi
+          artifact="artifacts/android/$filename"
+          cp "$source_apk" "$artifact"
+          scripts/verify_android_apk.sh "$artifact" armeabi-v7a,arm64-v8a,x86_64
+          "$ANDROID_SDK_ROOT/build-tools/36.0.0/apksigner" \
+            verify --verbose --print-certs "$artifact"
+          printf 'signing_mode=%s\n' "$SECRETBASE_ANDROID_SIGNING_MODE" \
+            >artifacts/android/ANDROID-BUILD.txt
+          (cd artifacts/android && sha256sum -- "$filename" >SHA256SUMS.txt)
+          echo "apk=$artifact" >>"$GITHUB_OUTPUT"
+      - name: Upload Android package
+        uses: actions/upload-artifact@v7
+        with:
+          name: secretbase-android-universal
+          path: artifacts/android/
+          if-no-files-found: error
+          retention-days: ${{ inputs.retention-days }}
+
+  emulator-smoke:
+    name: Smoke test Android API ${{ matrix.api-level }}
+    if: inputs.run-emulators
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    strategy:
+      fail-fast: false
+      matrix:
+        api-level: [29, 36]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+      - name: Download Android package
+        uses: actions/download-artifact@v8
+        with:
+          name: secretbase-android-universal
+          path: artifacts/android
+      - name: Boot emulator and launch SecretBase
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: ${{ matrix.api-level }}
+          arch: x86_64
+          target: google_apis
+          profile: pixel_6
+          disable-animations: true
+          emulator-options: >-
+            -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim
+            -camera-back none
+          script: |
+            set -euo pipefail
+            apk=$(find artifacts/android -maxdepth 1 -type f -name '*.apk' -print -quit)
+            test -n "$apk"
+            adb logcat -c
+            adb install "$apk"
+            adb shell am start -W \
+              -n io.github.langxi13.secretbase/.MainActivity \
+              | tee "$RUNNER_TEMP/android-api-${{ matrix.api-level }}-launch.txt"
+            sleep 8
+            pid=$(adb shell pidof io.github.langxi13.secretbase | tr -d '\r')
+            test -n "$pid"
+            adb exec-out screencap -p \
+              >"$RUNNER_TEMP/android-api-${{ matrix.api-level }}.png"
+            adb logcat -d --pid="$pid" \
+              >"$RUNNER_TEMP/android-api-${{ matrix.api-level }}-logcat.txt"
+            if grep -Fq 'FATAL EXCEPTION' \
+              "$RUNNER_TEMP/android-api-${{ matrix.api-level }}-logcat.txt"; then
+              exit 1
+            fi
+      - name: Upload emulator evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: secretbase-android-api-${{ matrix.api-level }}-smoke
+          path: |
+            ${{ runner.temp }}/android-api-${{ matrix.api-level }}.png
+            ${{ runner.temp }}/android-api-${{ matrix.api-level }}-launch.txt
+            ${{ runner.temp }}/android-api-${{ matrix.api-level }}-logcat.txt
+          if-no-files-found: warn
+          retention-days: ${{ inputs.retention-days }}
