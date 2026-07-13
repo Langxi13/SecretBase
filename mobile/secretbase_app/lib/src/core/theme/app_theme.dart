@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 
+enum AppTextSize { standard, large }
+
 abstract final class AppTheme {
   static const _primary = Color(0xFF006B68);
   static const _secondary = Color(0xFFB54708);
   static const _tertiary = Color(0xFF315DA8);
 
-  static ThemeData light() {
+  static ThemeData light({AppTextSize textSize = AppTextSize.standard}) {
     final scheme =
         ColorScheme.fromSeed(
           seedColor: _primary,
@@ -23,10 +25,10 @@ abstract final class AppTheme {
           outlineVariant: const Color(0xFFD5DCDF),
           error: const Color(0xFFB42318),
         );
-    return _build(scheme, const Color(0xFFF4F7F8));
+    return _build(scheme, const Color(0xFFF4F7F8), textSize);
   }
 
-  static ThemeData dark() {
+  static ThemeData dark({AppTextSize textSize = AppTextSize.standard}) {
     final scheme =
         ColorScheme.fromSeed(
           seedColor: const Color(0xFF58C7C1),
@@ -45,17 +47,24 @@ abstract final class AppTheme {
           outlineVariant: const Color(0xFF3B4548),
           error: const Color(0xFFFFB4AB),
         );
-    return _build(scheme, const Color(0xFF101416));
+    return _build(scheme, const Color(0xFF101416), textSize);
   }
 
-  static ThemeData _build(ColorScheme scheme, Color scaffoldBackground) {
+  static ThemeData _build(
+    ColorScheme scheme,
+    Color scaffoldBackground,
+    AppTextSize textSize,
+  ) {
+    final compact = textSize == AppTextSize.standard;
     final base = ThemeData(
       useMaterial3: true,
       colorScheme: scheme,
       scaffoldBackgroundColor: scaffoldBackground,
-      visualDensity: VisualDensity.standard,
+      visualDensity: compact
+          ? const VisualDensity(horizontal: -1, vertical: -1)
+          : VisualDensity.standard,
     );
-    final textTheme = _zeroLetterSpacing(base.textTheme);
+    final textTheme = _normalizeTextTheme(base.textTheme, compact ? 0.92 : 1);
     return base.copyWith(
       textTheme: textTheme,
       appBarTheme: AppBarTheme(
@@ -85,9 +94,9 @@ abstract final class AppTheme {
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
         fillColor: scheme.surfaceContainerLow,
-        contentPadding: const EdgeInsets.symmetric(
-          horizontal: 14,
-          vertical: 13,
+        contentPadding: EdgeInsets.symmetric(
+          horizontal: compact ? 12 : 14,
+          vertical: compact ? 10 : 13,
         ),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(6),
@@ -106,9 +115,10 @@ abstract final class AppTheme {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
         side: BorderSide(color: scheme.outlineVariant),
         labelStyle: textTheme.labelMedium,
+        labelPadding: EdgeInsets.symmetric(horizontal: compact ? 5 : 7),
       ),
       navigationBarTheme: NavigationBarThemeData(
-        height: 68,
+        height: compact ? 62 : 68,
         elevation: 3,
         backgroundColor: scheme.surface,
         indicatorColor: scheme.primaryContainer,
@@ -126,7 +136,10 @@ abstract final class AppTheme {
       filledButtonTheme: FilledButtonThemeData(
         style: FilledButton.styleFrom(
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
-          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 13),
+          padding: EdgeInsets.symmetric(
+            horizontal: compact ? 15 : 18,
+            vertical: compact ? 10 : 13,
+          ),
           textStyle: textTheme.labelLarge?.copyWith(
             fontWeight: FontWeight.w700,
           ),
@@ -135,7 +148,10 @@ abstract final class AppTheme {
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          padding: EdgeInsets.symmetric(
+            horizontal: compact ? 14 : 16,
+            vertical: compact ? 9 : 12,
+          ),
           textStyle: textTheme.labelLarge?.copyWith(
             fontWeight: FontWeight.w600,
           ),
@@ -154,27 +170,40 @@ abstract final class AppTheme {
         color: scheme.outlineVariant,
         thickness: 1,
       ),
+      listTileTheme: ListTileThemeData(
+        dense: compact,
+        contentPadding: EdgeInsets.symmetric(horizontal: compact ? 14 : 16),
+        horizontalTitleGap: compact ? 10 : 16,
+        minLeadingWidth: compact ? 28 : 40,
+        minVerticalPadding: compact ? 6 : 8,
+      ),
     );
   }
 
-  static TextTheme _zeroLetterSpacing(TextTheme theme) {
-    TextStyle? normalize(TextStyle? style) => style?.copyWith(letterSpacing: 0);
+  static TextTheme _normalizeTextTheme(TextTheme theme, double scale) {
+    TextStyle normalize(TextStyle? style, double fontSize) {
+      return (style ?? const TextStyle()).copyWith(
+        fontSize: fontSize * scale,
+        letterSpacing: 0,
+      );
+    }
+
     return theme.copyWith(
-      displayLarge: normalize(theme.displayLarge),
-      displayMedium: normalize(theme.displayMedium),
-      displaySmall: normalize(theme.displaySmall),
-      headlineLarge: normalize(theme.headlineLarge),
-      headlineMedium: normalize(theme.headlineMedium),
-      headlineSmall: normalize(theme.headlineSmall),
-      titleLarge: normalize(theme.titleLarge),
-      titleMedium: normalize(theme.titleMedium),
-      titleSmall: normalize(theme.titleSmall),
-      bodyLarge: normalize(theme.bodyLarge),
-      bodyMedium: normalize(theme.bodyMedium),
-      bodySmall: normalize(theme.bodySmall),
-      labelLarge: normalize(theme.labelLarge),
-      labelMedium: normalize(theme.labelMedium),
-      labelSmall: normalize(theme.labelSmall),
+      displayLarge: normalize(theme.displayLarge, 57),
+      displayMedium: normalize(theme.displayMedium, 45),
+      displaySmall: normalize(theme.displaySmall, 36),
+      headlineLarge: normalize(theme.headlineLarge, 32),
+      headlineMedium: normalize(theme.headlineMedium, 28),
+      headlineSmall: normalize(theme.headlineSmall, 24),
+      titleLarge: normalize(theme.titleLarge, 22),
+      titleMedium: normalize(theme.titleMedium, 16),
+      titleSmall: normalize(theme.titleSmall, 14),
+      bodyLarge: normalize(theme.bodyLarge, 16),
+      bodyMedium: normalize(theme.bodyMedium, 14),
+      bodySmall: normalize(theme.bodySmall, 12),
+      labelLarge: normalize(theme.labelLarge, 14),
+      labelMedium: normalize(theme.labelMedium, 12),
+      labelSmall: normalize(theme.labelSmall, 11),
     );
   }
 }

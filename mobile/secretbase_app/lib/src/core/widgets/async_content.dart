@@ -73,20 +73,20 @@ class EmptyView extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
     return Center(
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 48),
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 38),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             Container(
-              width: 56,
-              height: 56,
+              width: 52,
+              height: 52,
               decoration: BoxDecoration(
                 color: scheme.surfaceContainer,
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Icon(icon, color: scheme.primary),
             ),
-            const SizedBox(height: 15),
+            const SizedBox(height: 12),
             Text(
               title,
               style: Theme.of(
@@ -104,7 +104,7 @@ class EmptyView extends StatelessWidget {
                 textAlign: TextAlign.center,
               ),
             ],
-            if (action != null) ...[const SizedBox(height: 18), action!],
+            if (action != null) ...[const SizedBox(height: 15), action!],
           ],
         ),
       ),

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:secretbase/src/core/mobile_error_presenter.dart';
+import 'package:secretbase/src/core/theme/app_theme.dart';
 import 'package:secretbase/src/core/widgets/async_content.dart';
 import 'package:secretbase/src/core/widgets/responsive_dialog.dart';
 import 'package:secretbase/src/data/vault_providers.dart';
@@ -30,15 +31,15 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Padding(
-          padding: const EdgeInsets.fromLTRB(20, 14, 14, 12),
+          padding: const EdgeInsets.fromLTRB(16, 10, 10, 9),
           child: Row(
             children: [
               Expanded(
                 child: Text(
                   '设置',
-                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                    fontWeight: FontWeight.w800,
-                  ),
+                  style: Theme.of(
+                    context,
+                  ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
                 ),
               ),
               OutlinedButton.icon(
@@ -52,7 +53,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         const Divider(height: 1),
         Expanded(
           child: ListView(
-            padding: const EdgeInsets.fromLTRB(14, 14, 14, 80),
+            padding: const EdgeInsets.fromLTRB(12, 12, 12, 76),
             children: [
               Center(
                 child: ConstrainedBox(
@@ -61,7 +62,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       _VaultSummary(status: vault.status),
-                      const SizedBox(height: 14),
+                      const SizedBox(height: 10),
                       _SettingsSection(
                         title: '外观',
                         icon: Icons.palette_outlined,
@@ -99,12 +100,34 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                                       .read(preferencesProvider.notifier)
                                       .setThemeMode(values.first),
                                 ),
+                                const Divider(height: 28),
+                                const Text('字体大小'),
+                                const SizedBox(height: 10),
+                                SegmentedButton<AppTextSize>(
+                                  showSelectedIcon: false,
+                                  segments: const [
+                                    ButtonSegment(
+                                      value: AppTextSize.standard,
+                                      icon: Icon(Icons.text_fields),
+                                      label: Text('标准'),
+                                    ),
+                                    ButtonSegment(
+                                      value: AppTextSize.large,
+                                      icon: Icon(Icons.format_size),
+                                      label: Text('大字体'),
+                                    ),
+                                  ],
+                                  selected: {preferences.textSize},
+                                  onSelectionChanged: (values) => ref
+                                      .read(preferencesProvider.notifier)
+                                      .setTextSize(values.first),
+                                ),
                               ],
                             ),
                           ),
                         ],
                       ),
-                      const SizedBox(height: 14),
+                      const SizedBox(height: 10),
                       _SettingsSection(
                         title: '安全',
                         icon: Icons.security_outlined,
@@ -141,7 +164,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                           ),
                         ],
                       ),
-                      const SizedBox(height: 14),
+                      const SizedBox(height: 10),
                       _SettingsSection(
                         title: '数据',
                         icon: Icons.storage_outlined,
@@ -177,7 +200,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                           ),
                         ],
                       ),
-                      const SizedBox(height: 14),
+                      const SizedBox(height: 10),
                       const _SettingsSection(
                         title: '关于',
                         icon: Icons.info_outline,
@@ -325,7 +348,7 @@ class _VaultSummary extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: scheme.primaryContainer,
         borderRadius: BorderRadius.circular(6),
@@ -335,9 +358,9 @@ class _VaultSummary extends StatelessWidget {
           Icon(
             Icons.verified_user_outlined,
             color: scheme.onPrimaryContainer,
-            size: 30,
+            size: 27,
           ),
-          const SizedBox(width: 13),
+          const SizedBox(width: 11),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -377,18 +400,18 @@ class _SettingsSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    return Container(
-      decoration: BoxDecoration(
-        color: scheme.surface,
+    return Material(
+      color: scheme.surface,
+      shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(6),
-        border: Border.all(color: scheme.outlineVariant),
+        side: BorderSide(color: scheme.outlineVariant),
       ),
       clipBehavior: Clip.antiAlias,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 13, 16, 9),
+            padding: const EdgeInsets.fromLTRB(14, 11, 14, 8),
             child: Row(
               children: [
                 Icon(icon, size: 19, color: scheme.primary),

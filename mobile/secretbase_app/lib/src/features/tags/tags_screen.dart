@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:secretbase/src/core/mobile_error_presenter.dart';
 import 'package:secretbase/src/core/widgets/async_content.dart';
+import 'package:secretbase/src/core/widgets/paged_scroll.dart';
 import 'package:secretbase/src/core/widgets/page_controls.dart';
 import 'package:secretbase/src/data/vault_providers.dart';
 import 'package:secretbase/src/features/taxonomy/taxonomy_editor_dialog.dart';
@@ -23,6 +24,7 @@ class TagsScreen extends ConsumerStatefulWidget {
 
 class _TagsScreenState extends ConsumerState<TagsScreen> {
   final _searchController = TextEditingController();
+  final _scrollController = ScrollController();
   final Set<String> _selected = {};
   int _page = 1;
   String _search = '';
@@ -32,6 +34,7 @@ class _TagsScreenState extends ConsumerState<TagsScreen> {
   @override
   void dispose() {
     _searchController.dispose();
+    _scrollController.dispose();
     super.dispose();
   }
 
@@ -54,19 +57,27 @@ class _TagsScreenState extends ConsumerState<TagsScreen> {
         ),
         const Divider(height: 1),
         Padding(
-          padding: const EdgeInsets.fromLTRB(14, 11, 14, 10),
+          padding: const EdgeInsets.fromLTRB(12, 7, 12, 8),
           child: Center(
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 920),
               child: TextField(
                 controller: _searchController,
-                onChanged: (value) => setState(() {
-                  _search = value.trim();
-                  _page = 1;
-                }),
+                onChanged: (value) {
+                  setState(() {
+                    _search = value.trim();
+                    _page = 1;
+                  });
+                  resetPagedScroll(_scrollController);
+                },
                 decoration: InputDecoration(
-                  hintText: '筛选标签名称或简介',
-                  prefixIcon: const Icon(Icons.search),
+                  isDense: true,
+                  hintText: '筛选标签',
+                  prefixIcon: const Icon(Icons.search, size: 20),
+                  prefixIconConstraints: const BoxConstraints(
+                    minWidth: 40,
+                    minHeight: 40,
+                  ),
                   suffixIcon: _search.isEmpty
                       ? null
                       : IconButton(
@@ -77,6 +88,7 @@ class _TagsScreenState extends ConsumerState<TagsScreen> {
                               _search = '';
                               _page = 1;
                             });
+                            resetPagedScroll(_scrollController);
                           },
                           icon: const Icon(Icons.close),
                         ),
@@ -125,8 +137,9 @@ class _TagsScreenState extends ConsumerState<TagsScreen> {
         await ref.read(taxonomyProvider('tags').future);
       },
       child: ListView.builder(
+        controller: _scrollController,
         physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.fromLTRB(14, 4, 14, 88),
+        padding: const EdgeInsets.fromLTRB(12, 3, 12, 84),
         itemCount: pageItems.isEmpty ? 1 : pageItems.length + 1,
         itemBuilder: (context, index) {
           if (pageItems.isEmpty) {
@@ -147,12 +160,16 @@ class _TagsScreenState extends ConsumerState<TagsScreen> {
               page: currentPage,
               totalPages: totalPages,
               pageSize: pageSize,
-              onPageChanged: (value) => setState(() => _page = value),
+              onPageChanged: (value) {
+                setState(() => _page = value);
+                resetPagedScroll(_scrollController);
+              },
               onPageSizeChanged: (value) {
                 ref
                     .read(preferencesProvider.notifier)
                     .setTaxonomyPageSize(value);
                 setState(() => _page = 1);
+                resetPagedScroll(_scrollController);
               },
             );
           }
@@ -301,7 +318,7 @@ class _TagsHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 14, 14, 12),
+      padding: const EdgeInsets.fromLTRB(16, 10, 10, 9),
       child: Row(
         children: [
           Expanded(
@@ -311,7 +328,7 @@ class _TagsHeader extends StatelessWidget {
               overflow: TextOverflow.ellipsis,
               style: Theme.of(
                 context,
-              ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w800),
+              ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
             ),
           ),
           if (selectionMode) ...[
@@ -337,11 +354,13 @@ class _TagsHeader extends StatelessWidget {
               onPressed: onToggleSelection,
               icon: const Icon(Icons.checklist),
             ),
-            const SizedBox(width: 4),
-            FilledButton.icon(
-              onPressed: onCreate,
-              icon: const Icon(Icons.add, size: 18),
-              label: const Text('新建标签'),
+            Tooltip(
+              message: '新建标签',
+              child: FilledButton.icon(
+                onPressed: onCreate,
+                icon: const Icon(Icons.add, size: 17),
+                label: const Text('新建'),
+              ),
             ),
           ],
         ],
@@ -378,7 +397,7 @@ class _TagRow extends StatelessWidget {
       child: InkWell(
         onTap: selectionMode ? () => onSelected(!selected) : onOpen,
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 11),
+          padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 8),
           child: Row(
             children: [
               if (selectionMode) ...[
@@ -388,17 +407,17 @@ class _TagRow extends StatelessWidget {
                   materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
                   visualDensity: VisualDensity.compact,
                 ),
-                const SizedBox(width: 8),
+                const SizedBox(width: 5),
               ],
               Container(
-                width: 10,
-                height: 44,
+                width: 8,
+                height: 38,
                 decoration: BoxDecoration(
                   color: color,
                   borderRadius: BorderRadius.circular(4),
                 ),
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: 10),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -414,7 +433,7 @@ class _TagRow extends StatelessWidget {
                                 ?.copyWith(fontWeight: FontWeight.w800),
                           ),
                         ),
-                        const SizedBox(width: 8),
+                        const SizedBox(width: 6),
                         Text(
                           '${tag.count} 条',
                           style: Theme.of(context).textTheme.labelMedium
@@ -423,7 +442,7 @@ class _TagRow extends StatelessWidget {
                       ],
                     ),
                     if (tag.description.isNotEmpty) ...[
-                      const SizedBox(height: 3),
+                      const SizedBox(height: 2),
                       Text(
                         tag.description,
                         maxLines: 1,
@@ -442,6 +461,11 @@ class _TagRow extends StatelessWidget {
                   visualDensity: VisualDensity.compact,
                   onPressed: onEdit,
                   icon: const Icon(Icons.edit_outlined, size: 18),
+                  style: IconButton.styleFrom(
+                    fixedSize: const Size(36, 36),
+                    minimumSize: const Size(36, 36),
+                    padding: EdgeInsets.zero,
+                  ),
                 ),
                 IconButton(
                   tooltip: '删除标签',
@@ -449,6 +473,11 @@ class _TagRow extends StatelessWidget {
                   color: scheme.error,
                   onPressed: onDelete,
                   icon: const Icon(Icons.delete_outline, size: 18),
+                  style: IconButton.styleFrom(
+                    fixedSize: const Size(36, 36),
+                    minimumSize: const Size(36, 36),
+                    padding: EdgeInsets.zero,
+                  ),
                 ),
               ],
             ],

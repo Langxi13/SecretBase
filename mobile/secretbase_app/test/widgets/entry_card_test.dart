@@ -6,7 +6,7 @@ import 'package:secretbase/src/rust/mobile/models.dart';
 
 void main() {
   testWidgets('条目卡片限制字段预览数量并再次保护隐藏字段', (tester) async {
-    tester.view.physicalSize = const Size(360, 800);
+    tester.view.physicalSize = const Size(320, 800);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
@@ -48,19 +48,24 @@ void main() {
 
     await tester.pumpWidget(
       MaterialApp(
-        theme: AppTheme.light(),
+        theme: AppTheme.light(textSize: AppTextSize.large),
         home: Scaffold(
-          body: Padding(
-            padding: const EdgeInsets.all(8),
-            child: EntryCard(entry: entry, onTap: () {}),
+          body: Align(
+            alignment: Alignment.topCenter,
+            child: Padding(
+              padding: const EdgeInsets.all(8),
+              child: EntryCard(entry: entry, onTap: () {}),
+            ),
           ),
         ),
       ),
     );
 
     expect(find.text('还有 2 个字段'), findsOneWidget);
+    expect(find.text('+1'), findsOneWidget);
     expect(find.text('must-not-render'), findsNothing);
     expect(find.text('••••••'), findsOneWidget);
+    expect(tester.getSize(find.byType(Card)).height, lessThan(210));
     expect(tester.takeException(), isNull);
   });
 }

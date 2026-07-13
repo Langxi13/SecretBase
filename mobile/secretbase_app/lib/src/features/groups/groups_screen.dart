@@ -1,11 +1,16 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:secretbase/src/core/mobile_error_presenter.dart';
 import 'package:secretbase/src/core/widgets/async_content.dart';
+import 'package:secretbase/src/core/widgets/paged_scroll.dart';
+import 'package:secretbase/src/core/widgets/page_controls.dart';
 import 'package:secretbase/src/data/vault_providers.dart';
 import 'package:secretbase/src/features/taxonomy/taxonomy_editor_dialog.dart';
 import 'package:secretbase/src/rust/api/mobile.dart' as rust_api;
 import 'package:secretbase/src/rust/mobile/models.dart';
+import 'package:secretbase/src/state/preferences_controller.dart';
 import 'package:secretbase/src/state/vault_controller.dart';
 
 class GroupsScreen extends ConsumerStatefulWidget {
@@ -20,11 +25,22 @@ class GroupsScreen extends ConsumerStatefulWidget {
 class _GroupsScreenState extends ConsumerState<GroupsScreen> {
   bool _reordering = false;
   bool _savingOrder = false;
+  final _scrollController = ScrollController();
+  int _page = 1;
   List<TaxonomyRecord> _ordered = [];
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     final groups = ref.watch(taxonomyProvider('groups'));
+    final pageSize = ref.watch(
+      preferencesProvider.select((preferences) => preferences.groupPageSize),
+    );
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -59,7 +75,7 @@ class _GroupsScreenState extends ConsumerState<GroupsScreen> {
                 );
               }
               if (_reordering) return _buildReorderList();
-              return _buildGrid(items);
+              return _buildGrid(items, pageSize);
             },
           ),
         ),
@@ -67,38 +83,71 @@ class _GroupsScreenState extends ConsumerState<GroupsScreen> {
     );
   }
 
-  Widget _buildGrid(List<TaxonomyRecord> groups) {
+  Widget _buildGrid(List<TaxonomyRecord> groups, int pageSize) {
+    final totalPages = math.max(1, (groups.length + pageSize - 1) ~/ pageSize);
+    final currentPage = _page.clamp(1, totalPages);
+    if (currentPage != _page) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) setState(() => _page = currentPage);
+      });
+    }
+    final start = (currentPage - 1) * pageSize;
+    final pageItems = groups.skip(start).take(pageSize).toList();
+
     return RefreshIndicator(
       onRefresh: () async {
         ref.invalidate(taxonomyProvider('groups'));
         await ref.read(taxonomyProvider('groups').future);
       },
-      child: GridView.builder(
+      child: CustomScrollView(
+        controller: _scrollController,
         physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.fromLTRB(14, 14, 14, 90),
-        gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-          maxCrossAxisExtent: 430,
-          mainAxisExtent: 178,
-          crossAxisSpacing: 11,
-          mainAxisSpacing: 11,
-        ),
-        itemCount: groups.length,
-        itemBuilder: (context, index) {
-          final group = groups[index];
-          return _GroupCard(
-            group: group,
-            onOpen: () => widget.onOpenGroup(group.name),
-            onEdit: () => _edit(group),
-            onDelete: () => _delete(group),
-          );
-        },
+        slivers: [
+          SliverPadding(
+            padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
+            sliver: SliverGrid(
+              gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+                maxCrossAxisExtent: 430,
+                mainAxisExtent: 154,
+                crossAxisSpacing: 9,
+                mainAxisSpacing: 9,
+              ),
+              delegate: SliverChildBuilderDelegate((context, index) {
+                final group = pageItems[index];
+                return _GroupCard(
+                  group: group,
+                  onOpen: () => widget.onOpenGroup(group.name),
+                  onEdit: () => _edit(group),
+                  onDelete: () => _delete(group),
+                );
+              }, childCount: pageItems.length),
+            ),
+          ),
+          SliverToBoxAdapter(
+            child: PageControls(
+              page: currentPage,
+              totalPages: totalPages,
+              pageSize: pageSize,
+              onPageChanged: (value) {
+                setState(() => _page = value);
+                resetPagedScroll(_scrollController);
+              },
+              onPageSizeChanged: (value) {
+                ref.read(preferencesProvider.notifier).setGroupPageSize(value);
+                setState(() => _page = 1);
+                resetPagedScroll(_scrollController);
+              },
+            ),
+          ),
+          const SliverToBoxAdapter(child: SizedBox(height: 78)),
+        ],
       ),
     );
   }
 
   Widget _buildReorderList() {
     return ReorderableListView.builder(
-      padding: const EdgeInsets.fromLTRB(14, 12, 14, 90),
+      padding: const EdgeInsets.fromLTRB(12, 10, 12, 86),
       buildDefaultDragHandles: false,
       itemCount: _ordered.length,
       onReorderItem: (oldIndex, newIndex) {
@@ -111,7 +160,7 @@ class _GroupsScreenState extends ConsumerState<GroupsScreen> {
         final item = _ordered[index];
         return Padding(
           key: ValueKey(item.name),
-          padding: const EdgeInsets.only(bottom: 8),
+          padding: const EdgeInsets.only(bottom: 6),
           child: Material(
             color: Theme.of(context).colorScheme.surface,
             shape: RoundedRectangleBorder(
@@ -121,7 +170,7 @@ class _GroupsScreenState extends ConsumerState<GroupsScreen> {
               ),
             ),
             child: ListTile(
-              leading: CircleAvatar(radius: 17, child: Text('${index + 1}')),
+              leading: CircleAvatar(radius: 15, child: Text('${index + 1}')),
               title: Text(
                 item.name,
                 maxLines: 1,
@@ -258,7 +307,7 @@ class _GroupsHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 14, 14, 12),
+      padding: const EdgeInsets.fromLTRB(16, 10, 10, 9),
       child: Row(
         children: [
           Expanded(
@@ -266,7 +315,7 @@ class _GroupsHeader extends StatelessWidget {
               reordering ? '调整密码组顺序' : '密码组',
               style: Theme.of(
                 context,
-              ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w800),
+              ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
             ),
           ),
           if (reordering) ...[
@@ -278,7 +327,7 @@ class _GroupsHeader extends StatelessWidget {
             FilledButton.icon(
               onPressed: saving ? null : onSaveOrder,
               icon: const Icon(Icons.save_outlined, size: 17),
-              label: Text(saving ? '保存中' : '保存顺序'),
+              label: Text(saving ? '保存中' : '保存'),
             ),
           ] else ...[
             if (hasGroups)
@@ -303,11 +352,13 @@ class _GroupsHeader extends StatelessWidget {
                 ),
               ],
             ),
-            const SizedBox(width: 4),
-            FilledButton.icon(
-              onPressed: onCreate,
-              icon: const Icon(Icons.create_new_folder_outlined, size: 18),
-              label: const Text('新建密码组'),
+            Tooltip(
+              message: '新建密码组',
+              child: FilledButton.icon(
+                onPressed: onCreate,
+                icon: const Icon(Icons.create_new_folder_outlined, size: 17),
+                label: const Text('新建'),
+              ),
             ),
           ],
         ],
@@ -337,25 +388,26 @@ class _GroupCard extends StatelessWidget {
       child: InkWell(
         onTap: onOpen,
         child: Padding(
-          padding: const EdgeInsets.all(14),
+          padding: const EdgeInsets.all(12),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Row(
                 children: [
                   Container(
-                    width: 38,
-                    height: 38,
+                    width: 34,
+                    height: 34,
                     decoration: BoxDecoration(
                       color: scheme.tertiaryContainer,
                       borderRadius: BorderRadius.circular(7),
                     ),
                     child: Icon(
                       Icons.folder,
+                      size: 19,
                       color: scheme.onTertiaryContainer,
                     ),
                   ),
-                  const SizedBox(width: 11),
+                  const SizedBox(width: 9),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -364,7 +416,7 @@ class _GroupCard extends StatelessWidget {
                           group.name,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: Theme.of(context).textTheme.titleMedium
+                          style: Theme.of(context).textTheme.titleSmall
                               ?.copyWith(fontWeight: FontWeight.w800),
                         ),
                         Text(
@@ -377,7 +429,7 @@ class _GroupCard extends StatelessWidget {
                   ),
                 ],
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 8),
               Expanded(
                 child: Text(
                   group.description.isEmpty ? '暂无简介' : group.description,
@@ -399,14 +451,14 @@ class _GroupCard extends StatelessWidget {
                     color: scheme.primary,
                     onPressed: onOpen,
                   ),
-                  const SizedBox(width: 7),
+                  const SizedBox(width: 5),
                   _SmallAction(
                     tooltip: '编辑密码组',
                     icon: Icons.edit_outlined,
                     color: scheme.tertiary,
                     onPressed: onEdit,
                   ),
-                  const SizedBox(width: 7),
+                  const SizedBox(width: 5),
                   _SmallAction(
                     tooltip: '删除密码组',
                     icon: Icons.delete_outline,
@@ -441,12 +493,12 @@ class _SmallAction extends StatelessWidget {
     return IconButton(
       tooltip: tooltip,
       onPressed: onPressed,
-      icon: Icon(icon, size: 17),
+      icon: Icon(icon, size: 16),
       color: color,
       style: IconButton.styleFrom(
         backgroundColor: color.withValues(alpha: 0.09),
-        fixedSize: const Size(32, 32),
-        minimumSize: const Size(32, 32),
+        fixedSize: const Size(30, 30),
+        minimumSize: const Size(30, 30),
         padding: EdgeInsets.zero,
       ),
     );
