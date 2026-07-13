@@ -2,7 +2,7 @@ use std::{fs, path::PathBuf};
 
 use secretbase_vault_core::{
     decrypt_v1, encrypt_v1, encrypt_v1_with_parameters, inspect_header, validate_document,
-    VaultDocument, VaultError,
+    VaultDocument, VaultError, VaultSession,
 };
 use serde::Deserialize;
 use serde_json::Value;
@@ -97,6 +97,64 @@ fn random_rust_encryption_round_trips() -> Result<(), Box<dyn std::error::Error>
         fs::read(fixture_dir().join(&vector.encrypted_file))?
     );
     assert_eq!(decrypt_v1(&manifest.test_password, &encrypted)?, document);
+    Ok(())
+}
+
+#[test]
+fn vault_session_reuses_key_and_preserves_candidate_isolation(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let manifest = read_manifest()?;
+    let vector = manifest.vectors.first().ok_or("missing fixture vector")?;
+    let document =
+        VaultDocument::from_json_bytes(&fs::read(fixture_dir().join(&vector.plaintext_file))?)?;
+    let session = VaultSession::create(&manifest.test_password, document.clone())?;
+
+    let mut candidate = document.as_value().clone();
+    candidate["future_root"] = serde_json::json!({"mobile": true});
+    let candidate = VaultDocument::from_value(candidate)?;
+    let encrypted = session.encrypted_document_bytes(&candidate)?;
+
+    assert_eq!(session.document(), &document);
+    let unlocked = VaultSession::unlock(&manifest.test_password, &encrypted)?;
+    assert_eq!(
+        unlocked.document().as_value()["future_root"]["mobile"],
+        true
+    );
+    Ok(())
+}
+
+#[test]
+fn scoped_encryption_is_purpose_bound_and_rekeyed() -> Result<(), Box<dyn std::error::Error>> {
+    let document = validate_document(serde_json::json!({
+        "version": "1.0",
+        "created_at": "2026-07-12T00:00:00Z",
+        "app_name": "SecretBase",
+        "entries": [],
+        "deleted_entries": [],
+        "tags_meta": {},
+        "groups_meta": {}
+    }))?;
+    let mut session = VaultSession::create("old-password", document)?;
+    let encrypted_settings = session.encrypt_scoped_bytes("mobile-ai-settings", b"secret")?;
+
+    assert_eq!(
+        session.decrypt_scoped_bytes("mobile-ai-settings", &encrypted_settings)?,
+        b"secret"
+    );
+    assert_eq!(
+        session.decrypt_scoped_bytes("another-purpose", &encrypted_settings),
+        Err(VaultError::AuthenticationFailed)
+    );
+
+    session.rekey("new-password");
+    let encrypted_vault = session.encrypted_bytes()?;
+    assert_eq!(
+        VaultSession::unlock("old-password", &encrypted_vault)
+            .err()
+            .ok_or("old password still works")?,
+        VaultError::AuthenticationFailed
+    );
+    assert!(VaultSession::unlock("new-password", &encrypted_vault).is_ok());
     Ok(())
 }
 
