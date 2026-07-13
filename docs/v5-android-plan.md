@@ -1,6 +1,6 @@
 # SecretBase V5 Android 实施计划
 
-本文档定义 V5.0 Android 首版的架构、阶段、功能边界和验收标准。状态：规划完成，尚未开始实现。
+本文档定义 V5.0 Android 首版的架构、阶段、功能边界和验收标准。状态：核心实现和本机 arm64 APK 构建已完成，等待 GitHub Android CI、API 29/36 模拟器和 arm64 真机验收；尚未创建 `v5.0.0` 标签。
 
 ## 1. 产品目标
 
@@ -12,7 +12,7 @@ V5.0 首先提供一个真正离线、脱离浏览器和 FastAPI 的 Android 密
 
 - Flutter 负责 Android UI、导航、系统生命周期、文件选择、剪贴板和平台能力。
 - Rust 负责 Vault V1 加解密、payload 校验、会话状态和密码库领域操作。
-- 优先使用 `flutter_rust_bridge` 生成 Dart/Rust 绑定；第一阶段必须先用黄金向量验证字节、错误码和 UTF-8 往返，再锁定依赖版本。
+- 使用 `flutter_rust_bridge 2.12.0` 生成 Dart/Rust 绑定，并固定 Flutter 3.44.6、Rust 1.88.0、API 36、NDK 28.2 和 Java 17。
 - Rust API 保持平台无关，不直接依赖 Android Context、外部存储路径或 Flutter UI 类型。
 - Vault 默认保存在 Android 应用私有目录；导入导出使用 Storage Access Framework，不申请宽泛的外部存储权限。
 - 移动端不启动本地 HTTP 服务，也不打包 Python、FastAPI 或现有 Web 前端。
@@ -24,6 +24,19 @@ mobile/secretbase_app/     Flutter Android/iOS 工程
 vault-core/                共享 Rust 格式与领域核心
 tests/fixtures/vault-v1/   Python、Rust、Flutter 共用黄金向量
 ```
+
+当前实现已经覆盖：
+
+- Vault 会话、原子写入、revision 冲突、10 份恢复副本、主密码修改和加密导入导出。
+- 旧 Vault 缺失条目 ID 或默认字段时的安全补全，并继续保留未知 JSON 字段。
+- 创建与解锁、后台遮挡、5 分钟锁定、设备锁屏立即锁定和 Android `FLAG_SECURE`。
+- 条目分页、搜索、筛选、详情、新建、编辑、模板复制、回收站、自定义字段隐藏与复制。
+- 标签分页和批量删除；密码组新建、编辑、删除、成员筛选和拖动排序。
+- 五项彼此隔离的 AI 能力：文本解析、单条目标签整理、密码组整理、标签治理和自然语言操作计划。所有变更必须先预览、勾选并通过 revision 校验后应用。
+- AI 配置按用途加密，默认只允许 HTTPS；首次使用要求隐私同意，每次发送前展示数据摘要。
+- Storage Access Framework 导入导出、敏感剪贴板标记与自动清理、明暗主题和中文响应式界面。
+
+本机已通过 Flutter 分析、4 项 Dart/Widget 测试、Vault Core 7 项测试、移动端 Rust 15 项测试和两套 Clippy。Android CI 负责三 ABI Release APK、API 29/36 模拟器和持久签名流程；本机仅构建 arm64，避免在低内存服务器上并行编译。
 
 ## 3. 分阶段实施
 
@@ -72,10 +85,10 @@ tests/fixtures/vault-v1/   Python、Rust、Flutter 共用黄金向量
 
 ## 4. Android MVP 范围
 
-首版包含：本地 Vault、条目、搜索、自定义字段、标签、密码组、回收站、加密导入导出、主题和生命周期锁定。
+首版包含：本地 Vault、条目、搜索、自定义字段、标签、密码组、回收站、加密导入导出、主题、生命周期锁定和五项需用户确认的 AI 辅助能力。
 
-首版不包含：AI 整理、云同步、账号系统、团队共享、浏览器自动填充、生物识别代管主密码、Wear OS、平板专属双栏、Play 商店发布和 iOS 包。
+首版不包含：云同步、账号系统、团队共享、浏览器自动填充、生物识别代管主密码、Wear OS、平板专属双栏、Play 商店发布和 iOS 包。
 
 ## 5. 后续顺序
 
-Android MVP 稳定后再启动 iOS 适配。iOS 应复用同一 Flutter 页面和 Rust API，只新增 Keychain/文件选择/应用生命周期等平台实现，不分叉 Vault 数据模型或业务规则。
+先完成 GitHub Android CI、API 29/36 模拟器、Android 10+ arm64 真机、桌面与手机加密备份双向迁移、安装升级和卸载数据语义验收。上述门禁全部通过后再创建 `v5.0.0` 标签；Android MVP 稳定后才启动 iOS 适配。iOS 应复用同一 Flutter 页面和 Rust API，只新增 Keychain、文件选择和应用生命周期等平台实现，不分叉 Vault 数据模型或业务规则。

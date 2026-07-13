@@ -49,6 +49,23 @@ The script produces `SecretBase-v<version>-macos-arm64.dmg`, `SecretBase-v<versi
 
 Unsigned test builds may require approval through System Settings -> Privacy & Security -> Open Anyway. Do not disable Gatekeeper as part of the normal installation flow. Developer ID signing and notarization remain deferred until an Apple Developer account is available.
 
+## Android Build And Signing
+
+V5 uses Flutter 3.44.6, Java 17, Rust 1.88.0, API 36, NDK 28.2, and CMake 3.22.1. Local low-memory hosts should build only `android-arm64`; the dedicated Android workflow builds the three-ABI universal APK and runs API 29/36 emulator smoke tests.
+
+Android application data is stored in the private app directory and is removed by Android uninstall. Export an encrypted backup before uninstalling or clearing app storage. The APK does not request broad storage access; import and export use the Android system document picker.
+
+Persistent release signing uses repository or environment Secrets only:
+
+```text
+ANDROID_KEYSTORE_BASE64
+ANDROID_KEYSTORE_PASSWORD
+ANDROID_KEY_ALIAS
+ANDROID_KEY_PASSWORD
+```
+
+The four values must be configured together. Ordinary CI creates a short-lived test key and labels its APK with `-ci`; never publish that artifact as a formal release. For a publishable candidate, manually run `.github/workflows/android.yml` with `require-release-signing` enabled. The workflow fails if persistent signing is unavailable, verifies all ABI libraries and Manifest security attributes, scans native libraries for machine-specific paths, and produces `SHA256SUMS.txt`.
+
 ## Recommended Layout
 
 ```text

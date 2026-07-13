@@ -238,6 +238,23 @@ cargo clippy --locked --all-targets --all-features -- -D warnings
 cargo test --locked --release --all-features
 ```
 
+V5.0 Android 客户端的核心实现已经完成，当前尚未正式发布。它使用 Flutter + Rust，完全脱离浏览器和 FastAPI，覆盖创建与解锁、条目、标签、密码组、回收站、加密迁移、生命周期锁定和五项需用户确认的 AI 辅助能力。Vault 与恢复副本保存在 Android 应用私有目录；卸载应用会删除该目录，因此卸载前必须导出加密备份。
+
+低内存 Linux 开发机只构建 arm64：
+
+```bash
+cd mobile/secretbase_app
+flutter pub get
+flutter analyze
+flutter test --concurrency=1
+CARGO_BUILD_JOBS=1 CARGOKIT_RUST_TOOLCHAIN=1.88.0 \
+  flutter build apk --debug --target-platform android-arm64 --no-pub
+../../scripts/verify_android_apk.sh \
+  build/app/outputs/flutter-apk/app-debug.apk arm64-v8a
+```
+
+三 ABI Release APK、API 29/36 模拟器和可选持久签名由 `.github/workflows/android.yml` 执行。功能与剩余门禁见 `docs/v5-android-plan.md` 和 `docs/manual-qa-checklist-v5-android.md`；完成 CI 与真机验收前不创建 `v5.0.0` 标签。
+
 Apple Silicon Mac 使用 Python 3.11 构建测试包：
 
 ```bash
@@ -648,6 +665,8 @@ V3.3 adds a macOS 13+ Apple Silicon arm64 desktop app while preserving the same 
 
 V4.0 shared Vault preparation is complete. Existing Web, Windows, and macOS builds continue to use the Python production core. The normative Vault V1 contract, public golden vectors, and isolated Rust reference implementation now provide the compatibility boundary for future Flutter Android and iOS clients without migrating existing vaults or bundling Rust into current desktop packages. See `docs/v4-vault-core.md` for acceptance and `docs/v5-android-plan.md` for the next implementation phase.
 
+The V5 Android client is implemented but not released. It is a browser-free Flutter/Rust app for Android 10+ with private Vault storage, lifecycle locking, entries, tags, groups, trash, encrypted transfer, and five review-before-apply AI workflows. Android uninstall removes the private app directory, so users must export an encrypted backup first. The dedicated Android workflow builds a three-ABI release APK and runs API 29/36 emulator smoke tests; `v5.0.0` remains blocked on CI and arm64 hardware acceptance.
+
 Build the macOS test package on Apple Silicon with Python 3.11:
 
 ```bash
@@ -859,6 +878,9 @@ desktop/
   launcher.py          browser-based local desktop-mode launcher
   runtime.py           shared in-process backend and desktop paths
   SecretBase.spec      PyInstaller one-folder build definition
+mobile/
+  secretbase_app/      Flutter Android client, Rust bridge, and Android build files
+vault-core/            shared Vault V1 Rust core and compatibility tests
 docs/
   api-specification.md
   app-roadmap.md
@@ -884,6 +906,9 @@ scripts/
 - `docs/manual-qa-checklist-v3.2.md`: V3.2 Windows hardware acceptance checklist.
 - `docs/v3.3-macos-desktop.md`: V3.3 macOS arm64 implementation, packaging, and release gates.
 - `docs/manual-qa-checklist-v3.3.md`: V3.3 macOS arm64 hardware acceptance checklist.
+- `docs/v4-vault-core.md`: V4 Vault V1 contract and Rust compatibility-core acceptance.
+- `docs/v5-android-plan.md`: V5 Android architecture, implemented scope, and remaining release gates.
+- `docs/manual-qa-checklist-v5-android.md`: V5 Android emulator, hardware, migration, and signing acceptance checklist.
 - `docs/manual-qa-checklist.md`: V3.1 Windows hardware acceptance checklist.
 - `docs/release-assessment-v3.0.0.md`: V3.0.0 completeness, risk, and release assessment.
 - `docs/release-safety-checklist.md`: release safety checklist.
