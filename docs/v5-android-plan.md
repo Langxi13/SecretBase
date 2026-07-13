@@ -1,6 +1,6 @@
 # SecretBase V5 Android 实施计划
 
-本文档定义 V5.0 Android 首版的架构、阶段、功能边界和验收标准。状态：核心实现和本机 arm64 APK 构建已完成，等待 GitHub Android CI、API 29/36 模拟器和 arm64 真机验收；尚未创建 `v5.0.0` 标签。
+本文档定义 V5.0 Android 首版的架构、阶段、功能边界和验收标准。状态：核心实现、本机 arm64 APK、GitHub 三 ABI 构建及 API 29/36 模拟器已通过，等待 arm64 真机、跨桌面迁移和持久签名验收；尚未创建 `v5.0.0` 标签。
 
 ## 1. 产品目标
 
@@ -36,7 +36,7 @@ tests/fixtures/vault-v1/   Python、Rust、Flutter 共用黄金向量
 - AI 配置按用途加密，默认只允许 HTTPS；首次使用要求隐私同意，每次发送前展示数据摘要。
 - Storage Access Framework 导入导出、敏感剪贴板标记与自动清理、明暗主题和中文响应式界面。
 
-本机已通过 Flutter 分析、4 项 Dart/Widget 测试、Vault Core 7 项测试、移动端 Rust 15 项测试和两套 Clippy。Android CI 负责三 ABI Release APK、API 29/36 模拟器和持久签名流程；本机仅构建 arm64，避免在低内存服务器上并行编译。
+本机已通过 Flutter 分析、4 项 Dart/Widget 测试、Vault Core 7 项测试、移动端 Rust 15 项测试和两套 Clippy。Android CI 已通过三 ABI Release APK、隐私扫描及 API 29/36 模拟器，并保留可选持久签名流程；本机仅构建 arm64，避免在低内存服务器上并行编译。
 
 ## 3. 分阶段实施
 
@@ -91,4 +91,4 @@ tests/fixtures/vault-v1/   Python、Rust、Flutter 共用黄金向量
 
 ## 5. 后续顺序
 
-先完成 GitHub Android CI、API 29/36 模拟器、Android 10+ arm64 真机、桌面与手机加密备份双向迁移、安装升级和卸载数据语义验收。上述门禁全部通过后再创建 `v5.0.0` 标签；Android MVP 稳定后才启动 iOS 适配。iOS 应复用同一 Flutter 页面和 Rust API，只新增 Keychain、文件选择和应用生命周期等平台实现，不分叉 Vault 数据模型或业务规则。
+GitHub Android CI 和 API 29/36 模拟器已完成。下一步依次完成 Android 10+ arm64 真机、桌面与手机加密备份双向迁移、安装升级、卸载数据语义和持久签名验收。上述门禁全部通过后再创建 `v5.0.0` 标签；Android MVP 稳定后才启动 iOS 适配。iOS 应复用同一 Flutter 页面和 Rust API，只新增 Keychain、文件选择和应用生命周期等平台实现，不分叉 Vault 数据模型或业务规则。

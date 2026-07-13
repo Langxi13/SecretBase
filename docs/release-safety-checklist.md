@@ -41,10 +41,10 @@ SecretBase 已进入真实生产使用阶段。后续任何迭代默认不得破
 - [ ] Vault V1 Python 黄金向量和 Rust `fmt`、Clippy、release 测试是否全部通过。
 - [ ] Rust 参考核心是否仍与 FastAPI、桌面打包和用户数据目录隔离。
 - [ ] Vault envelope 是否保持 V1，未知根字段、条目字段和自定义字段是否能往返保留。
-- [ ] Android Flutter 分析、Widget 测试、移动端 Rust 测试和 Clippy 是否全部通过。
-- [ ] Android 三 ABI Release APK 是否包含对应的 `libsecretbase_mobile.so`，并通过 API 29/36 模拟器启动验证。
-- [ ] Android Manifest 是否保持 `allowBackup=false`、`usesCleartextTraffic=false`、API 29 最低版本和 `FLAG_SECURE` 运行时保护。
-- [ ] Android APK 是否通过 `scripts/verify_android_apk.sh`，且不含真实工作区、用户目录、私人域名、Vault 或签名密钥。
+- [x] Android Flutter 分析、Widget 测试、移动端 Rust 测试和 Clippy 是否全部通过。
+- [x] Android 三 ABI Release APK 是否包含对应的 `libsecretbase_mobile.so`，并通过 API 29/36 模拟器启动验证。
+- [x] Android Manifest 是否保持 `allowBackup=false`、`usesCleartextTraffic=false`、API 29 最低版本和 `FLAG_SECURE` 运行时保护。
+- [x] Android APK 是否通过 `scripts/verify_android_apk.sh`，且不含真实工作区、用户目录、私人域名、Vault 或签名密钥。
 - [ ] 正式 Android APK 是否使用持久发布密钥；一次性 CI 密钥产物是否明确带 `-ci` 且未上传正式 Release。
 - [ ] Android 真机是否完成锁屏、后台超时、条目/标签/密码组、AI 确认、跨桌面备份和卸载删除私有数据验收。
 - [ ] 统一 Release 是否同时包含当前版本的 Windows 与 macOS 资产，避免更新入口缺少对应平台下载。
