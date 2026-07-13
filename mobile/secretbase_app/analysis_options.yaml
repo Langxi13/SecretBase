@@ -1,0 +1,6 @@
+include: package:flutter_lints/flutter.yaml
+
+analyzer:
+  exclude:
+    # Cargokit is a vendored standalone Dart package with its own CI check.
+    - rust_builder/cargokit/**

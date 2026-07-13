@@ -1,0 +1,50 @@
+name: Android
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "mobile/**"
+      - "vault-core/**"
+      - "tests/fixtures/vault-v1/**"
+      - "scripts/android_emulator_smoke.sh"
+      - "scripts/verify_android_apk.sh"
+      - ".github/workflows/android.yml"
+      - ".github/workflows/reusable-android.yml"
+  pull_request:
+    paths:
+      - "mobile/**"
+      - "vault-core/**"
+      - "tests/fixtures/vault-v1/**"
+      - "scripts/android_emulator_smoke.sh"
+      - "scripts/verify_android_apk.sh"
+      - ".github/workflows/android.yml"
+      - ".github/workflows/reusable-android.yml"
+  workflow_dispatch:
+    inputs:
+      run-emulators:
+        description: Run API 29 and API 36 emulator smoke tests
+        required: false
+        type: boolean
+        default: true
+      require-release-signing:
+        description: Require the persistent Android signing secrets
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: android-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  android:
+    uses: ./.github/workflows/reusable-android.yml
+    with:
+      retention-days: 14
+      run-emulators: ${{ github.event_name != 'workflow_dispatch' || inputs.run-emulators }}
+      require-release-signing: ${{ github.event_name == 'workflow_dispatch' && inputs.require-release-signing }}
+    secrets: inherit

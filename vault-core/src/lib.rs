@@ -20,6 +20,7 @@ pub const PBKDF2_ITERATIONS: u32 = 600_000;
 pub const SALT_LENGTH: usize = 32;
 pub const NONCE_LENGTH: usize = 12;
 pub const AUTH_TAG_LENGTH: usize = 16;
+pub const PURPOSE_KEY_ITERATIONS: u32 = 100_000;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct HeaderInfo {
@@ -89,6 +90,94 @@ impl VaultDocument {
     }
 }
 
+pub struct VaultSession {
+    document: VaultDocument,
+    key: Zeroizing<[u8; 32]>,
+    salt: [u8; SALT_LENGTH],
+}
+
+impl VaultSession {
+    pub fn create(password: &str, document: VaultDocument) -> Result<Self, VaultError> {
+        let mut salt = [0_u8; SALT_LENGTH];
+        OsRng.fill_bytes(&mut salt);
+        Ok(Self {
+            document,
+            key: derive_key(password, &salt),
+            salt,
+        })
+    }
+
+    pub fn unlock(password: &str, content: &[u8]) -> Result<Self, VaultError> {
+        let parsed = parse_header(content)?;
+        let key = derive_key(password, &parsed.salt);
+        let plaintext = decrypt_bytes_with_key(key.as_ref(), &parsed)?;
+        let document = VaultDocument::from_json_bytes(&plaintext)?;
+        Ok(Self {
+            document,
+            key,
+            salt: parsed.salt,
+        })
+    }
+
+    pub fn document(&self) -> &VaultDocument {
+        &self.document
+    }
+
+    pub fn replace_document(&mut self, value: Value) -> Result<(), VaultError> {
+        self.document = VaultDocument::from_value(value)?;
+        Ok(())
+    }
+
+    pub fn encrypted_bytes(&self) -> Result<Vec<u8>, VaultError> {
+        self.encrypted_document_bytes(&self.document)
+    }
+
+    pub fn encrypted_document_bytes(
+        &self,
+        document: &VaultDocument,
+    ) -> Result<Vec<u8>, VaultError> {
+        let mut nonce = [0_u8; NONCE_LENGTH];
+        OsRng.fill_bytes(&mut nonce);
+        encrypt_bytes_with_key(
+            self.key.as_ref(),
+            self.salt,
+            nonce,
+            &document.to_json_bytes()?,
+        )
+    }
+
+    pub fn rekey(&mut self, password: &str) {
+        let mut salt = [0_u8; SALT_LENGTH];
+        OsRng.fill_bytes(&mut salt);
+        self.key = derive_key(password, &salt);
+        self.salt = salt;
+    }
+
+    pub fn encrypt_scoped_bytes(
+        &self,
+        purpose: &str,
+        plaintext: &[u8],
+    ) -> Result<Vec<u8>, VaultError> {
+        let key = derive_purpose_key(self.key.as_ref(), &self.salt, purpose);
+        let mut nonce = [0_u8; NONCE_LENGTH];
+        OsRng.fill_bytes(&mut nonce);
+        encrypt_bytes_with_key(key.as_ref(), self.salt, nonce, plaintext)
+    }
+
+    pub fn decrypt_scoped_bytes(
+        &self,
+        purpose: &str,
+        content: &[u8],
+    ) -> Result<Vec<u8>, VaultError> {
+        let parsed = parse_header(content)?;
+        if parsed.salt != self.salt {
+            return Err(VaultError::AuthenticationFailed);
+        }
+        let key = derive_purpose_key(self.key.as_ref(), &self.salt, purpose);
+        decrypt_bytes_with_key(key.as_ref(), &parsed)
+    }
+}
+
 pub fn validate_document(value: Value) -> Result<VaultDocument, VaultError> {
     VaultDocument::from_value(value)
 }
@@ -113,17 +202,7 @@ pub fn inspect_header(content: &[u8]) -> Result<HeaderInfo, VaultError> {
 pub fn decrypt_v1(password: &str, content: &[u8]) -> Result<VaultDocument, VaultError> {
     let parsed = parse_header(content)?;
     let key = derive_key(password, &parsed.salt);
-    let cipher = Aes256Gcm::new_from_slice(key.as_ref())
-        .map_err(|_| VaultError::InvalidFormat("derived key length"))?;
-    let mut ciphertext_with_tag = Vec::with_capacity(parsed.ciphertext.len() + AUTH_TAG_LENGTH);
-    ciphertext_with_tag.extend_from_slice(parsed.ciphertext);
-    ciphertext_with_tag.extend_from_slice(parsed.auth_tag);
-    let plaintext = cipher
-        .decrypt(
-            Nonce::from_slice(&parsed.nonce),
-            ciphertext_with_tag.as_ref(),
-        )
-        .map_err(|_| VaultError::AuthenticationFailed)?;
+    let plaintext = decrypt_bytes_with_key(key.as_ref(), &parsed)?;
     VaultDocument::from_json_bytes(&plaintext)
 }
 
@@ -153,10 +232,18 @@ fn encrypt_with_parameters(
 ) -> Result<Vec<u8>, VaultError> {
     let plaintext = document.to_json_bytes()?;
     let key = derive_key(password, &salt);
-    let cipher =
-        Aes256Gcm::new_from_slice(key.as_ref()).map_err(|_| VaultError::EncryptionFailed)?;
+    encrypt_bytes_with_key(key.as_ref(), salt, nonce, &plaintext)
+}
+
+fn encrypt_bytes_with_key(
+    key: &[u8],
+    salt: [u8; SALT_LENGTH],
+    nonce: [u8; NONCE_LENGTH],
+    plaintext: &[u8],
+) -> Result<Vec<u8>, VaultError> {
+    let cipher = Aes256Gcm::new_from_slice(key).map_err(|_| VaultError::EncryptionFailed)?;
     let ciphertext_with_tag = cipher
-        .encrypt(Nonce::from_slice(&nonce), plaintext.as_ref())
+        .encrypt(Nonce::from_slice(&nonce), plaintext)
         .map_err(|_| VaultError::EncryptionFailed)?;
     if ciphertext_with_tag.len() < AUTH_TAG_LENGTH {
         return Err(VaultError::EncryptionFailed);
@@ -172,6 +259,20 @@ fn encrypt_with_parameters(
     output.extend_from_slice(auth_tag);
     output.extend_from_slice(ciphertext);
     Ok(output)
+}
+
+fn decrypt_bytes_with_key(key: &[u8], parsed: &ParsedHeader<'_>) -> Result<Vec<u8>, VaultError> {
+    let cipher = Aes256Gcm::new_from_slice(key)
+        .map_err(|_| VaultError::InvalidFormat("derived key length"))?;
+    let mut ciphertext_with_tag = Vec::with_capacity(parsed.ciphertext.len() + AUTH_TAG_LENGTH);
+    ciphertext_with_tag.extend_from_slice(parsed.ciphertext);
+    ciphertext_with_tag.extend_from_slice(parsed.auth_tag);
+    cipher
+        .decrypt(
+            Nonce::from_slice(&parsed.nonce),
+            ciphertext_with_tag.as_ref(),
+        )
+        .map_err(|_| VaultError::AuthenticationFailed)
 }
 
 fn parse_header(content: &[u8]) -> Result<ParsedHeader<'_>, VaultError> {
@@ -203,6 +304,26 @@ fn parse_header(content: &[u8]) -> Result<ParsedHeader<'_>, VaultError> {
 fn derive_key(password: &str, salt: &[u8; SALT_LENGTH]) -> Zeroizing<[u8; 32]> {
     let mut key = Zeroizing::new([0_u8; 32]);
     pbkdf2_hmac::<Sha256>(password.as_bytes(), salt, PBKDF2_ITERATIONS, key.as_mut());
+    key
+}
+
+fn derive_purpose_key(
+    vault_key: &[u8],
+    salt: &[u8; SALT_LENGTH],
+    purpose: &str,
+) -> Zeroizing<[u8; 32]> {
+    let mut scoped_salt = Vec::with_capacity(12 + salt.len() + purpose.len());
+    scoped_salt.extend_from_slice(b"SecretBase:");
+    scoped_salt.extend_from_slice(salt);
+    scoped_salt.push(b':');
+    scoped_salt.extend_from_slice(purpose.as_bytes());
+    let mut key = Zeroizing::new([0_u8; 32]);
+    pbkdf2_hmac::<Sha256>(
+        vault_key,
+        &scoped_salt,
+        PURPOSE_KEY_ITERATIONS,
+        key.as_mut(),
+    );
     key
 }
 
