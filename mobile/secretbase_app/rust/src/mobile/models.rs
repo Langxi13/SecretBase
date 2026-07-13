@@ -125,6 +125,52 @@ pub struct AiRequestPlan {
 }
 
 #[derive(Debug, Clone)]
+pub struct AiAssistantRequestPlan {
+    pub conversation_id: String,
+    pub token: String,
+    pub request: AiHttpRequest,
+    pub summary: AiSendSummary,
+    pub mode: String,
+}
+
+#[derive(Debug, Clone)]
+pub struct AiAssistantTurnResult {
+    pub conversation_id: String,
+    pub message: String,
+    pub preview: Option<AiPreview>,
+    pub warnings: Vec<String>,
+    pub navigation_entry_id: Option<String>,
+    pub navigation_entry_title: Option<String>,
+}
+
+#[derive(Debug, Clone)]
+pub struct AiConversationSummary {
+    pub id: String,
+    pub title: String,
+    pub created_at: String,
+    pub updated_at: String,
+    pub message_count: u32,
+}
+
+#[derive(Debug, Clone)]
+pub struct AiConversationMessage {
+    pub id: String,
+    pub role: String,
+    pub content: String,
+    pub mode: String,
+    pub created_at: String,
+}
+
+#[derive(Debug, Clone)]
+pub struct AiConversation {
+    pub id: String,
+    pub title: String,
+    pub created_at: String,
+    pub updated_at: String,
+    pub messages: Vec<AiConversationMessage>,
+}
+
+#[derive(Debug, Clone)]
 pub struct AiPreviewDetail {
     pub label: String,
     pub value: String,

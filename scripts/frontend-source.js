@@ -5,6 +5,7 @@ const root = path.resolve(__dirname, '..');
 const templatePaths = [
     'frontend/templates/app-layout.html',
     'frontend/templates/workspace-list.html',
+    'frontend/templates/ai-workspace.html',
     'frontend/templates/entry-dialogs.html',
     'frontend/templates/ai-dialog.html',
     'frontend/templates/tag-browser-dialog.html',
@@ -22,6 +23,7 @@ const cssPaths = [
     'frontend/css/modals.css',
     'frontend/css/form-controls.css',
     'frontend/css/ai-components.css',
+    'frontend/css/ai-workspace.css',
     'frontend/css/management-components.css',
     'frontend/css/desktop-components.css',
     'frontend/css/component-responsive.css',

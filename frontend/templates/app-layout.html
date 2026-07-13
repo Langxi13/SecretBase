@@ -96,6 +96,10 @@
                     <span class="sidebar-btn-icon">+</span>
                     <span class="sidebar-btn-text">新建条目</span>
                 </button>
+                <button class="sidebar-nav-item sidebar-ai-entry" @click="openAiAssistant" :title="isSidebarCollapsed ? 'AI 管家' : ''">
+                    <span class="nav-icon-text"><i class="nav-icon">✦</i><span class="nav-text">AI 管家</span></span>
+                    <strong class="nav-count">AI</strong>
+                </button>
                 <nav class="sidebar-section" aria-label="条目视图">
                     <span class="sidebar-label sidebar-label-view" aria-label="视图" :title="isSidebarCollapsed ? '视图' : ''">
                         <span class="sidebar-label-icon" aria-hidden="true">▦</span>
@@ -147,8 +151,8 @@
                     <h1 class="logo">🔐 SecretBase</h1>
                 </div>
                 <div class="header-right">
-                    <button class="btn-icon" @click="openAiParse" title="AI 智能录入">
-                        🤖
+                    <button class="btn-icon" @click="openAiAssistant" title="AI 管家">
+                        ✦
                     </button>
                     <button class="btn-icon" @click="toggleTheme" title="切换主题">
                         {{ themeIcon }}

@@ -6,10 +6,19 @@ from pathlib import Path
 from fastapi import APIRouter, HTTPException
 
 from ai_services import client as ai_client
+from ai_services.providers import provider_presets, provider_runtime
 from storage import is_unlocked
 
 
 router = APIRouter()
+
+
+@router.get("/providers")
+async def ai_providers():
+    """Return built-in provider presets without any credentials."""
+    if not is_unlocked():
+        raise HTTPException(status_code=401, detail="请先解锁")
+    return {"success": True, "data": {"providers": provider_presets()}}
 
 
 @router.get("/status")
@@ -30,6 +39,7 @@ async def ai_models(payload: dict):
         raise HTTPException(status_code=401, detail="请先解锁")
 
     base_url = ai_client._normalize_base_url(ai_client._payload_value(payload, "baseUrl", "base_url"))
+    provider_id = ai_client._payload_value(payload, "providerId", "provider_id") or "custom"
     api_key = ai_client._payload_value(payload, "apiKey", "api_key")
     if not api_key:
         saved_config = ai_client._load_ai_config()
@@ -40,7 +50,10 @@ async def ai_models(payload: dict):
 
     return {
         "success": True,
-        "data": {"models": await ai_client._fetch_model_ids(base_url, api_key)},
+        "data": {
+            "models": await ai_client._fetch_model_ids(base_url, api_key),
+            "provider_id": provider_runtime(provider_id, base_url)["provider_id"],
+        },
     }
 
 
@@ -51,6 +64,7 @@ async def save_ai_settings(payload: dict):
         raise HTTPException(status_code=401, detail="请先解锁")
 
     base_url = ai_client._normalize_base_url(ai_client._payload_value(payload, "baseUrl", "base_url"))
+    provider_id = ai_client._payload_value(payload, "providerId", "provider_id") or "custom"
     api_key = ai_client._payload_value(payload, "apiKey", "api_key")
     model = ai_client._payload_value(payload, "model")
     if not model:
@@ -63,14 +77,11 @@ async def save_ai_settings(payload: dict):
         else:
             raise HTTPException(status_code=422, detail="API Key 不能为空")
 
-    models = await ai_client._fetch_model_ids(base_url, api_key)
-    if model not in models:
-        raise HTTPException(status_code=422, detail="只能保存服务商模型列表中返回的模型")
-    await ai_client._verify_ai_config(base_url, api_key, model)
+    runtime = await ai_client._verify_ai_config(base_url, api_key, model, provider_id)
 
     settings = ai_client._load_secure_settings_for_write()
     settings["ai"] = {
-        "base_url": base_url,
+        **runtime,
         "api_key": api_key,
         "api_key_mask": ai_client._mask_api_key(api_key),
         "model": model,

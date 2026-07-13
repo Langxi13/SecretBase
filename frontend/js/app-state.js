@@ -69,6 +69,7 @@
         const showCreateModal = ref(false);
         const showEditModal = ref(false);
         const showAiParse = ref(false);
+        const showAiAssistant = ref(false);
         const showSettings = ref(false);
         const showChangePassword = ref(false);
         const showTrash = ref(false);
@@ -174,42 +175,6 @@
             { id: 'card', name: '银行卡/证件', fields: [{ name: '号码', value: '', copyable: true, hidden: true }, { name: '姓名', value: '', copyable: false, hidden: false }, { name: '有效期', value: '', copyable: false, hidden: false }] }
         ];
 
-        const aiMode = ref('parse');
-        const aiText = ref('');
-        const aiResult = ref(null);
-        const aiParsing = ref(false);
-        const aiStatus = ref(null);
-        const aiStatusError = ref('');
-        const aiFailureMessage = ref('');
-        const aiOrganizing = ref(false);
-        const aiOrganizeError = ref('');
-        const aiOrganizeResult = ref(null);
-        const aiOrganizeMode = ref('tags');
-        const aiOrganizeOptions = reactive({
-            organizeTags: true,
-            organizeGroups: false
-        });
-        const aiOrganizePrompts = reactive({
-            tags: '',
-            groups: '',
-            'tag-governance': ''
-        });
-        const aiActionInstruction = ref('');
-        const aiActionResult = ref(null);
-        const aiActionError = ref('');
-        const aiCooldownUntil = ref(0);
-        const aiNow = ref(Date.now());
-        const lastAiParseText = ref('');
-        const isAiTagGovernanceMode = computed(() => aiOrganizeMode.value === 'tag-governance');
-        const currentAiOrganizePrompt = computed({
-            get() {
-                return aiOrganizePrompts[aiOrganizeMode.value] || '';
-            },
-            set(value) {
-                aiOrganizePrompts[aiOrganizeMode.value] = value;
-            }
-        });
-
         const settingsForm = reactive({
             theme: 'system',
             pageSize: 20,
@@ -227,19 +192,7 @@
             { key: 'data', label: '数据' },
             ...(isDesktopMode ? [{ key: 'desktop', label: '桌面' }] : [])
         ];
-        const aiSettingsForm = reactive({
-            baseUrl: '',
-            apiKey: '',
-            model: ''
-        });
-        const aiSettingsStatus = ref(null);
-        const aiSettingsEditing = ref(false);
-        const aiModels = ref([]);
-        const aiModelsLoading = ref(false);
-        const aiSettingsSaving = ref(false);
-        const aiSettingsError = ref('');
-        const aiSettingsMessage = ref('');
-        const aiConfiguredBaseUrl = computed(() => aiSettingsStatus.value?.base_url || aiSettingsStatus.value?.baseUrl || '');
+        const aiState = window.SecretBaseAiState.createAiState({ ref, reactive, computed });
         const importConflictStrategy = ref('skip');
         const advancedFilters = reactive({
             untagged: false,
@@ -339,6 +292,7 @@
             showCreateModal,
             showEditModal,
             showAiParse,
+            showAiAssistant,
             showSettings,
             showChangePassword,
             showTrash,
@@ -412,39 +366,10 @@
             tagInput,
             selectedTemplate,
             entryTemplates,
-            aiMode,
-            aiText,
-            aiResult,
-            aiParsing,
-            aiStatus,
-            aiStatusError,
-            aiFailureMessage,
-            aiOrganizing,
-            aiOrganizeError,
-            aiOrganizeResult,
-            aiOrganizeMode,
-            aiOrganizeOptions,
-            aiOrganizePrompts,
-            aiActionInstruction,
-            aiActionResult,
-            aiActionError,
-            aiCooldownUntil,
-            aiNow,
-            lastAiParseText,
-            isAiTagGovernanceMode,
-            currentAiOrganizePrompt,
+            ...aiState,
             settingsForm,
             activeSettingsTab,
             settingsTabs,
-            aiSettingsForm,
-            aiSettingsStatus,
-            aiSettingsEditing,
-            aiModels,
-            aiModelsLoading,
-            aiSettingsSaving,
-            aiSettingsError,
-            aiSettingsMessage,
-            aiConfiguredBaseUrl,
             importConflictStrategy,
             advancedFilters,
             defaultTimeRange,

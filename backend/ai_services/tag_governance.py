@@ -4,6 +4,7 @@ from datetime import datetime
 
 from ai_services.organize import _clean_name_list
 from ai_services.parsing import _clean_text
+from ai_services.privacy import url_hostname
 from tag_utils import (
     TAG_COLOR_PATTERN,
     ensure_entry_tags_meta,
@@ -13,16 +14,14 @@ from tag_utils import (
 )
 
 
-def _entry_for_ai_tag_governance(entry) -> dict:
+def _entry_for_ai_tag_governance(entry, entry_ref: str | None = None) -> dict:
     return {
-        "id": entry.id,
+        "id": entry_ref or entry.id,
         "title": entry.title,
-        "url": entry.url or "",
+        "hostname": url_hostname(entry.url),
         "tags": entry.tags,
         "groups": getattr(entry, "groups", []) or [],
         "field_names": [field.name for field in entry.fields],
-        "remarks": entry.remarks or "",
-        "starred": entry.starred,
     }
 
 

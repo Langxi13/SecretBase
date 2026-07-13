@@ -6,6 +6,185 @@
 import '../frb_generated.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
+class AiAssistantRequestPlan {
+  final String conversationId;
+  final String token;
+  final AiHttpRequest request;
+  final AiSendSummary summary;
+  final String mode;
+
+  const AiAssistantRequestPlan({
+    required this.conversationId,
+    required this.token,
+    required this.request,
+    required this.summary,
+    required this.mode,
+  });
+
+  @override
+  int get hashCode =>
+      conversationId.hashCode ^
+      token.hashCode ^
+      request.hashCode ^
+      summary.hashCode ^
+      mode.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is AiAssistantRequestPlan &&
+          runtimeType == other.runtimeType &&
+          conversationId == other.conversationId &&
+          token == other.token &&
+          request == other.request &&
+          summary == other.summary &&
+          mode == other.mode;
+}
+
+class AiAssistantTurnResult {
+  final String conversationId;
+  final String message;
+  final AiPreview? preview;
+  final List<String> warnings;
+  final String? navigationEntryId;
+  final String? navigationEntryTitle;
+
+  const AiAssistantTurnResult({
+    required this.conversationId,
+    required this.message,
+    this.preview,
+    required this.warnings,
+    this.navigationEntryId,
+    this.navigationEntryTitle,
+  });
+
+  @override
+  int get hashCode =>
+      conversationId.hashCode ^
+      message.hashCode ^
+      preview.hashCode ^
+      warnings.hashCode ^
+      navigationEntryId.hashCode ^
+      navigationEntryTitle.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is AiAssistantTurnResult &&
+          runtimeType == other.runtimeType &&
+          conversationId == other.conversationId &&
+          message == other.message &&
+          preview == other.preview &&
+          warnings == other.warnings &&
+          navigationEntryId == other.navigationEntryId &&
+          navigationEntryTitle == other.navigationEntryTitle;
+}
+
+class AiConversation {
+  final String id;
+  final String title;
+  final String createdAt;
+  final String updatedAt;
+  final List<AiConversationMessage> messages;
+
+  const AiConversation({
+    required this.id,
+    required this.title,
+    required this.createdAt,
+    required this.updatedAt,
+    required this.messages,
+  });
+
+  @override
+  int get hashCode =>
+      id.hashCode ^
+      title.hashCode ^
+      createdAt.hashCode ^
+      updatedAt.hashCode ^
+      messages.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is AiConversation &&
+          runtimeType == other.runtimeType &&
+          id == other.id &&
+          title == other.title &&
+          createdAt == other.createdAt &&
+          updatedAt == other.updatedAt &&
+          messages == other.messages;
+}
+
+class AiConversationMessage {
+  final String id;
+  final String role;
+  final String content;
+  final String mode;
+  final String createdAt;
+
+  const AiConversationMessage({
+    required this.id,
+    required this.role,
+    required this.content,
+    required this.mode,
+    required this.createdAt,
+  });
+
+  @override
+  int get hashCode =>
+      id.hashCode ^
+      role.hashCode ^
+      content.hashCode ^
+      mode.hashCode ^
+      createdAt.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is AiConversationMessage &&
+          runtimeType == other.runtimeType &&
+          id == other.id &&
+          role == other.role &&
+          content == other.content &&
+          mode == other.mode &&
+          createdAt == other.createdAt;
+}
+
+class AiConversationSummary {
+  final String id;
+  final String title;
+  final String createdAt;
+  final String updatedAt;
+  final int messageCount;
+
+  const AiConversationSummary({
+    required this.id,
+    required this.title,
+    required this.createdAt,
+    required this.updatedAt,
+    required this.messageCount,
+  });
+
+  @override
+  int get hashCode =>
+      id.hashCode ^
+      title.hashCode ^
+      createdAt.hashCode ^
+      updatedAt.hashCode ^
+      messageCount.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is AiConversationSummary &&
+          runtimeType == other.runtimeType &&
+          id == other.id &&
+          title == other.title &&
+          createdAt == other.createdAt &&
+          updatedAt == other.updatedAt &&
+          messageCount == other.messageCount;
+}
+
 class AiHttpHeader {
   final String name;
   final String value;

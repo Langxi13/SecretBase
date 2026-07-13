@@ -55,6 +55,7 @@ async def ai_parse(request: AiParseRequest):
                 {"role": "user", "content": text},
             ],
             3000,
+            ai_config.get("structured_output", "prompt_json"),
         )
         payload = ai_client._extract_json_content(content)
         parsed_entries = _normalize_ai_payload(payload)

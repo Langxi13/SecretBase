@@ -38,7 +38,7 @@ flutter_rust_bridge::frb_generated_boilerplate!(
     default_rust_auto_opaque = RustAutoOpaqueMoi,
 );
 pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_VERSION: &str = "2.12.0";
-pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = -831736213;
+pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = 1610353470;
 
 // Section: executor
 
@@ -187,6 +187,38 @@ fn wire__crate__api__mobile__change_password_impl(
         },
     )
 }
+fn wire__crate__api__mobile__clear_ai_conversations_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "clear_ai_conversations",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, crate::mobile::error::MobileError>((move || {
+                    let output_ok = crate::api::mobile::clear_ai_conversations()?;
+                    Ok(output_ok)
+                })())
+            }
+        },
+    )
+}
 fn wire__crate__api__mobile__clear_ai_settings_impl(
     port_: flutter_rust_bridge::for_generated::MessagePort,
     ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
@@ -213,6 +245,41 @@ fn wire__crate__api__mobile__clear_ai_settings_impl(
             move |context| {
                 transform_result_sse::<_, crate::mobile::error::MobileError>((move || {
                     let output_ok = crate::api::mobile::clear_ai_settings()?;
+                    Ok(output_ok)
+                })())
+            }
+        },
+    )
+}
+fn wire__crate__api__mobile__consume_ai_assistant_response_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "consume_ai_assistant_response",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_token = <String>::sse_decode(&mut deserializer);
+            let api_content = <String>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, crate::mobile::error::MobileError>((move || {
+                    let output_ok =
+                        crate::api::mobile::consume_ai_assistant_response(api_token, api_content)?;
                     Ok(output_ok)
                 })())
             }
@@ -254,6 +321,39 @@ fn wire__crate__api__mobile__consume_ai_response_impl(
         },
     )
 }
+fn wire__crate__api__mobile__create_ai_conversation_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "create_ai_conversation",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_title = <String>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, crate::mobile::error::MobileError>((move || {
+                    let output_ok = crate::api::mobile::create_ai_conversation(api_title)?;
+                    Ok(output_ok)
+                })())
+            }
+        },
+    )
+}
 fn wire__crate__api__mobile__create_vault_impl(
     port_: flutter_rust_bridge::for_generated::MessagePort,
     ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
@@ -281,6 +381,39 @@ fn wire__crate__api__mobile__create_vault_impl(
             move |context| {
                 transform_result_sse::<_, crate::mobile::error::MobileError>((move || {
                     let output_ok = crate::api::mobile::create_vault(api_password)?;
+                    Ok(output_ok)
+                })())
+            }
+        },
+    )
+}
+fn wire__crate__api__mobile__delete_ai_conversation_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "delete_ai_conversation",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_id = <String>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, crate::mobile::error::MobileError>((move || {
+                    let output_ok = crate::api::mobile::delete_ai_conversation(api_id)?;
                     Ok(output_ok)
                 })())
             }
@@ -397,6 +530,39 @@ fn wire__crate__api__mobile__export_encrypted_vault_impl(
         },
     )
 }
+fn wire__crate__api__mobile__get_ai_conversation_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "get_ai_conversation",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_id = <String>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, crate::mobile::error::MobileError>((move || {
+                    let output_ok = crate::api::mobile::get_ai_conversation(api_id)?;
+                    Ok(output_ok)
+                })())
+            }
+        },
+    )
+}
 fn wire__crate__api__mobile__get_entry_impl(
     port_: flutter_rust_bridge::for_generated::MessagePort,
     ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
@@ -491,6 +657,38 @@ fn wire__crate__api__mobile__initialize_runtime_impl(
             move |context| {
                 transform_result_sse::<_, crate::mobile::error::MobileError>((move || {
                     let output_ok = crate::api::mobile::initialize_runtime(api_data_root)?;
+                    Ok(output_ok)
+                })())
+            }
+        },
+    )
+}
+fn wire__crate__api__mobile__list_ai_conversations_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "list_ai_conversations",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, crate::mobile::error::MobileError>((move || {
+                    let output_ok = crate::api::mobile::list_ai_conversations()?;
                     Ok(output_ok)
                 })())
             }
@@ -732,6 +930,47 @@ fn wire__crate__api__mobile__pending_import_preview_impl(
             move |context| {
                 transform_result_sse::<_, crate::mobile::error::MobileError>((move || {
                     let output_ok = crate::api::mobile::pending_import_preview()?;
+                    Ok(output_ok)
+                })())
+            }
+        },
+    )
+}
+fn wire__crate__api__mobile__prepare_ai_assistant_request_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "prepare_ai_assistant_request",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_conversation_id = <Option<String>>::sse_decode(&mut deserializer);
+            let api_message = <String>::sse_decode(&mut deserializer);
+            let api_mode = <String>::sse_decode(&mut deserializer);
+            let api_selected_entry_ids = <Vec<String>>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, crate::mobile::error::MobileError>((move || {
+                    let output_ok = crate::api::mobile::prepare_ai_assistant_request(
+                        api_conversation_id,
+                        api_message,
+                        api_mode,
+                        api_selected_entry_ids,
+                    )?;
                     Ok(output_ok)
                 })())
             }
@@ -1285,6 +1524,99 @@ impl SseDecode for String {
     }
 }
 
+impl SseDecode for crate::mobile::models::AiAssistantRequestPlan {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut var_conversationId = <String>::sse_decode(deserializer);
+        let mut var_token = <String>::sse_decode(deserializer);
+        let mut var_request = <crate::mobile::models::AiHttpRequest>::sse_decode(deserializer);
+        let mut var_summary = <crate::mobile::models::AiSendSummary>::sse_decode(deserializer);
+        let mut var_mode = <String>::sse_decode(deserializer);
+        return crate::mobile::models::AiAssistantRequestPlan {
+            conversation_id: var_conversationId,
+            token: var_token,
+            request: var_request,
+            summary: var_summary,
+            mode: var_mode,
+        };
+    }
+}
+
+impl SseDecode for crate::mobile::models::AiAssistantTurnResult {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut var_conversationId = <String>::sse_decode(deserializer);
+        let mut var_message = <String>::sse_decode(deserializer);
+        let mut var_preview = <Option<crate::mobile::models::AiPreview>>::sse_decode(deserializer);
+        let mut var_warnings = <Vec<String>>::sse_decode(deserializer);
+        let mut var_navigationEntryId = <Option<String>>::sse_decode(deserializer);
+        let mut var_navigationEntryTitle = <Option<String>>::sse_decode(deserializer);
+        return crate::mobile::models::AiAssistantTurnResult {
+            conversation_id: var_conversationId,
+            message: var_message,
+            preview: var_preview,
+            warnings: var_warnings,
+            navigation_entry_id: var_navigationEntryId,
+            navigation_entry_title: var_navigationEntryTitle,
+        };
+    }
+}
+
+impl SseDecode for crate::mobile::models::AiConversation {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut var_id = <String>::sse_decode(deserializer);
+        let mut var_title = <String>::sse_decode(deserializer);
+        let mut var_createdAt = <String>::sse_decode(deserializer);
+        let mut var_updatedAt = <String>::sse_decode(deserializer);
+        let mut var_messages =
+            <Vec<crate::mobile::models::AiConversationMessage>>::sse_decode(deserializer);
+        return crate::mobile::models::AiConversation {
+            id: var_id,
+            title: var_title,
+            created_at: var_createdAt,
+            updated_at: var_updatedAt,
+            messages: var_messages,
+        };
+    }
+}
+
+impl SseDecode for crate::mobile::models::AiConversationMessage {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut var_id = <String>::sse_decode(deserializer);
+        let mut var_role = <String>::sse_decode(deserializer);
+        let mut var_content = <String>::sse_decode(deserializer);
+        let mut var_mode = <String>::sse_decode(deserializer);
+        let mut var_createdAt = <String>::sse_decode(deserializer);
+        return crate::mobile::models::AiConversationMessage {
+            id: var_id,
+            role: var_role,
+            content: var_content,
+            mode: var_mode,
+            created_at: var_createdAt,
+        };
+    }
+}
+
+impl SseDecode for crate::mobile::models::AiConversationSummary {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut var_id = <String>::sse_decode(deserializer);
+        let mut var_title = <String>::sse_decode(deserializer);
+        let mut var_createdAt = <String>::sse_decode(deserializer);
+        let mut var_updatedAt = <String>::sse_decode(deserializer);
+        let mut var_messageCount = <u32>::sse_decode(deserializer);
+        return crate::mobile::models::AiConversationSummary {
+            id: var_id,
+            title: var_title,
+            created_at: var_createdAt,
+            updated_at: var_updatedAt,
+            message_count: var_messageCount,
+        };
+    }
+}
+
 impl SseDecode for crate::mobile::models::AiHttpHeader {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
@@ -1551,6 +1883,34 @@ impl SseDecode for Vec<String> {
         let mut ans_ = Vec::with_capacity(len_ as usize);
         for idx_ in 0..len_ {
             ans_.push(<String>::sse_decode(deserializer));
+        }
+        return ans_;
+    }
+}
+
+impl SseDecode for Vec<crate::mobile::models::AiConversationMessage> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut len_ = <i32>::sse_decode(deserializer);
+        let mut ans_ = Vec::with_capacity(len_ as usize);
+        for idx_ in 0..len_ {
+            ans_.push(<crate::mobile::models::AiConversationMessage>::sse_decode(
+                deserializer,
+            ));
+        }
+        return ans_;
+    }
+}
+
+impl SseDecode for Vec<crate::mobile::models::AiConversationSummary> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut len_ = <i32>::sse_decode(deserializer);
+        let mut ans_ = Vec::with_capacity(len_ as usize);
+        for idx_ in 0..len_ {
+            ans_.push(<crate::mobile::models::AiConversationSummary>::sse_decode(
+                deserializer,
+            ));
         }
         return ans_;
     }
@@ -1853,61 +2213,86 @@ fn pde_ffi_dispatcher_primary_impl(
         2 => wire__crate__api__mobile__apply_ai_preview_impl(port, ptr, rust_vec_len, data_len),
         3 => wire__crate__api__mobile__apply_import_impl(port, ptr, rust_vec_len, data_len),
         4 => wire__crate__api__mobile__change_password_impl(port, ptr, rust_vec_len, data_len),
-        5 => wire__crate__api__mobile__clear_ai_settings_impl(port, ptr, rust_vec_len, data_len),
-        6 => wire__crate__api__mobile__consume_ai_response_impl(port, ptr, rust_vec_len, data_len),
-        7 => wire__crate__api__mobile__create_vault_impl(port, ptr, rust_vec_len, data_len),
-        8 => wire__crate__api__mobile__delete_taxonomies_impl(port, ptr, rust_vec_len, data_len),
-        9 => wire__crate__api__mobile__delete_taxonomy_impl(port, ptr, rust_vec_len, data_len),
-        10 => {
+        5 => {
+            wire__crate__api__mobile__clear_ai_conversations_impl(port, ptr, rust_vec_len, data_len)
+        }
+        6 => wire__crate__api__mobile__clear_ai_settings_impl(port, ptr, rust_vec_len, data_len),
+        7 => wire__crate__api__mobile__consume_ai_assistant_response_impl(
+            port,
+            ptr,
+            rust_vec_len,
+            data_len,
+        ),
+        8 => wire__crate__api__mobile__consume_ai_response_impl(port, ptr, rust_vec_len, data_len),
+        9 => {
+            wire__crate__api__mobile__create_ai_conversation_impl(port, ptr, rust_vec_len, data_len)
+        }
+        10 => wire__crate__api__mobile__create_vault_impl(port, ptr, rust_vec_len, data_len),
+        11 => {
+            wire__crate__api__mobile__delete_ai_conversation_impl(port, ptr, rust_vec_len, data_len)
+        }
+        12 => wire__crate__api__mobile__delete_taxonomies_impl(port, ptr, rust_vec_len, data_len),
+        13 => wire__crate__api__mobile__delete_taxonomy_impl(port, ptr, rust_vec_len, data_len),
+        14 => {
             wire__crate__api__mobile__export_encrypted_vault_impl(port, ptr, rust_vec_len, data_len)
         }
-        11 => wire__crate__api__mobile__get_entry_impl(port, ptr, rust_vec_len, data_len),
-        12 => wire__crate__api__mobile__init_app_impl(port, ptr, rust_vec_len, data_len),
-        13 => wire__crate__api__mobile__initialize_runtime_impl(port, ptr, rust_vec_len, data_len),
-        14 => wire__crate__api__mobile__list_entries_impl(port, ptr, rust_vec_len, data_len),
-        15 => wire__crate__api__mobile__list_recovery_snapshots_impl(
+        15 => wire__crate__api__mobile__get_ai_conversation_impl(port, ptr, rust_vec_len, data_len),
+        16 => wire__crate__api__mobile__get_entry_impl(port, ptr, rust_vec_len, data_len),
+        17 => wire__crate__api__mobile__init_app_impl(port, ptr, rust_vec_len, data_len),
+        18 => wire__crate__api__mobile__initialize_runtime_impl(port, ptr, rust_vec_len, data_len),
+        19 => {
+            wire__crate__api__mobile__list_ai_conversations_impl(port, ptr, rust_vec_len, data_len)
+        }
+        20 => wire__crate__api__mobile__list_entries_impl(port, ptr, rust_vec_len, data_len),
+        21 => wire__crate__api__mobile__list_recovery_snapshots_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        16 => wire__crate__api__mobile__list_taxonomy_impl(port, ptr, rust_vec_len, data_len),
-        17 => wire__crate__api__mobile__lock_vault_impl(port, ptr, rust_vec_len, data_len),
-        18 => wire__crate__api__mobile__parse_ai_models_response_impl(
+        22 => wire__crate__api__mobile__list_taxonomy_impl(port, ptr, rust_vec_len, data_len),
+        23 => wire__crate__api__mobile__lock_vault_impl(port, ptr, rust_vec_len, data_len),
+        24 => wire__crate__api__mobile__parse_ai_models_response_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        19 => wire__crate__api__mobile__pending_ai_preview_impl(port, ptr, rust_vec_len, data_len),
-        20 => {
+        25 => wire__crate__api__mobile__pending_ai_preview_impl(port, ptr, rust_vec_len, data_len),
+        26 => {
             wire__crate__api__mobile__pending_import_preview_impl(port, ptr, rust_vec_len, data_len)
         }
-        21 => wire__crate__api__mobile__prepare_ai_models_request_impl(
+        27 => wire__crate__api__mobile__prepare_ai_assistant_request_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        22 => wire__crate__api__mobile__prepare_ai_request_impl(port, ptr, rust_vec_len, data_len),
-        23 => wire__crate__api__mobile__prepare_ai_verify_request_impl(
+        28 => wire__crate__api__mobile__prepare_ai_models_request_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        24 => wire__crate__api__mobile__preview_import_impl(port, ptr, rust_vec_len, data_len),
-        25 => wire__crate__api__mobile__preview_recovery_impl(port, ptr, rust_vec_len, data_len),
-        26 => wire__crate__api__mobile__purge_entry_impl(port, ptr, rust_vec_len, data_len),
-        27 => wire__crate__api__mobile__restore_entry_impl(port, ptr, rust_vec_len, data_len),
-        28 => wire__crate__api__mobile__save_ai_settings_impl(port, ptr, rust_vec_len, data_len),
-        29 => wire__crate__api__mobile__save_entry_impl(port, ptr, rust_vec_len, data_len),
-        30 => wire__crate__api__mobile__save_group_order_impl(port, ptr, rust_vec_len, data_len),
-        31 => wire__crate__api__mobile__save_taxonomy_impl(port, ptr, rust_vec_len, data_len),
-        32 => wire__crate__api__mobile__trash_entry_impl(port, ptr, rust_vec_len, data_len),
-        33 => wire__crate__api__mobile__unlock_vault_impl(port, ptr, rust_vec_len, data_len),
-        34 => wire__crate__api__mobile__vault_status_impl(port, ptr, rust_vec_len, data_len),
-        35 => wire__crate__api__mobile__verify_ai_response_impl(port, ptr, rust_vec_len, data_len),
+        29 => wire__crate__api__mobile__prepare_ai_request_impl(port, ptr, rust_vec_len, data_len),
+        30 => wire__crate__api__mobile__prepare_ai_verify_request_impl(
+            port,
+            ptr,
+            rust_vec_len,
+            data_len,
+        ),
+        31 => wire__crate__api__mobile__preview_import_impl(port, ptr, rust_vec_len, data_len),
+        32 => wire__crate__api__mobile__preview_recovery_impl(port, ptr, rust_vec_len, data_len),
+        33 => wire__crate__api__mobile__purge_entry_impl(port, ptr, rust_vec_len, data_len),
+        34 => wire__crate__api__mobile__restore_entry_impl(port, ptr, rust_vec_len, data_len),
+        35 => wire__crate__api__mobile__save_ai_settings_impl(port, ptr, rust_vec_len, data_len),
+        36 => wire__crate__api__mobile__save_entry_impl(port, ptr, rust_vec_len, data_len),
+        37 => wire__crate__api__mobile__save_group_order_impl(port, ptr, rust_vec_len, data_len),
+        38 => wire__crate__api__mobile__save_taxonomy_impl(port, ptr, rust_vec_len, data_len),
+        39 => wire__crate__api__mobile__trash_entry_impl(port, ptr, rust_vec_len, data_len),
+        40 => wire__crate__api__mobile__unlock_vault_impl(port, ptr, rust_vec_len, data_len),
+        41 => wire__crate__api__mobile__vault_status_impl(port, ptr, rust_vec_len, data_len),
+        42 => wire__crate__api__mobile__verify_ai_response_impl(port, ptr, rust_vec_len, data_len),
         _ => unreachable!(),
     }
 }
@@ -1926,6 +2311,127 @@ fn pde_ffi_dispatcher_sync_impl(
 
 // Section: rust2dart
 
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::mobile::models::AiAssistantRequestPlan {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        [
+            self.conversation_id.into_into_dart().into_dart(),
+            self.token.into_into_dart().into_dart(),
+            self.request.into_into_dart().into_dart(),
+            self.summary.into_into_dart().into_dart(),
+            self.mode.into_into_dart().into_dart(),
+        ]
+        .into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for crate::mobile::models::AiAssistantRequestPlan
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<crate::mobile::models::AiAssistantRequestPlan>
+    for crate::mobile::models::AiAssistantRequestPlan
+{
+    fn into_into_dart(self) -> crate::mobile::models::AiAssistantRequestPlan {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::mobile::models::AiAssistantTurnResult {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        [
+            self.conversation_id.into_into_dart().into_dart(),
+            self.message.into_into_dart().into_dart(),
+            self.preview.into_into_dart().into_dart(),
+            self.warnings.into_into_dart().into_dart(),
+            self.navigation_entry_id.into_into_dart().into_dart(),
+            self.navigation_entry_title.into_into_dart().into_dart(),
+        ]
+        .into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for crate::mobile::models::AiAssistantTurnResult
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<crate::mobile::models::AiAssistantTurnResult>
+    for crate::mobile::models::AiAssistantTurnResult
+{
+    fn into_into_dart(self) -> crate::mobile::models::AiAssistantTurnResult {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::mobile::models::AiConversation {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        [
+            self.id.into_into_dart().into_dart(),
+            self.title.into_into_dart().into_dart(),
+            self.created_at.into_into_dart().into_dart(),
+            self.updated_at.into_into_dart().into_dart(),
+            self.messages.into_into_dart().into_dart(),
+        ]
+        .into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for crate::mobile::models::AiConversation
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<crate::mobile::models::AiConversation>
+    for crate::mobile::models::AiConversation
+{
+    fn into_into_dart(self) -> crate::mobile::models::AiConversation {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::mobile::models::AiConversationMessage {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        [
+            self.id.into_into_dart().into_dart(),
+            self.role.into_into_dart().into_dart(),
+            self.content.into_into_dart().into_dart(),
+            self.mode.into_into_dart().into_dart(),
+            self.created_at.into_into_dart().into_dart(),
+        ]
+        .into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for crate::mobile::models::AiConversationMessage
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<crate::mobile::models::AiConversationMessage>
+    for crate::mobile::models::AiConversationMessage
+{
+    fn into_into_dart(self) -> crate::mobile::models::AiConversationMessage {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::mobile::models::AiConversationSummary {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        [
+            self.id.into_into_dart().into_dart(),
+            self.title.into_into_dart().into_dart(),
+            self.created_at.into_into_dart().into_dart(),
+            self.updated_at.into_into_dart().into_dart(),
+            self.message_count.into_into_dart().into_dart(),
+        ]
+        .into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for crate::mobile::models::AiConversationSummary
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<crate::mobile::models::AiConversationSummary>
+    for crate::mobile::models::AiConversationSummary
+{
+    fn into_into_dart(self) -> crate::mobile::models::AiConversationSummary {
+        self
+    }
+}
 // Codec=Dco (DartCObject based), see doc to use other codecs
 impl flutter_rust_bridge::IntoDart for crate::mobile::models::AiHttpHeader {
     fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
@@ -2374,6 +2880,62 @@ impl SseEncode for String {
     }
 }
 
+impl SseEncode for crate::mobile::models::AiAssistantRequestPlan {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <String>::sse_encode(self.conversation_id, serializer);
+        <String>::sse_encode(self.token, serializer);
+        <crate::mobile::models::AiHttpRequest>::sse_encode(self.request, serializer);
+        <crate::mobile::models::AiSendSummary>::sse_encode(self.summary, serializer);
+        <String>::sse_encode(self.mode, serializer);
+    }
+}
+
+impl SseEncode for crate::mobile::models::AiAssistantTurnResult {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <String>::sse_encode(self.conversation_id, serializer);
+        <String>::sse_encode(self.message, serializer);
+        <Option<crate::mobile::models::AiPreview>>::sse_encode(self.preview, serializer);
+        <Vec<String>>::sse_encode(self.warnings, serializer);
+        <Option<String>>::sse_encode(self.navigation_entry_id, serializer);
+        <Option<String>>::sse_encode(self.navigation_entry_title, serializer);
+    }
+}
+
+impl SseEncode for crate::mobile::models::AiConversation {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <String>::sse_encode(self.id, serializer);
+        <String>::sse_encode(self.title, serializer);
+        <String>::sse_encode(self.created_at, serializer);
+        <String>::sse_encode(self.updated_at, serializer);
+        <Vec<crate::mobile::models::AiConversationMessage>>::sse_encode(self.messages, serializer);
+    }
+}
+
+impl SseEncode for crate::mobile::models::AiConversationMessage {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <String>::sse_encode(self.id, serializer);
+        <String>::sse_encode(self.role, serializer);
+        <String>::sse_encode(self.content, serializer);
+        <String>::sse_encode(self.mode, serializer);
+        <String>::sse_encode(self.created_at, serializer);
+    }
+}
+
+impl SseEncode for crate::mobile::models::AiConversationSummary {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <String>::sse_encode(self.id, serializer);
+        <String>::sse_encode(self.title, serializer);
+        <String>::sse_encode(self.created_at, serializer);
+        <String>::sse_encode(self.updated_at, serializer);
+        <u32>::sse_encode(self.message_count, serializer);
+    }
+}
+
 impl SseEncode for crate::mobile::models::AiHttpHeader {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
@@ -2542,6 +3104,26 @@ impl SseEncode for Vec<String> {
         <i32>::sse_encode(self.len() as _, serializer);
         for item in self {
             <String>::sse_encode(item, serializer);
+        }
+    }
+}
+
+impl SseEncode for Vec<crate::mobile::models::AiConversationMessage> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <i32>::sse_encode(self.len() as _, serializer);
+        for item in self {
+            <crate::mobile::models::AiConversationMessage>::sse_encode(item, serializer);
+        }
+    }
+}
+
+impl SseEncode for Vec<crate::mobile::models::AiConversationSummary> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <i32>::sse_encode(self.len() as _, serializer);
+        for item in self {
+            <crate::mobile::models::AiConversationSummary>::sse_encode(item, serializer);
         }
     }
 }

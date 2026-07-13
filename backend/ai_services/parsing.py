@@ -89,12 +89,14 @@ def _normalize_entry(entry, index: int = 0):
 
     fields = _normalize_fields(entry.get("fields") or entry.get("field_items") or entry.get("credentials"))
     tags = _normalize_tags(entry.get("tags") or entry.get("labels") or entry.get("categories"))
+    groups = _normalize_tags(entry.get("groups") or entry.get("password_groups") or entry.get("folders"))
 
     return {
         "title": title,
         "url": url,
         "fields": fields,
         "tags": tags,
+        "groups": groups,
         "remarks": _clean_text(entry.get("remarks") or entry.get("note") or entry.get("notes") or entry.get("comment"), 2000)
     }
 
@@ -122,7 +124,7 @@ def _normalize_ai_payload(payload):
         raw_entries = [{}]
 
     entries = [_normalize_entry(entry, index) for index, entry in enumerate(raw_entries)]
-    entries = [entry for entry in entries if entry["title"] or entry["fields"] or entry["tags"]]
+    entries = [entry for entry in entries if entry["title"] or entry["fields"] or entry["tags"] or entry["groups"]]
     if not entries:
         entries = [_normalize_entry({}, 0)]
     return entries

@@ -13,6 +13,11 @@ from crypto import decrypt_vault_with_key, encrypt_vault_with_key, parse_vault_h
 from secure_settings import AI_SETTINGS_PURPOSE
 from storage import derive_unlocked_purpose_key
 from ai_services.prompts import AI_CHAT_TIMEOUT_SECONDS
+from ai_services.providers import (
+    normalize_base_url,
+    provider_runtime,
+    validate_endpoint_target,
+)
 
 
 logger = logging.getLogger(__name__)
@@ -42,9 +47,13 @@ def _extract_json_content(content: str):
 def _empty_ai_status() -> dict:
     return {
         "configured": False,
+        "provider_id": "custom",
+        "provider_name": "自定义接口",
         "base_url": "",
         "model": "",
         "api_key_mask": "",
+        "structured_output": "auto",
+        "customized": False,
     }
 
 
@@ -58,13 +67,7 @@ def _mask_api_key(api_key: str) -> str:
 
 
 def _normalize_base_url(base_url: str) -> str:
-    base_url = str(base_url or "").strip().rstrip("/")
-    for suffix in ("/chat/completions", "/models"):
-        if base_url.endswith(suffix):
-            base_url = base_url[: -len(suffix)].rstrip("/")
-    if not base_url.startswith(("https://", "http://")):
-        raise HTTPException(status_code=422, detail="Base URL 必须以 http:// 或 https:// 开头")
-    return base_url
+    return normalize_base_url(base_url)
 
 
 def _payload_value(payload: dict, *names: str) -> str:
@@ -128,10 +131,14 @@ def _load_ai_config() -> dict | None:
     if not all(ai_config.get(key) for key in ("base_url", "api_key", "model")):
         return None
     return {
+        "provider_id": str(ai_config.get("provider_id") or "custom"),
+        "provider_name": str(ai_config.get("provider_name") or "自定义接口"),
         "base_url": str(ai_config["base_url"]).rstrip("/"),
         "api_key": str(ai_config["api_key"]),
         "model": str(ai_config["model"]),
         "api_key_mask": str(ai_config.get("api_key_mask") or _mask_api_key(ai_config["api_key"])),
+        "structured_output": str(ai_config.get("structured_output") or "prompt_json"),
+        "customized": bool(ai_config.get("customized")),
     }
 
 
@@ -140,9 +147,13 @@ def _ai_status_from_config(config: dict | None) -> dict:
         return _empty_ai_status()
     return {
         "configured": True,
+        "provider_id": config["provider_id"],
+        "provider_name": config["provider_name"],
         "base_url": config["base_url"],
         "model": config["model"],
         "api_key_mask": config["api_key_mask"],
+        "structured_output": config["structured_output"],
+        "customized": config["customized"],
     }
 
 
@@ -162,6 +173,7 @@ def _auth_headers(api_key: str) -> dict:
 
 
 async def _fetch_model_ids(base_url: str, api_key: str) -> list[str]:
+    base_url = validate_endpoint_target(base_url)
     try:
         async with httpx.AsyncClient(timeout=15.0, trust_env=False) as client:
             response = await client.get(_model_endpoint(base_url), headers=_auth_headers(api_key))
@@ -204,19 +216,23 @@ async def _request_chat_completion(
     model: str,
     messages: list[dict],
     max_tokens: int,
+    structured_output: str = "response_format",
 ) -> str:
+    base_url = validate_endpoint_target(base_url)
+    body = {
+        "model": model,
+        "messages": messages,
+        "temperature": 0,
+        "max_tokens": max_tokens,
+    }
+    if structured_output == "response_format":
+        body["response_format"] = {"type": "json_object"}
     try:
         async with httpx.AsyncClient(timeout=AI_CHAT_TIMEOUT_SECONDS, trust_env=False) as client:
             response = await client.post(
                 _chat_endpoint(base_url),
                 headers=_auth_headers(api_key),
-                json={
-                    "model": model,
-                    "messages": messages,
-                    "temperature": 0,
-                    "max_tokens": max_tokens,
-                    "response_format": {"type": "json_object"},
-                },
+                json=body,
             )
     except httpx.TimeoutException:
         raise HTTPException(status_code=502, detail="AI 服务响应超时")
@@ -237,17 +253,45 @@ async def _request_chat_completion(
         raise HTTPException(status_code=422, detail="AI 返回格式错误")
 
 
-async def _verify_ai_config(base_url: str, api_key: str, model: str) -> None:
-    content = await _request_chat_completion(
-        base_url,
-        api_key,
-        model,
-        [{"role": "user", "content": 'Return exactly this JSON object: {"ok": true}'}],
-        100,
-    )
+async def _verify_ai_config(
+    base_url: str,
+    api_key: str,
+    model: str,
+    provider_id: str = "custom",
+) -> dict:
+    runtime = provider_runtime(provider_id, base_url)
+    requested_mode = runtime["structured_output"]
+    modes = [requested_mode]
+    if requested_mode == "auto":
+        modes = ["response_format", "prompt_json"]
+    elif requested_mode == "response_format":
+        modes.append("prompt_json")
+
+    last_error = None
+    content = ""
+    successful_mode = "prompt_json"
+    for mode in dict.fromkeys(modes):
+        try:
+            content = await _request_chat_completion(
+                runtime["base_url"],
+                api_key,
+                model,
+                [{"role": "user", "content": 'Return exactly this JSON object: {"ok": true}'}],
+                100,
+                mode,
+            )
+            successful_mode = mode
+            break
+        except HTTPException as error:
+            last_error = error
+    else:
+        raise last_error or HTTPException(status_code=502, detail="AI 连通测试失败")
+
     try:
         payload = _extract_json_content(content)
     except json.JSONDecodeError:
         raise HTTPException(status_code=502, detail="AI 连通测试失败：模型未返回有效 JSON")
     if not isinstance(payload, dict) or payload.get("ok") is not True:
         raise HTTPException(status_code=502, detail="AI 连通测试失败：模型返回内容不符合预期")
+    runtime["structured_output"] = successful_mode
+    return runtime

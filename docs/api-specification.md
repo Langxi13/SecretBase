@@ -1002,13 +1002,19 @@ POST /groups/{group_name}/entries
 - 404: 密码组不存在
 - 422: 密码组名称为空或 ids 为空
 
-## 7. AI 智能录入模块
+## 7. AI 管家与专业工具模块
 
-阶段：V1.1/V1.2。若未配置 AI API Key，前端必须允许用户继续手动录入，不能阻塞核心功能。AI 接入由用户在解锁后进入设置页配置 Base URL、API Key，并实时拉取模型列表选择模型。
+AI 是可选能力，未配置 API Key 时不能阻塞任何本地密码库功能。内置 OpenAI、DeepSeek、Kimi、智谱 GLM、SiliconFlow、Gemini、OpenRouter 和自定义 OpenAI-compatible 预设；所有 Base URL 均可手动编辑，不内置 Qwen。模型列表获取失败时允许用户手工填写模型 ID。
+
+```
+GET /ai/providers
+```
+
+该接口返回厂商名称、默认 Base URL、结构化输出模式和是否为聚合服务，不返回任何用户配置或 API Key。
 
 ### 7.0 查询 AI 状态
 
-**查询 AI 是否已配置。该接口只返回配置状态、Base URL、模型名和 Key 掩码，绝不能返回完整 API Key。**
+**查询 AI 是否已配置。该接口只返回厂商、Base URL、模型名、结构化输出模式和 Key 掩码，绝不能返回完整 API Key。**
 
 ```
 GET /ai/status
@@ -1021,9 +1027,13 @@ GET /ai/status
   "success": true,
   "data": {
     "configured": false,
+    "provider_id": "custom",
+    "provider_name": "自定义接口",
     "base_url": "",
     "model": "",
-    "api_key_mask": ""
+    "api_key_mask": "",
+    "structured_output": "auto",
+    "customized": false
   }
 }
 ```
@@ -1044,6 +1054,7 @@ POST /ai/models
 
 ```json
 {
+  "providerId": "deepseek",
   "baseUrl": "https://api.deepseek.com",
   "apiKey": "sk-..."
 }
@@ -1057,7 +1068,8 @@ POST /ai/models
 {
   "success": true,
   "data": {
-    "models": ["deepseek-v4-flash", "deepseek-v4-pro"]
+    "models": ["deepseek-v4-flash", "deepseek-v4-pro"],
+    "provider_id": "deepseek"
   }
 }
 ```
@@ -1070,7 +1082,7 @@ POST /ai/models
 
 ### 7.2 保存 AI 设置
 
-**保存 AI Base URL、模型和 API Key。保存前后端必须先拉取模型列表，确认 `model` 来自服务商返回列表，再用所选模型执行固定无敏感连通测试。**
+**保存 AI 厂商、Base URL、模型和 API Key。后端使用固定无敏感请求验证模型连通性；不要求模型列表接口一定可用。**
 
 ```
 PUT /ai/settings
@@ -1081,12 +1093,13 @@ PUT /ai/settings
 ```json
 {
   "baseUrl": "https://api.deepseek.com",
+  "providerId": "deepseek",
   "apiKey": "sk-...",
   "model": "deepseek-v4-flash"
 }
 ```
 
-已保存 AI 配置后，如果只更换同一 Base URL 下的模型，`apiKey` 可以省略。API Key 只写入本机加密安全设置文件，不写入明文 `settings.json`，也不进入 vault 备份/恢复。
+已保存 AI 配置后，如果只更换同一 Base URL 下的模型，`apiKey` 可以省略。API Key 只写入本机加密安全设置文件，不写入明文 `settings.json`，也不进入 vault 备份/恢复。外部地址必须使用 HTTPS；桌面模式仅允许显式配置回环 HTTP 接口。
 
 **响应：**
 
@@ -1095,9 +1108,13 @@ PUT /ai/settings
   "success": true,
   "data": {
     "configured": true,
+    "provider_id": "deepseek",
+    "provider_name": "DeepSeek",
     "base_url": "https://api.deepseek.com",
     "model": "deepseek-v4-flash",
-    "api_key_mask": "sk-...abcd"
+    "api_key_mask": "sk-...abcd",
+    "structured_output": "response_format",
+    "customized": false
   },
   "message": "AI 设置已保存"
 }
@@ -1106,8 +1123,8 @@ PUT /ai/settings
 **错误情况：**
 
 - 401: 未解锁
-- 422: Base URL、API Key 或模型无效，或模型不在服务商返回列表中
-- 502: 获取模型列表失败或固定连通测试失败
+- 422: Base URL、API Key 或模型无效，或目标地址被安全策略阻止
+- 502: 固定连通测试失败
 
 ### 7.3 清除 AI 设置
 
@@ -1124,9 +1141,13 @@ DELETE /ai/settings
   "success": true,
   "data": {
     "configured": false,
+    "provider_id": "custom",
+    "provider_name": "自定义接口",
     "base_url": "",
     "model": "",
-    "api_key_mask": ""
+    "api_key_mask": "",
+    "structured_output": "auto",
+    "customized": false
   },
   "message": "AI 设置已清除"
 }
@@ -1169,6 +1190,7 @@ POST /ai/parse
         {"name": "IP", "value": "192.0.2.10", "copyable": true, "hidden": false}
       ],
       "tags": ["示例云", "服务器"],
+      "groups": ["服务器"],
       "remarks": ""
     },
     "parsed_entries": [
@@ -1181,6 +1203,7 @@ POST /ai/parse
           {"name": "IP", "value": "192.0.2.10", "copyable": true, "hidden": false}
         ],
         "tags": ["示例云", "服务器"],
+        "groups": ["服务器"],
         "remarks": ""
       }
     ],
@@ -1200,7 +1223,7 @@ POST /ai/parse
 
 **基于当前筛选范围，为条目生成标签或密码组整理建议。该接口只返回建议，不写入 vault。**
 
-整理请求不会向 AI 发送字段值；后端只发送条目标题、网址、字段名、现有标签、现有密码组、备注等信息。标签整理和密码组整理必须分开执行，`organize_tags` 与 `organize_groups` 不能同时为 `true`。单次最多整理 100 条，超过后前端应提示缩小筛选范围。
+整理请求只发送条目标题、网址 hostname、字段名、现有标签和密码组，不发送字段值、完整网址、备注或真实 UUID。标签整理和密码组整理必须分开执行，`organize_tags` 与 `organize_groups` 不能同时为 `true`。单次最多整理 100 条，超过后前端应提示缩小筛选范围。
 
 ```
 POST /ai/organize/preview
@@ -1231,6 +1254,8 @@ POST /ai/organize/preview
   "success": true,
   "data": {
     "entry_count": 1,
+    "plan_token": "server-side-token",
+    "source_revision": 8,
     "summary": {
       "affected_entries": 1,
       "add_tags": 2,
@@ -1242,6 +1267,7 @@ POST /ai/organize/preview
     },
     "suggestions": [
       {
+        "id": "organize-1",
         "entry_id": "uuid",
         "entry_title": "公司邮箱",
         "selected": true,
@@ -1274,7 +1300,7 @@ POST /ai/organize/preview
 
 ### 7.6 应用 AI 整理建议
 
-**应用用户确认后的整理建议。该接口必须只接受前端确认后的建议列表，并重新校验条目仍存在且未删除。**
+**应用用户确认后的整理建议。动作正文保存在服务端待处理区，前端只能提交计划令牌和所选建议 ID。**
 
 ```
 POST /ai/organize/apply
@@ -1284,20 +1310,9 @@ POST /ai/organize/apply
 
 ```json
 {
-  "suggestions": [
-    {
-      "entry_id": "uuid",
-      "selected": true,
-      "add_tags": ["邮箱", "工作"],
-      "remove_tags": ["待整理"],
-      "add_groups": ["工作账号"],
-      "remove_groups": [],
-      "group_descriptions": {
-        "工作账号": "公司邮箱、协作工具和内部系统"
-      },
-      "reason": "标题和字段名显示这是工作邮箱账号"
-    }
-  ]
+  "plan_token": "server-side-token",
+  "selected_ids": ["organize-1"],
+  "expected_revision": 8
 }
 ```
 
@@ -1308,7 +1323,9 @@ POST /ai/organize/apply
   "success": true,
   "data": {
     "updated_count": 1,
-    "created_groups": ["工作账号"]
+    "created_groups": ["工作账号"],
+    "undo_token": "undo-token",
+    "revision": 9
   },
   "message": "已整理 1 个条目"
 }
@@ -1317,7 +1334,9 @@ POST /ai/organize/apply
 **错误情况：**
 
 - 401: 未解锁
-- 422: 建议列表为空或字段格式无效
+- 409: Vault revision 已变化
+- 410: 计划已过期或不属于当前解锁会话
+- 422: 未选择有效建议
 
 ### 7.7 生成 AI 标签系统管理建议
 
@@ -1343,6 +1362,8 @@ POST /ai/tags/preview
   "success": true,
   "data": {
     "entry_count": 2,
+    "plan_token": "server-side-token",
+    "source_revision": 8,
     "summary": {
       "total_actions": 3,
       "affected_entries": 1,
@@ -1355,6 +1376,7 @@ POST /ai/tags/preview
     },
     "suggestions": [
       {
+        "id": "tag-1",
         "action": "merge_tags",
         "selected": true,
         "source_tags": ["git", "代码"],
@@ -1383,15 +1405,9 @@ POST /ai/tags/apply
 
 ```json
 {
-  "suggestions": [
-    {
-      "action": "assign_tag",
-      "selected": true,
-      "tag": "邮箱",
-      "entry_ids": ["uuid"],
-      "reason": "标题显示这是邮箱条目"
-    }
-  ]
+  "plan_token": "server-side-token",
+  "selected_ids": ["tag-1"],
+  "expected_revision": 8
 }
 ```
 
@@ -1412,7 +1428,7 @@ POST /ai/tags/apply
 
 **根据用户自然语言指令生成结构化操作计划。该接口只返回计划，不写入 vault。**
 
-后端不会向 AI 发送字段值，只发送条目标题、网址、标签、密码组、字段名、字段索引、字段隐藏/可复制状态和备注。AI 返回的危险动作会被过滤；字段拆分时真实字段值只在 `/ai/actions/apply` 中由后端本地复制。
+后端只发送条目标题、网址 hostname、标签、密码组、字段名、字段索引和字段隐藏/可复制状态，不发送字段值、完整网址、备注或真实 UUID。AI 返回的危险动作会被过滤；字段拆分时真实字段值只在 `/ai/actions/apply` 中由后端本地复制。
 
 ```
 POST /ai/actions/preview
@@ -1437,6 +1453,8 @@ POST /ai/actions/preview
   "success": true,
   "data": {
     "entry_count": 1,
+    "plan_token": "server-side-token",
+    "source_revision": 8,
     "summary": {
       "total_actions": 6,
       "create_group": 1,
@@ -1447,6 +1465,7 @@ POST /ai/actions/preview
     },
     "actions": [
       {
+        "id": "action-1",
         "type": "create_group",
         "selected": true,
         "group": "demo-service",
@@ -1488,7 +1507,7 @@ POST /ai/actions/preview
 }
 ```
 
-允许动作：`create_group`、`update_group`、`create_entry`、`create_entry_from_field`、`update_entry`。`update_group` 必须提供原密码组 `group`，可通过 `group_new` 改名，也可通过 `description` 更新简介；至少提供其中一项。不允许删除条目、删除字段或覆盖字段值。`update_entry` 只有同时提供 `field_index`、`field_name` 和 `field_name_new` 时才会重命名字段；只有部分字段重命名信息时，预览会忽略这些字段上下文，不影响标签、密码组、标题、网址或备注更新。
+允许动作：`create_group`、`update_group`、`create_entry`、`create_entry_from_field`、`update_entry`。`update_group` 必须提供原密码组 `group`，可通过 `group_new` 改名，也可通过 `description` 更新简介；至少提供其中一项。不允许删除条目、删除字段、覆盖字段值或删除密码组。`update_entry` 只能更新标题、标签、密码组和字段名，不能修改已有网址或备注。
 
 **错误情况：**
 
@@ -1507,18 +1526,9 @@ POST /ai/actions/apply
 
 ```json
 {
-  "actions": [
-    {
-      "type": "create_entry_from_field",
-      "selected": true,
-      "source_entry_id": "uuid",
-      "field_index": 0,
-      "field_name": "账号",
-      "title": "demo-service 账号",
-      "groups": ["demo-service"],
-      "tags": ["demo-service"]
-    }
-  ]
+  "plan_token": "server-side-token",
+  "selected_ids": ["action-1"],
+  "expected_revision": 8
 }
 ```
 
@@ -1538,7 +1548,51 @@ POST /ai/actions/apply
 }
 ```
 
-应用前后端会重新校验来源条目、字段索引和字段名，任何选中动作无效时返回 `422` 且不写入，避免计划过期导致复制错误。
+应用前后端会重新校验来源条目、字段索引、字段名、解锁会话和 Vault revision，并在写入前创建加密恢复快照。任何选中动作无效时都不会写入。
+
+### 7.11 对话式 AI 管家
+
+默认 AI 工作区使用两阶段协议：`prepare` 只在本机构造发送清单和临时别名；`submit` 才调用模型并生成不可篡改计划。普通模式禁止发送已有字段值、完整 URL、备注和真实 UUID；`sensitive_create` 仅用于用户主动提交新条目原文，必须二次确认。
+
+```text
+GET    /ai/assistant/conversations
+POST   /ai/assistant/conversations
+GET    /ai/assistant/conversations/{conversation_id}
+DELETE /ai/assistant/conversations/{conversation_id}
+DELETE /ai/assistant/conversations
+POST   /ai/assistant/turns/prepare
+POST   /ai/assistant/turns/submit
+POST   /ai/assistant/plans/apply
+POST   /ai/assistant/plans/undo
+```
+
+`POST /ai/assistant/turns/prepare` 请求示例：
+
+```json
+{
+  "conversation_id": null,
+  "message": "帮我统一当前范围内的字段命名",
+  "mode": "assistant",
+  "scope": "current_view",
+  "filters": {}
+}
+```
+
+响应包含 `turn_token`、目标厂商、目标 host、数据类型、条目数量、风险提示和 `source_revision`。若 `requires_confirmation=false`，前端可直接提交；若为 `sensitive_create` 或元数据疑似包含敏感文本，必须展示发送清单并由用户确认。
+
+`POST /ai/assistant/turns/submit` 只接收 `turn_token` 和 `acknowledge_risk`。模型允许返回密码组管理、标签管理、条目/字段重命名、空字段、字段属性、空条目模板、本地字段拆分和条目定位动作；不提供删除条目、删除字段、字段值写入、已有 URL/备注修改或密码组删除动作。
+
+计划应用请求统一为：
+
+```json
+{
+  "plan_token": "server-side-token",
+  "selected_ids": ["assistant-1"],
+  "expected_revision": 8
+}
+```
+
+成功写入会返回 `undo_token` 和新 revision。撤销接口只能在 Vault 未发生其他变化时使用。对话历史使用用途隔离密钥保存在本机加密文件中；AI 新建原文不会写入历史或后续模型上下文。
 
 ## 8. 导入导出模块
 

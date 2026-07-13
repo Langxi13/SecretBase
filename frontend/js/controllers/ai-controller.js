@@ -1,5 +1,5 @@
 /**
- * AI 解析、整理建议、自然语言操作计划与 AI 接入设置。
+ * AI 解析、整理建议与自然语言操作计划。
  */
 (function () {
     function createAiController(options) {
@@ -47,35 +47,8 @@
             loadTags,
             loadGroups,
             openSettings,
-            selectSettingsTab,
-            aiSettingsForm,
-            aiSettingsStatus,
-            aiSettingsEditing,
-            aiModels,
-            aiModelsLoading,
-            aiSettingsSaving,
-            aiSettingsError,
-            aiSettingsMessage
+            selectSettingsTab
         } = options;
-
-        async function loadAiSettingsStatus() {
-            aiSettingsError.value = '';
-            try {
-                const result = await api.get('/ai/status');
-                const status = result.data || {};
-                status.base_url = status.base_url || status.baseUrl || '';
-                aiSettingsStatus.value = status;
-                aiSettingsForm.baseUrl = status.base_url || '';
-                aiSettingsForm.model = status.model || '';
-                aiSettingsForm.apiKey = '';
-                aiModels.value = status.model ? [status.model] : [];
-                aiSettingsEditing.value = !status.configured;
-            } catch (error) {
-                aiSettingsStatus.value = null;
-                aiSettingsEditing.value = true;
-                aiSettingsError.value = error.message || '无法加载 AI 配置状态';
-            }
-        }
 
         async function openAiParse() {
             showAiParse.value = true;
@@ -194,8 +167,16 @@
             aiOrganizeError.value = '';
             try {
                 const result = isAiTagGovernanceMode.value
-                    ? await api.post('/ai/tags/apply', { suggestions })
-                    : await api.post('/ai/organize/apply', { suggestions });
+                    ? await api.post('/ai/tags/apply', {
+                        plan_token: aiOrganizeResult.value.plan_token,
+                        selected_ids: suggestions.map(item => item.id),
+                        expected_revision: aiOrganizeResult.value.source_revision
+                    })
+                    : await api.post('/ai/organize/apply', {
+                        plan_token: aiOrganizeResult.value.plan_token,
+                        selected_ids: suggestions.map(item => item.id),
+                        expected_revision: aiOrganizeResult.value.source_revision
+                    });
                 showToast(result.message || 'AI 整理已应用', 'success');
                 aiOrganizeResult.value = null;
                 await Promise.all([loadEntries(currentPage.value), loadTags(), loadGroups()]);
@@ -243,7 +224,11 @@
             aiOrganizing.value = true;
             aiActionError.value = '';
             try {
-                const result = await api.post('/ai/actions/apply', { actions });
+                const result = await api.post('/ai/actions/apply', {
+                    plan_token: aiActionResult.value.plan_token,
+                    selected_ids: actions.map(item => item.id),
+                    expected_revision: aiActionResult.value.source_revision
+                });
                 showToast(result.message || 'AI 操作计划已应用', 'success');
                 aiActionResult.value = null;
                 await Promise.all([loadEntries(currentPage.value), loadTags(), loadGroups()]);
@@ -326,6 +311,7 @@
                 entryForm.url = entry.url || '';
                 entryForm.fields = entry.fields || [];
                 entryForm.tags = entry.tags || [];
+                entryForm.groups = entry.groups || [];
                 entryForm.remarks = buildAiRemarks(entry.remarks);
                 showAiParse.value = false;
                 showCreateModal.value = true;
@@ -341,6 +327,7 @@
                         url: entry.url || '',
                         starred: false,
                         tags: entry.tags || [],
+                        groups: entry.groups || [],
                         fields: entry.fields || [],
                         remarks: buildAiRemarks(entry.remarks)
                     });
@@ -370,112 +357,7 @@
             entry.fields.splice(index, 1);
         }
 
-        async function fetchAiModels() {
-            aiSettingsError.value = '';
-            aiSettingsMessage.value = '';
-            const baseUrl = aiSettingsForm.baseUrl.trim();
-            const apiKey = aiSettingsForm.apiKey.trim();
-            if (!baseUrl || !apiKey) {
-                if (!(aiSettingsStatus.value?.configured && baseUrl === aiSettingsStatus.value.base_url)) {
-                    aiSettingsError.value = '请先填写 Base URL 和 API Key';
-                    return;
-                }
-            }
-            if (!baseUrl) {
-                aiSettingsError.value = '请先填写 Base URL';
-                return;
-            }
-
-            aiModelsLoading.value = true;
-            try {
-                const result = await api.post('/ai/models', { baseUrl, apiKey });
-                aiModels.value = result.data?.models || [];
-                if (!aiModels.value.includes(aiSettingsForm.model)) {
-                    aiSettingsForm.model = aiModels.value[0] || '';
-                }
-                aiSettingsMessage.value = aiModels.value.length > 0
-                    ? `已获取 ${aiModels.value.length} 个模型`
-                    : '服务商未返回可用模型';
-            } catch (error) {
-                aiModels.value = [];
-                aiSettingsForm.model = '';
-                aiSettingsError.value = error.message || '获取模型列表失败';
-            } finally {
-                aiModelsLoading.value = false;
-            }
-        }
-
-        async function saveAiConfiguration() {
-            aiSettingsError.value = '';
-            aiSettingsMessage.value = '';
-            const baseUrl = aiSettingsForm.baseUrl.trim();
-            const apiKey = aiSettingsForm.apiKey.trim();
-            const model = aiSettingsForm.model;
-            if (!baseUrl || !model) {
-                aiSettingsError.value = '请填写 Base URL，并从模型列表中选择模型';
-                return;
-            }
-            if (!apiKey && !(aiSettingsStatus.value?.configured && baseUrl === aiSettingsStatus.value.base_url)) {
-                aiSettingsError.value = '请填写 API Key';
-                return;
-            }
-
-            aiSettingsSaving.value = true;
-            try {
-                const result = await api.put('/ai/settings', { baseUrl, apiKey, model });
-                aiSettingsStatus.value = result.data;
-                aiSettingsForm.apiKey = '';
-                aiModels.value = result.data?.model ? [result.data.model] : [];
-                aiSettingsEditing.value = false;
-                aiSettingsMessage.value = 'AI 连通测试通过，设置已保存';
-                showToast('AI 设置已保存', 'success');
-            } catch (error) {
-                aiSettingsError.value = error.message || 'AI 连通测试失败，设置未保存';
-            } finally {
-                aiSettingsSaving.value = false;
-            }
-        }
-
-        async function clearAiConfiguration() {
-            aiSettingsError.value = '';
-            aiSettingsMessage.value = '';
-            try {
-                const result = await api.delete('/ai/settings');
-                aiSettingsStatus.value = result.data;
-                aiSettingsForm.baseUrl = '';
-                aiSettingsForm.apiKey = '';
-                aiSettingsForm.model = '';
-                aiModels.value = [];
-                aiSettingsEditing.value = true;
-                aiSettingsMessage.value = 'AI 设置已清除';
-                showToast('AI 设置已清除', 'success');
-            } catch (error) {
-                aiSettingsError.value = error.message || '清除 AI 设置失败';
-            }
-        }
-
-        function editAiConfiguration() {
-            aiSettingsEditing.value = true;
-            aiSettingsError.value = '';
-            aiSettingsMessage.value = '';
-            aiSettingsForm.baseUrl = aiSettingsStatus.value?.base_url || '';
-            aiSettingsForm.model = aiSettingsStatus.value?.model || '';
-            aiSettingsForm.apiKey = '';
-            aiModels.value = aiSettingsStatus.value?.model ? [aiSettingsStatus.value.model] : [];
-        }
-
-        function cancelAiConfigurationEdit() {
-            aiSettingsEditing.value = false;
-            aiSettingsError.value = '';
-            aiSettingsMessage.value = '';
-            aiSettingsForm.baseUrl = aiSettingsStatus.value?.base_url || '';
-            aiSettingsForm.model = aiSettingsStatus.value?.model || '';
-            aiSettingsForm.apiKey = '';
-            aiModels.value = aiSettingsStatus.value?.model ? [aiSettingsStatus.value.model] : [];
-        }
-
         return {
-            loadAiSettingsStatus,
             openAiParse,
             manualEntryFromAi,
             clearAiParse,
@@ -493,12 +375,7 @@
             applyAiResult,
             toggleAiEntrySelection,
             addAiEntryField,
-            removeAiEntryField,
-            fetchAiModels,
-            saveAiConfiguration,
-            clearAiConfiguration,
-            editAiConfiguration,
-            cancelAiConfigurationEdit
+            removeAiEntryField
         };
     }
 

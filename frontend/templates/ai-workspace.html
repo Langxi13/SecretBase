@@ -1,0 +1,208 @@
+        <div v-if="showAiAssistant" class="ai-workspace-overlay" role="dialog" aria-modal="true" aria-label="AI 管家">
+            <section class="ai-workspace-shell">
+                <header class="ai-workspace-header">
+                    <div class="ai-workspace-title">
+                        <span class="ai-workspace-mark">✦</span>
+                        <div>
+                            <h2>AI 管家</h2>
+                            <p v-if="aiStatus?.configured">{{ aiStatus.provider_name || '自定义接口' }} · {{ aiStatus.model }}</p>
+                            <p v-else>尚未配置 AI 服务</p>
+                        </div>
+                    </div>
+                    <div class="ai-workspace-actions">
+                        <button class="btn-icon compact" @click="aiAssistantHistoryOpen = !aiAssistantHistoryOpen" title="对话历史" aria-label="对话历史">◷</button>
+                        <button class="btn-icon compact" @click="openProfessionalAiTools" title="打开专业工具" aria-label="打开专业工具">⌘</button>
+                        <button class="btn-icon compact" @click="openAssistantSettings" title="AI 服务设置" aria-label="AI 服务设置">⚙</button>
+                        <button class="modal-close" @click="closeAiAssistant" title="关闭">✕</button>
+                    </div>
+                </header>
+
+                <div class="ai-workspace-body">
+                    <aside v-if="aiAssistantHistoryOpen" class="ai-history-panel" aria-label="AI 对话历史">
+                        <div class="ai-history-toolbar">
+                            <strong>对话历史</strong>
+                            <button class="btn-icon compact" @click="createAssistantConversation" title="新建对话">＋</button>
+                        </div>
+                        <div class="ai-history-list">
+                            <button
+                                v-for="conversation in aiAssistantConversations"
+                                :key="conversation.id"
+                                class="ai-history-item"
+                                :class="{ active: aiAssistantConversationId === conversation.id }"
+                                @click="loadAssistantConversation(conversation.id)"
+                            >
+                                <span>{{ conversation.title }}</span>
+                                <small>{{ conversation.message_count }} 条</small>
+                            </button>
+                        </div>
+                        <div class="ai-history-footer">
+                            <button
+                                v-if="aiAssistantConversationId"
+                                class="btn-small danger"
+                                @click="deleteAssistantConversation(aiAssistantConversationId)"
+                            >删除当前对话</button>
+                            <button class="btn-small" @click="clearAssistantHistory">清除全部</button>
+                        </div>
+                    </aside>
+
+                    <main class="ai-chat-column">
+                        <div v-if="!aiStatus?.configured" class="ai-empty-state">
+                            <span class="ai-empty-icon">✦</span>
+                            <h3>配置 AI 服务后开始使用</h3>
+                            <button class="btn-primary" @click="openAssistantSettings">配置 AI 服务</button>
+                        </div>
+                        <div v-else class="ai-chat-thread" aria-live="polite">
+                            <div v-if="aiAssistantMessages.length === 0" class="ai-empty-state compact">
+                                <span class="ai-empty-icon">✦</span>
+                                <h3>今天想整理什么？</h3>
+                                <div class="ai-starter-row">
+                                    <button @click="useAssistantQuickReply('统计当前范围内未分组和未加标签的条目')">检查分类</button>
+                                    <button @click="useAssistantQuickReply('帮我检查当前范围内的字段命名是否统一')">检查字段名</button>
+                                    <button @click="useAssistantQuickReply('帮我整理当前范围内的密码组')">整理密码组</button>
+                                </div>
+                            </div>
+                            <article
+                                v-for="message in aiAssistantMessages"
+                                :key="message.id"
+                                class="ai-chat-message"
+                                :class="'role-' + message.role"
+                            >
+                                <div class="ai-message-role">{{ message.role === 'user' ? '你' : 'AI 管家' }}</div>
+                                <p>{{ message.content }}</p>
+                            </article>
+                            <div v-if="aiAssistantBusy" class="ai-chat-progress">
+                                <span class="loading-spinner small"></span>
+                                <span>{{ aiAssistantStage || '正在处理' }}</span>
+                            </div>
+                        </div>
+
+                        <div v-if="aiAssistantError" class="warning-panel ai-assistant-error">
+                            {{ aiAssistantError }}
+                        </div>
+
+                        <div v-if="aiAssistantPrepared" class="ai-send-review">
+                            <div class="ai-send-review-header">
+                                <strong>{{ aiAssistantPrepared.manifest.includes_field_values ? '确认发送敏感新建内容' : '发现疑似敏感元数据' }}</strong>
+                                <span>{{ aiAssistantPrepared.manifest.provider_name }} · {{ aiAssistantPrepared.manifest.target_host }}</span>
+                            </div>
+                            <p>本轮将发送：{{ aiAssistantPrepared.manifest.data_types.join('、') }}</p>
+                            <p v-if="aiAssistantPrepared.manifest.entry_count">范围：{{ aiAssistantPrepared.manifest.entry_count }} 个条目</p>
+                            <div v-if="aiAssistantPrepared.manifest.warnings?.length" class="ai-risk-list">
+                                <span v-for="warning in aiAssistantPrepared.manifest.warnings" :key="warning.location">
+                                    {{ warning.location }}：{{ warning.preview }}
+                                </span>
+                            </div>
+                            <pre v-if="aiAssistantPrepared.manifest.includes_field_values">{{ aiAssistantPrepared.originalMessage }}</pre>
+                            <div class="ai-send-review-actions">
+                                <button class="btn-secondary" @click="cancelPreparedTurn">取消</button>
+                                <button class="btn-primary" @click="submitPreparedTurn(true)">确认并发送一次</button>
+                            </div>
+                        </div>
+
+                        <footer class="ai-composer">
+                            <div class="ai-composer-toolbar">
+                                <div class="ai-mode-switch" role="group" aria-label="AI 输入模式">
+                                    <button :class="{ active: aiAssistantMode === 'assistant' }" @click="aiAssistantMode = 'assistant'">管家</button>
+                                    <button :class="{ active: aiAssistantMode === 'sensitive_create' }" @click="aiAssistantMode = 'sensitive_create'">AI 新建</button>
+                                </div>
+                                <select v-if="aiAssistantMode === 'assistant'" v-model="aiAssistantScope" aria-label="AI 分析范围">
+                                    <option value="current_view">当前视图</option>
+                                    <option value="selection">已选条目</option>
+                                    <option value="all">全部条目</option>
+                                </select>
+                                <span class="ai-privacy-indicator" :class="{ sensitive: aiAssistantMode === 'sensitive_create' }">
+                                    {{ aiAssistantMode === 'sensitive_create' ? '可能发送新建字段值' : '仅发送受限元数据' }}
+                                </span>
+                            </div>
+                            <div class="ai-composer-input">
+                                <textarea
+                                    v-model="aiAssistantInput"
+                                    :placeholder="aiAssistantMode === 'sensitive_create' ? '描述要新建的条目，可包含字段值；发送前会再次确认' : '告诉 AI 管家你想查找、整理或调整什么'"
+                                    rows="3"
+                                    @keydown.ctrl.enter.prevent="sendAssistantMessage"
+                                    @keydown.meta.enter.prevent="sendAssistantMessage"
+                                ></textarea>
+                                <button class="btn-primary ai-send-button" @click="sendAssistantMessage" :disabled="aiAssistantBusy || !aiAssistantInput.trim()">
+                                    发送
+                                </button>
+                            </div>
+                        </footer>
+                    </main>
+
+                    <aside class="ai-plan-panel" :class="{ 'is-empty': !aiAssistantPlan && !aiAssistantLastResult }" aria-label="AI 计划审核">
+                        <div class="ai-plan-heading">
+                            <div>
+                                <span>本轮审核</span>
+                                <strong>{{ aiAssistantPlan ? aiAssistantPlan.actions.length + ' 项计划' : '暂无计划' }}</strong>
+                            </div>
+                            <span class="ai-scope-badge">{{ aiAssistantScope === 'all' ? '全部条目' : aiAssistantScope === 'selection' ? '已选条目' : '当前视图' }}</span>
+                        </div>
+                        <div v-if="aiAssistantPlan" class="ai-plan-content">
+                            <p>{{ aiAssistantPlan.message }}</p>
+                            <p class="info-message">{{ aiAssistantPlan.privacy_note }}</p>
+                            <div
+                                v-for="action in aiAssistantPlan.actions"
+                                :key="action.id"
+                                class="ai-plan-item"
+                                :class="{ danger: action.danger }"
+                            >
+                                <input type="checkbox" v-model="action.selected" :aria-label="'选择' + action.title">
+                                <span>
+                                    <strong>{{ action.title }}</strong>
+                                    <small v-if="action.reason">{{ action.reason }}</small>
+                                    <span v-if="action.sensitive" class="ai-sensitive-entry-preview">
+                                        <small v-if="action.url">网址：{{ action.url }}</small>
+                                        <small v-if="action.tags?.length">标签：{{ action.tags.join('、') }}</small>
+                                        <small v-if="action.groups?.length">密码组：{{ action.groups.join('、') }}</small>
+                                        <span v-for="(field, fieldIndex) in action.fields" :key="fieldIndex" class="ai-sensitive-field-row">
+                                            <span>{{ field.name }}</span>
+                                            <code>{{ field.hidden && !field.revealed ? '••••••••' : field.value }}</code>
+                                            <button
+                                                v-if="field.hidden"
+                                                type="button"
+                                                class="btn-icon compact"
+                                                @click.prevent="field.revealed = !field.revealed"
+                                                :title="field.revealed ? '隐藏字段值' : '显示字段值'"
+                                            >{{ field.revealed ? '◉' : '◎' }}</button>
+                                        </span>
+                                        <small v-if="action.remarks">备注：{{ action.remarks }}</small>
+                                    </span>
+                                </span>
+                            </div>
+                            <button class="btn-primary ai-plan-apply" @click="applyAssistantPlan" :disabled="aiAssistantBusy || !aiAssistantPlan.actions.some(item => item.selected)">
+                                应用已选计划
+                            </button>
+                        </div>
+                        <div v-else-if="aiAssistantLastResult?.navigation" class="ai-plan-empty">
+                            <p>已定位到 {{ aiAssistantLastResult.navigation.entry_title }}</p>
+                            <button class="btn-primary" @click="openAssistantNavigation()">打开条目</button>
+                        </div>
+                        <div v-else-if="aiAssistantLastResult?.localAction?.type === 'generate_password'" class="ai-plan-empty">
+                            <p>{{ aiAssistantLastResult.message }}</p>
+                            <button class="btn-primary" @click="generateAssistantSecret">本地生成密码</button>
+                        </div>
+                        <div v-else-if="aiAssistantLastResult?.generatedSecret" class="ai-plan-empty ai-generated-secret">
+                            <p>{{ aiAssistantLastResult.message }}</p>
+                            <code>{{ aiAssistantLastResult.generatedSecret }}</code>
+                            <button class="btn-primary" @click="copyAssistantSecret">复制密码</button>
+                        </div>
+                        <div v-else-if="aiAssistantLastResult?.message" class="ai-plan-empty">
+                            <p>{{ aiAssistantLastResult.message }}</p>
+                            <div v-if="aiAssistantLastResult.emptyGroups?.length" class="ai-empty-group-actions">
+                                <span>以下密码组已经为空，可单独确认删除：</span>
+                                <button
+                                    v-for="group in aiAssistantLastResult.emptyGroups"
+                                    :key="group"
+                                    class="btn-small danger"
+                                    @click="deleteAssistantEmptyGroup(group)"
+                                >删除 {{ group }}</button>
+                            </div>
+                            <button v-if="aiAssistantLastResult.undoToken" class="btn-secondary" @click="undoAssistantPlan">撤销本次操作</button>
+                        </div>
+                        <div v-else class="ai-plan-empty">
+                            <span>计划会在通过安全校验后显示在这里</span>
+                        </div>
+                    </aside>
+                </div>
+            </section>
+        </div>

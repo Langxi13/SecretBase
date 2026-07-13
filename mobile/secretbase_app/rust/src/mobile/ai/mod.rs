@@ -1,9 +1,11 @@
 mod apply;
+pub(crate) mod assistant;
+pub(crate) mod history;
 mod normalize;
 mod prompts;
 mod types;
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeSet, HashMap};
 
 use chrono::{SecondsFormat, Utc};
 use secretbase_vault_core::VaultSession;
@@ -19,7 +21,9 @@ use super::{
 
 pub(crate) use apply::apply_preview;
 pub(crate) use normalize::normalize_response;
-pub(crate) use types::{AiConfig, AiKind, PendingAiPreview, PendingAiRequest};
+pub(crate) use types::{
+    AiConfig, AiKind, PendingAiPreview, PendingAiRequest, PendingAssistantRequest,
+};
 
 const SETTINGS_PURPOSE: &str = "mobile-ai-settings";
 const MAX_AI_ENTRIES: usize = 100;
@@ -189,14 +193,19 @@ pub fn prepare_request(
         .ok_or_else(|| MobileError::new("INVALID_AI_KIND", "AI 功能类型无效"))?;
     let input = input.trim();
     let user_prompt = bounded_text(user_prompt, 1000, "用户偏好不能超过 1000 个字符")?;
-    let all_entries = entry_summaries(document, kind == AiKind::Actions)?;
+    if kind != AiKind::Parse
+        && (assistant::looks_sensitive(input) || assistant::looks_sensitive(user_prompt))
+    {
+        return Err(MobileError::new(
+            "AI_SENSITIVE_INPUT",
+            "普通 AI 工具检测到疑似密码或 Token；请改用文本解析或 AI 新建发送完整原文",
+        ));
+    }
+    let (all_entries, entry_aliases) = aliased_entry_summaries(document, kind == AiKind::Actions)?;
     let all_entry_count = all_entries.len();
-    let all_entry_ids = all_entries
-        .iter()
-        .filter_map(|item| item.get("id").and_then(Value::as_str).map(str::to_string))
-        .collect::<Vec<_>>();
     let existing_tags = taxonomy_names(document, "tags_meta", "tags");
     let existing_groups = taxonomy_names(document, "groups_meta", "groups");
+    let mut requested_aliases = HashMap::new();
 
     let (system_prompt, user_payload, max_tokens, timeout_seconds, summary) = match kind {
         AiKind::Parse => {
@@ -231,11 +240,16 @@ pub fn prepare_request(
             let entry_id = entry_id
                 .filter(|value| !value.trim().is_empty())
                 .ok_or_else(|| MobileError::new("VALIDATION_FAILED", "请选择一个条目"))?;
+            let entry_alias = entry_aliases
+                .iter()
+                .find_map(|(alias, id)| (id == entry_id).then_some(alias.as_str()))
+                .ok_or_else(|| MobileError::new("ENTRY_NOT_FOUND", "所选条目不存在"))?;
             let entry = all_entries
                 .iter()
-                .find(|item| item.get("id").and_then(Value::as_str) == Some(entry_id))
+                .find(|item| item.get("id").and_then(Value::as_str) == Some(entry_alias))
                 .cloned()
                 .ok_or_else(|| MobileError::new("ENTRY_NOT_FOUND", "所选条目不存在"))?;
+            requested_aliases.insert(entry_alias.to_string(), entry_id.to_string());
             (
                 prompts::ORGANIZE_PROMPT,
                 json!({
@@ -321,6 +335,10 @@ pub fn prepare_request(
         }
     };
 
+    if kind != AiKind::Parse && kind != AiKind::EntryTags {
+        requested_aliases = entry_aliases;
+    }
+
     let request = build_chat_request(
         &config.base_url,
         &config.api_key,
@@ -346,13 +364,7 @@ pub fn prepare_request(
         source_revision: revision,
         input_chars: count_u32(input.chars().count()),
         input_lines: count_u32(input.lines().count()),
-        allowed_entry_ids: if kind == AiKind::Parse {
-            Vec::new()
-        } else if kind == AiKind::EntryTags {
-            entry_id.map(str::to_string).into_iter().collect()
-        } else {
-            all_entry_ids
-        },
+        entry_aliases: requested_aliases,
     };
     Ok((
         AiRequestPlan {
@@ -470,14 +482,23 @@ fn build_chat_request(
     max_tokens: u32,
     timeout_seconds: u32,
 ) -> Result<AiHttpRequest, MobileError> {
-    let body = serde_json::to_string(&json!({
+    let mut payload = json!({
         "model": model,
         "messages": messages,
         "temperature": 0,
-        "max_tokens": max_tokens,
-        "response_format": {"type": "json_object"}
-    }))
-    .map_err(|_| MobileError::new("AI_REQUEST_INVALID", "无法构造 AI 请求"))?;
+        "max_tokens": max_tokens
+    });
+    if supports_response_format(base_url) {
+        payload
+            .as_object_mut()
+            .expect("chat payload is always an object")
+            .insert(
+                "response_format".to_string(),
+                json!({"type": "json_object"}),
+            );
+    }
+    let body = serde_json::to_string(&payload)
+        .map_err(|_| MobileError::new("AI_REQUEST_INVALID", "无法构造 AI 请求"))?;
     Ok(AiHttpRequest {
         method: "POST".to_string(),
         url: endpoint(base_url, "chat/completions")?,
@@ -487,6 +508,18 @@ fn build_chat_request(
     })
 }
 
+fn supports_response_format(base_url: &str) -> bool {
+    Url::parse(base_url)
+        .ok()
+        .and_then(|url| url.host_str().map(str::to_ascii_lowercase))
+        .is_some_and(|host| {
+            matches!(
+                host.as_str(),
+                "api.openai.com" | "api.deepseek.com" | "generativelanguage.googleapis.com"
+            )
+        })
+}
+
 fn structure_summary(title: &str, entry_count: usize) -> AiSendSummary {
     AiSendSummary {
         title: title.to_string(),
@@ -494,7 +527,7 @@ fn structure_summary(title: &str, entry_count: usize) -> AiSendSummary {
         input_chars: 0,
         includes_field_values: false,
         categories: vec![
-            "条目名称与网址".to_string(),
+            "条目名称与网址 hostname".to_string(),
             "字段名称与隐藏/复制属性".to_string(),
             "已有标签与密码组".to_string(),
         ],
@@ -502,15 +535,16 @@ fn structure_summary(title: &str, entry_count: usize) -> AiSendSummary {
     }
 }
 
-fn entry_summaries(
+fn aliased_entry_summaries(
     document: &Value,
     include_field_indices: bool,
-) -> Result<Vec<Value>, MobileError> {
+) -> Result<(Vec<Value>, HashMap<String, String>), MobileError> {
     let entries = document
         .get("entries")
         .and_then(Value::as_array)
         .ok_or_else(|| MobileError::new("INVALID_PAYLOAD", "Vault 条目数据无效"))?;
     let mut result = Vec::new();
+    let mut aliases = HashMap::new();
     for entry in entries {
         let Some(item) = entry.as_object() else {
             continue;
@@ -557,17 +591,25 @@ fn entry_summaries(
                     .collect::<Vec<_>>()
             })
             .unwrap_or_default();
+        let hostname = item
+            .get("url")
+            .and_then(Value::as_str)
+            .and_then(|value| Url::parse(value).ok())
+            .and_then(|value| value.host_str().map(str::to_string))
+            .unwrap_or_default();
+        let alias = format!("E{:03}", result.len() + 1);
+        aliases.insert(alias.clone(), id.to_string());
         result.push(json!({
-            "id": id,
+            "id": alias,
             "title": title,
-            "url": item.get("url").and_then(Value::as_str).unwrap_or(""),
+            "hostname": hostname,
             "tags": string_values(item.get("tags")),
             "groups": string_values(item.get("groups")),
             "fields": fields,
             "starred": item.get("starred").and_then(Value::as_bool).unwrap_or(false)
         }));
     }
-    Ok(result)
+    Ok((result, aliases))
 }
 
 fn taxonomy_names(document: &Value, meta_key: &str, field_key: &str) -> Vec<String> {
@@ -701,7 +743,7 @@ mod tests {
                         hidden: true,
                     },
                 ],
-                remarks: String::new(),
+                remarks: "本机私有备注".to_string(),
             },
             NOW,
         )
@@ -710,11 +752,16 @@ mod tests {
     }
 
     fn pending(kind: AiKind, document: &Value) -> PendingAiRequest {
-        let ids = document["entries"]
+        let entry_aliases = document["entries"]
             .as_array()
             .unwrap()
             .iter()
-            .filter_map(|entry| entry["id"].as_str().map(str::to_string))
+            .enumerate()
+            .filter_map(|(index, entry)| {
+                entry["id"]
+                    .as_str()
+                    .map(|id| (format!("E{:03}", index + 1), id.to_string()))
+            })
             .collect();
         PendingAiRequest {
             token: "request-token".to_string(),
@@ -722,7 +769,7 @@ mod tests {
             source_revision: 8,
             input_chars: 100,
             input_lines: 4,
-            allowed_entry_ids: ids,
+            entry_aliases,
         }
     }
 
@@ -754,11 +801,12 @@ mod tests {
     #[test]
     fn incomplete_field_rename_is_dropped_without_blocking_other_action_changes() {
         let mut document = sample_document();
-        let entry_id = document["entries"][0]["id"].as_str().unwrap().to_string();
         let response = provider_response(serde_json::json!({
             "actions": [{
                 "type": "update_entry",
-                "entry_id": entry_id,
+                "entry_id": "E001",
+                "url": "https://attacker.example.test",
+                "remarks": "不应覆盖",
                 "field_name_new": "新字段名",
                 "add_groups": ["服务器"],
                 "reason": "整理服务器条目"
@@ -780,6 +828,11 @@ mod tests {
             serde_json::json!(["服务器"])
         );
         assert_eq!(document["entries"][0]["fields"][0]["name"], "服务器 IP");
+        assert_eq!(
+            document["entries"][0]["url"],
+            "https://console.example.test"
+        );
+        assert_eq!(document["entries"][0]["remarks"], "本机私有备注");
     }
 
     #[test]
@@ -848,6 +901,57 @@ mod tests {
         assert!(matches!(
             error,
             MobileError::Failure { ref code, .. } if code == "AI_HTTPS_REQUIRED"
+        ));
+    }
+
+    #[test]
+    fn provider_requests_only_use_supported_response_format() {
+        let openai = build_chat_request(
+            "https://api.openai.com/v1",
+            "test-key",
+            "test-model",
+            vec![json!({"role": "user", "content": "test"})],
+            100,
+            30,
+        )
+        .unwrap();
+        let openrouter = build_chat_request(
+            "https://openrouter.ai/api/v1",
+            "test-key",
+            "test-model",
+            vec![json!({"role": "user", "content": "test"})],
+            100,
+            30,
+        )
+        .unwrap();
+
+        assert!(openai.body.contains("response_format"));
+        assert!(!openrouter.body.contains("response_format"));
+    }
+
+    #[test]
+    fn professional_tools_reject_secrets_outside_text_parse_mode() {
+        let document = sample_document();
+        let config = AiConfig {
+            base_url: "https://api.example.test/v1".to_string(),
+            api_key: "test-key".to_string(),
+            model: "test-model".to_string(),
+            saved_at: NOW.to_string(),
+        };
+        let error = prepare_request(
+            &document,
+            1,
+            &config,
+            "actions",
+            "password: must-not-send",
+            None,
+            "",
+        )
+        .err()
+        .unwrap();
+        assert!(matches!(
+            error,
+            MobileError::Failure { ref code, .. } if code == "AI_SENSITIVE_INPUT"
         ));
     }
 }

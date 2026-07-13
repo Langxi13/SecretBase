@@ -34,7 +34,9 @@ def main() -> None:
 
         from fastapi.testclient import TestClient  # noqa: E402
         from ai_services import client as ai_client  # noqa: E402
+        from ai_services import pending as ai_pending  # noqa: E402
         import routes.ai as ai_routes  # noqa: E402
+        import storage  # noqa: E402
         from main import app  # noqa: E402
 
         captured_payloads = []
@@ -183,7 +185,7 @@ def main() -> None:
         assert preview["actions"][5]["field_name"] is None
         assert "delete_entry" not in {action["type"] for action in preview["actions"]}
         assert any("不支持" in warning or "已忽略" in warning for warning in preview["warnings"])
-        assert "不会发送任何字段值" in preview["privacy_note"]
+        assert "不发送字段值" in preview["privacy_note"]
 
         bad_actions = [dict(item) for item in preview["actions"]]
         bad_actions[2]["field_name"] = "已改名字段"
@@ -194,7 +196,15 @@ def main() -> None:
         )
 
         apply_result = expect_success(
-            client.post("/ai/actions/apply", json={"actions": preview["actions"]}, headers=headers),
+            client.post(
+                "/ai/actions/apply",
+                json={
+                    "plan_token": preview["plan_token"],
+                    "selected_ids": [item["id"] for item in preview["actions"]],
+                    "expected_revision": preview["source_revision"],
+                },
+                headers=headers,
+            ),
             "ai actions apply",
         )
         assert apply_result["created_groups"] == 1
@@ -238,18 +248,24 @@ def main() -> None:
         assert details_by_title["demo-service API Key"]["groups"] == ["demo-service"]
         assert set(details_by_title["demo-service API Key"]["tags"]) == {"demo-service", "API"}
 
+        rename_action = {
+            "id": "action-rename-group",
+            "type": "update_group",
+            "selected": True,
+            "group": "客户系统",
+            "group_new": "客户资料",
+        }
+        rename_token = ai_pending.put_pending(
+            "actions",
+            {"actions": [rename_action]},
+        )
         rename_only_result = expect_success(
             client.post(
                 "/ai/actions/apply",
                 json={
-                    "actions": [
-                        {
-                            "type": "update_group",
-                            "selected": True,
-                            "group": "客户系统",
-                            "group_new": "客户资料",
-                        }
-                    ]
+                    "plan_token": rename_token,
+                    "selected_ids": [rename_action["id"]],
+                    "expected_revision": storage.vault_revision(),
                 },
                 headers=headers,
             ),

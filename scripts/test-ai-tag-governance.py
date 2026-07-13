@@ -34,7 +34,9 @@ def main() -> None:
 
         from fastapi.testclient import TestClient  # noqa: E402
         from ai_services import client as ai_client  # noqa: E402
+        from ai_services import pending as ai_pending  # noqa: E402
         import routes.ai as ai_routes  # noqa: E402
+        import storage  # noqa: E402
         from main import app  # noqa: E402
 
         captured_payloads = []
@@ -161,10 +163,18 @@ def main() -> None:
             "delete_tag",
             "assign_tag",
         }
-        assert "不会发送任何字段值" in preview["privacy_note"]
+        assert "不发送字段值" in preview["privacy_note"]
 
         apply_result = expect_success(
-            client.post("/ai/tags/apply", json={"suggestions": preview["suggestions"]}, headers=headers),
+            client.post(
+                "/ai/tags/apply",
+                json={
+                    "plan_token": preview["plan_token"],
+                    "selected_ids": [item["id"] for item in preview["suggestions"]],
+                    "expected_revision": preview["source_revision"],
+                },
+                headers=headers,
+            ),
             "tag governance apply",
         )
         assert apply_result["applied_count"] == 5
@@ -184,18 +194,24 @@ def main() -> None:
         assert "git" not in tags_by_name
         assert "代码" not in tags_by_name
 
+        stale_suggestion = {
+            "id": "tag-stale-update",
+            "action": "update_tag",
+            "tag": "不存在的旧标签",
+            "new_tag": "不应被创建",
+            "description": "过期建议不应创建新标签",
+        }
+        stale_token = ai_pending.put_pending(
+            "tag-governance",
+            {"suggestions": [stale_suggestion]},
+        )
         stale_update = expect_success(
             client.post(
                 "/ai/tags/apply",
                 json={
-                    "suggestions": [
-                        {
-                            "action": "update_tag",
-                            "tag": "不存在的旧标签",
-                            "new_tag": "不应被创建",
-                            "description": "过期建议不应创建新标签",
-                        }
-                    ]
+                    "plan_token": stale_token,
+                    "selected_ids": [stale_suggestion["id"]],
+                    "expected_revision": storage.vault_revision(),
                 },
                 headers=headers,
             ),

@@ -43,6 +43,7 @@ const app = createApp({
             nextTick,
             debounce,
             copyToClipboard,
+            openExternalUrl,
             api,
             store,
             showToast,

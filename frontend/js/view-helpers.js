@@ -193,11 +193,16 @@
                 .map(normalizeFieldForEdit)
                 .filter(field => field.name)
             : [];
+        const groups = String(entry.groupsText || '')
+            .split(/[,，]/)
+            .map(group => group.trim())
+            .filter(Boolean);
         return {
             title: String(entry.title || '').trim(),
             url: String(entry.url || '').trim(),
             fields,
             tags: Array.from(new Set(tags)),
+            groups: Array.from(new Set(groups)),
             remarks: String(entry.remarks || '').trim()
         };
     }
@@ -216,6 +221,8 @@
             fields: Array.isArray(entry?.fields) ? entry.fields : [],
             tags: Array.isArray(entry?.tags) ? entry.tags : [],
             tagsText: Array.isArray(entry?.tags) ? entry.tags.join(', ') : '',
+            groups: Array.isArray(entry?.groups) ? entry.groups : [],
+            groupsText: Array.isArray(entry?.groups) ? entry.groups.join(', ') : '',
             remarks: String(entry?.remarks || '').trim()
         }));
     }

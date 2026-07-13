@@ -8,13 +8,14 @@ from models import Entry, FieldItem
 from tag_utils import ensure_entry_tags_meta
 from ai_services.organize import _append_unique, _clean_name_list, _field_is_hidden_for_organize
 from ai_services.parsing import _clean_text, _normalize_fields, _to_bool
+from ai_services.privacy import url_hostname
 
 
-def _entry_for_ai_actions(entry) -> dict:
+def _entry_for_ai_actions(entry, entry_ref: str | None = None) -> dict:
     return {
-        "id": entry.id,
+        "id": entry_ref or entry.id,
         "title": entry.title,
-        "url": entry.url or "",
+        "hostname": url_hostname(entry.url),
         "tags": entry.tags,
         "groups": getattr(entry, "groups", []) or [],
         "fields": [
@@ -26,8 +27,6 @@ def _entry_for_ai_actions(entry) -> dict:
             }
             for index, field in enumerate(entry.fields)
         ],
-        "remarks": entry.remarks or "",
-        "starred": entry.starred,
     }
 
 
@@ -98,6 +97,8 @@ def _normalize_ai_action(item, valid_entry_ids: set[str]) -> tuple[dict | None, 
         action["url"] = None
     warning = None
     if action_type == "update_entry":
+        action["url"] = None
+        action["remarks"] = ""
         has_field_context = action["field_index"] is not None or bool(action["field_name"]) or bool(action["field_name_new"])
         has_complete_rename = action["field_index"] is not None and bool(action["field_name"]) and bool(action["field_name_new"])
         if has_field_context and not has_complete_rename:
@@ -375,13 +376,6 @@ def apply_actions(vault, selected_actions) -> dict:
             if action.title and action.title != entry.title:
                 entry.title = action.title
                 changed = True
-            if action.url is not None and action.url != (entry.url or ""):
-                entry.url = action.url
-                changed = True
-            if action.remarks and action.remarks != (entry.remarks or ""):
-                entry.remarks = action.remarks
-                changed = True
-
             tags = [tag for tag in (entry.tags or []) if tag not in action.remove_tags]
             for tag in action.add_tags:
                 if tag not in tags:

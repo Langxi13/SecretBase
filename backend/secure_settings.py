@@ -9,6 +9,7 @@ from crypto import decrypt_vault_with_key, encrypt_vault_with_key, parse_vault_h
 
 
 AI_SETTINGS_PURPOSE = "ai-settings"
+AI_HISTORY_PURPOSE = "ai-conversation-history-v1"
 
 
 def derive_purpose_key(vault_key: bytes, salt: bytes, purpose: str) -> bytes:

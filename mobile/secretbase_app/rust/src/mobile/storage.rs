@@ -14,6 +14,7 @@ use super::{error::MobileError, models::RecoverySnapshot};
 
 pub const VAULT_FILENAME: &str = "secretbase.vault";
 pub const SECURE_SETTINGS_FILENAME: &str = "secure-settings.vault";
+pub const AI_HISTORY_FILENAME: &str = "ai-history.vault";
 const RECOVERY_LIMIT: usize = 10;
 
 pub fn vault_path(root: &Path) -> PathBuf {
@@ -22,6 +23,30 @@ pub fn vault_path(root: &Path) -> PathBuf {
 
 pub fn secure_settings_path(root: &Path) -> PathBuf {
     root.join(SECURE_SETTINGS_FILENAME)
+}
+
+pub fn ai_history_path(root: &Path) -> PathBuf {
+    root.join(AI_HISTORY_FILENAME)
+}
+
+pub fn read_ai_history(root: &Path) -> Result<Option<Vec<u8>>, MobileError> {
+    let path = ai_history_path(root);
+    if !path.is_file() {
+        return Ok(None);
+    }
+    Ok(Some(fs::read(path)?))
+}
+
+pub fn persist_ai_history(root: &Path, content: &[u8]) -> Result<(), MobileError> {
+    atomic_write(&ai_history_path(root), content)
+}
+
+pub fn delete_ai_history(root: &Path) -> Result<(), MobileError> {
+    let path = ai_history_path(root);
+    if path.exists() {
+        fs::remove_file(path)?;
+    }
+    Ok(())
 }
 
 pub fn read_secure_settings(root: &Path) -> Result<Option<Vec<u8>>, MobileError> {

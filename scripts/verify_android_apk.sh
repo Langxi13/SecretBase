@@ -65,15 +65,17 @@ fi
 
 temporary_dir=$(mktemp -d)
 trap 'rm -rf "$temporary_dir"' EXIT
+forbidden_build_pattern='(/home/[^/]+/(work|projects?)/|/Users/[^/]+/(work|projects?)/|/usr/local/[^/]*(Work|Project)[^/]*/|/root/\.(cargo|rustup)/)'
+if [[ -n "${SECRETBASE_PRIVATE_SCAN_PATTERN:-}" ]]; then
+  forbidden_build_pattern="(${forbidden_build_pattern}|${SECRETBASE_PRIVATE_SCAN_PATTERN})"
+fi
 
 for abi in "${abi_list[@]}"; do
   library_path="lib/$abi/libsecretbase_mobile.so"
   output_path="$temporary_dir/${abi//\//_}.so"
   unzip -p "$apk_path" "$library_path" >"$output_path"
   strings "$output_path" >"$output_path.strings"
-  if grep -Eq \
-    '(/home/runner/work/|/Users/runner/work/|/usr/local/Web-Project/|/root/\.(cargo|rustup)/|Secert-Base|ptivitic\.cloud)' \
-    "$output_path.strings"; then
+  if grep -Eq "$forbidden_build_pattern" "$output_path.strings"; then
     echo "Rust library contains a private or machine-specific build path: $library_path" >&2
     exit 1
   fi

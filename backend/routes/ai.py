@@ -10,11 +10,12 @@ from ai_services.prompts import (
     AI_PARSE_COOLDOWN_SECONDS,
     AI_PARSE_MAX_INPUT_CHARS,
 )
-from routes import ai_actions, ai_organize, ai_parse, ai_settings, ai_tags
+from routes import ai_actions, ai_assistant, ai_organize, ai_parse, ai_settings, ai_tags
 
 
 router = APIRouter()
 router.include_router(ai_settings.router)
+router.include_router(ai_assistant.router)
 router.include_router(ai_organize.router)
 router.include_router(ai_actions.router)
 router.include_router(ai_tags.router)

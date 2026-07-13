@@ -1,6 +1,7 @@
 use crate::mobile::{
     error::MobileError,
     models::{
+        AiAssistantRequestPlan, AiAssistantTurnResult, AiConversation, AiConversationSummary,
         AiHttpRequest, AiPreview, AiRequestPlan, AiStatus, EntryDraft, EntryPage, EntryRecord,
         ImportPreview, OperationResult, RecoverySnapshot, TaxonomyRecord, VaultStatus,
     },
@@ -201,4 +202,40 @@ pub fn apply_ai_preview(
     expected_revision: u64,
 ) -> Result<OperationResult, MobileError> {
     runtime::apply_ai_preview(token, selected_item_ids, expected_revision)
+}
+
+pub fn list_ai_conversations() -> Result<Vec<AiConversationSummary>, MobileError> {
+    runtime::list_ai_conversations()
+}
+
+pub fn get_ai_conversation(id: String) -> Result<AiConversation, MobileError> {
+    runtime::get_ai_conversation(id)
+}
+
+pub fn create_ai_conversation(title: String) -> Result<AiConversationSummary, MobileError> {
+    runtime::create_ai_conversation(title)
+}
+
+pub fn delete_ai_conversation(id: String) -> Result<(), MobileError> {
+    runtime::delete_ai_conversation(id)
+}
+
+pub fn clear_ai_conversations() -> Result<(), MobileError> {
+    runtime::clear_ai_conversations()
+}
+
+pub fn prepare_ai_assistant_request(
+    conversation_id: Option<String>,
+    message: String,
+    mode: String,
+    selected_entry_ids: Vec<String>,
+) -> Result<AiAssistantRequestPlan, MobileError> {
+    runtime::prepare_ai_assistant_request(conversation_id, message, mode, selected_entry_ids)
+}
+
+pub fn consume_ai_assistant_response(
+    token: String,
+    content: String,
+) -> Result<AiAssistantTurnResult, MobileError> {
+    runtime::consume_ai_assistant_response(token, content)
 }

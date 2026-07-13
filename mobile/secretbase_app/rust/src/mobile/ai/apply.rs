@@ -9,7 +9,8 @@ use crate::mobile::{
 };
 
 use super::types::{
-    ActionPlan, OrganizeSuggestion, PendingAiPreview, PreviewData, TagGovernanceSuggestion,
+    ActionPlan, AssistantAction, OrganizeSuggestion, PendingAiPreview, PreviewData,
+    TagGovernanceSuggestion,
 };
 
 pub fn apply_preview(
@@ -41,7 +42,7 @@ pub fn apply_preview(
                     url: entry.url.clone(),
                     starred: false,
                     tags: entry.tags.clone(),
-                    groups: Vec::new(),
+                    groups: entry.groups.clone(),
                     fields: entry
                         .fields
                         .iter()
@@ -64,7 +65,302 @@ pub fn apply_preview(
             apply_governance(value, suggestions, &selected, now)
         }
         PreviewData::Actions(actions) => apply_actions(value, actions, &selected, now),
+        PreviewData::Assistant(actions) => apply_assistant(value, actions, &selected, now),
     }
+}
+
+fn apply_assistant(
+    value: &mut Value,
+    actions: &[AssistantAction],
+    selected: &HashSet<String>,
+    now: &str,
+) -> Result<String, MobileError> {
+    let mut applied = 0;
+    for action in actions.iter().filter(|item| selected.contains(&item.id)) {
+        match action.action_type.as_str() {
+            "create_group" => {
+                let name = required_name(action.name.as_deref(), "创建密码组操作缺少名称")?;
+                ensure_taxonomy(value, "groups", name, &action.description, None, now)?;
+            }
+            "update_group" => {
+                apply_assistant_taxonomy_update(value, "groups", action, now)?;
+            }
+            "assign_groups" => {
+                apply_assistant_assignment(value, action, true, now)?;
+            }
+            "create_tag" => {
+                let name = required_name(action.name.as_deref(), "创建标签操作缺少名称")?;
+                ensure_taxonomy(
+                    value,
+                    "tags",
+                    name,
+                    &action.description,
+                    action.color.as_deref(),
+                    now,
+                )?;
+            }
+            "update_tag" => {
+                apply_assistant_taxonomy_update(value, "tags", action, now)?;
+            }
+            "delete_tag" => {
+                let name = required_name(action.name.as_deref(), "删除标签操作缺少名称")?;
+                document::delete_taxonomy(value, "tags", name, now)?;
+            }
+            "merge_tags" => {
+                let suggestion = TagGovernanceSuggestion {
+                    id: action.id.clone(),
+                    action: "merge_tags".to_string(),
+                    tag: None,
+                    new_tag: None,
+                    source_tags: action.source_tags.clone(),
+                    target_tag: action.target_tag.clone(),
+                    entry_ids: Vec::new(),
+                    description: action.description.clone(),
+                    color: action.color.clone(),
+                    reason: action.reason.clone(),
+                };
+                apply_merge_tags(value, &suggestion, now)?;
+            }
+            "assign_tags" => {
+                apply_assistant_assignment(value, action, false, now)?;
+            }
+            "rename_entry" => {
+                let id = required_name(action.entry_id.as_deref(), "条目重命名操作缺少条目")?;
+                let entry = document::get_entry(value, id)?;
+                let mut draft = draft_from_entry(&entry);
+                draft.title =
+                    required_name(action.new_name.as_deref(), "条目重命名操作缺少新标题")?
+                        .to_string();
+                document::save_entry(value, Some(id), &draft, now)?;
+            }
+            "rename_field" => {
+                apply_assistant_field_change(value, action, "rename", now)?;
+            }
+            "add_empty_field" => {
+                let id = required_name(action.entry_id.as_deref(), "添加字段操作缺少条目")?;
+                let entry = document::get_entry(value, id)?;
+                let mut draft = draft_from_entry(&entry);
+                let name = required_name(action.name.as_deref(), "添加字段操作缺少字段名")?;
+                if draft.fields.iter().any(|field| field.name == name) {
+                    return Err(MobileError::new("VALIDATION_FAILED", "新增字段名称已存在"));
+                }
+                draft.fields.push(FieldRecord {
+                    name: name.to_string(),
+                    value: String::new(),
+                    copyable: action.copyable.unwrap_or(false),
+                    hidden: action.hidden.unwrap_or(false),
+                });
+                document::save_entry(value, Some(id), &draft, now)?;
+            }
+            "set_field_flags" => {
+                apply_assistant_field_change(value, action, "flags", now)?;
+            }
+            "create_entry_template" => {
+                let title = required_name(action.title.as_deref(), "新建条目模板缺少标题")?;
+                let draft = EntryDraft {
+                    title: title.to_string(),
+                    url: String::new(),
+                    starred: false,
+                    tags: action.tags.clone(),
+                    groups: action.groups.clone(),
+                    fields: action
+                        .fields
+                        .iter()
+                        .map(|field| FieldRecord {
+                            name: field.name.clone(),
+                            value: String::new(),
+                            copyable: field.copyable,
+                            hidden: field.hidden,
+                        })
+                        .collect(),
+                    remarks: String::new(),
+                };
+                document::save_entry(value, None, &draft, now)?;
+            }
+            "create_entry_from_field" => {
+                apply_assistant_split_field(value, action, now)?;
+            }
+            _ => {
+                return Err(MobileError::new(
+                    "AI_ACTION_INVALID",
+                    "不支持的 AI 管家操作",
+                ))
+            }
+        }
+        applied += 1;
+    }
+    Ok(format!("已应用 {applied} 项 AI 管家操作"))
+}
+
+fn apply_assistant_taxonomy_update(
+    value: &mut Value,
+    kind: &str,
+    action: &AssistantAction,
+    now: &str,
+) -> Result<(), MobileError> {
+    let current = required_name(action.name.as_deref(), "更新分类操作缺少原名称")?;
+    if !taxonomy_exists(value, kind, current)? {
+        return Err(MobileError::new(
+            "TAXONOMY_NOT_FOUND",
+            "AI 更新的分类不存在",
+        ));
+    }
+    let destination = action.new_name.as_deref().unwrap_or(current);
+    let (current_description, current_color) = taxonomy_meta(value, kind, current);
+    let description = if action.description.is_empty() {
+        current_description.as_str()
+    } else {
+        action.description.as_str()
+    };
+    let color = action.color.as_deref().or(current_color.as_deref());
+    document::save_taxonomy(
+        value,
+        kind,
+        Some(current),
+        destination,
+        description,
+        color,
+        now,
+    )
+}
+
+fn apply_assistant_assignment(
+    value: &mut Value,
+    action: &AssistantAction,
+    groups: bool,
+    now: &str,
+) -> Result<(), MobileError> {
+    let kind = if groups { "groups" } else { "tags" };
+    for name in &action.add {
+        ensure_taxonomy(value, kind, name, "", None, now)?;
+    }
+    for id in &action.entry_ids {
+        let entry = document::get_entry(value, id)?;
+        if entry.deleted {
+            return Err(MobileError::new(
+                "ENTRY_NOT_FOUND",
+                "AI 建议引用的条目已删除",
+            ));
+        }
+        let mut draft = draft_from_entry(&entry);
+        let names = if groups {
+            &mut draft.groups
+        } else {
+            &mut draft.tags
+        };
+        names.retain(|name| !action.remove.contains(name));
+        append_unique(names, &action.add);
+        document::save_entry(value, Some(id), &draft, now)?;
+    }
+    Ok(())
+}
+
+fn apply_assistant_field_change(
+    value: &mut Value,
+    action: &AssistantAction,
+    change: &str,
+    now: &str,
+) -> Result<(), MobileError> {
+    let id = required_name(action.entry_id.as_deref(), "字段操作缺少条目")?;
+    let entry = document::get_entry(value, id)?;
+    let mut draft = draft_from_entry(&entry);
+    let index = action
+        .field_index
+        .ok_or_else(|| MobileError::new("VALIDATION_FAILED", "字段操作缺少字段索引"))?;
+    let field = draft
+        .fields
+        .get(index)
+        .ok_or_else(|| MobileError::new("VALIDATION_FAILED", "字段操作引用的字段索引无效"))?;
+    if action.field_name.as_deref() != Some(field.name.as_str()) {
+        return Err(MobileError::retryable(
+            "REVISION_CONFLICT",
+            "字段名称已变化，请重新生成 AI 计划",
+        ));
+    }
+    if change == "rename" {
+        let new_name = required_name(action.new_name.as_deref(), "字段重命名缺少新名称")?;
+        if draft
+            .fields
+            .iter()
+            .enumerate()
+            .any(|(other_index, field)| other_index != index && field.name == new_name)
+        {
+            return Err(MobileError::new(
+                "VALIDATION_FAILED",
+                "字段重命名后的名称已存在",
+            ));
+        }
+        draft.fields[index].name = new_name.to_string();
+    } else {
+        if let Some(copyable) = action.copyable {
+            draft.fields[index].copyable = copyable;
+        }
+        if let Some(hidden) = action.hidden {
+            draft.fields[index].hidden = hidden;
+        }
+    }
+    document::save_entry(value, Some(id), &draft, now)?;
+    Ok(())
+}
+
+fn apply_assistant_split_field(
+    value: &mut Value,
+    action: &AssistantAction,
+    now: &str,
+) -> Result<(), MobileError> {
+    let source_id = required_name(
+        action.source_entry_id.as_deref(),
+        "字段拆分操作缺少来源条目",
+    )?;
+    let source = document::get_entry(value, source_id)?;
+    let index = action
+        .field_index
+        .ok_or_else(|| MobileError::new("VALIDATION_FAILED", "字段拆分操作缺少字段索引"))?;
+    let field = source
+        .fields
+        .get(index)
+        .ok_or_else(|| MobileError::new("VALIDATION_FAILED", "字段拆分引用的字段索引无效"))?;
+    if action.field_name.as_deref() != Some(field.name.as_str()) {
+        return Err(MobileError::retryable(
+            "REVISION_CONFLICT",
+            "字段名称已变化，请重新生成 AI 计划",
+        ));
+    }
+    let title = required_name(action.title.as_deref(), "字段拆分操作缺少新条目标题")?;
+    let draft = EntryDraft {
+        title: title.to_string(),
+        url: String::new(),
+        starred: false,
+        tags: action.tags.clone(),
+        groups: action.groups.clone(),
+        fields: vec![field.clone()],
+        remarks: String::new(),
+    };
+    document::save_entry(value, None, &draft, now)?;
+    Ok(())
+}
+
+fn taxonomy_meta(value: &Value, kind: &str, name: &str) -> (String, Option<String>) {
+    let key = if kind == "groups" {
+        "groups_meta"
+    } else {
+        "tags_meta"
+    };
+    let record = value
+        .get(key)
+        .and_then(Value::as_object)
+        .and_then(|meta| meta.get(name))
+        .and_then(Value::as_object);
+    let description = record
+        .and_then(|record| record.get("description"))
+        .and_then(Value::as_str)
+        .unwrap_or("")
+        .to_string();
+    let color = record
+        .and_then(|record| record.get("color"))
+        .and_then(Value::as_str)
+        .map(str::to_string);
+    (description, color)
 }
 
 fn apply_organize(
@@ -478,12 +774,6 @@ fn apply_update_entry(
         .filter(|title| !title.trim().is_empty())
     {
         draft.title = title.clone();
-    }
-    if let Some(url) = &action.url {
-        draft.url = url.clone();
-    }
-    if !action.remarks.is_empty() {
-        draft.remarks = action.remarks.clone();
     }
     draft.tags.retain(|tag| !action.remove_tags.contains(tag));
     append_unique(&mut draft.tags, &action.add_tags);

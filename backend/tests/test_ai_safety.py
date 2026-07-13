@@ -1,0 +1,283 @@
+import unittest
+from pathlib import Path
+from tempfile import TemporaryDirectory
+from unittest.mock import patch
+
+from fastapi import HTTPException
+
+from ai_services import conversation
+from ai_services import history as ai_history
+from ai_services import pending as ai_pending
+from ai_services.privacy import entry_metadata
+from ai_services.providers import normalize_base_url
+from models import AiTurnPrepareRequest, Entry, FieldItem, VaultData
+
+
+class AiSafetyTests(unittest.TestCase):
+    def setUp(self):
+        self.entry = Entry(
+            title="生产控制台",
+            url="https://console.example.test/private/path?account=owner",
+            tags=["开发"],
+            groups=["服务器"],
+            fields=[
+                FieldItem(
+                    name="登录密码",
+                    value="never-send-this-value",
+                    copyable=True,
+                    hidden=True,
+                )
+            ],
+            remarks="never-send-this-remark",
+        )
+        self.vault = VaultData(entries=[self.entry])
+        self.turn = {
+            "entry_map": {"E001": self.entry.id},
+            "field_map": {
+                "E001.F01": {
+                    "entry_id": self.entry.id,
+                    "index": 0,
+                    "name": "登录密码",
+                }
+            },
+        }
+
+    def test_metadata_dto_excludes_values_full_urls_remarks_and_real_ids(self):
+        metadata = entry_metadata(self.entry, "E001")
+        serialized = repr(metadata)
+
+        self.assertEqual(metadata["ref"], "E001")
+        self.assertEqual(metadata["hostname"], "console.example.test")
+        self.assertNotIn(self.entry.id, serialized)
+        self.assertNotIn("never-send-this-value", serialized)
+        self.assertNotIn("never-send-this-remark", serialized)
+        self.assertNotIn("/private/path", serialized)
+        self.assertNotIn("value", metadata["fields"][0])
+
+    def test_forbidden_value_key_is_rejected_before_plan_creation(self):
+        payload = {
+            "message": "建议",
+            "domain": "entry_structure",
+            "actions": [
+                {
+                    "type": "rename_field",
+                    "field_ref": "E001.F01",
+                    "new_name": "密码",
+                    "value": "must-never-enter-plan",
+                }
+            ],
+            "warnings": [],
+        }
+
+        with self.assertRaises(HTTPException) as raised:
+            conversation._normalize_assistant_response(payload, self.turn)
+
+        self.assertEqual(raised.exception.status_code, 422)
+        self.assertIn("禁止", raised.exception.detail)
+
+    def test_alias_is_resolved_locally_and_display_uses_entry_title(self):
+        payload = {
+            "message": "建议重命名",
+            "domain": "entry_structure",
+            "actions": [
+                {
+                    "type": "rename_entry",
+                    "entry_ref": "E001",
+                    "new_title": "控制台",
+                }
+            ],
+            "warnings": [],
+        }
+
+        with patch.object(conversation, "get_vault_data", return_value=self.vault):
+            _, domain, actions, display, _ = conversation._normalize_assistant_response(
+                payload,
+                self.turn,
+            )
+
+        self.assertEqual(domain, "entry_structure")
+        self.assertEqual(actions[0]["entry_id"], self.entry.id)
+        self.assertIn("生产控制台", display[0]["title"])
+        self.assertNotIn(self.entry.id, display[0]["title"])
+
+    def test_mixed_tag_and_group_plan_is_rejected(self):
+        payload = {
+            "message": "混合建议",
+            "domain": "tags",
+            "actions": [
+                {"type": "create_tag", "name": "开发"},
+                {"type": "create_group", "name": "工作"},
+            ],
+            "warnings": [],
+        }
+
+        with patch.object(conversation, "get_vault_data", return_value=self.vault):
+            with self.assertRaises(HTTPException) as raised:
+                conversation._normalize_assistant_response(payload, self.turn)
+
+        self.assertEqual(raised.exception.status_code, 422)
+        self.assertIn("不同类型", raised.exception.detail)
+
+    def test_unknown_or_blacklisted_action_is_rejected(self):
+        payload = {
+            "message": "危险建议",
+            "domain": "entry_structure",
+            "actions": [{"type": "delete_entry", "entry_ref": "E001"}],
+            "warnings": [],
+        }
+
+        with patch.object(conversation, "get_vault_data", return_value=self.vault):
+            with self.assertRaises(HTTPException) as raised:
+                conversation._normalize_assistant_response(payload, self.turn)
+
+        self.assertEqual(raised.exception.status_code, 422)
+        self.assertIn("不允许", raised.exception.detail)
+
+    def test_missing_entry_reference_is_rejected_as_validation_error(self):
+        payload = {
+            "message": "建议重命名",
+            "domain": "entry_structure",
+            "actions": [{"type": "rename_entry", "new_title": "控制台"}],
+            "warnings": [],
+        }
+
+        with patch.object(conversation, "get_vault_data", return_value=self.vault):
+            with self.assertRaises(HTTPException) as raised:
+                conversation._normalize_assistant_response(payload, self.turn)
+
+        self.assertEqual(raised.exception.status_code, 422)
+        self.assertIn("引用", raised.exception.detail)
+
+    def test_invalid_port_is_reported_as_validation_error(self):
+        with self.assertRaises(HTTPException) as raised:
+            normalize_base_url("https://api.example.test:not-a-port/v1")
+
+        self.assertEqual(raised.exception.status_code, 422)
+        self.assertIn("端口", raised.exception.detail)
+
+    def test_prepare_turn_stores_only_metadata_and_alias_maps(self):
+        captured = {}
+
+        def capture_pending(kind, payload, source_revision=None):
+            captured["kind"] = kind
+            captured["payload"] = payload
+            return "pending-token"
+
+        request = AiTurnPrepareRequest(
+            message="请整理密码组",
+            mode="assistant",
+            scope="all",
+        )
+        with (
+            patch.object(
+                conversation.ai_client,
+                "_load_ai_config",
+                return_value={
+                    "provider_id": "custom",
+                    "provider_name": "测试接口",
+                    "base_url": "https://api.example.test/v1",
+                    "api_key": "test-key",
+                    "model": "test-model",
+                },
+            ),
+            patch.object(conversation, "get_vault_data", return_value=self.vault),
+            patch.object(
+                conversation,
+                "ensure_conversation",
+                return_value={"id": "conversation"},
+            ),
+            patch.object(conversation, "put_pending", side_effect=capture_pending),
+            patch.object(conversation, "vault_revision", return_value=3),
+        ):
+            result = conversation.prepare_turn(request)
+
+        serialized = repr(captured["payload"])
+        self.assertEqual(captured["kind"], "assistant-turn")
+        self.assertEqual(result["source_revision"], 3)
+        self.assertIn("E001", serialized)
+        self.assertNotIn(self.entry.id, repr(captured["payload"]["metadata"]))
+        self.assertNotIn("never-send-this-value", serialized)
+        self.assertNotIn("never-send-this-remark", serialized)
+        self.assertNotIn("/private/path", serialized)
+
+    def test_normal_mode_rejects_user_supplied_secret_before_pending_plan(self):
+        request = AiTurnPrepareRequest(
+            message="password: never-send-this-value",
+            mode="assistant",
+            scope="all",
+        )
+        with (
+            patch.object(
+                conversation.ai_client,
+                "_load_ai_config",
+                return_value={
+                    "base_url": "https://api.example.test/v1",
+                    "api_key": "test-key",
+                    "model": "test-model",
+                },
+            ),
+            patch.object(conversation, "get_vault_data", return_value=self.vault),
+            patch.object(
+                conversation,
+                "ensure_conversation",
+                return_value={"id": "conversation"},
+            ),
+            patch.object(conversation, "put_pending") as pending,
+        ):
+            with self.assertRaises(HTTPException) as raised:
+                conversation.prepare_turn(request)
+
+        self.assertEqual(raised.exception.status_code, 422)
+        self.assertIn("AI 新建", raised.exception.detail)
+        pending.assert_not_called()
+
+    def test_conversation_history_is_encrypted_at_rest(self):
+        key = bytes(range(32))
+        salt = bytes(reversed(range(32)))
+        with TemporaryDirectory() as directory:
+            path = Path(directory) / "ai-history.enc"
+            with (
+                patch.object(ai_history, "HISTORY_PATH", path),
+                patch.object(
+                    ai_history,
+                    "derive_unlocked_purpose_key",
+                    return_value=(key, salt),
+                ),
+            ):
+                summary = ai_history.create_conversation("安全测试")
+                ai_history.append_messages(
+                    summary["id"],
+                    [
+                        {"role": "user", "content": "普通整理请求"},
+                        {"role": "assistant", "content": "已生成建议"},
+                    ],
+                )
+                loaded = ai_history.get_conversation(summary["id"])
+
+            self.assertIsNotNone(loaded)
+            self.assertEqual(len(loaded["messages"]), 2)
+            content = path.read_bytes()
+            self.assertNotIn("普通整理请求".encode("utf-8"), content)
+            self.assertNotIn("已生成建议".encode("utf-8"), content)
+
+    def test_pending_plan_is_bound_to_session_and_revision(self):
+        ai_pending._ITEMS.clear()
+        with (
+            patch.object(ai_pending, "vault_session_id", return_value="session-a"),
+            patch.object(ai_pending, "vault_revision", return_value=4),
+        ):
+            token = ai_pending.put_pending("assistant-plan", {"actions": []})
+
+        with (
+            patch.object(ai_pending, "vault_session_id", return_value="session-a"),
+            patch.object(ai_pending, "vault_revision", return_value=5),
+        ):
+            with self.assertRaises(HTTPException) as raised:
+                ai_pending.get_pending(token, "assistant-plan")
+
+        self.assertEqual(raised.exception.status_code, 409)
+        self.assertNotIn(token, ai_pending._ITEMS)
+
+
+if __name__ == "__main__":
+    unittest.main()

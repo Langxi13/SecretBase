@@ -377,6 +377,48 @@ class AiActionApplyRequest(BaseModel):
     actions: List[AiActionPlanItem] = Field(..., min_items=1)
 
 
+class AiPendingPlanApplyRequest(BaseModel):
+    """通过服务端计划令牌应用不可篡改的 AI 建议。"""
+    plan_token: str = Field(..., min_length=20, max_length=200)
+    selected_ids: List[str] = Field(..., min_items=1, max_items=1000)
+    expected_revision: int = Field(..., ge=1)
+
+    @validator('selected_ids')
+    def validate_selected_ids(cls, value):
+        cleaned = []
+        seen = set()
+        for item in value:
+            item = str(item or '').strip()
+            if item and item not in seen:
+                seen.add(item)
+                cleaned.append(item)
+        if not cleaned:
+            raise ValueError('至少选择一项 AI 计划')
+        return cleaned
+
+
+class AiConversationCreateRequest(BaseModel):
+    title: str = Field(default="", max_length=60)
+
+
+class AiTurnPrepareRequest(BaseModel):
+    conversation_id: Optional[str] = Field(default=None, max_length=100)
+    message: str = Field(..., min_length=1, max_length=6000)
+    mode: str = Field(default="assistant", pattern="^(assistant|sensitive_create)$")
+    filters: dict = Field(default_factory=dict)
+    scope: str = Field(default="current_view", pattern="^(current_view|selection|all)$")
+
+
+class AiTurnSubmitRequest(BaseModel):
+    turn_token: str = Field(..., min_length=20, max_length=200)
+    acknowledge_risk: bool = False
+
+
+class AiUndoRequest(BaseModel):
+    undo_token: str = Field(..., min_length=20, max_length=200)
+    expected_revision: int = Field(..., ge=1)
+
+
 class ImportConflictRequest(BaseModel):
     """导入冲突处理请求"""
     conflict_strategy: str = Field(default="skip", pattern="^(skip|overwrite|ask)$")

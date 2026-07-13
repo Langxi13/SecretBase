@@ -9,6 +9,7 @@
         nextTick,
         debounce,
         copyToClipboard,
+        openExternalUrl,
         api,
         store,
         showToast,
@@ -20,38 +21,18 @@
         pagination
     }) {
         const listActions = {};
-
-        const {
-            aiSoftInputChars,
-            aiMaxInputChars,
-            aiCooldownSeconds,
-            aiTextLength,
-            aiInputWarning,
-            canParseAi,
-            selectedAiEntryCount,
-            selectedAiOrganizeCount,
-            aiOrganizeSummary,
-            selectedAiOrganizeChangeCount,
-            selectedAiActionCount,
-            aiActionSummary,
-            canPreviewAiOrganize,
-            canPreviewAiActions
-        } = window.SecretBaseAiView.createAiView({
+        const aiFeature = window.SecretBaseAiFeatureComposition.createAiFeatureComposition({
             computed,
-            aiText: state.aiText,
-            aiParsing: state.aiParsing,
-            aiStatus: state.aiStatus,
-            aiCooldownUntil: state.aiCooldownUntil,
-            aiNow: state.aiNow,
-            lastAiParseText: state.lastAiParseText,
-            aiResult: state.aiResult,
-            aiOrganizing: state.aiOrganizing,
-            aiOrganizeOptions: state.aiOrganizeOptions,
-            aiActionInstruction: state.aiActionInstruction,
-            aiOrganizeResult: state.aiOrganizeResult,
-            isAiTagGovernanceMode: state.isAiTagGovernanceMode,
-            groups: state.groups,
-            aiActionResult: state.aiActionResult
+            nextTick,
+            api,
+            store,
+            showToast,
+            copyToClipboard,
+            state,
+            data,
+            ui,
+            viewHelpers,
+            settingsActions
         });
 
         const selectedSearchScopeLabels = computed(() => {
@@ -169,61 +150,6 @@
 
         const visiblePages = computed(() => {
             return pagination.createVisiblePages(state.currentPage.value, state.totalPages.value);
-        });
-
-        const aiActions = window.SecretBaseAiController.createAiController({
-            api,
-            store,
-            showToast,
-            nextTick,
-            viewHelpers,
-            showAiParse: state.showAiParse,
-            aiMode: state.aiMode,
-            aiText: state.aiText,
-            aiResult: state.aiResult,
-            aiParsing: state.aiParsing,
-            aiStatus: state.aiStatus,
-            aiStatusError: state.aiStatusError,
-            aiFailureMessage: state.aiFailureMessage,
-            aiOrganizing: state.aiOrganizing,
-            aiOrganizeError: state.aiOrganizeError,
-            aiOrganizeResult: state.aiOrganizeResult,
-            aiOrganizeMode: state.aiOrganizeMode,
-            aiOrganizeOptions: state.aiOrganizeOptions,
-            currentAiOrganizePrompt: state.currentAiOrganizePrompt,
-            aiActionInstruction: state.aiActionInstruction,
-            aiActionResult: state.aiActionResult,
-            aiActionError: state.aiActionError,
-            aiCooldownUntil: state.aiCooldownUntil,
-            aiNow: state.aiNow,
-            lastAiParseText: state.lastAiParseText,
-            isAiTagGovernanceMode: state.isAiTagGovernanceMode,
-            canPreviewAiOrganize,
-            canPreviewAiActions,
-            canParseAi,
-            aiCooldownSeconds,
-            aiMaxInputChars,
-            searchQuery: state.searchQuery,
-            selectedSearchScopes: state.selectedSearchScopes,
-            sortBy: state.sortBy,
-            sortOrder: state.sortOrder,
-            currentPage: state.currentPage,
-            entryForm: state.entryForm,
-            showCreateModal: state.showCreateModal,
-            resetEntryForm: ui.resetEntryForm,
-            loadEntries: data.loadEntries,
-            loadTags: data.loadTags,
-            loadGroups: data.loadGroups,
-            openSettings: (...args) => settingsActions.openSettings(...args),
-            selectSettingsTab: (...args) => settingsActions.selectSettingsTab(...args),
-            aiSettingsForm: state.aiSettingsForm,
-            aiSettingsStatus: state.aiSettingsStatus,
-            aiSettingsEditing: state.aiSettingsEditing,
-            aiModels: state.aiModels,
-            aiModelsLoading: state.aiModelsLoading,
-            aiSettingsSaving: state.aiSettingsSaving,
-            aiSettingsError: state.aiSettingsError,
-            aiSettingsMessage: state.aiSettingsMessage
         });
 
         const tagActions = window.SecretBaseTagController.createTagController({
@@ -451,20 +377,7 @@
 
         return {
             views: {
-                aiSoftInputChars,
-                aiMaxInputChars,
-                aiCooldownSeconds,
-                aiTextLength,
-                aiInputWarning,
-                canParseAi,
-                selectedAiEntryCount,
-                selectedAiOrganizeCount,
-                aiOrganizeSummary,
-                selectedAiOrganizeChangeCount,
-                selectedAiActionCount,
-                aiActionSummary,
-                canPreviewAiOrganize,
-                canPreviewAiActions,
+                ...aiFeature.views,
                 selectedSearchScopeLabels,
                 tagBrowserSortOptions,
                 sortedTagBrowserTags,
@@ -499,7 +412,7 @@
                 ...desktop.views
             },
             actions: {
-                ...aiActions,
+                ...aiFeature.actions,
                 ...tagActions,
                 ...backupActions,
                 ...trashActions,

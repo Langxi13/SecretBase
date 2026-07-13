@@ -339,3 +339,21 @@ async def delete_group(group_name: str):
         "data": {"affected_count": affected_count},
         "message": f"密码组已移除，影响 {affected_count} 个条目",
     }
+
+
+@router.delete("/{group_name}/empty")
+async def delete_empty_group(group_name: str):
+    """Delete group metadata only when no active entry belongs to it."""
+    check_unlocked()
+    name = normalize_group_name(group_name)
+    if not name:
+        raise HTTPException(status_code=422, detail="密码组名称不能为空")
+    vault = get_vault_data()
+    if any(name in (getattr(entry, "groups", []) or []) for entry in vault.entries if not entry.deleted):
+        raise HTTPException(status_code=409, detail="密码组仍包含条目，不能删除")
+    if not isinstance(vault.groups_meta, dict) or name not in vault.groups_meta:
+        raise HTTPException(status_code=404, detail="密码组不存在")
+    vault.groups_meta.pop(name, None)
+    save_vault_data(vault)
+    logger.info("删除空密码组: %s", name)
+    return {"success": True, "data": {"name": name}, "message": "空密码组已删除"}

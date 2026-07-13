@@ -9,7 +9,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
-from config import VAULT_PATH, BACKUP_DIR, SETTINGS_PATH, SECURE_SETTINGS_FILE
+from config import AI_HISTORY_FILE, VAULT_PATH, BACKUP_DIR, SETTINGS_PATH, SECURE_SETTINGS_FILE
 from crypto import (
     SecureKey,
     decrypt_vault,
@@ -20,14 +20,21 @@ from crypto import (
     parse_vault_header,
 )
 from models import VaultData, Settings
-from secure_settings import AI_SETTINGS_PURPOSE, derive_purpose_key, prepare_rekey, replace_file_atomically
+from secure_settings import (
+    AI_HISTORY_PURPOSE,
+    AI_SETTINGS_PURPOSE,
+    derive_purpose_key,
+    prepare_rekey,
+    replace_file_atomically,
+)
 from vault_document import decode_vault_document, encode_vault_document
 
 logger = logging.getLogger(__name__)
 
 AUTO_BACKUP_TYPE = "auto"
 MANUAL_BACKUP_TYPE = "manual"
-BACKUP_TYPES = {AUTO_BACKUP_TYPE, MANUAL_BACKUP_TYPE}
+AI_BACKUP_TYPE = "ai"
+BACKUP_TYPES = {AUTO_BACKUP_TYPE, MANUAL_BACKUP_TYPE, AI_BACKUP_TYPE}
 BACKUP_SUFFIX = ".bak"
 LEGACY_BACKUP_PREFIX = "secretbase.enc."
 
@@ -37,6 +44,8 @@ _vault_data: Optional[VaultData] = None
 _last_activity_at: Optional[float] = None
 _session_token: Optional[str] = None
 _vault_fingerprint: Optional[str] = None
+_vault_revision = 0
+_vault_session_id: Optional[str] = None
 
 
 class ConflictError(Exception):
@@ -139,6 +148,16 @@ def create_session_token() -> str:
     return _session_token
 
 
+def vault_revision() -> int:
+    """Return the monotonic revision for the current unlocked session."""
+    return _vault_revision
+
+
+def vault_session_id() -> str | None:
+    """Return an opaque identifier that changes on every unlock."""
+    return _vault_session_id
+
+
 def validate_session_token(token: str | None) -> bool:
     return bool(_session_token and token and secrets.compare_digest(_session_token, token))
 
@@ -187,6 +206,7 @@ def _ensure_backup_dirs() -> None:
     _backup_root().mkdir(parents=True, exist_ok=True)
     _backup_dir(AUTO_BACKUP_TYPE).mkdir(parents=True, exist_ok=True)
     _backup_dir(MANUAL_BACKUP_TYPE).mkdir(parents=True, exist_ok=True)
+    _backup_dir(AI_BACKUP_TYPE).mkdir(parents=True, exist_ok=True)
 
 
 def _is_backup_filename(filename: str) -> bool:
@@ -195,6 +215,7 @@ def _is_backup_filename(filename: str) -> bool:
         and (
             filename.startswith("secretbase.auto.")
             or filename.startswith("secretbase.manual.")
+            or filename.startswith("secretbase.ai.")
             or filename.startswith(LEGACY_BACKUP_PREFIX)
         )
     )
@@ -292,7 +313,7 @@ def resolve_backup_file(filename: str) -> tuple[Path, str]:
 
 def import_encrypted_vault(content: bytes) -> int:
     """导入加密 vault 文件，必须能用当前主密码解密。"""
-    global _vault_data
+    global _vault_data, _vault_revision
 
     if not is_unlocked():
         raise ValueError("Vault 未解锁")
@@ -301,13 +322,14 @@ def import_encrypted_vault(content: bytes) -> int:
     data = decode_vault_document(plaintext)
     save_vault(content)
     _vault_data = data
+    _vault_revision += 1
     logger.info("导入加密 vault 成功")
     return len(data.entries)
 
 
 def import_encrypted_vault_with_password(content: bytes, password: str) -> int:
     """用备份主密码解密旧备份，再用当前会话密钥写回。"""
-    global _vault_data
+    global _vault_data, _vault_revision
 
     if not is_unlocked():
         raise ValueError("Vault 未解锁")
@@ -316,6 +338,7 @@ def import_encrypted_vault_with_password(content: bytes, password: str) -> int:
     data = decode_vault_document(plaintext)
     save_vault(_encrypt_with_current_key(plaintext))
     _vault_data = data
+    _vault_revision += 1
     logger.info("导入旧加密 vault 成功")
     return len(data.entries)
 
@@ -373,6 +396,8 @@ def _create_backup_unlocked(strict: bool = False, backup_type: str = AUTO_BACKUP
         shutil.copy2(VAULT_PATH, backup_path)
         if backup_type == AUTO_BACKUP_TYPE:
             _cleanup_backups()
+        elif backup_type == AI_BACKUP_TYPE:
+            _cleanup_ai_backups()
         logger.info(f"创建备份: {backup_path}")
         return backup_path
     except Exception as e:
@@ -387,6 +412,29 @@ def create_backup() -> Path:
     with VaultFileLock(VAULT_PATH):
         _ensure_current_vault_unchanged()
         return _create_backup_unlocked(strict=True, backup_type=MANUAL_BACKUP_TYPE)
+
+
+def create_ai_snapshot() -> Path:
+    """Create an encrypted recovery point immediately before an AI write."""
+    with VaultFileLock(VAULT_PATH):
+        _ensure_current_vault_unchanged()
+        return _create_backup_unlocked(strict=True, backup_type=AI_BACKUP_TYPE)
+
+
+def restore_ai_snapshot(filename: str) -> int:
+    """Restore an AI snapshot using the current unlocked key."""
+    global _vault_data, _vault_revision
+    if Path(filename).name != filename or not filename.startswith("secretbase.ai.") or not filename.endswith(BACKUP_SUFFIX):
+        raise ValueError("AI 恢复快照名称无效")
+    path = _backup_dir(AI_BACKUP_TYPE) / filename
+    if not path.is_file():
+        raise FileNotFoundError("AI 恢复快照不存在")
+    content = path.read_bytes()
+    data = read_encrypted_vault_with_current_key(content)
+    save_vault(content)
+    _vault_data = data
+    _vault_revision += 1
+    return len([entry for entry in data.entries if not entry.deleted])
 
 
 def _cleanup_backups():
@@ -406,9 +454,27 @@ def _cleanup_backups():
         logger.error(f"清理备份失败: {e}")
 
 
+def _cleanup_ai_backups() -> None:
+    try:
+        _ensure_backup_dirs()
+        now = time.time()
+        snapshots = sorted(
+            [path for path in _backup_dir(AI_BACKUP_TYPE).glob(f"*{BACKUP_SUFFIX}") if path.is_file()],
+            key=lambda path: path.stat().st_mtime,
+        )
+        for path in list(snapshots):
+            if now - path.stat().st_mtime > 7 * 24 * 60 * 60:
+                path.unlink(missing_ok=True)
+                snapshots.remove(path)
+        while len(snapshots) > 10:
+            snapshots.pop(0).unlink(missing_ok=True)
+    except Exception as error:
+        logger.error("清理 AI 恢复快照失败: %s", error)
+
+
 def unlock_vault(password: str) -> bool:
     """解锁 vault，缓存派生密钥和数据。"""
-    global _vault_key, _vault_data
+    global _vault_key, _vault_data, _vault_revision, _vault_session_id
     
     content = get_vault_content()
     if content is None:
@@ -422,6 +488,8 @@ def unlock_vault(password: str) -> bool:
         if _vault_key is not None:
             _vault_key.lock()
         _vault_key = SecureKey(key, header["salt"])
+        _vault_revision = 1
+        _vault_session_id = secrets.token_urlsafe(24)
         _set_vault_fingerprint_from_content(content)
         touch_activity()
         logger.info("Vault 解锁成功")
@@ -434,6 +502,7 @@ def unlock_vault(password: str) -> bool:
 def lock_vault():
     """锁定 vault，清除缓存"""
     global _vault_key, _vault_data, _last_activity_at, _session_token, _vault_fingerprint
+    global _vault_revision, _vault_session_id
     if _vault_key is not None:
         _vault_key.lock()
     _vault_key = None
@@ -441,6 +510,8 @@ def lock_vault():
     _last_activity_at = None
     _session_token = None
     _vault_fingerprint = None
+    _vault_revision = 0
+    _vault_session_id = None
     logger.info("Vault 已锁定")
 
 
@@ -472,7 +543,7 @@ def _restore_cached_vault_from_disk() -> None:
 
 def save_vault_data(vault: VaultData):
     """保存 vault 数据（必须已解锁）"""
-    global _vault_data
+    global _vault_data, _vault_revision
     
     if not is_unlocked():
         raise ValueError("Vault 未解锁")
@@ -482,6 +553,7 @@ def save_vault_data(vault: VaultData):
         encrypted = _encrypt_with_current_key(plaintext)
         save_vault(encrypted)
         _vault_data = vault
+        _vault_revision += 1
         logger.info("Vault 数据已保存")
     except Exception as e:
         _restore_cached_vault_from_disk()
@@ -491,7 +563,7 @@ def save_vault_data(vault: VaultData):
 
 def init_vault(password: str) -> bool:
     """初始化新的 vault"""
-    global _vault_key, _vault_data
+    global _vault_key, _vault_data, _vault_revision, _vault_session_id
     
     if is_initialized():
         return False
@@ -508,6 +580,8 @@ def init_vault(password: str) -> bool:
             _vault_key.lock()
         _vault_key = SecureKey(key, salt)
         _vault_data = vault
+        _vault_revision = 1
+        _vault_session_id = secrets.token_urlsafe(24)
         touch_activity()
         logger.info("Vault 初始化成功")
         return True
@@ -518,7 +592,7 @@ def init_vault(password: str) -> bool:
 
 def change_vault_password(old_password: str, new_password: str) -> bool:
     """修改 vault 密码"""
-    global _vault_key
+    global _vault_key, _vault_revision
     
     if not is_unlocked():
         return False
@@ -540,32 +614,41 @@ def change_vault_password(old_password: str, new_password: str) -> bool:
         # AI 本地设置的密钥依赖当前 vault 密钥；先完成可回滚的设置文件轮换，
         # 再提交 vault，避免密码更新后遗留一份只能由旧主密码解密的 API Key。
         old_key = _vault_key.get()
-        secure_settings_path = Path(SECURE_SETTINGS_FILE)
-        rekey_state = prepare_rekey(
-            secure_settings_path,
-            AI_SETTINGS_PURPOSE,
-            old_key,
-            _vault_key.salt,
-            new_key,
-            new_salt,
-        )
-        if rekey_state:
-            if rekey_state[1] is None:
-                logger.warning("AI 安全设置无法随主密码迁移，将清除遗留文件")
-            replace_file_atomically(secure_settings_path, rekey_state[1])
+        secure_files = [
+            (Path(SECURE_SETTINGS_FILE), AI_SETTINGS_PURPOSE, "AI 安全设置"),
+            (Path(AI_HISTORY_FILE), AI_HISTORY_PURPOSE, "AI 对话历史"),
+        ]
+        rekey_states = []
+        for secure_path, purpose, label in secure_files:
+            state = prepare_rekey(
+                secure_path,
+                purpose,
+                old_key,
+                _vault_key.salt,
+                new_key,
+                new_salt,
+            )
+            rekey_states.append((secure_path, label, state))
+            if state:
+                if state[1] is None:
+                    logger.warning("%s无法随主密码迁移，将清除遗留文件", label)
+                replace_file_atomically(secure_path, state[1])
         try:
             save_vault(encrypted)
         except Exception:
-            if rekey_state:
+            for secure_path, label, state in rekey_states:
+                if not state:
+                    continue
                 try:
-                    replace_file_atomically(secure_settings_path, rekey_state[0])
+                    replace_file_atomically(secure_path, state[0])
                 except Exception as rollback_error:
-                    logger.critical("主密码变更回滚 AI 安全设置失败: %s", rollback_error)
+                    logger.critical("主密码变更回滚%s失败: %s", label, rollback_error)
             raise
 
         if _vault_key is not None:
             _vault_key.lock()
         _vault_key = SecureKey(new_key, new_salt)
+        _vault_revision += 1
         logger.info("密码修改成功")
         return True
     except Exception as e:

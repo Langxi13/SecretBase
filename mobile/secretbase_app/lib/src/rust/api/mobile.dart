@@ -232,3 +232,38 @@ Future<OperationResult> applyAiPreview({
   selectedItemIds: selectedItemIds,
   expectedRevision: expectedRevision,
 );
+
+Future<List<AiConversationSummary>> listAiConversations() =>
+    RustLib.instance.api.crateApiMobileListAiConversations();
+
+Future<AiConversation> getAiConversation({required String id}) =>
+    RustLib.instance.api.crateApiMobileGetAiConversation(id: id);
+
+Future<AiConversationSummary> createAiConversation({required String title}) =>
+    RustLib.instance.api.crateApiMobileCreateAiConversation(title: title);
+
+Future<void> deleteAiConversation({required String id}) =>
+    RustLib.instance.api.crateApiMobileDeleteAiConversation(id: id);
+
+Future<void> clearAiConversations() =>
+    RustLib.instance.api.crateApiMobileClearAiConversations();
+
+Future<AiAssistantRequestPlan> prepareAiAssistantRequest({
+  String? conversationId,
+  required String message,
+  required String mode,
+  required List<String> selectedEntryIds,
+}) => RustLib.instance.api.crateApiMobilePrepareAiAssistantRequest(
+  conversationId: conversationId,
+  message: message,
+  mode: mode,
+  selectedEntryIds: selectedEntryIds,
+);
+
+Future<AiAssistantTurnResult> consumeAiAssistantResponse({
+  required String token,
+  required String content,
+}) => RustLib.instance.api.crateApiMobileConsumeAiAssistantResponse(
+  token: token,
+  content: content,
+);

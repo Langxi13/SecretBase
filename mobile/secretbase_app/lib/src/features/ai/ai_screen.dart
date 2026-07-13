@@ -447,7 +447,7 @@ class _AiHeader extends StatelessWidget {
         children: [
           Expanded(
             child: Text(
-              'AI 管理',
+              '专业工具',
               style: Theme.of(
                 context,
               ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),

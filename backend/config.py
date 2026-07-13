@@ -35,6 +35,7 @@ class RuntimeConfig:
     vault_path: Path
     settings_path: Path
     secure_settings_path: Path
+    conversation_history_path: Path
     frontend_dir: Path
     cors_origins: str
     log_level: str
@@ -51,6 +52,7 @@ def load_runtime_config() -> RuntimeConfig:
     vault_path = resolve_backend_path(os.getenv("VAULT_PATH", data_dir / "secretbase.enc"))
     settings_path = resolve_backend_path(os.getenv("SETTINGS_PATH", data_dir / "settings.json"))
     secure_settings_path = data_dir / "secure-settings.enc"
+    conversation_history_path = data_dir / "ai-history.enc"
     frontend_dir = resolve_backend_path(os.getenv("SECRETBASE_FRONTEND_DIR", BASE_DIR.parent / "frontend"))
 
     port = int(os.getenv("PORT", 10004))
@@ -67,6 +69,7 @@ def load_runtime_config() -> RuntimeConfig:
         vault_path=vault_path,
         settings_path=settings_path,
         secure_settings_path=secure_settings_path,
+        conversation_history_path=conversation_history_path,
         frontend_dir=frontend_dir,
         cors_origins=os.getenv("CORS_ORIGINS", default_cors_origins),
         log_level=os.getenv("LOG_LEVEL", "INFO"),
@@ -87,6 +90,7 @@ HOST = RUNTIME_CONFIG.host
 VAULT_PATH = str(RUNTIME_CONFIG.vault_path)
 SETTINGS_PATH = str(RUNTIME_CONFIG.settings_path)
 SECURE_SETTINGS_FILE = str(RUNTIME_CONFIG.secure_settings_path)
+AI_HISTORY_FILE = str(RUNTIME_CONFIG.conversation_history_path)
 FRONTEND_DIR = RUNTIME_CONFIG.frontend_dir
 
 # CORS 配置
@@ -118,6 +122,7 @@ def ensure_runtime_dirs() -> None:
     Path(VAULT_PATH).parent.mkdir(parents=True, exist_ok=True)
     Path(SETTINGS_PATH).parent.mkdir(parents=True, exist_ok=True)
     Path(SECURE_SETTINGS_FILE).parent.mkdir(parents=True, exist_ok=True)
+    Path(AI_HISTORY_FILE).parent.mkdir(parents=True, exist_ok=True)
 
 
 def get_cors_origins() -> list[str]:

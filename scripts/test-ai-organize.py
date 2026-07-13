@@ -35,7 +35,9 @@ def main() -> None:
         from fastapi.testclient import TestClient  # noqa: E402
         from ai_services import client as ai_client  # noqa: E402
         from ai_services import organize as ai_organize  # noqa: E402
+        from ai_services import pending as ai_pending  # noqa: E402
         import routes.ai as ai_routes  # noqa: E402
+        import storage  # noqa: E402
         from main import app  # noqa: E402
 
         captured_payloads = []
@@ -307,7 +309,11 @@ def main() -> None:
         apply_result = expect_success(
             client.post(
                 "/ai/organize/apply",
-                json={"suggestions": preview["suggestions"]},
+                json={
+                    "plan_token": preview["plan_token"],
+                    "selected_ids": [item["id"] for item in preview["suggestions"]],
+                    "expected_revision": preview["source_revision"],
+                },
                 headers=headers,
             ),
             "organize apply tags",
@@ -315,10 +321,26 @@ def main() -> None:
         assert apply_result["updated_count"] == 1
         assert apply_result["created_groups"] == []
 
+        fresh_group_preview = expect_success(
+            client.post(
+                "/ai/organize/preview",
+                json={
+                    "filters": {"search": "公司邮箱", "searchScopes": ["title"]},
+                    "organize_tags": False,
+                    "organize_groups": True,
+                },
+                headers=headers,
+            ),
+            "organize preview fresh group plan",
+        )
         apply_group_result = expect_success(
             client.post(
                 "/ai/organize/apply",
-                json={"suggestions": group_only_preview["suggestions"]},
+                json={
+                    "plan_token": fresh_group_preview["plan_token"],
+                    "selected_ids": [item["id"] for item in fresh_group_preview["suggestions"]],
+                    "expected_revision": fresh_group_preview["source_revision"],
+                },
                 headers=headers,
             ),
             "organize apply groups",
@@ -350,15 +372,23 @@ def main() -> None:
             client.post("/groups", json={"name": "待补充简介", "description": ""}, headers=headers),
             "create empty group metadata",
         )
+        metadata_suggestion = {
+            "id": "organize-metadata",
+            "entry_id": metadata_entry["id"],
+            "add_groups": ["待补充简介"],
+            "group_descriptions": {"待补充简介": "由 AI 补充的密码组简介"},
+        }
+        metadata_token = ai_pending.put_pending(
+            "organize",
+            {"suggestions": [metadata_suggestion]},
+        )
         metadata_apply = expect_success(
             client.post(
                 "/ai/organize/apply",
                 json={
-                    "suggestions": [{
-                        "entry_id": metadata_entry["id"],
-                        "add_groups": ["待补充简介"],
-                        "group_descriptions": {"待补充简介": "由 AI 补充的密码组简介"},
-                    }]
+                    "plan_token": metadata_token,
+                    "selected_ids": [metadata_suggestion["id"]],
+                    "expected_revision": storage.vault_revision(),
                 },
                 headers=headers,
             ),

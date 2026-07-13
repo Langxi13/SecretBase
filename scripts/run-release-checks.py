@@ -27,9 +27,9 @@ PYTHON_TESTS = [
 ]
 
 
-def run(command: list[str]) -> None:
+def run(command: list[str], cwd: Path = ROOT) -> None:
     print(f"+ {' '.join(command)}", flush=True)
-    subprocess.run(command, cwd=ROOT, check=True)
+    subprocess.run(command, cwd=cwd, check=True)
 
 
 def main() -> int:
@@ -38,6 +38,10 @@ def main() -> int:
         raise RuntimeError("未找到 Node.js，无法执行前端发布检查")
 
     run([sys.executable, "-m", "compileall", "-q", "backend", "desktop", "scripts"])
+    run(
+        [sys.executable, "-m", "unittest", "discover", "-s", "tests", "-v"],
+        cwd=ROOT / "backend",
+    )
     for test in PYTHON_TESTS:
         run([sys.executable, test])
 

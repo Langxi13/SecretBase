@@ -4,6 +4,7 @@ import re
 from datetime import datetime
 
 from ai_services.parsing import _clean_text
+from ai_services.privacy import url_hostname
 from ai_services.prompts import ORGANIZE_GROUP_RULES
 from tag_utils import ensure_entry_tags_meta
 
@@ -175,16 +176,14 @@ def _field_is_hidden_for_organize(field) -> bool:
     return bool(hidden)
 
 
-def _entry_for_ai_organize(entry) -> dict:
+def _entry_for_ai_organize(entry, entry_ref: str | None = None) -> dict:
     return {
-        "id": entry.id,
+        "id": entry_ref or entry.id,
         "title": entry.title,
-        "url": entry.url or "",
+        "hostname": url_hostname(entry.url),
         "tags": entry.tags,
         "groups": getattr(entry, "groups", []) or [],
         "field_names": [field.name for field in entry.fields],
-        "remarks": entry.remarks or "",
-        "starred": entry.starred,
     }
 
 

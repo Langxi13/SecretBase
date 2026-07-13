@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:secretbase/src/core/mobile_error_presenter.dart';
 import 'package:secretbase/src/core/widgets/responsive_dialog.dart';
 import 'package:secretbase/src/features/ai/ai_transport.dart';
+import 'package:secretbase/src/features/ai/ai_providers.dart';
 import 'package:secretbase/src/rust/api/mobile.dart' as rust_api;
 import 'package:secretbase/src/rust/mobile/models.dart';
 
@@ -30,9 +31,12 @@ class AiSettingsDialog extends StatefulWidget {
 class _AiSettingsDialogState extends State<AiSettingsDialog> {
   final _baseUrlController = TextEditingController();
   final _apiKeyController = TextEditingController();
+  final _modelController = TextEditingController();
   AiStatus? _status;
   List<String> _models = [];
   String? _model;
+  String _providerId = 'deepseek';
+  bool _manualModel = false;
   bool _loading = true;
   bool _working = false;
   bool _obscureKey = true;
@@ -48,6 +52,7 @@ class _AiSettingsDialogState extends State<AiSettingsDialog> {
   void dispose() {
     _baseUrlController.dispose();
     _apiKeyController.dispose();
+    _modelController.dispose();
     super.dispose();
   }
 
@@ -59,8 +64,12 @@ class _AiSettingsDialogState extends State<AiSettingsDialog> {
         _status = status;
         _baseUrlController.text = status.configured
             ? status.baseUrl
-            : 'https://api.openai.com/v1';
+            : aiProviderById('deepseek').baseUrl;
+        _providerId = status.configured
+            ? inferAiProviderId(status.baseUrl)
+            : 'deepseek';
         _model = status.configured ? status.model : null;
+        _modelController.text = _model ?? '';
         if (_model != null) _models = [_model!];
         _loading = false;
       });
@@ -90,21 +99,26 @@ class _AiSettingsDialogState extends State<AiSettingsDialog> {
       setState(() {
         _models = models;
         _model = models.contains(_model) ? _model : models.first;
+        _modelController.text = _model ?? '';
+        _manualModel = false;
         _working = false;
       });
     } catch (error) {
       if (mounted) {
         setState(() {
           _working = false;
-          _error = _errorMessage(error);
+          _manualModel = true;
+          _modelController.text = _model ?? '';
+          _error = '${_errorMessage(error)}，可以手动填写模型 ID';
         });
       }
     }
   }
 
   Future<void> _save() async {
-    if (_model == null) {
-      setState(() => _error = '请先获取并选择模型');
+    final model = (_manualModel ? _modelController.text : _model ?? '').trim();
+    if (model.isEmpty) {
+      setState(() => _error = '请选择或填写模型 ID');
       return;
     }
     setState(() {
@@ -115,14 +129,14 @@ class _AiSettingsDialogState extends State<AiSettingsDialog> {
       final request = await rust_api.prepareAiVerifyRequest(
         baseUrl: _baseUrlController.text,
         apiKey: _apiKeyController.text,
-        model: _model!,
+        model: model,
       );
       final response = await AiTransport.send(request);
       await rust_api.verifyAiResponse(content: response);
       final status = await rust_api.saveAiSettings(
         baseUrl: _baseUrlController.text,
         apiKey: _apiKeyController.text,
-        model: _model!,
+        model: model,
       );
       if (mounted) Navigator.of(context).pop(status);
     } catch (error) {
@@ -133,6 +147,29 @@ class _AiSettingsDialogState extends State<AiSettingsDialog> {
         });
       }
     }
+  }
+
+  void _selectProvider(String? value) {
+    if (value == null || value == _providerId) return;
+    final provider = aiProviderById(value);
+    setState(() {
+      _providerId = value;
+      _baseUrlController.text = provider.baseUrl;
+      _apiKeyController.clear();
+      _models = [];
+      _model = null;
+      _modelController.clear();
+      _manualModel = false;
+      _error = provider.aggregator
+          ? 'OpenRouter 是聚合服务，请同时确认其隐私政策和实际模型供应方。'
+          : null;
+    });
+  }
+
+  void _resetOfficialUrl() {
+    final provider = aiProviderById(_providerId);
+    if (provider.baseUrl.isEmpty) return;
+    setState(() => _baseUrlController.text = provider.baseUrl);
   }
 
   Future<void> _clear() async {
@@ -174,15 +211,47 @@ class _AiSettingsDialogState extends State<AiSettingsDialog> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
+                        DropdownButtonFormField<String>(
+                          initialValue: _providerId,
+                          isExpanded: true,
+                          decoration: const InputDecoration(
+                            labelText: '服务厂商',
+                            prefixIcon: Icon(Icons.hub_outlined),
+                          ),
+                          items: aiProviderPresets
+                              .map(
+                                (provider) => DropdownMenuItem(
+                                  value: provider.id,
+                                  child: Text(
+                                    provider.aggregator
+                                        ? '${provider.name}（聚合服务）'
+                                        : provider.name,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                              )
+                              .toList(),
+                          onChanged: _working ? null : _selectProvider,
+                        ),
+                        const SizedBox(height: 14),
                         TextField(
                           controller: _baseUrlController,
                           enabled: !_working,
                           keyboardType: TextInputType.url,
-                          decoration: const InputDecoration(
+                          decoration: InputDecoration(
                             labelText: 'Base URL',
-                            prefixIcon: Icon(Icons.cloud_outlined),
+                            prefixIcon: const Icon(Icons.cloud_outlined),
                             hintText: 'https://api.example.com/v1',
-                            helperText: '仅支持 OpenAI-compatible HTTPS 接口',
+                            helperText: '自动填充后仍可手动修改，仅支持 HTTPS',
+                            suffixIcon: _providerId == 'custom'
+                                ? null
+                                : IconButton(
+                                    tooltip: '恢复官方地址',
+                                    onPressed: _working
+                                        ? null
+                                        : _resetOfficialUrl,
+                                    icon: const Icon(Icons.restart_alt),
+                                  ),
                           ),
                         ),
                         const SizedBox(height: 14),
@@ -216,32 +285,54 @@ class _AiSettingsDialogState extends State<AiSettingsDialog> {
                           icon: const Icon(Icons.sync, size: 18),
                           label: const Text('获取模型列表'),
                         ),
-                        const SizedBox(height: 14),
-                        DropdownButtonFormField<String>(
-                          initialValue: _models.contains(_model)
-                              ? _model
-                              : null,
-                          isExpanded: true,
-                          decoration: const InputDecoration(
-                            labelText: '模型',
-                            prefixIcon: Icon(Icons.memory_outlined),
-                          ),
-                          items: _models
-                              .map(
-                                (model) => DropdownMenuItem(
-                                  value: model,
-                                  child: Text(
-                                    model,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ),
-                              )
-                              .toList(),
-                          onChanged: _working
+                        const SizedBox(height: 8),
+                        TextButton.icon(
+                          onPressed: _working
                               ? null
-                              : (value) => setState(() => _model = value),
+                              : () => setState(() {
+                                  _manualModel = true;
+                                  _modelController.text = _model ?? '';
+                                }),
+                          icon: const Icon(Icons.edit_outlined, size: 18),
+                          label: const Text('手动填写模型 ID'),
                         ),
+                        const SizedBox(height: 14),
+                        if (_manualModel)
+                          TextField(
+                            controller: _modelController,
+                            enabled: !_working,
+                            decoration: const InputDecoration(
+                              labelText: '模型 ID',
+                              prefixIcon: Icon(Icons.memory_outlined),
+                              hintText: '填写厂商控制台中的模型 ID',
+                            ),
+                          )
+                        else
+                          DropdownButtonFormField<String>(
+                            initialValue: _models.contains(_model)
+                                ? _model
+                                : null,
+                            isExpanded: true,
+                            decoration: const InputDecoration(
+                              labelText: '模型',
+                              prefixIcon: Icon(Icons.memory_outlined),
+                            ),
+                            items: _models
+                                .map(
+                                  (model) => DropdownMenuItem(
+                                    value: model,
+                                    child: Text(
+                                      model,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                )
+                                .toList(),
+                            onChanged: _working
+                                ? null
+                                : (value) => setState(() => _model = value),
+                          ),
                         if (_error != null) ...[
                           const SizedBox(height: 16),
                           Text(

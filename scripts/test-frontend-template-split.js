@@ -24,7 +24,7 @@ const appJs = readProjectFile('frontend/js/app.js');
 const loaderJs = readProjectFile('frontend/js/template-loader.js');
 const fullMarkup = readFrontendMarkup();
 
-assertIncludes(indexHtml, 'js/template-loader.js?v=20260712-ui-v81', '入口页必须在 app.js 前加载模板加载器');
+assertIncludes(indexHtml, 'js/template-loader.js?v=20260714-ai-v1', '入口页必须在 app.js 前加载模板加载器');
 assertIncludes(appJs, 'window.SecretBaseTemplateLoader.mount(app)', 'Vue 应用必须由模板加载器挂载');
 assertIncludes(loaderJs, 'Promise.all(templatePaths.map(loadTemplate))', '模板加载器必须并行读取全部片段');
 assertIncludes(loaderJs, "credentials: 'same-origin'", '模板请求必须保持同源凭据策略');

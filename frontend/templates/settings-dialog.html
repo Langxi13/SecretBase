@@ -56,6 +56,10 @@
                                 <h4>当前 AI 配置</h4>
                                 <dl>
                                     <div>
+                                        <dt>厂商</dt>
+                                        <dd>{{ aiSettingsStatus.provider_name || '自定义接口' }}</dd>
+                                    </div>
+                                    <div>
                                         <dt>Base URL</dt>
                                         <dd>{{ aiConfiguredBaseUrl || '未记录' }}</dd>
                                     </div>
@@ -82,8 +86,19 @@
                                     当前已保存：{{ aiConfiguredBaseUrl || '未记录 URL' }} · {{ aiSettingsStatus.model }} · {{ aiSettingsStatus.api_key_mask }}
                                 </div>
                                 <div class="setting-item">
+                                    <label>服务厂商</label>
+                                    <select v-model="aiSettingsForm.providerId" @change="selectAiProvider">
+                                        <option v-for="provider in aiProviders" :key="provider.id" :value="provider.id">
+                                            {{ provider.name }}{{ provider.category === 'aggregator' ? '（聚合服务）' : '' }}
+                                        </option>
+                                    </select>
+                                </div>
+                                <div class="setting-item">
                                     <label>Base URL</label>
-                                    <input type="text" v-model="aiSettingsForm.baseUrl" placeholder="https://api.deepseek.com 或 https://api.openai.com/v1">
+                                    <div class="ai-base-url-row">
+                                        <input type="text" v-model="aiSettingsForm.baseUrl" placeholder="https://api.deepseek.com 或 https://api.openai.com/v1">
+                                        <button class="btn-small" @click="resetAiProviderUrl" :disabled="aiSettingsForm.providerId === 'custom'">恢复官方地址</button>
+                                    </div>
                                 </div>
                                 <div class="setting-item">
                                     <label>API Key</label>
@@ -93,15 +108,28 @@
                                     <button class="btn-secondary" @click="fetchAiModels" :disabled="aiModelsLoading || aiSettingsSaving">
                                         {{ aiModelsLoading ? '获取中...' : '获取模型列表' }}
                                     </button>
+                                    <button class="btn-secondary" @click="enableAiManualModel" :disabled="aiModelsLoading || aiSettingsSaving">
+                                        手动填写模型
+                                    </button>
                                     <button class="btn-secondary" @click="loadAiSettingsStatus" :disabled="aiModelsLoading || aiSettingsSaving">刷新状态</button>
                                 </div>
                                 <div class="setting-item">
                                     <label>模型</label>
-                                    <select v-model="aiSettingsForm.model" :disabled="aiModels.length === 0 || aiModelsLoading || aiSettingsSaving">
+                                    <input
+                                        v-if="aiManualModel"
+                                        type="text"
+                                        v-model="aiSettingsForm.model"
+                                        placeholder="填写厂商控制台中的模型 ID"
+                                        :disabled="aiModelsLoading || aiSettingsSaving"
+                                    >
+                                    <select v-else v-model="aiSettingsForm.model" :disabled="aiModels.length === 0 || aiModelsLoading || aiSettingsSaving">
                                         <option value="" disabled>请先获取模型列表</option>
                                         <option v-for="model in aiModels" :key="model" :value="model">{{ model }}</option>
                                     </select>
                                 </div>
+                                <p class="muted-text ai-provider-note">
+                                    Base URL 可以手动修改。切换厂商或主机后需重新填写 API Key；模型列表失败时可直接填写模型 ID。
+                                </p>
                             </div>
                             <p v-if="aiSettingsMessage" class="info-message">{{ aiSettingsMessage }}</p>
                             <p v-if="aiSettingsError" class="error-message">{{ aiSettingsError }}</p>

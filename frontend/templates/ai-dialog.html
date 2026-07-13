@@ -51,6 +51,7 @@
                                     <label>标题 <input type="text" v-model="entry.title" placeholder="条目标题"></label>
                                     <label>网址 <input type="text" v-model="entry.url" placeholder="https://example.com"></label>
                                     <label class="full-width">标签 <input type="text" v-model="entry.tagsText" placeholder="多个标签用逗号分隔"></label>
+                                    <label class="full-width">密码组 <input type="text" v-model="entry.groupsText" placeholder="可选择已有名称，也可填写要新建的密码组"></label>
                                     <label class="full-width">备注 <textarea v-model="entry.remarks" rows="2" placeholder="备注"></textarea></label>
                                 </div>
                                 <div class="ai-field-editor">
@@ -168,22 +169,22 @@
                                 </div>
                                 <div v-if="!isAiTagGovernanceMode" class="ai-organize-chip-row">
                                     <strong>新增标签</strong>
-                                    <span v-for="tag in suggestion.add_tags" :key="'add-tag-' + tag" class="tag">{{ tag }} <button @click="removeAiOrganizeItem(suggestion, 'add_tags', tag)">✕</button></span>
+                                    <span v-for="tag in suggestion.add_tags" :key="'add-tag-' + tag" class="tag">{{ tag }}</span>
                                     <em v-if="!suggestion.add_tags || suggestion.add_tags.length === 0">无</em>
                                 </div>
                                 <div v-if="!isAiTagGovernanceMode" class="ai-organize-chip-row">
                                     <strong>移除标签</strong>
-                                    <span v-for="tag in suggestion.remove_tags" :key="'remove-tag-' + tag" class="tag remove-chip">{{ tag }} <button @click="removeAiOrganizeItem(suggestion, 'remove_tags', tag)">✕</button></span>
+                                    <span v-for="tag in suggestion.remove_tags" :key="'remove-tag-' + tag" class="tag remove-chip">{{ tag }}</span>
                                     <em v-if="!suggestion.remove_tags || suggestion.remove_tags.length === 0">无</em>
                                 </div>
                                 <div v-if="!isAiTagGovernanceMode" class="ai-organize-chip-row">
                                     <strong>加入密码组</strong>
-                                    <span v-for="group in suggestion.add_groups" :key="'add-group-' + group" class="group-chip">{{ group }} <button @click="removeAiOrganizeItem(suggestion, 'add_groups', group)">✕</button></span>
+                                    <span v-for="group in suggestion.add_groups" :key="'add-group-' + group" class="group-chip">{{ group }}</span>
                                     <em v-if="!suggestion.add_groups || suggestion.add_groups.length === 0">无</em>
                                 </div>
                                 <div v-if="!isAiTagGovernanceMode" class="ai-organize-chip-row">
                                     <strong>移除密码组</strong>
-                                    <span v-for="group in suggestion.remove_groups" :key="'remove-group-' + group" class="group-chip remove-chip">{{ group }} <button @click="removeAiOrganizeItem(suggestion, 'remove_groups', group)">✕</button></span>
+                                    <span v-for="group in suggestion.remove_groups" :key="'remove-group-' + group" class="group-chip remove-chip">{{ group }}</span>
                                     <em v-if="!suggestion.remove_groups || suggestion.remove_groups.length === 0">无</em>
                                 </div>
                             </details>

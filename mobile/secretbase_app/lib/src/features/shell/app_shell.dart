@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:secretbase/src/core/widgets/brand_mark.dart';
-import 'package:secretbase/src/features/ai/ai_screen.dart';
+import 'package:secretbase/src/features/ai/ai_manager_screen.dart';
 import 'package:secretbase/src/features/entries/entries_screen.dart';
 import 'package:secretbase/src/features/groups/groups_screen.dart';
 import 'package:secretbase/src/features/settings/settings_screen.dart';
@@ -67,7 +67,7 @@ class _AppShellState extends ConsumerState<AppShell> {
         EntriesScreen(preset: _entryPreset),
         GroupsScreen(onOpenGroup: _openGroup),
         TagsScreen(onOpenTag: _openTag),
-        const AiScreen(),
+        const AiManagerScreen(),
         const SettingsScreen(),
       ],
     );

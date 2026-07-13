@@ -10,10 +10,11 @@ use serde_json::Value;
 use uuid::Uuid;
 
 use super::{
-    ai::{self, PendingAiPreview, PendingAiRequest},
+    ai::{self, PendingAiPreview, PendingAiRequest, PendingAssistantRequest},
     document,
     error::MobileError,
     models::{
+        AiAssistantRequestPlan, AiAssistantTurnResult, AiConversation, AiConversationSummary,
         AiHttpRequest, AiPreview, AiRequestPlan, AiStatus, EntryDraft, EntryPage, EntryRecord,
         ImportPreview, OperationResult, RecoverySnapshot, TaxonomyRecord, VaultStatus,
     },
@@ -34,6 +35,7 @@ struct MobileRuntime {
     revision: u64,
     pending_import: Option<PendingImport>,
     pending_ai_request: Option<PendingAiRequest>,
+    pending_ai_assistant: Option<PendingAssistantRequest>,
     pending_ai_preview: Option<PendingAiPreview>,
 }
 
@@ -94,6 +96,7 @@ impl MobileRuntime {
         self.revision = self.revision.saturating_add(1);
         self.pending_import = None;
         self.pending_ai_request = None;
+        self.pending_ai_assistant = None;
         self.pending_ai_preview = None;
         Ok(OperationResult {
             revision: self.revision,
@@ -120,6 +123,7 @@ pub fn initialize_runtime(data_root: String) -> Result<VaultStatus, MobileError>
         }
         runtime.root = Some(root);
         runtime.pending_ai_request = None;
+        runtime.pending_ai_assistant = None;
         runtime.pending_ai_preview = None;
         status(runtime)
     })
@@ -164,6 +168,8 @@ pub fn create_vault(password: String) -> Result<VaultStatus, MobileError> {
         if storage::vault_path(&root).exists() {
             return Err(MobileError::new("VAULT_EXISTS", "本机密码库已经存在"));
         }
+        storage::delete_secure_settings(&root)?;
+        storage::delete_ai_history(&root)?;
         let document = VaultDocument::from_value(document::new_document(&now()))?;
         let session = VaultSession::create(&password, document)?;
         storage::persist_vault(&root, &session.encrypted_bytes()?, false)?;
@@ -171,6 +177,7 @@ pub fn create_vault(password: String) -> Result<VaultStatus, MobileError> {
         runtime.revision = 1;
         runtime.pending_import = None;
         runtime.pending_ai_request = None;
+        runtime.pending_ai_assistant = None;
         runtime.pending_ai_preview = None;
         status(runtime)
     })
@@ -194,6 +201,7 @@ pub fn unlock_vault(password: String) -> Result<VaultStatus, MobileError> {
         runtime.revision = runtime.revision.saturating_add(1).max(1);
         runtime.pending_import = None;
         runtime.pending_ai_request = None;
+        runtime.pending_ai_assistant = None;
         runtime.pending_ai_preview = None;
         status(runtime)
     })
@@ -204,6 +212,7 @@ pub fn lock_vault() -> Result<VaultStatus, MobileError> {
         runtime.session = None;
         runtime.pending_import = None;
         runtime.pending_ai_request = None;
+        runtime.pending_ai_assistant = None;
         runtime.pending_ai_preview = None;
         runtime.revision = runtime.revision.saturating_add(1);
         status(runtime)
@@ -439,7 +448,9 @@ pub fn apply_import(token: String) -> Result<OperationResult, MobileError> {
         }
         runtime.revision = runtime.revision.saturating_add(1).max(1);
         runtime.pending_ai_request = None;
+        runtime.pending_ai_assistant = None;
         runtime.pending_ai_preview = None;
+        storage::delete_ai_history(&root)?;
         Ok(OperationResult {
             revision: runtime.revision,
             message: "加密密码库已导入".to_string(),
@@ -481,11 +492,13 @@ pub fn change_password(
         runtime.session = Some(replacement);
         runtime.pending_import = None;
         runtime.pending_ai_request = None;
+        runtime.pending_ai_assistant = None;
         runtime.pending_ai_preview = None;
+        storage::delete_ai_history(&root)?;
         runtime.revision = runtime.revision.saturating_add(1);
         Ok(OperationResult {
             revision: runtime.revision,
-            message: "主密码已更新；请重新配置本机 AI 设置".to_string(),
+            message: "主密码已更新；本机 AI 设置和对话历史已清除".to_string(),
         })
     })
 }
@@ -556,6 +569,7 @@ pub fn save_ai_settings(
         };
         let status = ai::save_config(&root, runtime.session()?, &base_url, &effective_key, &model)?;
         runtime.pending_ai_request = None;
+        runtime.pending_ai_assistant = None;
         runtime.pending_ai_preview = None;
         Ok(status)
     })
@@ -566,6 +580,7 @@ pub fn clear_ai_settings() -> Result<AiStatus, MobileError> {
         let _ = runtime.session()?;
         let root = runtime.root()?.to_path_buf();
         runtime.pending_ai_request = None;
+        runtime.pending_ai_assistant = None;
         runtime.pending_ai_preview = None;
         ai::clear_config(&root)
     })
@@ -590,8 +605,127 @@ pub fn prepare_ai_request(
             &user_prompt,
         )?;
         runtime.pending_ai_request = Some(pending);
+        runtime.pending_ai_assistant = None;
         runtime.pending_ai_preview = None;
         Ok(plan)
+    })
+}
+
+pub fn list_ai_conversations() -> Result<Vec<AiConversationSummary>, MobileError> {
+    with_runtime(|runtime| ai::history::list(runtime.root()?, runtime.session()?))
+}
+
+pub fn get_ai_conversation(id: String) -> Result<AiConversation, MobileError> {
+    with_runtime(|runtime| {
+        ai::history::get(runtime.root()?, runtime.session()?, &id)?
+            .ok_or_else(|| MobileError::new("AI_CONVERSATION_NOT_FOUND", "AI 对话不存在"))
+    })
+}
+
+pub fn create_ai_conversation(title: String) -> Result<AiConversationSummary, MobileError> {
+    with_runtime(|runtime| ai::history::create(runtime.root()?, runtime.session()?, &title))
+}
+
+pub fn delete_ai_conversation(id: String) -> Result<(), MobileError> {
+    with_runtime(|runtime| {
+        if !ai::history::delete(runtime.root()?, runtime.session()?, &id)? {
+            return Err(MobileError::new(
+                "AI_CONVERSATION_NOT_FOUND",
+                "AI 对话不存在",
+            ));
+        }
+        Ok(())
+    })
+}
+
+pub fn clear_ai_conversations() -> Result<(), MobileError> {
+    with_runtime(|runtime| {
+        let _ = runtime.session()?;
+        ai::history::clear(runtime.root()?)
+    })
+}
+
+pub fn prepare_ai_assistant_request(
+    conversation_id: Option<String>,
+    message: String,
+    mode: String,
+    selected_entry_ids: Vec<String>,
+) -> Result<AiAssistantRequestPlan, MobileError> {
+    with_runtime(|runtime| {
+        let root = runtime.root()?.to_path_buf();
+        let session = runtime.session()?;
+        let conversation_id =
+            ai::history::ensure(&root, session, conversation_id.as_deref(), &message)?;
+        let context = if mode == "assistant" {
+            ai::history::context(&root, session, &conversation_id)?
+        } else {
+            Vec::new()
+        };
+        let config = ai::load_config(&root, session)?
+            .ok_or_else(|| MobileError::new("AI_NOT_CONFIGURED", "请先配置 AI 服务"))?;
+        let prepared = ai::assistant::prepare(
+            session.document().as_value(),
+            runtime.revision,
+            &config,
+            conversation_id,
+            &message,
+            &mode,
+            &selected_entry_ids,
+            context,
+        )?;
+        let public = AiAssistantRequestPlan {
+            conversation_id: prepared.conversation_id.clone(),
+            token: prepared.token.clone(),
+            request: prepared.request.clone(),
+            summary: prepared.summary.clone(),
+            mode: prepared.mode.clone(),
+        };
+        runtime.pending_ai_request = None;
+        runtime.pending_ai_assistant = Some(prepared.pending);
+        runtime.pending_ai_preview = None;
+        Ok(public)
+    })
+}
+
+pub fn consume_ai_assistant_response(
+    token: String,
+    content: String,
+) -> Result<AiAssistantTurnResult, MobileError> {
+    with_runtime(|runtime| {
+        let pending = runtime
+            .pending_ai_assistant
+            .take()
+            .ok_or_else(|| MobileError::new("AI_REQUEST_MISSING", "AI 对话请求已失效"))?;
+        if pending.token != token || pending.source_revision != runtime.revision {
+            return Err(MobileError::retryable(
+                "REVISION_CONFLICT",
+                "密码库已发生变化，请重新生成 AI 建议",
+            ));
+        }
+        let normalized = ai::assistant::normalize_response(
+            runtime.session()?.document().as_value(),
+            &pending,
+            &content,
+        )?;
+        let root = runtime.root()?.to_path_buf();
+        ai::history::append_turn(
+            &root,
+            runtime.session()?,
+            &pending.conversation_id,
+            &pending.user_message,
+            &normalized.message,
+            &pending.mode,
+        )?;
+        let preview = normalized.preview.as_ref().map(ai::public_preview);
+        runtime.pending_ai_preview = normalized.preview;
+        Ok(AiAssistantTurnResult {
+            conversation_id: pending.conversation_id,
+            message: normalized.message,
+            preview,
+            warnings: normalized.warnings,
+            navigation_entry_id: normalized.navigation_entry_id,
+            navigation_entry_title: normalized.navigation_entry_title,
+        })
     })
 }
 
@@ -685,6 +819,7 @@ mod tests {
             revision: 4,
             pending_import: None,
             pending_ai_request: None,
+            pending_ai_assistant: None,
             pending_ai_preview: None,
         };
 
@@ -715,6 +850,7 @@ mod tests {
             revision: 1,
             pending_import: None,
             pending_ai_request: None,
+            pending_ai_assistant: None,
             pending_ai_preview: None,
         };
 

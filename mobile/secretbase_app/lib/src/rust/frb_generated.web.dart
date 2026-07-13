@@ -26,6 +26,21 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   String dco_decode_String(dynamic raw);
 
   @protected
+  AiAssistantRequestPlan dco_decode_ai_assistant_request_plan(dynamic raw);
+
+  @protected
+  AiAssistantTurnResult dco_decode_ai_assistant_turn_result(dynamic raw);
+
+  @protected
+  AiConversation dco_decode_ai_conversation(dynamic raw);
+
+  @protected
+  AiConversationMessage dco_decode_ai_conversation_message(dynamic raw);
+
+  @protected
+  AiConversationSummary dco_decode_ai_conversation_summary(dynamic raw);
+
+  @protected
   AiHttpHeader dco_decode_ai_http_header(dynamic raw);
 
   @protected
@@ -87,6 +102,16 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   List<String> dco_decode_list_String(dynamic raw);
+
+  @protected
+  List<AiConversationMessage> dco_decode_list_ai_conversation_message(
+    dynamic raw,
+  );
+
+  @protected
+  List<AiConversationSummary> dco_decode_list_ai_conversation_summary(
+    dynamic raw,
+  );
 
   @protected
   List<AiHttpHeader> dco_decode_list_ai_http_header(dynamic raw);
@@ -161,6 +186,29 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   String sse_decode_String(SseDeserializer deserializer);
 
   @protected
+  AiAssistantRequestPlan sse_decode_ai_assistant_request_plan(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  AiAssistantTurnResult sse_decode_ai_assistant_turn_result(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  AiConversation sse_decode_ai_conversation(SseDeserializer deserializer);
+
+  @protected
+  AiConversationMessage sse_decode_ai_conversation_message(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  AiConversationSummary sse_decode_ai_conversation_summary(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   AiHttpHeader sse_decode_ai_http_header(SseDeserializer deserializer);
 
   @protected
@@ -224,6 +272,16 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   List<String> sse_decode_list_String(SseDeserializer deserializer);
+
+  @protected
+  List<AiConversationMessage> sse_decode_list_ai_conversation_message(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  List<AiConversationSummary> sse_decode_list_ai_conversation_summary(
+    SseDeserializer deserializer,
+  );
 
   @protected
   List<AiHttpHeader> sse_decode_list_ai_http_header(
@@ -315,6 +373,36 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void sse_encode_String(String self, SseSerializer serializer);
 
   @protected
+  void sse_encode_ai_assistant_request_plan(
+    AiAssistantRequestPlan self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_ai_assistant_turn_result(
+    AiAssistantTurnResult self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_ai_conversation(
+    AiConversation self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_ai_conversation_message(
+    AiConversationMessage self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_ai_conversation_summary(
+    AiConversationSummary self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_ai_http_header(AiHttpHeader self, SseSerializer serializer);
 
   @protected
@@ -391,6 +479,18 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void sse_encode_list_String(List<String> self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_list_ai_conversation_message(
+    List<AiConversationMessage> self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_list_ai_conversation_summary(
+    List<AiConversationSummary> self,
+    SseSerializer serializer,
+  );
 
   @protected
   void sse_encode_list_ai_http_header(

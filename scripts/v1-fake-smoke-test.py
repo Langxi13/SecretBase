@@ -25,6 +25,7 @@ import main  # noqa: E402
 import storage  # noqa: E402
 import routes.ai as ai_route  # noqa: E402
 from ai_services import client as ai_client  # noqa: E402
+from ai_services import providers as ai_providers  # noqa: E402
 from crypto import encrypt_vault  # noqa: E402
 
 
@@ -224,12 +225,23 @@ def run():
     assert settings["desktop_zoom_percent"] == 110
     expect_json(client.put("/settings", json={"desktop_zoom_percent": 501}), 422, "invalid desktop zoom")
 
+    empty_ai_status = {
+        "configured": False,
+        "provider_id": "custom",
+        "provider_name": "自定义接口",
+        "base_url": "",
+        "model": "",
+        "api_key_mask": "",
+        "structured_output": "auto",
+        "customized": False,
+    }
     ai_status = expect_success(client.get("/ai/status"), "ai status unconfigured")["data"]
-    assert ai_status == {"configured": False, "base_url": "", "model": "", "api_key_mask": ""}
+    assert ai_status == empty_ai_status
     expect_json(client.post("/ai/parse", json={"text": "cannot parse before ai setup"}), 502, "ai parse before configuration")
 
     original_ai_client = ai_client.httpx.AsyncClient
     ai_client.httpx.AsyncClient = FakeAiClient
+    ai_providers.OFFICIAL_HOSTS.add("api.example.test")
     try:
         models = expect_success(
             client.post("/ai/models", json={"baseUrl": "https://api.example.test/v1/", "apiKey": "sk-test-secret"}),
@@ -250,9 +262,13 @@ def run():
         )["data"]
         assert saved == {
             "configured": True,
+            "provider_id": "custom",
+            "provider_name": "自定义接口",
             "base_url": "https://api.example.test/v1",
             "model": "deepseek-chat",
             "api_key_mask": "sk-...cret",
+            "structured_output": "response_format",
+            "customized": False,
         }
         assert any(call["method"] == "GET" and call["url"] == "https://api.example.test/v1/models" for call in FakeAiClient.calls)
         assert any(
@@ -285,9 +301,13 @@ def run():
         )["data"]
         assert updated == {
             "configured": True,
+            "provider_id": "custom",
+            "provider_name": "自定义接口",
             "base_url": "https://api.example.test/v1",
             "model": "gpt-test",
             "api_key_mask": "sk-...cret",
+            "structured_output": "response_format",
+            "customized": False,
         }
         saved = updated
 
@@ -303,13 +323,13 @@ def run():
         )
 
         cleared = expect_success(client.delete("/ai/settings"), "clear ai settings")["data"]
-        assert cleared == {"configured": False, "base_url": "", "model": "", "api_key_mask": ""}
+        assert cleared == empty_ai_status
         expect_json(client.post("/ai/parse", json={"text": "cannot parse after ai setup cleared"}), 502, "ai parse after configuration cleared")
 
         secure_path = Path(ai_client.SECURE_SETTINGS_FILE)
         secure_path.write_bytes(b"stale local secure settings")
         ai_status = expect_success(client.get("/ai/status"), "ai status with stale secure settings")["data"]
-        assert ai_status == {"configured": False, "base_url": "", "model": "", "api_key_mask": ""}
+        assert ai_status == empty_ai_status
         resaved = expect_success(
             client.put("/ai/settings", json={
                 "baseUrl": "https://api.example.test/v1",
@@ -321,10 +341,11 @@ def run():
         assert resaved["configured"] is True
         secure_path.write_bytes(b"stale local secure settings")
         cleared_stale = expect_success(client.delete("/ai/settings"), "clear stale ai settings")["data"]
-        assert cleared_stale == {"configured": False, "base_url": "", "model": "", "api_key_mask": ""}
+        assert cleared_stale == empty_ai_status
         assert not secure_path.exists()
     finally:
         ai_client.httpx.AsyncClient = original_ai_client
+        ai_providers.OFFICIAL_HOSTS.discard("api.example.test")
 
     expect_json(client.post("/entries", json={"title": ""}), 422, "invalid empty title")
     expect_json(client.post("/entries", json={"title": "Oversized tag", "tags": ["x" * 51]}), 422, "oversized entry tag")

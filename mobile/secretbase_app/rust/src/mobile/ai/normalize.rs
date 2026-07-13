@@ -62,18 +62,19 @@ pub fn normalize_response(
 ) -> Result<PendingAiPreview, MobileError> {
     let payload = extract_chat_payload(content)?;
     let entries = entry_info(document);
-    let allowed: HashSet<&str> = pending
-        .allowed_entry_ids
-        .iter()
-        .map(String::as_str)
-        .collect();
+    let allowed: HashSet<&str> = pending.entry_aliases.values().map(String::as_str).collect();
     let (items, warnings, data, privacy_note) = match pending.kind {
         AiKind::Parse => normalize_parse(&payload, pending)?,
-        AiKind::EntryTags | AiKind::Groups => {
-            normalize_organize(&payload, pending.kind, &entries, &allowed, document)?
-        }
-        AiKind::TagGovernance => normalize_governance(&payload, &entries, &allowed)?,
-        AiKind::Actions => normalize_actions(&payload, &entries, &allowed)?,
+        AiKind::EntryTags | AiKind::Groups => normalize_organize(
+            &payload,
+            pending.kind,
+            &entries,
+            &allowed,
+            &pending.entry_aliases,
+            document,
+        )?,
+        AiKind::TagGovernance => normalize_governance(&payload, &entries, &pending.entry_aliases)?,
+        AiKind::Actions => normalize_actions(&payload, &entries, &pending.entry_aliases)?,
     };
     let preview = AiPreview {
         token: Uuid::new_v4().to_string(),
@@ -155,6 +156,12 @@ fn normalize_parse(
                 .or_else(|| object.get("labels"))
                 .or_else(|| object.get("categories")),
         );
+        let groups = clean_names(
+            object
+                .get("groups")
+                .or_else(|| object.get("password_groups"))
+                .or_else(|| object.get("folders")),
+        );
         let remarks = clean_text(
             object
                 .get("remarks")
@@ -169,6 +176,7 @@ fn normalize_parse(
             url,
             fields,
             tags,
+            groups,
             remarks,
         });
     }
@@ -200,6 +208,9 @@ fn normalize_parse(
             if !entry.tags.is_empty() {
                 details.push(detail("标签", &entry.tags.join("、"), false, "add"));
             }
+            if !entry.groups.is_empty() {
+                details.push(detail("密码组", &entry.groups.join("、"), false, "add"));
+            }
             if !entry.remarks.is_empty() {
                 details.push(detail("备注", &entry.remarks, false, "info"));
             }
@@ -224,6 +235,7 @@ fn normalize_organize(
     kind: AiKind,
     entries: &HashMap<String, EntryInfo>,
     allowed: &HashSet<&str>,
+    aliases: &HashMap<String, String>,
     document: &Value,
 ) -> Result<(Vec<AiPreviewItem>, Vec<String>, PreviewData, String), MobileError> {
     let raw = payload_items(payload, "suggestions");
@@ -233,8 +245,11 @@ fn normalize_organize(
         let Some(object) = item.as_object() else {
             continue;
         };
-        let entry_id = clean_text(object.get("entry_id").or_else(|| object.get("id")), 100);
-        if !allowed.contains(entry_id.as_str()) || !seen.insert(entry_id.clone()) {
+        let entry_ref = clean_text(object.get("entry_id").or_else(|| object.get("id")), 20);
+        let Some(entry_id) = aliases.get(&entry_ref).cloned() else {
+            continue;
+        };
+        if !seen.insert(entry_id.clone()) {
             continue;
         }
         let descriptions = object
@@ -347,7 +362,7 @@ fn normalize_organize(
 fn normalize_governance(
     payload: &Value,
     entries: &HashMap<String, EntryInfo>,
-    allowed: &HashSet<&str>,
+    aliases: &HashMap<String, String>,
 ) -> Result<(Vec<AiPreviewItem>, Vec<String>, PreviewData, String), MobileError> {
     let allowed_actions = [
         "create_tag",
@@ -371,7 +386,7 @@ fn normalize_governance(
             100,
         )
         .into_iter()
-        .filter(|id| allowed.contains(id.as_str()))
+        .filter_map(|entry_ref| aliases.get(&entry_ref).cloned())
         .collect();
         let color = clean_text(object.get("color"), 20);
         suggestions.push(TagGovernanceSuggestion {
@@ -429,7 +444,7 @@ fn normalize_governance(
 fn normalize_actions(
     payload: &Value,
     entries: &HashMap<String, EntryInfo>,
-    allowed: &HashSet<&str>,
+    aliases: &HashMap<String, String>,
 ) -> Result<(Vec<AiPreviewItem>, Vec<String>, PreviewData, String), MobileError> {
     let allowed_types = [
         "create_group",
@@ -449,24 +464,26 @@ fn normalize_actions(
             warnings.push(format!("已忽略不支持的操作：{action_type}"));
             continue;
         }
-        let entry_id = optional_text(object.get("entry_id").or_else(|| object.get("id")), 100);
-        let source_entry_id = optional_text(
+        let entry_ref = optional_text(object.get("entry_id").or_else(|| object.get("id")), 20);
+        let source_entry_ref = optional_text(
             object
                 .get("source_entry_id")
                 .or_else(|| object.get("source_id")),
-            100,
+            20,
         );
-        if action_type == "update_entry"
-            && entry_id.as_deref().is_none_or(|id| !allowed.contains(id))
-        {
+        let entry_id = entry_ref
+            .as_deref()
+            .and_then(|entry_ref| aliases.get(entry_ref))
+            .cloned();
+        let source_entry_id = source_entry_ref
+            .as_deref()
+            .and_then(|entry_ref| aliases.get(entry_ref))
+            .cloned();
+        if action_type == "update_entry" && entry_id.is_none() {
             warnings.push("已忽略引用未知条目的更新操作".to_string());
             continue;
         }
-        if action_type == "create_entry_from_field"
-            && source_entry_id
-                .as_deref()
-                .is_none_or(|id| !allowed.contains(id))
-        {
+        if action_type == "create_entry_from_field" && source_entry_id.is_none() {
             warnings.push("已忽略引用未知来源条目的字段拆分操作".to_string());
             continue;
         }
@@ -500,7 +517,12 @@ fn normalize_actions(
         let mut field_warnings = Vec::new();
         let fields = normalize_fields(object.get("fields"), false, &mut field_warnings);
         warnings.extend(field_warnings);
-        let mut url = optional_text(object.get("url"), 2000);
+        let updates_existing_entry = action_type == "update_entry";
+        let mut url = if updates_existing_entry {
+            None
+        } else {
+            optional_text(object.get("url"), 2000)
+        };
         if url
             .as_deref()
             .is_some_and(|value| !value.starts_with("https://") && !value.starts_with("http://"))
@@ -522,7 +544,11 @@ fn normalize_actions(
             url,
             tags: clean_names(object.get("tags")),
             groups: clean_names(object.get("groups")),
-            remarks: clean_text(object.get("remarks").or_else(|| object.get("note")), 2000),
+            remarks: if updates_existing_entry {
+                String::new()
+            } else {
+                clean_text(object.get("remarks").or_else(|| object.get("note")), 2000)
+            },
             fields,
             entry_id,
             source_entry_id,

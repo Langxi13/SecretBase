@@ -16,7 +16,7 @@ SecretBase is intentionally scoped as a single-user encrypted vault. The priorit
 - Master-password initialization, unlock, lock, and auto-lock.
 - Entry CRUD with tags, custom fields, search, filters, sorting, pagination, and trash.
 - Encrypted backups and plain JSON export/import.
-- Optional DeepSeek-compatible AI-assisted parsing.
+- Optional conversational AI manager with multiple editable OpenAI-compatible provider presets, encrypted history, metadata-only requests, and review-before-apply plans.
 - Random session tokens and frontend `sessionStorage` token handling.
 - File locking, optimistic write conflict detection, and atomic vault writes.
 - Legacy encrypted backup compatibility with explicit backup password input.
@@ -27,7 +27,7 @@ SecretBase is intentionally scoped as a single-user encrypted vault. The priorit
 - Windows V3.2 per-user installer, desktop diagnostics, optional tray, safe uninstall flow, native zoom feedback, and Windows 10/11 hardware acceptance.
 - macOS V3.3 arm64 DMG/ZIP packaging, WKWebView lifecycle, native zoom controls, CI, and Apple Silicon hardware acceptance.
 - Normative Vault V1 format documentation, public Python-compatible golden vectors, and an isolated Rust reference core.
-- Android 10+ Flutter/Rust client with private storage, lifecycle locking, entries, tags, groups, trash, encrypted transfer, and review-before-apply AI workflows.
+- Android 10+ Flutter/Rust client with private storage, lifecycle locking, entries, tags, groups, trash, encrypted transfer, a conversational AI manager, and focused review-before-apply AI tools.
 
 ## Later, If Needed
 
@@ -43,5 +43,5 @@ SecretBase is intentionally scoped as a single-user encrypted vault. The priorit
 - Multi-user registration or shared vault permissions.
 - Database-backed storage.
 - Browser-side vault encryption rewrite.
-- Password generation.
+- Model-generated or remotely transmitted existing passwords; local secure generation may be offered as an explicit device-only action.
 - Automatic data migrations without explicit backup and restore rehearsal.

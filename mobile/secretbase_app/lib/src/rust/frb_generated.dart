@@ -68,7 +68,7 @@ class RustLib extends BaseEntrypoint<RustLibApi, RustLibApiImpl, RustLibWire> {
   String get codegenVersion => '2.12.0';
 
   @override
-  int get rustContentHash => -831736213;
+  int get rustContentHash => 1610353470;
 
   static const kDefaultExternalLibraryLoaderConfig =
       ExternalLibraryLoaderConfig(
@@ -95,14 +95,27 @@ abstract class RustLibApi extends BaseApi {
     required BigInt expectedRevision,
   });
 
+  Future<void> crateApiMobileClearAiConversations();
+
   Future<AiStatus> crateApiMobileClearAiSettings();
+
+  Future<AiAssistantTurnResult> crateApiMobileConsumeAiAssistantResponse({
+    required String token,
+    required String content,
+  });
 
   Future<AiPreview> crateApiMobileConsumeAiResponse({
     required String token,
     required String content,
   });
 
+  Future<AiConversationSummary> crateApiMobileCreateAiConversation({
+    required String title,
+  });
+
   Future<VaultStatus> crateApiMobileCreateVault({required String password});
+
+  Future<void> crateApiMobileDeleteAiConversation({required String id});
 
   Future<OperationResult> crateApiMobileDeleteTaxonomies({
     required String kind,
@@ -118,6 +131,8 @@ abstract class RustLibApi extends BaseApi {
 
   Future<Uint8List> crateApiMobileExportEncryptedVault();
 
+  Future<AiConversation> crateApiMobileGetAiConversation({required String id});
+
   Future<EntryRecord> crateApiMobileGetEntry({required String id});
 
   Future<void> crateApiMobileInitApp();
@@ -125,6 +140,8 @@ abstract class RustLibApi extends BaseApi {
   Future<VaultStatus> crateApiMobileInitializeRuntime({
     required String dataRoot,
   });
+
+  Future<List<AiConversationSummary>> crateApiMobileListAiConversations();
 
   Future<EntryPage> crateApiMobileListEntries({
     required int page,
@@ -151,6 +168,13 @@ abstract class RustLibApi extends BaseApi {
   Future<AiPreview?> crateApiMobilePendingAiPreview();
 
   Future<ImportPreview?> crateApiMobilePendingImportPreview();
+
+  Future<AiAssistantRequestPlan> crateApiMobilePrepareAiAssistantRequest({
+    String? conversationId,
+    required String message,
+    required String mode,
+    required List<String> selectedEntryIds,
+  });
 
   Future<AiHttpRequest> crateApiMobilePrepareAiModelsRequest({
     required String baseUrl,
@@ -364,7 +388,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       );
 
   @override
-  Future<AiStatus> crateApiMobileClearAiSettings() {
+  Future<void> crateApiMobileClearAiConversations() {
     return handler.executeNormal(
       NormalTask(
         callFfi: (port_) {
@@ -373,6 +397,33 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
             generalizedFrbRustBinding,
             serializer,
             funcId: 5,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_unit,
+          decodeErrorData: sse_decode_mobile_error,
+        ),
+        constMeta: kCrateApiMobileClearAiConversationsConstMeta,
+        argValues: [],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiMobileClearAiConversationsConstMeta =>
+      const TaskConstMeta(debugName: "clear_ai_conversations", argNames: []);
+
+  @override
+  Future<AiStatus> crateApiMobileClearAiSettings() {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 6,
             port: port_,
           );
         },
@@ -391,6 +442,41 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       const TaskConstMeta(debugName: "clear_ai_settings", argNames: []);
 
   @override
+  Future<AiAssistantTurnResult> crateApiMobileConsumeAiAssistantResponse({
+    required String token,
+    required String content,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(token, serializer);
+          sse_encode_String(content, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 7,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_ai_assistant_turn_result,
+          decodeErrorData: sse_decode_mobile_error,
+        ),
+        constMeta: kCrateApiMobileConsumeAiAssistantResponseConstMeta,
+        argValues: [token, content],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiMobileConsumeAiAssistantResponseConstMeta =>
+      const TaskConstMeta(
+        debugName: "consume_ai_assistant_response",
+        argNames: ["token", "content"],
+      );
+
+  @override
   Future<AiPreview> crateApiMobileConsumeAiResponse({
     required String token,
     required String content,
@@ -404,7 +490,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 6,
+            funcId: 8,
             port: port_,
           );
         },
@@ -426,6 +512,39 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       );
 
   @override
+  Future<AiConversationSummary> crateApiMobileCreateAiConversation({
+    required String title,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(title, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 9,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_ai_conversation_summary,
+          decodeErrorData: sse_decode_mobile_error,
+        ),
+        constMeta: kCrateApiMobileCreateAiConversationConstMeta,
+        argValues: [title],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiMobileCreateAiConversationConstMeta =>
+      const TaskConstMeta(
+        debugName: "create_ai_conversation",
+        argNames: ["title"],
+      );
+
+  @override
   Future<VaultStatus> crateApiMobileCreateVault({required String password}) {
     return handler.executeNormal(
       NormalTask(
@@ -435,7 +554,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 7,
+            funcId: 10,
             port: port_,
           );
         },
@@ -454,6 +573,37 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       const TaskConstMeta(debugName: "create_vault", argNames: ["password"]);
 
   @override
+  Future<void> crateApiMobileDeleteAiConversation({required String id}) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(id, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 11,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_unit,
+          decodeErrorData: sse_decode_mobile_error,
+        ),
+        constMeta: kCrateApiMobileDeleteAiConversationConstMeta,
+        argValues: [id],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiMobileDeleteAiConversationConstMeta =>
+      const TaskConstMeta(
+        debugName: "delete_ai_conversation",
+        argNames: ["id"],
+      );
+
+  @override
   Future<OperationResult> crateApiMobileDeleteTaxonomies({
     required String kind,
     required List<String> names,
@@ -469,7 +619,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 8,
+            funcId: 12,
             port: port_,
           );
         },
@@ -506,7 +656,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 9,
+            funcId: 13,
             port: port_,
           );
         },
@@ -536,7 +686,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 10,
+            funcId: 14,
             port: port_,
           );
         },
@@ -555,6 +705,34 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       const TaskConstMeta(debugName: "export_encrypted_vault", argNames: []);
 
   @override
+  Future<AiConversation> crateApiMobileGetAiConversation({required String id}) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(id, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 15,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_ai_conversation,
+          decodeErrorData: sse_decode_mobile_error,
+        ),
+        constMeta: kCrateApiMobileGetAiConversationConstMeta,
+        argValues: [id],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiMobileGetAiConversationConstMeta =>
+      const TaskConstMeta(debugName: "get_ai_conversation", argNames: ["id"]);
+
+  @override
   Future<EntryRecord> crateApiMobileGetEntry({required String id}) {
     return handler.executeNormal(
       NormalTask(
@@ -564,7 +742,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 11,
+            funcId: 16,
             port: port_,
           );
         },
@@ -591,7 +769,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 12,
+            funcId: 17,
             port: port_,
           );
         },
@@ -621,7 +799,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 13,
+            funcId: 18,
             port: port_,
           );
         },
@@ -641,6 +819,33 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
         debugName: "initialize_runtime",
         argNames: ["dataRoot"],
       );
+
+  @override
+  Future<List<AiConversationSummary>> crateApiMobileListAiConversations() {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 19,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_list_ai_conversation_summary,
+          decodeErrorData: sse_decode_mobile_error,
+        ),
+        constMeta: kCrateApiMobileListAiConversationsConstMeta,
+        argValues: [],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiMobileListAiConversationsConstMeta =>
+      const TaskConstMeta(debugName: "list_ai_conversations", argNames: []);
 
   @override
   Future<EntryPage> crateApiMobileListEntries({
@@ -666,7 +871,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 14,
+            funcId: 20,
             port: port_,
           );
         },
@@ -703,7 +908,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 15,
+            funcId: 21,
             port: port_,
           );
         },
@@ -733,7 +938,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 16,
+            funcId: 22,
             port: port_,
           );
         },
@@ -760,7 +965,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 17,
+            funcId: 23,
             port: port_,
           );
         },
@@ -790,7 +995,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 18,
+            funcId: 24,
             port: port_,
           );
         },
@@ -820,7 +1025,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 19,
+            funcId: 25,
             port: port_,
           );
         },
@@ -847,7 +1052,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 20,
+            funcId: 26,
             port: port_,
           );
         },
@@ -866,6 +1071,45 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       const TaskConstMeta(debugName: "pending_import_preview", argNames: []);
 
   @override
+  Future<AiAssistantRequestPlan> crateApiMobilePrepareAiAssistantRequest({
+    String? conversationId,
+    required String message,
+    required String mode,
+    required List<String> selectedEntryIds,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_opt_String(conversationId, serializer);
+          sse_encode_String(message, serializer);
+          sse_encode_String(mode, serializer);
+          sse_encode_list_String(selectedEntryIds, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 27,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_ai_assistant_request_plan,
+          decodeErrorData: sse_decode_mobile_error,
+        ),
+        constMeta: kCrateApiMobilePrepareAiAssistantRequestConstMeta,
+        argValues: [conversationId, message, mode, selectedEntryIds],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiMobilePrepareAiAssistantRequestConstMeta =>
+      const TaskConstMeta(
+        debugName: "prepare_ai_assistant_request",
+        argNames: ["conversationId", "message", "mode", "selectedEntryIds"],
+      );
+
+  @override
   Future<AiHttpRequest> crateApiMobilePrepareAiModelsRequest({
     required String baseUrl,
     required String apiKey,
@@ -879,7 +1123,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 21,
+            funcId: 28,
             port: port_,
           );
         },
@@ -918,7 +1162,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 22,
+            funcId: 29,
             port: port_,
           );
         },
@@ -955,7 +1199,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 23,
+            funcId: 30,
             port: port_,
           );
         },
@@ -990,7 +1234,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 24,
+            funcId: 31,
             port: port_,
           );
         },
@@ -1025,7 +1269,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 25,
+            funcId: 32,
             port: port_,
           );
         },
@@ -1060,7 +1304,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 26,
+            funcId: 33,
             port: port_,
           );
         },
@@ -1094,7 +1338,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 27,
+            funcId: 34,
             port: port_,
           );
         },
@@ -1130,7 +1374,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 28,
+            funcId: 35,
             port: port_,
           );
         },
@@ -1167,7 +1411,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 29,
+            funcId: 36,
             port: port_,
           );
         },
@@ -1201,7 +1445,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 30,
+            funcId: 37,
             port: port_,
           );
         },
@@ -1244,7 +1488,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 31,
+            funcId: 38,
             port: port_,
           );
         },
@@ -1285,7 +1529,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 32,
+            funcId: 39,
             port: port_,
           );
         },
@@ -1315,7 +1559,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 33,
+            funcId: 40,
             port: port_,
           );
         },
@@ -1342,7 +1586,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 34,
+            funcId: 41,
             port: port_,
           );
         },
@@ -1370,7 +1614,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 35,
+            funcId: 42,
             port: port_,
           );
         },
@@ -1395,6 +1639,82 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   String dco_decode_String(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return raw as String;
+  }
+
+  @protected
+  AiAssistantRequestPlan dco_decode_ai_assistant_request_plan(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 5)
+      throw Exception('unexpected arr length: expect 5 but see ${arr.length}');
+    return AiAssistantRequestPlan(
+      conversationId: dco_decode_String(arr[0]),
+      token: dco_decode_String(arr[1]),
+      request: dco_decode_ai_http_request(arr[2]),
+      summary: dco_decode_ai_send_summary(arr[3]),
+      mode: dco_decode_String(arr[4]),
+    );
+  }
+
+  @protected
+  AiAssistantTurnResult dco_decode_ai_assistant_turn_result(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 6)
+      throw Exception('unexpected arr length: expect 6 but see ${arr.length}');
+    return AiAssistantTurnResult(
+      conversationId: dco_decode_String(arr[0]),
+      message: dco_decode_String(arr[1]),
+      preview: dco_decode_opt_box_autoadd_ai_preview(arr[2]),
+      warnings: dco_decode_list_String(arr[3]),
+      navigationEntryId: dco_decode_opt_String(arr[4]),
+      navigationEntryTitle: dco_decode_opt_String(arr[5]),
+    );
+  }
+
+  @protected
+  AiConversation dco_decode_ai_conversation(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 5)
+      throw Exception('unexpected arr length: expect 5 but see ${arr.length}');
+    return AiConversation(
+      id: dco_decode_String(arr[0]),
+      title: dco_decode_String(arr[1]),
+      createdAt: dco_decode_String(arr[2]),
+      updatedAt: dco_decode_String(arr[3]),
+      messages: dco_decode_list_ai_conversation_message(arr[4]),
+    );
+  }
+
+  @protected
+  AiConversationMessage dco_decode_ai_conversation_message(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 5)
+      throw Exception('unexpected arr length: expect 5 but see ${arr.length}');
+    return AiConversationMessage(
+      id: dco_decode_String(arr[0]),
+      role: dco_decode_String(arr[1]),
+      content: dco_decode_String(arr[2]),
+      mode: dco_decode_String(arr[3]),
+      createdAt: dco_decode_String(arr[4]),
+    );
+  }
+
+  @protected
+  AiConversationSummary dco_decode_ai_conversation_summary(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 5)
+      throw Exception('unexpected arr length: expect 5 but see ${arr.length}');
+    return AiConversationSummary(
+      id: dco_decode_String(arr[0]),
+      title: dco_decode_String(arr[1]),
+      createdAt: dco_decode_String(arr[2]),
+      updatedAt: dco_decode_String(arr[3]),
+      messageCount: dco_decode_u_32(arr[4]),
+    );
   }
 
   @protected
@@ -1646,6 +1966,26 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  List<AiConversationMessage> dco_decode_list_ai_conversation_message(
+    dynamic raw,
+  ) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return (raw as List<dynamic>)
+        .map(dco_decode_ai_conversation_message)
+        .toList();
+  }
+
+  @protected
+  List<AiConversationSummary> dco_decode_list_ai_conversation_summary(
+    dynamic raw,
+  ) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return (raw as List<dynamic>)
+        .map(dco_decode_ai_conversation_summary)
+        .toList();
+  }
+
+  @protected
   List<AiHttpHeader> dco_decode_list_ai_http_header(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return (raw as List<dynamic>).map(dco_decode_ai_http_header).toList();
@@ -1828,6 +2168,101 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     // Codec=Sse (Serialization based), see doc to use other codecs
     var inner = sse_decode_list_prim_u_8_strict(deserializer);
     return utf8.decoder.convert(inner);
+  }
+
+  @protected
+  AiAssistantRequestPlan sse_decode_ai_assistant_request_plan(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_conversationId = sse_decode_String(deserializer);
+    var var_token = sse_decode_String(deserializer);
+    var var_request = sse_decode_ai_http_request(deserializer);
+    var var_summary = sse_decode_ai_send_summary(deserializer);
+    var var_mode = sse_decode_String(deserializer);
+    return AiAssistantRequestPlan(
+      conversationId: var_conversationId,
+      token: var_token,
+      request: var_request,
+      summary: var_summary,
+      mode: var_mode,
+    );
+  }
+
+  @protected
+  AiAssistantTurnResult sse_decode_ai_assistant_turn_result(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_conversationId = sse_decode_String(deserializer);
+    var var_message = sse_decode_String(deserializer);
+    var var_preview = sse_decode_opt_box_autoadd_ai_preview(deserializer);
+    var var_warnings = sse_decode_list_String(deserializer);
+    var var_navigationEntryId = sse_decode_opt_String(deserializer);
+    var var_navigationEntryTitle = sse_decode_opt_String(deserializer);
+    return AiAssistantTurnResult(
+      conversationId: var_conversationId,
+      message: var_message,
+      preview: var_preview,
+      warnings: var_warnings,
+      navigationEntryId: var_navigationEntryId,
+      navigationEntryTitle: var_navigationEntryTitle,
+    );
+  }
+
+  @protected
+  AiConversation sse_decode_ai_conversation(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_id = sse_decode_String(deserializer);
+    var var_title = sse_decode_String(deserializer);
+    var var_createdAt = sse_decode_String(deserializer);
+    var var_updatedAt = sse_decode_String(deserializer);
+    var var_messages = sse_decode_list_ai_conversation_message(deserializer);
+    return AiConversation(
+      id: var_id,
+      title: var_title,
+      createdAt: var_createdAt,
+      updatedAt: var_updatedAt,
+      messages: var_messages,
+    );
+  }
+
+  @protected
+  AiConversationMessage sse_decode_ai_conversation_message(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_id = sse_decode_String(deserializer);
+    var var_role = sse_decode_String(deserializer);
+    var var_content = sse_decode_String(deserializer);
+    var var_mode = sse_decode_String(deserializer);
+    var var_createdAt = sse_decode_String(deserializer);
+    return AiConversationMessage(
+      id: var_id,
+      role: var_role,
+      content: var_content,
+      mode: var_mode,
+      createdAt: var_createdAt,
+    );
+  }
+
+  @protected
+  AiConversationSummary sse_decode_ai_conversation_summary(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_id = sse_decode_String(deserializer);
+    var var_title = sse_decode_String(deserializer);
+    var var_createdAt = sse_decode_String(deserializer);
+    var var_updatedAt = sse_decode_String(deserializer);
+    var var_messageCount = sse_decode_u_32(deserializer);
+    return AiConversationSummary(
+      id: var_id,
+      title: var_title,
+      createdAt: var_createdAt,
+      updatedAt: var_updatedAt,
+      messageCount: var_messageCount,
+    );
   }
 
   @protected
@@ -2115,6 +2550,34 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  List<AiConversationMessage> sse_decode_list_ai_conversation_message(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    var len_ = sse_decode_i_32(deserializer);
+    var ans_ = <AiConversationMessage>[];
+    for (var idx_ = 0; idx_ < len_; ++idx_) {
+      ans_.add(sse_decode_ai_conversation_message(deserializer));
+    }
+    return ans_;
+  }
+
+  @protected
+  List<AiConversationSummary> sse_decode_list_ai_conversation_summary(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    var len_ = sse_decode_i_32(deserializer);
+    var ans_ = <AiConversationSummary>[];
+    for (var idx_ = 0; idx_ < len_; ++idx_) {
+      ans_.add(sse_decode_ai_conversation_summary(deserializer));
+    }
+    return ans_;
+  }
+
+  @protected
   List<AiHttpHeader> sse_decode_list_ai_http_header(
     SseDeserializer deserializer,
   ) {
@@ -2392,6 +2855,72 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  void sse_encode_ai_assistant_request_plan(
+    AiAssistantRequestPlan self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_String(self.conversationId, serializer);
+    sse_encode_String(self.token, serializer);
+    sse_encode_ai_http_request(self.request, serializer);
+    sse_encode_ai_send_summary(self.summary, serializer);
+    sse_encode_String(self.mode, serializer);
+  }
+
+  @protected
+  void sse_encode_ai_assistant_turn_result(
+    AiAssistantTurnResult self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_String(self.conversationId, serializer);
+    sse_encode_String(self.message, serializer);
+    sse_encode_opt_box_autoadd_ai_preview(self.preview, serializer);
+    sse_encode_list_String(self.warnings, serializer);
+    sse_encode_opt_String(self.navigationEntryId, serializer);
+    sse_encode_opt_String(self.navigationEntryTitle, serializer);
+  }
+
+  @protected
+  void sse_encode_ai_conversation(
+    AiConversation self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_String(self.id, serializer);
+    sse_encode_String(self.title, serializer);
+    sse_encode_String(self.createdAt, serializer);
+    sse_encode_String(self.updatedAt, serializer);
+    sse_encode_list_ai_conversation_message(self.messages, serializer);
+  }
+
+  @protected
+  void sse_encode_ai_conversation_message(
+    AiConversationMessage self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_String(self.id, serializer);
+    sse_encode_String(self.role, serializer);
+    sse_encode_String(self.content, serializer);
+    sse_encode_String(self.mode, serializer);
+    sse_encode_String(self.createdAt, serializer);
+  }
+
+  @protected
+  void sse_encode_ai_conversation_summary(
+    AiConversationSummary self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_String(self.id, serializer);
+    sse_encode_String(self.title, serializer);
+    sse_encode_String(self.createdAt, serializer);
+    sse_encode_String(self.updatedAt, serializer);
+    sse_encode_u_32(self.messageCount, serializer);
+  }
+
+  @protected
   void sse_encode_ai_http_header(AiHttpHeader self, SseSerializer serializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     sse_encode_String(self.name, serializer);
@@ -2601,6 +3130,30 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     sse_encode_i_32(self.length, serializer);
     for (final item in self) {
       sse_encode_String(item, serializer);
+    }
+  }
+
+  @protected
+  void sse_encode_list_ai_conversation_message(
+    List<AiConversationMessage> self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self.length, serializer);
+    for (final item in self) {
+      sse_encode_ai_conversation_message(item, serializer);
+    }
+  }
+
+  @protected
+  void sse_encode_list_ai_conversation_summary(
+    List<AiConversationSummary> self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self.length, serializer);
+    for (final item in self) {
+      sse_encode_ai_conversation_summary(item, serializer);
     }
   }
 
