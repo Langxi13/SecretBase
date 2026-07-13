@@ -253,7 +253,7 @@ CARGO_BUILD_JOBS=1 CARGOKIT_RUST_TOOLCHAIN=1.88.0 \
   build/app/outputs/flutter-apk/app-debug.apk arm64-v8a
 ```
 
-三 ABI Release APK、API 29/36 模拟器和可选持久签名由 `.github/workflows/android.yml` 执行。功能与剩余门禁见 `docs/v5-android-plan.md` 和 `docs/manual-qa-checklist-v5-android.md`；完成 CI 与真机验收前不创建 `v5.0.0` 标签。
+三 ABI Release APK、API 29/36 模拟器和可选持久签名由 `.github/workflows/android.yml` 执行。三 ABI 构建、APK 隐私扫描和两级模拟器已于 2026-07-13 通过；功能与剩余门禁见 `docs/v5-android-plan.md` 和 `docs/manual-qa-checklist-v5-android.md`。完成 arm64 真机、跨桌面迁移和持久签名验收前不创建 `v5.0.0` 标签。
 
 Apple Silicon Mac 使用 Python 3.11 构建测试包：
 
@@ -665,7 +665,7 @@ V3.3 adds a macOS 13+ Apple Silicon arm64 desktop app while preserving the same 
 
 V4.0 shared Vault preparation is complete. Existing Web, Windows, and macOS builds continue to use the Python production core. The normative Vault V1 contract, public golden vectors, and isolated Rust reference implementation now provide the compatibility boundary for future Flutter Android and iOS clients without migrating existing vaults or bundling Rust into current desktop packages. See `docs/v4-vault-core.md` for acceptance and `docs/v5-android-plan.md` for the next implementation phase.
 
-The V5 Android client is implemented but not released. It is a browser-free Flutter/Rust app for Android 10+ with private Vault storage, lifecycle locking, entries, tags, groups, trash, encrypted transfer, and five review-before-apply AI workflows. Android uninstall removes the private app directory, so users must export an encrypted backup first. The dedicated Android workflow builds a three-ABI release APK and runs API 29/36 emulator smoke tests; `v5.0.0` remains blocked on CI and arm64 hardware acceptance.
+The V5 Android client is implemented but not released. It is a browser-free Flutter/Rust app for Android 10+ with private Vault storage, lifecycle locking, entries, tags, groups, trash, encrypted transfer, and five review-before-apply AI workflows. Android uninstall removes the private app directory, so users must export an encrypted backup first. The three-ABI build, APK privacy scan, and API 29/36 emulator smoke tests passed on 2026-07-13; `v5.0.0` remains blocked on arm64 hardware, cross-desktop migration, and persistent signing acceptance.
 
 Build the macOS test package on Apple Silicon with Python 3.11:
 

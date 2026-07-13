@@ -9,7 +9,7 @@ SecretBase is intentionally scoped as a single-user encrypted vault. The priorit
 - Maintain a simple FastAPI backend and vendored Vue frontend with no runtime CDN dependency.
 - Keep production deployment practical behind nginx or another reverse proxy.
 - Maintain the stable Windows and macOS desktop packaging, diagnostics, lifecycle, and data-safety behavior described in [App Roadmap](app-roadmap.md).
-- Finish CI, emulator, hardware, migration, and signing acceptance for the implemented Android-first Flutter/Rust client.
+- Finish hardware, migration, and persistent signing acceptance for the implemented Android-first Flutter/Rust client; three-ABI CI and API 29/36 emulator gates are complete.
 
 ## Implemented
 

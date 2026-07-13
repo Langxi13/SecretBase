@@ -2,6 +2,8 @@
 
 本清单用于 Android 10+ arm64 真机和正式签名候选 APK。只使用空 Vault、公开测试向量或专用测试数据，不导入生产 Vault。
 
+状态：2026-07-13 已通过 GitHub 三 ABI 构建、APK 隐私扫描和 API 29/36 模拟器；下列真机、迁移和持久签名项目仍待验收。
+
 ## 安装与启动
 
 - [ ] APK 可在 Android 10（API 29）和较新 Android 版本安装、启动和覆盖升级。
@@ -46,9 +48,9 @@
 
 ## 发布门禁
 
-- [ ] GitHub Android workflow 的 Flutter、Rust、Clippy 和三 ABI Release 构建全部通过。
-- [ ] API 29/36 模拟器启动截图与日志无崩溃。
-- [ ] `scripts/verify_android_apk.sh` 通过，APK 不含真实构建机路径或私人域名。
+- [x] GitHub Android workflow 的 Flutter、Rust、Clippy 和三 ABI Release 构建全部通过。
+- [x] API 29/36 模拟器启动截图与日志无崩溃。
+- [x] `scripts/verify_android_apk.sh` 通过，APK 不含真实构建机路径或私人域名。
 - [ ] 正式 APK 使用持久发布密钥签名，签名证书指纹已离线记录并备份。
 - [ ] `SHA256SUMS.txt` 与实际 APK 一致，GitHub Release 不包含一次性 CI 签名产物。
 - [ ] 完成以上验收前不创建 `v5.0.0` 标签。
