@@ -1,13 +1,12 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:secretbase/src/core/mobile_error_presenter.dart';
 import 'package:secretbase/src/core/widgets/async_content.dart';
-import 'package:secretbase/src/core/widgets/paged_scroll.dart';
-import 'package:secretbase/src/core/widgets/page_controls.dart';
-import 'package:secretbase/src/core/widgets/responsive_dialog.dart';
+import 'package:secretbase/src/core/widgets/mobile_chrome.dart';
 import 'package:secretbase/src/data/vault_providers.dart';
+import 'package:secretbase/src/features/ai/ai_confirmation_sheets.dart';
+import 'package:secretbase/src/features/ai/ai_entry_picker_dialog.dart';
+import 'package:secretbase/src/features/ai/ai_plan_panel.dart';
 import 'package:secretbase/src/features/ai/ai_settings_dialog.dart';
 import 'package:secretbase/src/features/ai/ai_transport.dart';
 import 'package:secretbase/src/rust/api/mobile.dart' as rust_api;
@@ -30,7 +29,9 @@ enum AiTool {
 }
 
 class AiScreen extends ConsumerStatefulWidget {
-  const AiScreen({super.key});
+  const AiScreen({this.onBack, super.key});
+
+  final VoidCallback? onBack;
 
   @override
   ConsumerState<AiScreen> createState() => _AiScreenState();
@@ -46,6 +47,7 @@ class _AiScreenState extends ConsumerState<AiScreen> {
   AiPreview? _preview;
   final Set<String> _selected = {};
   final Set<String> _revealed = {};
+  final Set<String> _expanded = {};
   bool _working = false;
   String? _error;
 
@@ -66,7 +68,9 @@ class _AiScreenState extends ConsumerState<AiScreen> {
   Future<void> _restorePendingPreview() async {
     try {
       final preview = await rust_api.pendingAiPreview();
-      if (preview != null && mounted) _setPreview(preview);
+      if (preview != null && preview.kind != 'assistant' && mounted) {
+        _setPreview(preview);
+      }
     } catch (_) {
       // 锁定或首次进入时没有待处理建议属于正常状态。
     }
@@ -81,8 +85,11 @@ class _AiScreenState extends ConsumerState<AiScreen> {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            _AiHeader(status: status, onSettings: _openSettings),
-            const Divider(height: 1),
+            _AiHeader(
+              status: status,
+              onBack: widget.onBack,
+              onSettings: _openSettings,
+            ),
             if (snapshot.connectionState != ConnectionState.done)
               const Expanded(child: LoadingView(label: '正在读取 AI 设置'))
             else if (snapshot.hasError)
@@ -142,10 +149,11 @@ class _AiScreenState extends ConsumerState<AiScreen> {
                     ],
                     if (_preview != null) ...[
                       const SizedBox(height: 12),
-                      _PreviewPanel(
+                      AiPlanPanel(
                         preview: _preview!,
                         selected: _selected,
                         revealed: _revealed,
+                        expanded: _expanded,
                         working: _working,
                         onSelectionChanged: (id, value) => setState(() {
                           if (value) {
@@ -164,6 +172,9 @@ class _AiScreenState extends ConsumerState<AiScreen> {
                         }),
                         onReveal: (key) => setState(() {
                           if (!_revealed.add(key)) _revealed.remove(key);
+                        }),
+                        onExpanded: (id) => setState(() {
+                          if (!_expanded.add(id)) _expanded.remove(id);
                         }),
                         onApply: _applyPreview,
                       ),
@@ -192,6 +203,7 @@ class _AiScreenState extends ConsumerState<AiScreen> {
       _preview = null;
       _selected.clear();
       _revealed.clear();
+      _expanded.clear();
       _error = null;
       _inputController.clear();
       _preferenceController.clear();
@@ -203,11 +215,7 @@ class _AiScreenState extends ConsumerState<AiScreen> {
   }
 
   Future<void> _pickEntry() async {
-    final selection = await showResponsiveDialog<_EntrySelection>(
-      context: context,
-      maxWidth: 720,
-      builder: (_) => const _AiEntryPickerDialog(),
-    );
+    final selection = await showAiEntryPickerDialog(context);
     if (selection != null && mounted) {
       setState(() {
         _entryId = selection.id;
@@ -233,6 +241,7 @@ class _AiScreenState extends ConsumerState<AiScreen> {
       _preview = null;
       _selected.clear();
       _revealed.clear();
+      _expanded.clear();
     });
     try {
       final plan = await rust_api.prepareAiRequest(
@@ -267,22 +276,9 @@ class _AiScreenState extends ConsumerState<AiScreen> {
   Future<void> _applyPreview() async {
     final preview = _preview;
     if (preview == null || _selected.isEmpty) return;
-    final confirmed = await showDialog<bool>(
+    final confirmed = await showAiApplyConfirmationSheet(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('应用 AI 建议'),
-        content: Text('确认应用选中的 ${_selected.length} 项建议？应用前会再次校验密码库版本。'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('取消'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('确认应用'),
-          ),
-        ],
-      ),
+      selectedCount: _selected.length,
     );
     if (confirmed != true) return;
     setState(() {
@@ -304,6 +300,7 @@ class _AiScreenState extends ConsumerState<AiScreen> {
           _preview = null;
           _selected.clear();
           _revealed.clear();
+          _expanded.clear();
         });
         ScaffoldMessenger.of(
           context,
@@ -324,8 +321,13 @@ class _AiScreenState extends ConsumerState<AiScreen> {
       _preview = preview;
       _selected
         ..clear()
-        ..addAll(preview.items.map((item) => item.id));
+        ..addAll(
+          preview.items
+              .where((item) => !aiPreviewItemIsHighImpact(item))
+              .map((item) => item.id),
+        );
       _revealed.clear();
+      _expanded.clear();
     });
   }
 
@@ -359,60 +361,11 @@ class _AiScreenState extends ConsumerState<AiScreen> {
   }
 
   Future<bool> _confirmSend(AiSendSummary summary, AiStatus status) async {
-    return await showDialog<bool>(
-          context: context,
-          builder: (context) => AlertDialog(
-            title: Text(summary.title),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Text('${status.baseUrl} · ${status.model}'),
-                const SizedBox(height: 12),
-                if (summary.entryCount > 0)
-                  Text('涉及条目：${summary.entryCount} 个'),
-                if (summary.inputChars > 0)
-                  Text('输入长度：${summary.inputChars} 个字符'),
-                const SizedBox(height: 8),
-                ...summary.categories.map(
-                  (category) => Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 2),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Icon(Icons.check, size: 17),
-                        const SizedBox(width: 7),
-                        Expanded(child: Text(category)),
-                      ],
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 10),
-                Text(
-                  summary.privacyNote,
-                  style: TextStyle(
-                    color: summary.includesFieldValues
-                        ? Theme.of(context).colorScheme.error
-                        : Theme.of(context).colorScheme.primary,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ],
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(false),
-                child: const Text('取消'),
-              ),
-              FilledButton.icon(
-                onPressed: () => Navigator.of(context).pop(true),
-                icon: const Icon(Icons.send_outlined, size: 18),
-                label: const Text('确认发送'),
-              ),
-            ],
-          ),
-        ) ??
-        false;
+    return showAiSendConfirmationSheet(
+      context: context,
+      status: status,
+      summary: summary,
+    );
   }
 
   Future<void> _openSettings() async {
@@ -422,6 +375,8 @@ class _AiScreenState extends ConsumerState<AiScreen> {
         _statusFuture = Future.value(status);
         _preview = null;
         _selected.clear();
+        _revealed.clear();
+        _expanded.clear();
       });
     }
   }
@@ -433,52 +388,35 @@ class _AiScreenState extends ConsumerState<AiScreen> {
 }
 
 class _AiHeader extends StatelessWidget {
-  const _AiHeader({required this.status, required this.onSettings});
+  const _AiHeader({
+    required this.status,
+    required this.onBack,
+    required this.onSettings,
+  });
 
   final AiStatus? status;
+  final VoidCallback? onBack;
   final VoidCallback onSettings;
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 10, 10, 9),
-      child: Row(
-        children: [
-          Expanded(
-            child: Text(
-              '专业工具',
-              style: Theme.of(
-                context,
-              ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
+    return MobilePageHeader(
+      title: '专业工具',
+      subtitle: status?.configured == true ? status!.model : '尚未配置 AI 服务',
+      leading: onBack == null
+          ? null
+          : IconButton(
+              tooltip: '返回 AI 管家',
+              onPressed: onBack,
+              icon: const Icon(Icons.arrow_back),
             ),
-          ),
-          if (status?.configured == true)
-            Container(
-              constraints: const BoxConstraints(maxWidth: 160),
-              padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
-              decoration: BoxDecoration(
-                color: scheme.primaryContainer,
-                borderRadius: BorderRadius.circular(5),
-              ),
-              child: Text(
-                status!.model,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                  color: scheme.onPrimaryContainer,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-            ),
-          const SizedBox(width: 5),
-          IconButton(
-            tooltip: 'AI 服务设置',
-            onPressed: onSettings,
-            icon: const Icon(Icons.settings_outlined),
-          ),
-        ],
-      ),
+      actions: [
+        IconButton(
+          tooltip: 'AI 服务设置',
+          onPressed: onSettings,
+          icon: const Icon(Icons.settings_outlined),
+        ),
+      ],
     );
   }
 }
@@ -491,19 +429,49 @@ class _ToolSelector extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Wrap(
-      spacing: 6,
-      runSpacing: 6,
-      children: AiTool.values
-          .map(
-            (tool) => ChoiceChip(
-              selected: tool == selected,
-              avatar: Icon(tool.icon, size: 17),
-              label: Text(tool.label),
-              onSelected: (_) => onSelected(tool),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        if (constraints.maxWidth < 600) {
+          return DropdownButtonFormField<AiTool>(
+            initialValue: selected,
+            decoration: const InputDecoration(
+              labelText: '选择专业工具',
+              prefixIcon: Icon(Icons.tune),
             ),
-          )
-          .toList(),
+            items: AiTool.values
+                .map(
+                  (tool) => DropdownMenuItem(
+                    value: tool,
+                    child: Row(
+                      children: [
+                        Icon(tool.icon, size: 18),
+                        const SizedBox(width: 8),
+                        Text(tool.label),
+                      ],
+                    ),
+                  ),
+                )
+                .toList(),
+            onChanged: (value) {
+              if (value != null) onSelected(value);
+            },
+          );
+        }
+        return Wrap(
+          spacing: 6,
+          runSpacing: 6,
+          children: AiTool.values
+              .map(
+                (tool) => ChoiceChip(
+                  selected: tool == selected,
+                  avatar: Icon(tool.icon, size: 17),
+                  label: Text(tool.label),
+                  onSelected: (_) => onSelected(tool),
+                ),
+              )
+              .toList(),
+        );
+      },
     );
   }
 }
@@ -614,276 +582,6 @@ class _RequestPanel extends StatelessWidget {
   }
 }
 
-class _PreviewPanel extends StatelessWidget {
-  const _PreviewPanel({
-    required this.preview,
-    required this.selected,
-    required this.revealed,
-    required this.working,
-    required this.onSelectionChanged,
-    required this.onSelectAll,
-    required this.onReveal,
-    required this.onApply,
-  });
-
-  final AiPreview preview;
-  final Set<String> selected;
-  final Set<String> revealed;
-  final bool working;
-  final void Function(String id, bool value) onSelectionChanged;
-  final ValueChanged<bool> onSelectAll;
-  final ValueChanged<String> onReveal;
-  final VoidCallback onApply;
-
-  @override
-  Widget build(BuildContext context) {
-    final allSelected =
-        preview.items.isNotEmpty && selected.length == preview.items.length;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Row(
-          children: [
-            Expanded(
-              child: Text(
-                preview.title,
-                style: Theme.of(
-                  context,
-                ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
-              ),
-            ),
-            Checkbox(
-              value: allSelected,
-              onChanged: preview.items.isEmpty
-                  ? null
-                  : (value) => onSelectAll(value ?? false),
-              materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-              visualDensity: VisualDensity.compact,
-            ),
-            const SizedBox(width: 4),
-            Text('全选', style: Theme.of(context).textTheme.bodySmall),
-          ],
-        ),
-        const SizedBox(height: 5),
-        Text(
-          preview.privacyNote,
-          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-            color: Theme.of(context).colorScheme.onSurfaceVariant,
-          ),
-        ),
-        if (preview.warnings.isNotEmpty) ...[
-          const SizedBox(height: 10),
-          _WarningBand(warnings: preview.warnings),
-        ],
-        const SizedBox(height: 10),
-        if (preview.items.isEmpty)
-          const EmptyView(icon: Icons.task_alt_outlined, title: '没有需要应用的建议')
-        else
-          ...preview.items.map(
-            (item) => Padding(
-              padding: const EdgeInsets.only(bottom: 9),
-              child: _PreviewItemCard(
-                item: item,
-                selected: selected.contains(item.id),
-                revealed: revealed,
-                onSelected: (value) => onSelectionChanged(item.id, value),
-                onReveal: onReveal,
-              ),
-            ),
-          ),
-        if (preview.items.isNotEmpty)
-          Align(
-            alignment: Alignment.centerRight,
-            child: FilledButton.icon(
-              onPressed: selected.isEmpty || working ? null : onApply,
-              icon: const Icon(Icons.done_all, size: 18),
-              label: Text('应用所选（${selected.length}）'),
-            ),
-          ),
-      ],
-    );
-  }
-}
-
-class _PreviewItemCard extends StatelessWidget {
-  const _PreviewItemCard({
-    required this.item,
-    required this.selected,
-    required this.revealed,
-    required this.onSelected,
-    required this.onReveal,
-  });
-
-  final AiPreviewItem item;
-  final bool selected;
-  final Set<String> revealed;
-  final ValueChanged<bool> onSelected;
-  final ValueChanged<String> onReveal;
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(10, 11, 12, 12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Checkbox(
-                  value: selected,
-                  onChanged: (value) => onSelected(value ?? false),
-                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                  visualDensity: VisualDensity.compact,
-                ),
-                const SizedBox(width: 7),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        item.title,
-                        style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                      if (item.subtitle.isNotEmpty) ...[
-                        const SizedBox(height: 2),
-                        Text(
-                          item.subtitle,
-                          style: Theme.of(context).textTheme.bodySmall
-                              ?.copyWith(
-                                color: Theme.of(
-                                  context,
-                                ).colorScheme.onSurfaceVariant,
-                              ),
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
-              ],
-            ),
-            if (item.details.isNotEmpty) ...[
-              const SizedBox(height: 9),
-              const Divider(height: 1),
-              const SizedBox(height: 5),
-              ...List.generate(item.details.length, (index) {
-                final detail = item.details[index];
-                final key = '${item.id}:$index';
-                return _AiDetailRow(
-                  detail: detail,
-                  revealed: revealed.contains(key),
-                  onReveal: detail.sensitive ? () => onReveal(key) : null,
-                );
-              }),
-            ],
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _AiDetailRow extends StatelessWidget {
-  const _AiDetailRow({
-    required this.detail,
-    required this.revealed,
-    this.onReveal,
-  });
-
-  final AiPreviewDetail detail;
-  final bool revealed;
-  final VoidCallback? onReveal;
-
-  @override
-  Widget build(BuildContext context) {
-    final color = switch (detail.changeType) {
-      'add' => const Color(0xFF18794E),
-      'remove' => Theme.of(context).colorScheme.error,
-      'update' => Theme.of(context).colorScheme.tertiary,
-      _ => Theme.of(context).colorScheme.onSurfaceVariant,
-    };
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 5),
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          final labelWidth = (constraints.maxWidth * 0.28).clamp(80.0, 150.0);
-          return Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              SizedBox(
-                width: labelWidth,
-                child: Text(
-                  detail.label,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: color,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Text(
-                  detail.sensitive && !revealed ? '••••••' : detail.value,
-                  style: Theme.of(context).textTheme.bodyMedium,
-                ),
-              ),
-              if (onReveal != null)
-                IconButton(
-                  tooltip: revealed ? '隐藏内容' : '显示内容',
-                  visualDensity: VisualDensity.compact,
-                  onPressed: onReveal,
-                  icon: Icon(
-                    revealed
-                        ? Icons.visibility_off_outlined
-                        : Icons.visibility_outlined,
-                    size: 18,
-                  ),
-                ),
-            ],
-          );
-        },
-      ),
-    );
-  }
-}
-
-class _WarningBand extends StatelessWidget {
-  const _WarningBand({required this.warnings});
-
-  final List<String> warnings;
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    return Container(
-      padding: const EdgeInsets.all(11),
-      decoration: BoxDecoration(
-        color: scheme.secondaryContainer,
-        borderRadius: BorderRadius.circular(6),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: warnings
-            .map(
-              (warning) => Padding(
-                padding: const EdgeInsets.symmetric(vertical: 2),
-                child: Text(
-                  warning,
-                  style: TextStyle(color: scheme.onSecondaryContainer),
-                ),
-              ),
-            )
-            .toList(),
-      ),
-    );
-  }
-}
-
 class _ErrorBand extends StatelessWidget {
   const _ErrorBand({required this.message});
 
@@ -896,132 +594,9 @@ class _ErrorBand extends StatelessWidget {
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: scheme.errorContainer,
-        borderRadius: BorderRadius.circular(6),
+        borderRadius: BorderRadius.circular(8),
       ),
       child: Text(message, style: TextStyle(color: scheme.onErrorContainer)),
-    );
-  }
-}
-
-class _EntrySelection {
-  const _EntrySelection(this.id, this.title);
-
-  final String id;
-  final String title;
-}
-
-class _AiEntryPickerDialog extends ConsumerStatefulWidget {
-  const _AiEntryPickerDialog();
-
-  @override
-  ConsumerState<_AiEntryPickerDialog> createState() =>
-      _AiEntryPickerDialogState();
-}
-
-class _AiEntryPickerDialogState extends ConsumerState<_AiEntryPickerDialog> {
-  final _searchController = TextEditingController();
-  final _scrollController = ScrollController();
-  Timer? _debounce;
-  int _page = 1;
-  String _search = '';
-
-  @override
-  void dispose() {
-    _debounce?.cancel();
-    _searchController.dispose();
-    _scrollController.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final pageSize = ref.watch(
-      preferencesProvider.select((preferences) => preferences.entryPageSize),
-    );
-    final query = EntryQuery(
-      page: _page,
-      pageSize: pageSize,
-      search: _search,
-      deleted: false,
-    );
-    final entries = ref.watch(entryPageProvider(query));
-    return DialogFrame(
-      title: '选择条目',
-      child: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.all(12),
-            child: TextField(
-              controller: _searchController,
-              onChanged: (value) {
-                _debounce?.cancel();
-                _debounce = Timer(const Duration(milliseconds: 280), () {
-                  if (mounted) {
-                    setState(() {
-                      _search = value.trim();
-                      _page = 1;
-                    });
-                    resetPagedScroll(_scrollController);
-                  }
-                });
-              },
-              decoration: const InputDecoration(
-                isDense: true,
-                hintText: '搜索条目名称',
-                prefixIcon: Icon(Icons.search, size: 20),
-                prefixIconConstraints: BoxConstraints(
-                  minWidth: 40,
-                  minHeight: 40,
-                ),
-              ),
-            ),
-          ),
-          Expanded(
-            child: entries.when(
-              loading: () => const LoadingView(),
-              error: (error, stackTrace) => ErrorView(
-                message: mobileErrorMessage(error),
-                onRetry: () => ref.invalidate(entryPageProvider(query)),
-              ),
-              data: (page) => ListView.builder(
-                controller: _scrollController,
-                itemCount: page.items.isEmpty ? 1 : page.items.length + 1,
-                itemBuilder: (context, index) {
-                  if (page.items.isEmpty) {
-                    return const EmptyView(
-                      icon: Icons.search_off,
-                      title: '没有匹配的条目',
-                    );
-                  }
-                  if (index == page.items.length) {
-                    return PageControls(
-                      page: page.page,
-                      totalPages: page.totalPages,
-                      pageSize: pageSize,
-                      showPageSize: false,
-                      onPageChanged: (value) {
-                        setState(() => _page = value);
-                        resetPagedScroll(_scrollController);
-                      },
-                      onPageSizeChanged: (_) {},
-                    );
-                  }
-                  final entry = page.items[index];
-                  return ListTile(
-                    leading: const Icon(Icons.key_outlined),
-                    title: Text(entry.title),
-                    subtitle: entry.url.isEmpty ? null : Text(entry.url),
-                    trailing: const Icon(Icons.chevron_right),
-                    onTap: () => Navigator.of(
-                      context,
-                    ).pop(_EntrySelection(entry.id, entry.title)),
-                  );
-                },
-              ),
-            ),
-          ),
-        ],
-      ),
     );
   }
 }

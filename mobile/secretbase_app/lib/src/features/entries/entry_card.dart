@@ -27,7 +27,8 @@ class EntryCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final previewFields = entry.fields.take(3).toList();
+    final compact = MediaQuery.sizeOf(context).width < 600;
+    final previewFields = entry.fields.take(compact ? 2 : 3).toList();
     final remaining = entry.fields.length - previewFields.length;
     final visibleGroups = entry.groups.take(1).toList();
     final visibleTags = entry.tags.take(1).toList();
@@ -50,7 +51,7 @@ class EntryCard extends StatelessWidget {
               ),
             ),
             Padding(
-              padding: const EdgeInsets.fromLTRB(14, 11, 12, 11),
+              padding: const EdgeInsets.fromLTRB(13, 10, 10, 10),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -58,6 +59,20 @@ class EntryCard extends StatelessWidget {
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      Container(
+                        width: 32,
+                        height: 32,
+                        decoration: BoxDecoration(
+                          color: _accent.withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(7),
+                        ),
+                        child: Icon(
+                          Icons.key_rounded,
+                          size: 17,
+                          color: _accent,
+                        ),
+                      ),
+                      const SizedBox(width: 9),
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -84,21 +99,24 @@ class EntryCard extends StatelessWidget {
                       ),
                       if (entry.starred)
                         Padding(
-                          padding: const EdgeInsets.only(left: 10),
+                          padding: const EdgeInsets.only(left: 8, top: 2),
                           child: Icon(
                             Icons.star_rounded,
                             size: 19,
                             color: scheme.secondary,
                           ),
                         ),
-                      const SizedBox(width: 2),
-                      Icon(Icons.chevron_right, color: scheme.onSurfaceVariant),
+                      Icon(
+                        Icons.chevron_right,
+                        size: 21,
+                        color: scheme.onSurfaceVariant,
+                      ),
                     ],
                   ),
                   if (previewFields.isNotEmpty) ...[
-                    const SizedBox(height: 9),
+                    const SizedBox(height: 8),
                     Divider(height: 1, color: scheme.outlineVariant),
-                    const SizedBox(height: 7),
+                    const SizedBox(height: 6),
                     ...previewFields.map(
                       (field) => Padding(
                         padding: const EdgeInsets.symmetric(vertical: 2),
@@ -122,7 +140,7 @@ class EntryCard extends StatelessWidget {
                       ),
                   ],
                   if (entry.tags.isNotEmpty || entry.groups.isNotEmpty) ...[
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 7),
                     Wrap(
                       spacing: 5,
                       runSpacing: 4,

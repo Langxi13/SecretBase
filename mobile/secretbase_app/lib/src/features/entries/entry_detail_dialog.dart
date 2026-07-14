@@ -92,11 +92,6 @@ class _EntryDetailDialogState extends State<EntryDetailDialog> {
             onPressed: _mutating ? null : () => _duplicate(entry),
             icon: const Icon(Icons.copy_all_outlined),
           ),
-          IconButton(
-            tooltip: '编辑条目',
-            onPressed: _mutating ? null : () => _edit(entry),
-            icon: const Icon(Icons.edit_outlined),
-          ),
         ],
       ],
       child: Column(
@@ -104,7 +99,7 @@ class _EntryDetailDialogState extends State<EntryDetailDialog> {
         children: [
           Expanded(
             child: SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(18, 18, 18, 24),
+              padding: const EdgeInsets.fromLTRB(14, 14, 14, 22),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
@@ -113,7 +108,7 @@ class _EntryDetailDialogState extends State<EntryDetailDialog> {
                     onCopyUrl: () => _copy(entry.url),
                   ),
                   if (entry.fields.isNotEmpty) ...[
-                    const SizedBox(height: 24),
+                    const SizedBox(height: 18),
                     const _DetailSectionTitle(
                       icon: Icons.view_list_outlined,
                       title: '自定义字段',
@@ -124,7 +119,7 @@ class _EntryDetailDialogState extends State<EntryDetailDialog> {
                         border: Border.all(
                           color: Theme.of(context).colorScheme.outlineVariant,
                         ),
-                        borderRadius: BorderRadius.circular(6),
+                        borderRadius: BorderRadius.circular(8),
                       ),
                       child: Column(
                         children: List.generate(entry.fields.length, (index) {
@@ -153,7 +148,7 @@ class _EntryDetailDialogState extends State<EntryDetailDialog> {
                     ),
                   ],
                   if (entry.tags.isNotEmpty || entry.groups.isNotEmpty) ...[
-                    const SizedBox(height: 24),
+                    const SizedBox(height: 18),
                     const _DetailSectionTitle(
                       icon: Icons.category_outlined,
                       title: '分类',
@@ -179,7 +174,7 @@ class _EntryDetailDialogState extends State<EntryDetailDialog> {
                     ),
                   ],
                   if (entry.remarks.isNotEmpty) ...[
-                    const SizedBox(height: 24),
+                    const SizedBox(height: 18),
                     const _DetailSectionTitle(
                       icon: Icons.notes_outlined,
                       title: '备注',
@@ -192,7 +187,7 @@ class _EntryDetailDialogState extends State<EntryDetailDialog> {
                       ).textTheme.bodyLarge?.copyWith(height: 1.55),
                     ),
                   ],
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 18),
                   _Metadata(entry: entry),
                 ],
               ),
@@ -399,7 +394,7 @@ class _EntryHeading extends StatelessWidget {
       padding: const EdgeInsets.all(15),
       decoration: BoxDecoration(
         color: scheme.surfaceContainerLow,
-        borderRadius: BorderRadius.circular(6),
+        borderRadius: BorderRadius.circular(8),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -413,10 +408,10 @@ class _EntryHeading extends StatelessWidget {
               const SizedBox(width: 10),
               Expanded(
                 child: Text(
-                  entry.title,
+                  entry.starred ? '已收藏条目' : '条目概览',
                   style: Theme.of(
                     context,
-                  ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
+                  ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w800),
                 ),
               ),
             ],
@@ -428,7 +423,10 @@ class _EntryHeading extends StatelessWidget {
                 Expanded(
                   child: SelectableText(
                     entry.url,
-                    style: TextStyle(color: scheme.primary),
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: scheme.primary,
+                      height: 1.4,
+                    ),
                   ),
                 ),
                 IconButton(

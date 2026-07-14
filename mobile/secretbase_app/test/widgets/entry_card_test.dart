@@ -61,7 +61,7 @@ void main() {
       ),
     );
 
-    expect(find.text('还有 2 个字段'), findsOneWidget);
+    expect(find.text('还有 3 个字段'), findsOneWidget);
     expect(find.text('+1'), findsOneWidget);
     expect(find.text('must-not-render'), findsNothing);
     expect(find.text('••••••'), findsOneWidget);

@@ -40,7 +40,7 @@ class _AppShellState extends ConsumerState<AppShell> {
     NavigationDestination(
       icon: Icon(Icons.auto_awesome_outlined),
       selectedIcon: Icon(Icons.auto_awesome),
-      label: 'AI',
+      label: '管家',
     ),
     NavigationDestination(
       icon: Icon(Icons.settings_outlined),
@@ -119,10 +119,20 @@ class _AppShellState extends ConsumerState<AppShell> {
 
     return Scaffold(
       body: SafeArea(child: body),
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: _index,
-        onDestinationSelected: (value) => setState(() => _index = value),
-        destinations: _destinations,
+      bottomNavigationBar: DecoratedBox(
+        decoration: BoxDecoration(
+          border: Border(
+            top: BorderSide(
+              color: Theme.of(context).colorScheme.outlineVariant,
+            ),
+          ),
+        ),
+        child: NavigationBar(
+          selectedIndex: _index,
+          labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
+          onDestinationSelected: (value) => setState(() => _index = value),
+          destinations: _destinations,
+        ),
       ),
     );
   }

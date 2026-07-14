@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:secretbase/src/core/mobile_error_presenter.dart';
 import 'package:secretbase/src/core/widgets/async_content.dart';
+import 'package:secretbase/src/core/widgets/mobile_chrome.dart';
 import 'package:secretbase/src/core/widgets/paged_scroll.dart';
 import 'package:secretbase/src/core/widgets/page_controls.dart';
 import 'package:secretbase/src/data/vault_providers.dart';
@@ -48,13 +49,13 @@ class _GroupsScreenState extends ConsumerState<GroupsScreen> {
           reordering: _reordering,
           saving: _savingOrder,
           hasGroups: groups.asData?.value.isNotEmpty ?? false,
+          groupCount: groups.asData?.value.length ?? 0,
           onCreate: _create,
           onRestoreDefault: _restoreDefault,
           onToggleOrder: () =>
               _toggleOrdering(groups.asData?.value ?? const []),
           onSaveOrder: _saveOrder,
         ),
-        const Divider(height: 1),
         Expanded(
           child: groups.when(
             loading: () => const LoadingView(label: '正在加载密码组'),
@@ -108,7 +109,7 @@ class _GroupsScreenState extends ConsumerState<GroupsScreen> {
             sliver: SliverGrid(
               gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
                 maxCrossAxisExtent: 430,
-                mainAxisExtent: 154,
+                mainAxisExtent: 132,
                 crossAxisSpacing: 9,
                 mainAxisSpacing: 9,
               ),
@@ -164,7 +165,7 @@ class _GroupsScreenState extends ConsumerState<GroupsScreen> {
           child: Material(
             color: Theme.of(context).colorScheme.surface,
             shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(6),
+              borderRadius: BorderRadius.circular(8),
               side: BorderSide(
                 color: Theme.of(context).colorScheme.outlineVariant,
               ),
@@ -290,6 +291,7 @@ class _GroupsHeader extends StatelessWidget {
     required this.reordering,
     required this.saving,
     required this.hasGroups,
+    required this.groupCount,
     required this.onCreate,
     required this.onRestoreDefault,
     required this.onToggleOrder,
@@ -299,6 +301,7 @@ class _GroupsHeader extends StatelessWidget {
   final bool reordering;
   final bool saving;
   final bool hasGroups;
+  final int groupCount;
   final VoidCallback onCreate;
   final VoidCallback onRestoreDefault;
   final VoidCallback onToggleOrder;
@@ -306,63 +309,57 @@ class _GroupsHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 10, 10, 9),
-      child: Row(
-        children: [
-          Expanded(
-            child: Text(
-              reordering ? '调整密码组顺序' : '密码组',
-              style: Theme.of(
-                context,
-              ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
-            ),
-          ),
-          if (reordering) ...[
-            TextButton(
-              onPressed: saving ? null : onToggleOrder,
-              child: const Text('取消'),
-            ),
-            const SizedBox(width: 6),
-            FilledButton.icon(
-              onPressed: saving ? null : onSaveOrder,
-              icon: const Icon(Icons.save_outlined, size: 17),
-              label: Text(saving ? '保存中' : '保存'),
-            ),
-          ] else ...[
-            if (hasGroups)
+    return MobilePageHeader(
+      title: reordering ? '调整密码组顺序' : '密码组',
+      subtitle: reordering ? '拖动右侧把手后保存' : '共 $groupCount 个密码组',
+      actions: reordering
+          ? [
               IconButton(
-                tooltip: '调整顺序',
-                onPressed: onToggleOrder,
-                icon: const Icon(Icons.swap_vert),
+                tooltip: '取消排序',
+                onPressed: saving ? null : onToggleOrder,
+                icon: const Icon(Icons.close),
               ),
-            PopupMenuButton<String>(
-              tooltip: '更多操作',
-              onSelected: (value) {
-                if (value == 'restore') onRestoreDefault();
-              },
-              itemBuilder: (context) => const [
-                PopupMenuItem(
-                  value: 'restore',
-                  child: ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    leading: Icon(Icons.restart_alt),
-                    title: Text('恢复默认排序'),
-                  ),
+              IconButton.filled(
+                tooltip: saving ? '正在保存' : '保存排序',
+                onPressed: saving ? null : onSaveOrder,
+                icon: saving
+                    ? const SizedBox(
+                        width: 17,
+                        height: 17,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.check),
+              ),
+            ]
+          : [
+              if (hasGroups)
+                IconButton(
+                  tooltip: '调整顺序',
+                  onPressed: onToggleOrder,
+                  icon: const Icon(Icons.swap_vert),
                 ),
-              ],
-            ),
-            Tooltip(
-              message: '新建密码组',
-              child: FilledButton.icon(
-                onPressed: onCreate,
-                icon: const Icon(Icons.create_new_folder_outlined, size: 17),
-                label: const Text('新建'),
+              PopupMenuButton<String>(
+                tooltip: '更多操作',
+                onSelected: (value) {
+                  if (value == 'restore') onRestoreDefault();
+                },
+                itemBuilder: (context) => const [
+                  PopupMenuItem(
+                    value: 'restore',
+                    child: ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: Icon(Icons.restart_alt),
+                      title: Text('恢复默认排序'),
+                    ),
+                  ),
+                ],
               ),
-            ),
-          ],
-        ],
-      ),
+              IconButton.filled(
+                tooltip: '新建密码组',
+                onPressed: onCreate,
+                icon: const Icon(Icons.create_new_folder_outlined),
+              ),
+            ],
     );
   }
 }
@@ -383,12 +380,13 @@ class _GroupCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    final accent = _parseColor(group.color, scheme.tertiary);
     return Card(
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: onOpen,
         child: Padding(
-          padding: const EdgeInsets.all(12),
+          padding: const EdgeInsets.fromLTRB(11, 10, 7, 9),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
@@ -398,14 +396,10 @@ class _GroupCard extends StatelessWidget {
                     width: 34,
                     height: 34,
                     decoration: BoxDecoration(
-                      color: scheme.tertiaryContainer,
+                      color: accent.withValues(alpha: 0.12),
                       borderRadius: BorderRadius.circular(7),
                     ),
-                    child: Icon(
-                      Icons.folder,
-                      size: 19,
-                      color: scheme.onTertiaryContainer,
-                    ),
+                    child: Icon(Icons.folder, size: 19, color: accent),
                   ),
                   const SizedBox(width: 9),
                   Expanded(
@@ -427,9 +421,14 @@ class _GroupCard extends StatelessWidget {
                       ],
                     ),
                   ),
+                  IconButton(
+                    tooltip: '密码组操作',
+                    onPressed: () => _showActions(context),
+                    icon: const Icon(Icons.more_vert, size: 20),
+                  ),
                 ],
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 6),
               Expanded(
                 child: Text(
                   group.description.isEmpty ? '暂无简介' : group.description,
@@ -442,65 +441,45 @@ class _GroupCard extends StatelessWidget {
                   ),
                 ),
               ),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  _SmallAction(
-                    tooltip: '查看条目',
-                    icon: Icons.arrow_forward,
-                    color: scheme.primary,
-                    onPressed: onOpen,
-                  ),
-                  const SizedBox(width: 5),
-                  _SmallAction(
-                    tooltip: '编辑密码组',
-                    icon: Icons.edit_outlined,
-                    color: scheme.tertiary,
-                    onPressed: onEdit,
-                  ),
-                  const SizedBox(width: 5),
-                  _SmallAction(
-                    tooltip: '删除密码组',
-                    icon: Icons.delete_outline,
-                    color: scheme.error,
-                    onPressed: onDelete,
-                  ),
-                ],
-              ),
             ],
           ),
         ),
       ),
     );
   }
-}
 
-class _SmallAction extends StatelessWidget {
-  const _SmallAction({
-    required this.tooltip,
-    required this.icon,
-    required this.color,
-    required this.onPressed,
-  });
-
-  final String tooltip;
-  final IconData icon;
-  final Color color;
-  final VoidCallback onPressed;
-
-  @override
-  Widget build(BuildContext context) {
-    return IconButton(
-      tooltip: tooltip,
-      onPressed: onPressed,
-      icon: Icon(icon, size: 16),
-      color: color,
-      style: IconButton.styleFrom(
-        backgroundColor: color.withValues(alpha: 0.09),
-        fixedSize: const Size(30, 30),
-        minimumSize: const Size(30, 30),
-        padding: EdgeInsets.zero,
-      ),
+  Future<void> _showActions(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return showMobileActionSheet(
+      context: context,
+      title: group.name,
+      actions: [
+        MobileAction(
+          label: '查看组内条目',
+          subtitle: '切换到已筛选的全部条目视图',
+          icon: Icons.arrow_forward,
+          color: scheme.primary,
+          onPressed: onOpen,
+        ),
+        MobileAction(
+          label: '编辑密码组',
+          icon: Icons.edit_outlined,
+          color: scheme.tertiary,
+          onPressed: onEdit,
+        ),
+        MobileAction(
+          label: '删除密码组',
+          subtitle: '仅空密码组可以删除',
+          icon: Icons.delete_outline,
+          color: scheme.error,
+          onPressed: onDelete,
+        ),
+      ],
     );
+  }
+
+  static Color _parseColor(String value, Color fallback) {
+    if (!RegExp(r'^#[0-9a-fA-F]{6}$').hasMatch(value)) return fallback;
+    return Color(int.parse(value.substring(1), radix: 16) | 0xFF000000);
   }
 }

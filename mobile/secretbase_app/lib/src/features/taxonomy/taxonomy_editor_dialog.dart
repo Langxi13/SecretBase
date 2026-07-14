@@ -166,30 +166,36 @@ class _TaxonomyEditorDialogState extends State<TaxonomyEditorDialog> {
                             label: selected ? '已选择颜色' : '选择颜色',
                             button: true,
                             child: InkWell(
-                              borderRadius: BorderRadius.circular(20),
+                              borderRadius: BorderRadius.circular(22),
                               onTap: () => setState(() => _color = value),
-                              child: Container(
-                                width: 36,
-                                height: 36,
-                                decoration: BoxDecoration(
-                                  color: color,
-                                  shape: BoxShape.circle,
-                                  border: Border.all(
-                                    color: selected
-                                        ? Theme.of(
-                                            context,
-                                          ).colorScheme.onSurface
-                                        : Colors.transparent,
-                                    width: 3,
+                              child: SizedBox(
+                                width: 44,
+                                height: 44,
+                                child: Center(
+                                  child: Container(
+                                    width: 34,
+                                    height: 34,
+                                    decoration: BoxDecoration(
+                                      color: color,
+                                      shape: BoxShape.circle,
+                                      border: Border.all(
+                                        color: selected
+                                            ? Theme.of(
+                                                context,
+                                              ).colorScheme.onSurface
+                                            : Colors.transparent,
+                                        width: 3,
+                                      ),
+                                    ),
+                                    child: selected
+                                        ? const Icon(
+                                            Icons.check,
+                                            color: Colors.white,
+                                            size: 19,
+                                          )
+                                        : null,
                                   ),
                                 ),
-                                child: selected
-                                    ? const Icon(
-                                        Icons.check,
-                                        color: Colors.white,
-                                        size: 20,
-                                      )
-                                    : null,
                               ),
                             ),
                           );

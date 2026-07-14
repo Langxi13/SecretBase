@@ -5,6 +5,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:secretbase/src/core/mobile_error_presenter.dart';
 import 'package:secretbase/src/core/widgets/async_content.dart';
 import 'package:secretbase/src/data/vault_providers.dart';
+import 'package:secretbase/src/features/ai/ai_confirmation_sheets.dart';
+import 'package:secretbase/src/features/ai/ai_manager_composer.dart';
 import 'package:secretbase/src/features/ai/ai_manager_dialogs.dart';
 import 'package:secretbase/src/features/ai/ai_manager_widgets.dart';
 import 'package:secretbase/src/features/ai/ai_plan_panel.dart';
@@ -34,6 +36,7 @@ class _AiManagerScreenState extends ConsumerState<AiManagerScreen> {
   AiPreview? _preview;
   final Set<String> _selectedPlanItems = {};
   final Set<String> _revealedDetails = {};
+  final Set<String> _expandedPlanItems = {};
   String _mode = 'assistant';
   String? _pendingUserMessage;
   String? _navigationEntryId;
@@ -94,10 +97,9 @@ class _AiManagerScreenState extends ConsumerState<AiManagerScreen> {
           status: _status,
           onNewConversation: _working ? null : _newConversation,
           onHistory: _working ? null : _openHistory,
-          onTools: _working ? null : _openProfessionalTools,
-          onSettings: _working ? null : _openSettings,
+          onTools: _working || _preview != null ? null : _openProfessionalTools,
+          onSettings: _openSettings,
         ),
-        const Divider(height: 1),
         if (_loading)
           const Expanded(child: LoadingView(label: '正在读取 AI 管家'))
         else if (_status?.configured != true)
@@ -129,6 +131,7 @@ class _AiManagerScreenState extends ConsumerState<AiManagerScreen> {
                       working: _working,
                       onModeChanged: (value) => setState(() => _mode = value),
                       onScope: _openScope,
+                      onPrompt: _usePrompt,
                       onSend: _send,
                     ),
                   ],
@@ -148,7 +151,7 @@ class _AiManagerScreenState extends ConsumerState<AiManagerScreen> {
         _preview != null ||
         _error != null;
     if (!hasContent) {
-      return AiManagerWelcome(onPrompt: _usePrompt);
+      return const AiManagerWelcome();
     }
     final children = <Widget>[
       for (final message in _messages) AiManagerMessageBubble(message: message),
@@ -185,6 +188,7 @@ class _AiManagerScreenState extends ConsumerState<AiManagerScreen> {
             preview: _preview!,
             selected: _selectedPlanItems,
             revealed: _revealedDetails,
+            expanded: _expandedPlanItems,
             working: _working,
             onSelectionChanged: (id, value) => setState(() {
               if (value) {
@@ -203,6 +207,11 @@ class _AiManagerScreenState extends ConsumerState<AiManagerScreen> {
             }),
             onReveal: (key) => setState(() {
               if (!_revealedDetails.add(key)) _revealedDetails.remove(key);
+            }),
+            onExpanded: (id) => setState(() {
+              if (!_expandedPlanItems.add(id)) {
+                _expandedPlanItems.remove(id);
+              }
             }),
             onApply: _applyPreview,
           ),
@@ -236,6 +245,7 @@ class _AiManagerScreenState extends ConsumerState<AiManagerScreen> {
       _preview = null;
       _selectedPlanItems.clear();
       _revealedDetails.clear();
+      _expandedPlanItems.clear();
     });
     _scrollToBottom();
     try {
@@ -289,24 +299,9 @@ class _AiManagerScreenState extends ConsumerState<AiManagerScreen> {
   Future<void> _applyPreview() async {
     final preview = _preview;
     if (preview == null || _selectedPlanItems.isEmpty || _working) return;
-    final confirmed = await showDialog<bool>(
+    final confirmed = await showAiApplyConfirmationSheet(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('应用 AI 操作计划'),
-        content: Text(
-          '确认应用选中的 ${_selectedPlanItems.length} 项操作？写入前会校验密码库版本并创建恢复快照。',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('取消'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('确认应用'),
-          ),
-        ],
-      ),
+      selectedCount: _selectedPlanItems.length,
     );
     if (confirmed != true) return;
     setState(() {
@@ -328,6 +323,7 @@ class _AiManagerScreenState extends ConsumerState<AiManagerScreen> {
         _preview = null;
         _selectedPlanItems.clear();
         _revealedDetails.clear();
+        _expandedPlanItems.clear();
       });
       ScaffoldMessenger.of(
         context,
@@ -345,8 +341,13 @@ class _AiManagerScreenState extends ConsumerState<AiManagerScreen> {
     _preview = preview;
     _selectedPlanItems
       ..clear()
-      ..addAll(preview.items.map((item) => item.id));
+      ..addAll(
+        preview.items
+            .where((item) => !aiPreviewItemIsHighImpact(item))
+            .map((item) => item.id),
+      );
     _revealedDetails.clear();
+    _expandedPlanItems.clear();
   }
 
   Future<void> _newConversation() async {
@@ -358,6 +359,9 @@ class _AiManagerScreenState extends ConsumerState<AiManagerScreen> {
         _messages = [];
         _preview = null;
         _selectedPlanItems.clear();
+        _revealedDetails.clear();
+        _expandedPlanItems.clear();
+        _scopeEntries.clear();
         _navigationEntryId = null;
         _navigationEntryTitle = null;
         _turnWarnings = [];
@@ -377,6 +381,13 @@ class _AiManagerScreenState extends ConsumerState<AiManagerScreen> {
         _conversationId = null;
         _messages = [];
         _preview = null;
+        _selectedPlanItems.clear();
+        _revealedDetails.clear();
+        _expandedPlanItems.clear();
+        _scopeEntries.clear();
+        _navigationEntryId = null;
+        _navigationEntryTitle = null;
+        _turnWarnings = [];
         _error = null;
       });
       return;
@@ -389,6 +400,9 @@ class _AiManagerScreenState extends ConsumerState<AiManagerScreen> {
         _messages = conversation.messages;
         _preview = null;
         _selectedPlanItems.clear();
+        _revealedDetails.clear();
+        _expandedPlanItems.clear();
+        _scopeEntries.clear();
         _navigationEntryId = null;
         _navigationEntryTitle = null;
         _turnWarnings = [];
@@ -432,9 +446,10 @@ class _AiManagerScreenState extends ConsumerState<AiManagerScreen> {
   Future<void> _openProfessionalTools() async {
     await Navigator.of(context).push<void>(
       MaterialPageRoute(
-        builder: (context) => const Scaffold(
-          appBar: AiProfessionalToolsAppBar(),
-          body: SafeArea(child: AiScreen()),
+        builder: (routeContext) => Scaffold(
+          body: SafeArea(
+            child: AiScreen(onBack: () => Navigator.of(routeContext).pop()),
+          ),
         ),
       ),
     );
@@ -470,63 +485,11 @@ class _AiManagerScreenState extends ConsumerState<AiManagerScreen> {
   }
 
   Future<bool> _confirmSend(AiSendSummary summary) async {
-    final status = _status;
-    return await showDialog<bool>(
-          context: context,
-          builder: (context) => AlertDialog(
-            title: Text(summary.title),
-            content: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Text('${status?.baseUrl ?? ''} · ${status?.model ?? ''}'),
-                  const SizedBox(height: 12),
-                  if (summary.entryCount > 0)
-                    Text('涉及条目：${summary.entryCount} 个'),
-                  if (summary.inputChars > 0)
-                    Text('输入长度：${summary.inputChars} 个字符'),
-                  const SizedBox(height: 8),
-                  ...summary.categories.map(
-                    (category) => Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 2),
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Icon(Icons.check, size: 17),
-                          const SizedBox(width: 7),
-                          Expanded(child: Text(category)),
-                        ],
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  Text(
-                    summary.privacyNote,
-                    style: TextStyle(
-                      color: summary.includesFieldValues
-                          ? Theme.of(context).colorScheme.error
-                          : Theme.of(context).colorScheme.primary,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(false),
-                child: const Text('取消'),
-              ),
-              FilledButton.icon(
-                onPressed: () => Navigator.of(context).pop(true),
-                icon: const Icon(Icons.send_outlined, size: 18),
-                label: const Text('确认发送'),
-              ),
-            ],
-          ),
-        ) ??
-        false;
+    return showAiSendConfirmationSheet(
+      context: context,
+      status: _status,
+      summary: summary,
+    );
   }
 
   void _scrollToBottom() {

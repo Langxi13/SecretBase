@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import 'package:secretbase/src/core/mobile_error_presenter.dart';
 import 'package:secretbase/src/core/theme/app_theme.dart';
 import 'package:secretbase/src/core/widgets/async_content.dart';
+import 'package:secretbase/src/core/widgets/mobile_chrome.dart';
 import 'package:secretbase/src/core/widgets/responsive_dialog.dart';
 import 'package:secretbase/src/data/vault_providers.dart';
 import 'package:secretbase/src/features/settings/transfer_service.dart';
@@ -30,27 +31,17 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 10, 10, 9),
-          child: Row(
-            children: [
-              Expanded(
-                child: Text(
-                  '设置',
-                  style: Theme.of(
-                    context,
-                  ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
-                ),
-              ),
-              OutlinedButton.icon(
-                onPressed: _working ? null : _lock,
-                icon: const Icon(Icons.lock_outline, size: 18),
-                label: const Text('立即锁定'),
-              ),
-            ],
-          ),
+        MobilePageHeader(
+          title: '设置',
+          subtitle: '外观、安全与本机数据',
+          actions: [
+            IconButton.outlined(
+              tooltip: '立即锁定',
+              onPressed: _working ? null : _lock,
+              icon: const Icon(Icons.lock_outline),
+            ),
+          ],
         ),
-        const Divider(height: 1),
         Expanded(
           child: ListView(
             padding: const EdgeInsets.fromLTRB(12, 12, 12, 76),
@@ -76,6 +67,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                                 const SizedBox(height: 10),
                                 SegmentedButton<ThemeMode>(
                                   showSelectedIcon: false,
+                                  expandedInsets: EdgeInsets.zero,
                                   segments: const [
                                     ButtonSegment(
                                       value: ThemeMode.system,
@@ -105,6 +97,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                                 const SizedBox(height: 10),
                                 SegmentedButton<AppTextSize>(
                                   showSelectedIcon: false,
+                                  expandedInsets: EdgeInsets.zero,
                                   segments: const [
                                     ButtonSegment(
                                       value: AppTextSize.standard,
@@ -351,7 +344,8 @@ class _VaultSummary extends StatelessWidget {
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: scheme.primaryContainer,
-        borderRadius: BorderRadius.circular(6),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: scheme.primary.withValues(alpha: 0.22)),
       ),
       child: Row(
         children: [
@@ -403,7 +397,7 @@ class _SettingsSection extends StatelessWidget {
     return Material(
       color: scheme.surface,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(6),
+        borderRadius: BorderRadius.circular(8),
         side: BorderSide(color: scheme.outlineVariant),
       ),
       clipBehavior: Clip.antiAlias,

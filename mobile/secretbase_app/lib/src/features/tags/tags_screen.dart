@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:secretbase/src/core/mobile_error_presenter.dart';
 import 'package:secretbase/src/core/widgets/async_content.dart';
+import 'package:secretbase/src/core/widgets/mobile_chrome.dart';
 import 'package:secretbase/src/core/widgets/paged_scroll.dart';
 import 'package:secretbase/src/core/widgets/page_controls.dart';
 import 'package:secretbase/src/data/vault_providers.dart';
@@ -50,12 +51,12 @@ class _TagsScreenState extends ConsumerState<TagsScreen> {
         _TagsHeader(
           selectionMode: _selectionMode,
           selectedCount: _selected.length,
+          totalCount: tags.asData?.value.length ?? 0,
           deleting: _deleting,
           onCreate: _create,
           onToggleSelection: _toggleSelectionMode,
           onDeleteSelected: _deleteSelected,
         ),
-        const Divider(height: 1),
         Padding(
           padding: const EdgeInsets.fromLTRB(12, 7, 12, 8),
           child: Center(
@@ -302,6 +303,7 @@ class _TagsHeader extends StatelessWidget {
   const _TagsHeader({
     required this.selectionMode,
     required this.selectedCount,
+    required this.totalCount,
     required this.deleting,
     required this.onCreate,
     required this.onToggleSelection,
@@ -310,6 +312,7 @@ class _TagsHeader extends StatelessWidget {
 
   final bool selectionMode;
   final int selectedCount;
+  final int totalCount;
   final bool deleting;
   final VoidCallback onCreate;
   final VoidCallback onToggleSelection;
@@ -317,54 +320,46 @@ class _TagsHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 10, 10, 9),
-      child: Row(
-        children: [
-          Expanded(
-            child: Text(
-              selectionMode ? '已选择 $selectedCount 个标签' : '标签管理',
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: Theme.of(
-                context,
-              ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
-            ),
-          ),
-          if (selectionMode) ...[
-            IconButton(
-              tooltip: '取消批量管理',
-              onPressed: deleting ? null : onToggleSelection,
-              icon: const Icon(Icons.close),
-            ),
-            const SizedBox(width: 4),
-            FilledButton.icon(
-              onPressed: selectedCount == 0 || deleting
-                  ? null
-                  : onDeleteSelected,
-              style: FilledButton.styleFrom(
-                backgroundColor: Theme.of(context).colorScheme.error,
+    return MobilePageHeader(
+      title: selectionMode ? '批量管理标签' : '标签管理',
+      subtitle: selectionMode ? '已选择 $selectedCount 个' : '共 $totalCount 个标签',
+      actions: selectionMode
+          ? [
+              IconButton(
+                tooltip: '取消批量管理',
+                onPressed: deleting ? null : onToggleSelection,
+                icon: const Icon(Icons.close),
               ),
-              icon: const Icon(Icons.delete_outline, size: 18),
-              label: Text(deleting ? '删除中' : '删除'),
-            ),
-          ] else ...[
-            IconButton(
-              tooltip: '批量管理',
-              onPressed: onToggleSelection,
-              icon: const Icon(Icons.checklist),
-            ),
-            Tooltip(
-              message: '新建标签',
-              child: FilledButton.icon(
+              IconButton.filled(
+                tooltip: deleting ? '正在删除' : '删除所选标签',
+                onPressed: selectedCount == 0 || deleting
+                    ? null
+                    : onDeleteSelected,
+                style: IconButton.styleFrom(
+                  backgroundColor: Theme.of(context).colorScheme.error,
+                  foregroundColor: Theme.of(context).colorScheme.onError,
+                ),
+                icon: deleting
+                    ? const SizedBox(
+                        width: 17,
+                        height: 17,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.delete_outline),
+              ),
+            ]
+          : [
+              IconButton(
+                tooltip: '批量管理',
+                onPressed: onToggleSelection,
+                icon: const Icon(Icons.checklist),
+              ),
+              IconButton.filled(
+                tooltip: '新建标签',
                 onPressed: onCreate,
-                icon: const Icon(Icons.add, size: 17),
-                label: const Text('新建'),
+                icon: const Icon(Icons.add),
               ),
-            ),
-          ],
-        ],
-      ),
+            ],
     );
   }
 }
@@ -393,11 +388,12 @@ class _TagRow extends StatelessWidget {
     final color = _parseColor(tag.color);
     final scheme = Theme.of(context).colorScheme;
     return Card(
+      color: selected ? scheme.primaryContainer : scheme.surface,
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: selectionMode ? () => onSelected(!selected) : onOpen,
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 8),
+          padding: const EdgeInsets.fromLTRB(10, 7, 6, 7),
           child: Row(
             children: [
               if (selectionMode) ...[
@@ -455,31 +451,12 @@ class _TagRow extends StatelessWidget {
                   ],
                 ),
               ),
-              if (!selectionMode) ...[
+              if (!selectionMode)
                 IconButton(
-                  tooltip: '编辑标签',
-                  visualDensity: VisualDensity.compact,
-                  onPressed: onEdit,
-                  icon: const Icon(Icons.edit_outlined, size: 18),
-                  style: IconButton.styleFrom(
-                    fixedSize: const Size(36, 36),
-                    minimumSize: const Size(36, 36),
-                    padding: EdgeInsets.zero,
-                  ),
+                  tooltip: '标签操作',
+                  onPressed: () => _showActions(context),
+                  icon: const Icon(Icons.more_vert, size: 20),
                 ),
-                IconButton(
-                  tooltip: '删除标签',
-                  visualDensity: VisualDensity.compact,
-                  color: scheme.error,
-                  onPressed: onDelete,
-                  icon: const Icon(Icons.delete_outline, size: 18),
-                  style: IconButton.styleFrom(
-                    fixedSize: const Size(36, 36),
-                    minimumSize: const Size(36, 36),
-                    padding: EdgeInsets.zero,
-                  ),
-                ),
-              ],
             ],
           ),
         ),
@@ -492,5 +469,34 @@ class _TagRow extends StatelessWidget {
         ? value.substring(1)
         : '087f8c';
     return Color(int.parse(normalized, radix: 16) | 0xFF000000);
+  }
+
+  Future<void> _showActions(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return showMobileActionSheet(
+      context: context,
+      title: tag.name,
+      actions: [
+        MobileAction(
+          label: '查看标签条目',
+          subtitle: '切换到已筛选的全部条目视图',
+          icon: Icons.arrow_forward,
+          color: scheme.primary,
+          onPressed: onOpen,
+        ),
+        MobileAction(
+          label: '编辑标签',
+          icon: Icons.edit_outlined,
+          color: scheme.tertiary,
+          onPressed: onEdit,
+        ),
+        MobileAction(
+          label: '删除标签',
+          icon: Icons.delete_outline,
+          color: scheme.error,
+          onPressed: onDelete,
+        ),
+      ],
+    );
   }
 }

@@ -83,7 +83,7 @@ abstract final class AppTheme {
         elevation: 0,
         color: scheme.surface,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(6),
+          borderRadius: BorderRadius.circular(8),
           side: BorderSide(color: scheme.outlineVariant),
         ),
       ),
@@ -99,30 +99,50 @@ abstract final class AppTheme {
           vertical: compact ? 10 : 13,
         ),
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(6),
+          borderRadius: BorderRadius.circular(8),
           borderSide: BorderSide(color: scheme.outlineVariant),
         ),
         enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(6),
+          borderRadius: BorderRadius.circular(8),
           borderSide: BorderSide(color: scheme.outlineVariant),
         ),
         focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(6),
+          borderRadius: BorderRadius.circular(8),
           borderSide: BorderSide(color: scheme.primary, width: 1.5),
         ),
       ),
       chipTheme: base.chipTheme.copyWith(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
         side: BorderSide(color: scheme.outlineVariant),
         labelStyle: textTheme.labelMedium,
         labelPadding: EdgeInsets.symmetric(horizontal: compact ? 5 : 7),
       ),
       navigationBarTheme: NavigationBarThemeData(
-        height: compact ? 62 : 68,
-        elevation: 3,
-        backgroundColor: scheme.surface,
+        height: compact ? 64 : 70,
+        elevation: 0,
+        backgroundColor: scheme.surfaceContainerLowest,
         indicatorColor: scheme.primaryContainer,
-        labelTextStyle: WidgetStatePropertyAll(textTheme.labelSmall),
+        indicatorShape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(8),
+        ),
+        labelTextStyle: WidgetStateProperty.resolveWith((states) {
+          return textTheme.labelSmall?.copyWith(
+            color: states.contains(WidgetState.selected)
+                ? scheme.primary
+                : scheme.onSurfaceVariant,
+            fontWeight: states.contains(WidgetState.selected)
+                ? FontWeight.w800
+                : FontWeight.w600,
+          );
+        }),
+        iconTheme: WidgetStateProperty.resolveWith((states) {
+          return IconThemeData(
+            size: states.contains(WidgetState.selected) ? 24 : 22,
+            color: states.contains(WidgetState.selected)
+                ? scheme.onPrimaryContainer
+                : scheme.onSurfaceVariant,
+          );
+        }),
       ),
       navigationRailTheme: NavigationRailThemeData(
         backgroundColor: scheme.surface,
@@ -135,7 +155,8 @@ abstract final class AppTheme {
       ),
       filledButtonTheme: FilledButtonThemeData(
         style: FilledButton.styleFrom(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+          minimumSize: Size(0, compact ? 42 : 48),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
           padding: EdgeInsets.symmetric(
             horizontal: compact ? 15 : 18,
             vertical: compact ? 10 : 13,
@@ -147,7 +168,8 @@ abstract final class AppTheme {
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+          minimumSize: Size(0, compact ? 42 : 48),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
           padding: EdgeInsets.symmetric(
             horizontal: compact ? 14 : 16,
             vertical: compact ? 9 : 12,
@@ -169,6 +191,44 @@ abstract final class AppTheme {
       dividerTheme: DividerThemeData(
         color: scheme.outlineVariant,
         thickness: 1,
+      ),
+      iconButtonTheme: IconButtonThemeData(
+        style: IconButton.styleFrom(
+          minimumSize: const Size(40, 40),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        ),
+      ),
+      floatingActionButtonTheme: FloatingActionButtonThemeData(
+        elevation: 2,
+        focusElevation: 2,
+        hoverElevation: 3,
+        highlightElevation: 1,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+      ),
+      bottomSheetTheme: BottomSheetThemeData(
+        backgroundColor: scheme.surfaceContainerLowest,
+        modalBackgroundColor: scheme.surfaceContainerLowest,
+        showDragHandle: true,
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+        ),
+      ),
+      popupMenuTheme: PopupMenuThemeData(
+        color: scheme.surfaceContainerLowest,
+        elevation: 3,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+      ),
+      snackBarTheme: SnackBarThemeData(
+        behavior: SnackBarBehavior.floating,
+        backgroundColor: scheme.inverseSurface,
+        contentTextStyle: textTheme.bodyMedium?.copyWith(
+          color: scheme.onInverseSurface,
+        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+      ),
+      checkboxTheme: CheckboxThemeData(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+        side: BorderSide(color: scheme.outline, width: 1.5),
       ),
       listTileTheme: ListTileThemeData(
         dense: compact,

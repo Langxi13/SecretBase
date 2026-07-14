@@ -5,6 +5,31 @@ import 'package:secretbase/src/features/ai/ai_plan_panel.dart';
 import 'package:secretbase/src/rust/mobile/models.dart';
 
 void main() {
+  test('标签删除和合并会被识别为高影响操作', () {
+    expect(
+      aiPreviewItemIsHighImpact(
+        const AiPreviewItem(
+          id: 'delete-tag',
+          title: '删除标签「临时」',
+          subtitle: '标签删除',
+          details: [],
+        ),
+      ),
+      isTrue,
+    );
+    expect(
+      aiPreviewItemIsHighImpact(
+        const AiPreviewItem(
+          id: 'create-group',
+          title: '新建密码组「工作」',
+          subtitle: '密码组',
+          details: [],
+        ),
+      ),
+      isFalse,
+    );
+  });
+
   testWidgets('AI 新建计划默认遮蔽敏感值并支持本地查看', (tester) async {
     tester.view.physicalSize = const Size(320, 720);
     tester.view.devicePixelRatio = 1;
@@ -36,6 +61,7 @@ void main() {
     );
     final selected = <String>{'item-1'};
     final revealed = <String>{};
+    final expanded = <String>{};
 
     await tester.pumpWidget(
       MaterialApp(
@@ -47,6 +73,7 @@ void main() {
                 preview: preview,
                 selected: selected,
                 revealed: revealed,
+                expanded: expanded,
                 working: false,
                 onSelectionChanged: (id, value) => setState(() {
                   if (value) {
@@ -57,6 +84,7 @@ void main() {
                 }),
                 onSelectAll: (_) {},
                 onReveal: (key) => setState(() => revealed.add(key)),
+                onExpanded: (id) => setState(() => expanded.add(id)),
                 onApply: () {},
               ),
             ),
@@ -66,6 +94,9 @@ void main() {
     );
 
     expect(find.text('must-not-show-before-confirmation'), findsNothing);
+    expect(find.text('••••••••'), findsNothing);
+    await tester.tap(find.byTooltip('展开建议详情'));
+    await tester.pump();
     expect(find.text('••••••••'), findsOneWidget);
     await tester.tap(find.byTooltip('显示内容'));
     await tester.pump();

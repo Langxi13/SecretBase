@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:secretbase/src/core/mobile_error_presenter.dart';
 import 'package:secretbase/src/core/widgets/async_content.dart';
+import 'package:secretbase/src/core/widgets/mobile_chrome.dart';
 import 'package:secretbase/src/core/widgets/paged_scroll.dart';
 import 'package:secretbase/src/core/widgets/page_controls.dart';
 import 'package:secretbase/src/data/vault_providers.dart';
@@ -90,18 +91,30 @@ class _EntriesScreenState extends ConsumerState<EntriesScreen> {
     final groups =
         ref.watch(taxonomyProvider('groups')).asData?.value ??
         const <TaxonomyRecord>[];
+    final compactFab = MediaQuery.sizeOf(context).width < 600;
 
     return Scaffold(
       backgroundColor: Colors.transparent,
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: _createEntry,
-        icon: const Icon(Icons.add),
-        label: const Text('新建条目'),
-      ),
+      floatingActionButton: compactFab
+          ? FloatingActionButton(
+              tooltip: '新建条目',
+              onPressed: _createEntry,
+              child: const Icon(Icons.add),
+            )
+          : FloatingActionButton.extended(
+              onPressed: _createEntry,
+              icon: const Icon(Icons.add),
+              label: const Text('新建条目'),
+            ),
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          _EntriesHeader(total: entries.asData?.value.total),
+          MobilePageHeader(
+            title: '全部条目',
+            subtitle: entries.asData?.value.total == null
+                ? '正在统计条目'
+                : '共 ${entries.asData!.value.total} 条',
+          ),
           _FilterBar(
             searchController: _searchController,
             selectedTag: _tag,
@@ -271,38 +284,6 @@ class _EntriesScreenState extends ConsumerState<EntriesScreen> {
         context,
       ).showSnackBar(SnackBar(content: Text(message)));
     }
-  }
-}
-
-class _EntriesHeader extends StatelessWidget {
-  const _EntriesHeader({required this.total});
-
-  final int? total;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 11, 16, 9),
-      child: Row(
-        children: [
-          Expanded(
-            child: Text(
-              '全部条目',
-              style: Theme.of(
-                context,
-              ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
-            ),
-          ),
-          if (total != null)
-            Text(
-              '$total 条',
-              style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-              ),
-            ),
-        ],
-      ),
-    );
   }
 }
 

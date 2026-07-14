@@ -393,7 +393,7 @@ class _FieldEditor extends StatelessWidget {
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: scheme.surfaceContainerLowest,
-        borderRadius: BorderRadius.circular(6),
+        borderRadius: BorderRadius.circular(8),
         border: Border.all(color: scheme.outlineVariant),
       ),
       child: Column(
@@ -740,7 +740,7 @@ class _EditorError extends StatelessWidget {
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: scheme.errorContainer,
-        borderRadius: BorderRadius.circular(6),
+        borderRadius: BorderRadius.circular(8),
       ),
       child: Text(message, style: TextStyle(color: scheme.onErrorContainer)),
     );
