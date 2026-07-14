@@ -35,6 +35,12 @@ assertNotIncludes(css, '.label-indicator', '旧的小圆点样式应删除，避
 assertNotIncludes(markup, 'sidebar-tools', '左侧栏不应保留与顶部和底部重复的管理区域');
 assertNotIncludes(markup, 'aria-label="管理工具"', '左侧栏管理入口应整组移除');
 assertNotIncludes(css, '.sidebar-tools', '左侧栏管理区域样式应同步删除');
+assertIncludes(markup, 'class="sidebar-nav-item sidebar-ai-entry" :class="{ active: showAiAssistant }"', 'AI 管家入口必须使用与普通导航一致的打开态');
+assertMatches(
+    css,
+    /\.sidebar-ai-entry\s*\{[\s\S]*?margin:\s*0;/,
+    'AI 管家入口不得使用额外外边距破坏侧栏对齐'
+);
 
 assertMatches(
     css,

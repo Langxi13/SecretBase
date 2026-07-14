@@ -1,9 +1,9 @@
         <!-- AI 智能录入弹窗 -->
-        <div v-if="showAiParse" class="modal-overlay">
-            <div class="modal-content ai-assistant-modal">
+        <div v-if="showAiParse" class="modal-overlay" :class="{ 'ai-subpanel-overlay': showAiAssistant }">
+            <div class="modal-content ai-assistant-modal" role="dialog" aria-modal="true" aria-label="AI 专业工具">
                 <div class="modal-header">
-                    <h2>🤖 AI 助手</h2>
-                    <button class="modal-close" @click="showAiParse = false">✕</button>
+                    <h2>AI 专业工具</h2>
+                    <button class="modal-close" @click="showAiParse = false" :title="showAiAssistant ? '返回 AI 管家' : '关闭'">✕</button>
                 </div>
                 <div class="modal-body">
                     <div class="ai-mode-tabs" role="tablist" aria-label="AI 功能">

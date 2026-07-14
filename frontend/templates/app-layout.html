@@ -96,7 +96,7 @@
                     <span class="sidebar-btn-icon">+</span>
                     <span class="sidebar-btn-text">新建条目</span>
                 </button>
-                <button class="sidebar-nav-item sidebar-ai-entry" @click="openAiAssistant" :title="isSidebarCollapsed ? 'AI 管家' : ''">
+                <button class="sidebar-nav-item sidebar-ai-entry" :class="{ active: showAiAssistant }" @click="openAiAssistant" :title="isSidebarCollapsed ? 'AI 管家' : ''">
                     <span class="nav-icon-text"><i class="nav-icon">✦</i><span class="nav-text">AI 管家</span></span>
                     <strong class="nav-count">AI</strong>
                 </button>

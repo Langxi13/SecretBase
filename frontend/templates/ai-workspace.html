@@ -77,9 +77,12 @@
                                 v-for="message in aiAssistantMessages"
                                 :key="message.id"
                                 class="ai-chat-message"
-                                :class="'role-' + message.role"
+                                :class="['role-' + message.role, { 'is-pending': message.pending }]"
                             >
-                                <div class="ai-message-role">{{ message.role === 'user' ? '你' : 'AI 管家' }}</div>
+                                <div class="ai-message-role">
+                                    {{ message.role === 'user' ? '你' : 'AI 管家' }}
+                                    <span v-if="message.pending"> · 已确认</span>
+                                </div>
                                 <p>{{ message.content }}</p>
                             </article>
                             <div v-if="aiAssistantBusy" class="ai-chat-progress">
@@ -93,32 +96,36 @@
                         </div>
 
                         <footer class="ai-composer">
-                            <div class="ai-composer-toolbar">
-                                <div class="ai-mode-switch" role="group" aria-label="AI 输入模式">
-                                    <button :class="{ active: aiAssistantMode === 'assistant' }" @click="aiAssistantMode = 'assistant'">管家</button>
-                                    <button :class="{ active: aiAssistantMode === 'sensitive_create' }" @click="aiAssistantMode = 'sensitive_create'">AI 新建</button>
+                            <div class="ai-composer-inner">
+                                <div class="ai-composer-surface">
+                                    <textarea
+                                        v-model="aiAssistantInput"
+                                        :placeholder="aiAssistantMode === 'sensitive_create' ? '描述要新建的条目，可包含字段值；发送前会再次确认' : '告诉 AI 管家你想查找、整理或调整什么'"
+                                        rows="2"
+                                        :disabled="aiAssistantBusy"
+                                        @keydown.ctrl.enter.prevent="sendAssistantMessage"
+                                        @keydown.meta.enter.prevent="sendAssistantMessage"
+                                    ></textarea>
+                                    <div class="ai-composer-footer">
+                                        <div class="ai-composer-toolbar">
+                                            <div class="ai-mode-switch" role="group" aria-label="AI 输入模式">
+                                                <button :class="{ active: aiAssistantMode === 'assistant' }" @click="aiAssistantMode = 'assistant'">管家</button>
+                                                <button :class="{ active: aiAssistantMode === 'sensitive_create' }" @click="aiAssistantMode = 'sensitive_create'">AI 新建</button>
+                                            </div>
+                                            <select v-if="aiAssistantMode === 'assistant'" v-model="aiAssistantScope" aria-label="AI 分析范围">
+                                                <option value="current_view">当前视图</option>
+                                                <option value="selection">已选条目</option>
+                                                <option value="all">全部条目</option>
+                                            </select>
+                                            <span class="ai-privacy-indicator" :class="{ sensitive: aiAssistantMode === 'sensitive_create' }">
+                                                {{ aiAssistantMode === 'sensitive_create' ? '逐次确认 · 可能含新字段值' : '逐次确认 · 不含已有字段值' }}
+                                            </span>
+                                        </div>
+                                        <button class="btn-primary ai-send-button" @click="sendAssistantMessage" :disabled="aiAssistantBusy || !!aiAssistantPrepared || !aiAssistantInput.trim()">
+                                            {{ aiAssistantBusy ? '处理中' : '预览发送' }}
+                                        </button>
+                                    </div>
                                 </div>
-                                <select v-if="aiAssistantMode === 'assistant'" v-model="aiAssistantScope" aria-label="AI 分析范围">
-                                    <option value="current_view">当前视图</option>
-                                    <option value="selection">已选条目</option>
-                                    <option value="all">全部条目</option>
-                                </select>
-                                <span class="ai-privacy-indicator" :class="{ sensitive: aiAssistantMode === 'sensitive_create' }">
-                                    {{ aiAssistantMode === 'sensitive_create' ? '逐次确认 · 可能发送新建字段值' : '逐次确认 · 仅发送受限元数据（不含字段值）' }}
-                                </span>
-                            </div>
-                            <div class="ai-composer-input">
-                                <textarea
-                                    v-model="aiAssistantInput"
-                                    :placeholder="aiAssistantMode === 'sensitive_create' ? '描述要新建的条目，可包含字段值；发送前会再次确认' : '告诉 AI 管家你想查找、整理或调整什么'"
-                                    rows="3"
-                                    :disabled="aiAssistantBusy"
-                                    @keydown.ctrl.enter.prevent="sendAssistantMessage"
-                                    @keydown.meta.enter.prevent="sendAssistantMessage"
-                                ></textarea>
-                                <button class="btn-primary ai-send-button" @click="sendAssistantMessage" :disabled="aiAssistantBusy || !!aiAssistantPrepared || !aiAssistantInput.trim()">
-                                    预览
-                                </button>
                             </div>
                         </footer>
                     </main>

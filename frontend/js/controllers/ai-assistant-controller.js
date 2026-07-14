@@ -4,6 +4,7 @@
 (function () {
     function createAiAssistantController(options) {
         const {
+            nextTick,
             api,
             store,
             showToast,
@@ -37,6 +38,32 @@
             openSettings,
             selectSettingsTab
         } = options;
+        let pendingMessageId = '';
+
+        async function scrollAssistantToBottom() {
+            await nextTick();
+            if (typeof document === 'undefined') return;
+            const thread = document.querySelector('.ai-chat-thread');
+            if (thread) thread.scrollTop = thread.scrollHeight;
+        }
+
+        function showPendingUserMessage(content) {
+            clearPendingUserMessage();
+            pendingMessageId = `pending-${Date.now()}`;
+            aiAssistantMessages.value = [...aiAssistantMessages.value, {
+                id: pendingMessageId,
+                role: 'user',
+                content,
+                pending: true
+            }];
+            scrollAssistantToBottom();
+        }
+
+        function clearPendingUserMessage() {
+            if (!pendingMessageId) return;
+            aiAssistantMessages.value = aiAssistantMessages.value.filter(message => message.id !== pendingMessageId);
+            pendingMessageId = '';
+        }
 
         function currentFilters() {
             if (aiAssistantScope.value === 'all') return {};
@@ -63,6 +90,7 @@
             const result = await api.post('/ai/assistant/conversations', { title: '' });
             aiAssistantConversationId.value = result.data.id;
             aiAssistantMessages.value = [];
+            pendingMessageId = '';
             aiAssistantPlan.value = null;
             aiAssistantLastResult.value = null;
             await loadConversations();
@@ -74,11 +102,13 @@
             const result = await api.get(`/ai/assistant/conversations/${encodeURIComponent(conversationId)}`);
             aiAssistantConversationId.value = conversationId;
             aiAssistantMessages.value = result.data?.messages || [];
+            pendingMessageId = '';
             aiAssistantPrepared.value = null;
             if (!preserveReview) {
                 aiAssistantPlan.value = null;
                 aiAssistantLastResult.value = null;
             }
+            scrollAssistantToBottom();
         }
 
         async function ensureConversation() {
@@ -101,6 +131,7 @@
                 const status = await api.get('/ai/status');
                 aiStatus.value = status.data;
                 await ensureConversation();
+                scrollAssistantToBottom();
             } catch (error) {
                 aiAssistantError.value = error.message || '无法加载 AI 管家';
             }
@@ -113,6 +144,7 @@
             }
             showAiAssistant.value = false;
             aiAssistantPrepared.value = null;
+            clearPendingUserMessage();
             aiAssistantPlan.value = null;
             aiAssistantLastResult.value = null;
             aiAssistantStage.value = '';
@@ -171,6 +203,7 @@
         }
 
         function applyAssistantTurnResult(data) {
+            clearPendingUserMessage();
             aiAssistantConversationId.value = data.conversation_id || aiAssistantConversationId.value;
             aiAssistantPrepared.value = null;
             aiAssistantInput.value = '';
@@ -218,6 +251,7 @@
             aiAssistantStage.value = '正在提交已确认的发送内容';
             aiAssistantError.value = '';
             aiAssistantPrepared.value = null;
+            showPendingUserMessage(prepared.originalMessage);
             try {
                 const preparedResult = await api.post('/ai/assistant/turns/prepare', {
                     preview_token: prepared.previewToken,
@@ -227,6 +261,7 @@
                 const turn = preparedResult.data || {};
                 aiAssistantConversationId.value = turn.conversation_id || aiAssistantConversationId.value;
                 if (turn.local_result) {
+                    clearPendingUserMessage();
                     aiAssistantPrepared.value = null;
                     aiAssistantInput.value = '';
                     aiAssistantMode.value = 'assistant';
@@ -247,6 +282,7 @@
                 }, { timeoutMs: 150000 });
                 applyAssistantTurnResult(result.data || {});
             } catch (error) {
+                clearPendingUserMessage();
                 aiAssistantError.value = error.message || 'AI 请求失败';
                 await restorePreparedReview(draft);
             } finally {

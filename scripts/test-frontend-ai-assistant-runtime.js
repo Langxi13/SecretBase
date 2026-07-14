@@ -73,6 +73,7 @@ const sandbox = {
     setTimeout,
     clearTimeout
 };
+sandbox.document = { querySelector: () => null };
 sandbox.window = {
     confirm: () => true,
     setTimeout,
@@ -88,9 +89,11 @@ const showAiParse = ref(false);
 const aiAssistantInput = ref('请整理密码组，内部提示词 XYZ');
 const aiAssistantBusy = ref(false);
 const aiAssistantPrepared = ref(null);
+const aiAssistantMessages = ref([]);
 let settingsOpened = 0;
 
 const controller = context.window.SecretBaseAiAssistantController.createAiAssistantController({
+    nextTick: async () => {},
     api,
     store: {
         state: { filters: {} },
@@ -109,7 +112,7 @@ const controller = context.window.SecretBaseAiAssistantController.createAiAssist
     aiAssistantError: ref(''),
     aiAssistantConversations: ref([]),
     aiAssistantConversationId: ref('conversation-1'),
-    aiAssistantMessages: ref([]),
+    aiAssistantMessages,
     aiAssistantPrepared,
     aiAssistantPlan: ref(null),
     aiAssistantLastResult: ref(null),
@@ -160,10 +163,16 @@ const controller = context.window.SecretBaseAiAssistantController.createAiAssist
     if (submitCalls[0].data.acknowledge_risk !== true) {
         throw new Error('模型请求必须携带本轮用户确认标记');
     }
+    if (!aiAssistantBusy.value || !aiAssistantMessages.value.some(message => message.pending)) {
+        throw new Error('确认发送后必须进入明确的处理中状态');
+    }
 
     releaseSubmit();
     await firstSubmit;
     if (aiAssistantBusy.value) throw new Error('请求完成后必须解除忙碌状态');
+    if (aiAssistantMessages.value.some(message => message.pending)) {
+        throw new Error('请求完成后必须移除临时用户消息');
+    }
 
     await controller.openProfessionalAiTools();
     if (!showAiAssistant.value || !showAiParse.value) {

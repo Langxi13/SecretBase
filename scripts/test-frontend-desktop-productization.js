@@ -18,8 +18,8 @@ function assertIncludes(content, needle, message) {
     if (!content.includes(needle)) throw new Error(message);
 }
 
-assertIncludes(indexHtml, 'js/controllers/desktop-controller.js?v=20260714-ai-v2', '入口页必须加载桌面控制器');
-assertIncludes(indexHtml, 'css/desktop-components.css?v=20260714-ai-v2', '入口页必须加载桌面样式');
+assertIncludes(indexHtml, 'js/controllers/desktop-controller.js?v=20260714-ai-v3', '入口页必须加载桌面控制器');
+assertIncludes(indexHtml, 'css/desktop-components.css?v=20260714-ai-v3', '入口页必须加载桌面样式');
 assertIncludes(stateSource, "runtimeConfig.mode === 'desktop'", '桌面入口必须由运行模式控制');
 assertIncludes(stateSource, 'desktopRuntimeCapabilities', '桌面运行时必须提供平台能力');
 assertIncludes(controllerSource, 'desktopSupportsTray', '桌面控制器必须按能力决定托盘 UI');

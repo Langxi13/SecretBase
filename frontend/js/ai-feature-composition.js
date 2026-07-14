@@ -96,6 +96,7 @@
         });
 
         const assistantActions = window.SecretBaseAiAssistantController.createAiAssistantController({
+            nextTick,
             api,
             store,
             showToast,
