@@ -42,6 +42,7 @@ For private repository use, contact the maintainer directly or use GitHub privat
 ## AI Security Boundary
 
 - Normal AI requests must never contain existing field values, full URLs, remarks, master passwords, or real entry IDs. Use per-request aliases and metadata-only DTOs.
+- Every AI turn must show a prompt-free transmission preview first. Keep the prompt in the current UI until explicit per-turn confirmation, and atomically consume the confirmed request token to prevent duplicate model calls.
 - Only the explicit AI Create mode may send user-supplied value-bearing text, after a second confirmation. Do not retain that source text in conversation history.
 - Model protocols and executors must not expose entry deletion, field deletion, field-value writes, existing URL/remark updates, or password-group deletion.
 - Every AI write requires a server-side pending plan, item-level confirmation, vault revision validation, and an encrypted recovery snapshot.

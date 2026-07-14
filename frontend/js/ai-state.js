@@ -53,6 +53,18 @@
         const aiAssistantLastResult = ref(null);
         const aiAssistantHistoryOpen = ref(false);
 
+        function resetAiAssistantSession() {
+            aiAssistantInput.value = '';
+            aiAssistantPrepared.value = null;
+            aiAssistantPlan.value = null;
+            aiAssistantLastResult.value = null;
+            aiAssistantMessages.value = [];
+            aiAssistantConversationId.value = '';
+            aiAssistantBusy.value = false;
+            aiAssistantStage.value = '';
+            aiAssistantError.value = '';
+        }
+
         const aiSettingsForm = reactive({
             providerId: 'deepseek',
             baseUrl: '',
@@ -107,6 +119,7 @@
             aiAssistantPlan,
             aiAssistantLastResult,
             aiAssistantHistoryOpen,
+            resetAiAssistantSession,
             aiSettingsForm,
             aiProviders,
             aiManualModel,

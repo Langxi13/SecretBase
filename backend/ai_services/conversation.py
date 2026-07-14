@@ -15,7 +15,7 @@ from ai_services.actions import _apply_group_update, _ensure_group_meta, _group_
 from ai_services.history import append_messages, ensure_conversation, model_context
 from ai_services.organize import _clean_name_list, _filter_entries_for_organize
 from ai_services.parsing import _clean_text, _normalize_ai_payload, _to_bool
-from ai_services.pending import discard_pending, get_pending, put_pending
+from ai_services.pending import consume_pending, discard_pending, put_pending
 from ai_services.privacy import (
     detect_sensitive_metadata,
     entry_metadata,
@@ -141,44 +141,39 @@ def _manifest(ai_config: dict, mode: str, entry_count: int, warnings: list[dict]
         "provider_id": ai_config.get("provider_id", "custom"),
         "provider_name": ai_config.get("provider_name", "自定义接口"),
         "target_host": host,
+        "model": ai_config.get("model", ""),
         "entry_count": entry_count,
         "includes_field_values": mode == "sensitive_create",
         "data_types": (
-            ["用户主动输入的新建条目原文", "现有标签和密码组名称"]
+            ["用户主动输入的新建条目原文"]
             if mode == "sensitive_create"
-            else ["标题", "网址 hostname", "标签", "密码组", "字段名", "隐藏/可复制状态", "分类简介"]
+            else ["本轮提示词", "标题", "网址 hostname", "标签", "密码组", "字段名", "隐藏/可复制状态", "分类简介"]
         ),
         "warnings": warnings,
     }
 
 
-def prepare_turn(request) -> dict:
+def _config_identity(ai_config: dict) -> dict:
+    return {
+        "provider_id": ai_config.get("provider_id", "custom"),
+        "base_url": str(ai_config.get("base_url") or "").rstrip("/"),
+        "model": str(ai_config.get("model") or ""),
+    }
+
+
+def _require_same_ai_target(expected: dict, current: dict) -> None:
+    if expected != _config_identity(current):
+        raise HTTPException(status_code=409, detail="AI 服务配置已变化，请重新确认发送内容")
+
+
+def preview_turn(request) -> dict:
     ai_config = ai_client._load_ai_config()
     if not ai_config:
         raise HTTPException(status_code=502, detail="AI 服务未配置")
     vault = get_vault_data()
-    message = _clean_text(request.message, 6000)
-    conversation = ensure_conversation(request.conversation_id, message)
 
     if request.mode == "assistant":
-        prompt_warnings = detect_sensitive_metadata([("输入内容", message)])
-        if prompt_warnings:
-            raise HTTPException(
-                status_code=422,
-                detail="普通管家模式检测到疑似密码或 Token；只有明确新建条目时才能切换到“AI 新建”后发送",
-            )
         entries = _scope_entries(vault, request.filters, request.scope)
-        local = _local_response(message, entries)
-        if local:
-            append_messages(conversation["id"], [
-                {"role": "user", "content": message},
-                {"role": "assistant", "content": local["message"], "meta": {"local": True}},
-            ])
-            return {
-                "conversation_id": conversation["id"],
-                "local_result": local,
-                "requires_confirmation": False,
-            }
         if not entries:
             raise HTTPException(status_code=422, detail="当前范围没有可供 AI 分析的条目")
         if len(entries) > MAX_ASSISTANT_ENTRIES:
@@ -190,10 +185,9 @@ def prepare_turn(request) -> dict:
         warnings = metadata_warning_scan(metadata, taxonomy)
         payload = {
             "mode": "assistant",
-            "conversation_id": conversation["id"],
-            "message": message,
             "metadata": metadata,
             "taxonomy": taxonomy,
+            "entry_ids": [entry.id for entry in entries],
             "entry_map": {ref: entry.id for ref, entry in aliases.items()},
             "field_map": {
                 field["ref"]: {"entry_id": entry.id, "index": index, "name": entry.fields[index].name}
@@ -202,23 +196,63 @@ def prepare_turn(request) -> dict:
             },
         }
     else:
-        taxonomy = taxonomy_metadata(vault)
         warnings = []
         payload = {
             "mode": "sensitive_create",
-            "conversation_id": conversation["id"],
-            "message": message,
-            "taxonomy": taxonomy,
         }
 
-    token = put_pending("assistant-turn", payload)
     manifest = _manifest(ai_config, request.mode, len(payload.get("metadata", [])), warnings)
+    payload["ai_target"] = _config_identity(ai_config)
+    payload["manifest"] = manifest
+    token = put_pending("assistant-preview", payload)
+    return {
+        "preview_token": token,
+        "manifest": manifest,
+        "source_revision": vault_revision(),
+    }
+
+
+def prepare_turn(request) -> dict:
+    preview = consume_pending(request.preview_token, "assistant-preview")
+    payload = copy.deepcopy(preview.payload)
+    ai_config = ai_client._load_ai_config()
+    if not ai_config:
+        raise HTTPException(status_code=502, detail="AI 服务未配置")
+    _require_same_ai_target(payload["ai_target"], ai_config)
+
+    message = _clean_text(request.message, 6000)
+    if payload["mode"] == "assistant":
+        prompt_warnings = detect_sensitive_metadata([("输入内容", message)])
+        if prompt_warnings:
+            raise HTTPException(
+                status_code=422,
+                detail="普通管家模式检测到疑似密码或 Token；只有明确新建条目时才能切换到“AI 新建”后发送",
+            )
+        vault = get_vault_data()
+        entries_by_id = {entry.id: entry for entry in vault.entries if not entry.deleted}
+        entries = [entries_by_id[entry_id] for entry_id in payload.get("entry_ids", []) if entry_id in entries_by_id]
+        local = _local_response(message, entries)
+        if local:
+            conversation = ensure_conversation(request.conversation_id, message)
+            append_messages(conversation["id"], [
+                {"role": "user", "content": message},
+                {"role": "assistant", "content": local["message"], "meta": {"local": True}},
+            ])
+            return {
+                "conversation_id": conversation["id"],
+                "local_result": local,
+                "source_revision": preview.source_revision,
+            }
+
+    conversation = ensure_conversation(request.conversation_id, message)
+    payload["conversation_id"] = conversation["id"]
+    payload["message"] = message
+    token = put_pending("assistant-turn", payload, preview.source_revision)
     return {
         "conversation_id": conversation["id"],
         "turn_token": token,
-        "manifest": manifest,
-        "requires_confirmation": request.mode == "sensitive_create" or bool(warnings),
-        "source_revision": vault_revision(),
+        "manifest": payload["manifest"],
+        "source_revision": preview.source_revision,
     }
 
 
@@ -422,15 +456,16 @@ def _normalize_assistant_response(payload: dict, turn: dict) -> tuple[str, str, 
 
 
 async def submit_turn(turn_token: str, acknowledge_risk: bool) -> dict:
-    pending = get_pending(turn_token, "assistant-turn")
+    pending = consume_pending(turn_token, "assistant-turn")
     turn = pending.payload
+    if not acknowledge_risk:
+        raise HTTPException(status_code=422, detail="发送到第三方 AI 前必须确认本轮数据清单")
     ai_config = ai_client._load_ai_config()
     if not ai_config:
         raise HTTPException(status_code=502, detail="AI 服务未配置")
+    _require_same_ai_target(turn["ai_target"], ai_config)
 
     if turn["mode"] == "sensitive_create":
-        if not acknowledge_risk:
-            raise HTTPException(status_code=422, detail="发送敏感新建内容前必须确认风险")
         content = await ai_client._request_chat_completion(
             ai_config["base_url"], ai_config["api_key"], ai_config["model"],
             [
@@ -448,7 +483,6 @@ async def submit_turn(turn_token: str, acknowledge_risk: bool) -> dict:
             "conversation_id": turn["conversation_id"],
             "entries": parsed,
         })
-        discard_pending(turn_token)
         append_messages(turn["conversation_id"], [
             {"role": "user", "content": "已通过 AI 新建模式提交敏感内容（原文未保存）", "mode": "sensitive_create"},
             {"role": "assistant", "content": f"已识别 {len(parsed)} 个新条目，请检查后确认创建。", "mode": "sensitive_create"},
@@ -498,7 +532,6 @@ async def submit_turn(turn_token: str, acknowledge_risk: bool) -> dict:
     )
     payload = ai_client._extract_json_content(content)
     message, domain, actions, display, warnings = _normalize_assistant_response(payload, turn)
-    discard_pending(turn_token)
     plan_token = put_pending("assistant-plan", {
         "mode": "assistant",
         "conversation_id": turn["conversation_id"],
@@ -694,7 +727,7 @@ def _apply_assistant_actions(vault, actions: list[dict]) -> dict:
 
 
 def apply_plan(plan_token: str, selected_ids: list[str], expected_revision: int) -> dict:
-    pending = get_pending(plan_token, "assistant-plan", expected_revision)
+    pending = consume_pending(plan_token, "assistant-plan", expected_revision)
     selected = set(selected_ids)
     snapshot = create_ai_snapshot()
     vault = copy.deepcopy(get_vault_data())
@@ -726,12 +759,11 @@ def apply_plan(plan_token: str, selected_ids: list[str], expected_revision: int)
                 "content": f"已按你的确认应用 {result['applied_count']} 项操作。",
                 "meta": {"applied": True},
             }])
-    discard_pending(plan_token)
     return result
 
 
 def undo_plan(undo_token: str, expected_revision: int) -> dict:
-    pending = get_pending(undo_token, "assistant-undo", expected_revision)
+    pending = consume_pending(undo_token, "assistant-undo", expected_revision)
     entry_count = restore_ai_snapshot(pending.payload["filename"])
     conversation_id = pending.payload.get("conversation_id")
     if conversation_id:
@@ -740,5 +772,4 @@ def undo_plan(undo_token: str, expected_revision: int) -> dict:
             "content": "已撤销上一轮 AI 操作。",
             "meta": {"undo": True},
         }])
-    discard_pending(undo_token)
     return {"entry_count": entry_count, "revision": vault_revision()}

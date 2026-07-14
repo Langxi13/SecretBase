@@ -68,6 +68,11 @@ const state = {
     showCreateModal: ref(true),
     showEditModal: ref(true),
     showAiParse: ref(true),
+    showAiAssistant: ref(true),
+    aiAssistantInput: ref('sensitive prompt'),
+    resetAiAssistantSession() {
+        this.aiAssistantInput.value = '';
+    },
     showSettings: ref(true),
     showDesktopStatus: ref(true),
     showDesktopCloseConfirm: ref(false),
@@ -187,7 +192,8 @@ controller.registerLifecycle({
         throw new Error('桌面锁定没有立即清除敏感列表');
     }
     if (state.showSettings.value || state.showEditModal.value || state.restoreWizard.visible
-        || state.showDesktopCloseConfirm.value) {
+        || state.showDesktopCloseConfirm.value || state.showAiAssistant.value
+        || state.aiAssistantInput.value) {
         throw new Error('桌面锁定没有关闭敏感弹窗');
     }
     if (state.desktopCloseSettingsSaving.value) {

@@ -2,7 +2,7 @@
 
 from fastapi import APIRouter, HTTPException
 
-from ai_services.conversation import apply_plan, prepare_turn, submit_turn, undo_plan
+from ai_services.conversation import apply_plan, prepare_turn, preview_turn, submit_turn, undo_plan
 from ai_services.history import (
     clear_history,
     create_conversation,
@@ -14,6 +14,7 @@ from models import (
     AiConversationCreateRequest,
     AiPendingPlanApplyRequest,
     AiTurnPrepareRequest,
+    AiTurnPreviewRequest,
     AiTurnSubmitRequest,
     AiUndoRequest,
 )
@@ -68,6 +69,12 @@ async def remove_all_conversations():
 async def prepare_assistant_turn(request: AiTurnPrepareRequest):
     _require_unlocked()
     return {"success": True, "data": prepare_turn(request)}
+
+
+@router.post("/assistant/turns/preview")
+async def preview_assistant_turn(request: AiTurnPreviewRequest):
+    _require_unlocked()
+    return {"success": True, "data": preview_turn(request)}
 
 
 @router.post("/assistant/turns/submit")

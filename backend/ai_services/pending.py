@@ -83,6 +83,19 @@ def discard_pending(token: str) -> None:
 
 
 def consume_pending(token: str, kind: str, expected_revision: int | None = None) -> PendingItem:
-    item = get_pending(token, kind, expected_revision)
-    discard_pending(token)
+    normalized_token = str(token or "")
+    with _LOCK:
+        _prune()
+        item = _ITEMS.get(normalized_token)
+        if not item or item.kind != kind:
+            raise HTTPException(status_code=410, detail="AI 计划已失效，请重新生成")
+        _ITEMS.pop(normalized_token, None)
+
+    if item.session_id != vault_session_id():
+        raise HTTPException(status_code=410, detail="AI 计划不属于当前解锁会话")
+    current_revision = vault_revision()
+    if item.source_revision != current_revision:
+        raise HTTPException(status_code=409, detail="密码库已变化，请重新生成 AI 计划")
+    if expected_revision is not None and expected_revision != current_revision:
+        raise HTTPException(status_code=409, detail="页面数据已过期，请刷新后重试")
     return item

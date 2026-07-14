@@ -1552,7 +1552,7 @@ POST /ai/actions/apply
 
 ### 7.11 对话式 AI 管家
 
-默认 AI 工作区使用两阶段协议：`prepare` 只在本机构造发送清单和临时别名；`submit` 才调用模型并生成不可篡改计划。普通模式禁止发送已有字段值、完整 URL、备注和真实 UUID；`sensitive_create` 仅用于用户主动提交新条目原文，必须二次确认。
+默认 AI 工作区使用三阶段协议：`preview` 不接收用户提示词，只生成目标服务、数据类型、范围和临时别名清单；用户逐次确认后，`prepare` 才绑定本轮提示词；`submit` 原子消费令牌并调用模型。普通模式禁止发送已有字段值、完整 URL、备注和真实 UUID；`sensitive_create` 仅用于用户主动提交新条目原文。
 
 ```text
 GET    /ai/assistant/conversations
@@ -1560,27 +1560,38 @@ POST   /ai/assistant/conversations
 GET    /ai/assistant/conversations/{conversation_id}
 DELETE /ai/assistant/conversations/{conversation_id}
 DELETE /ai/assistant/conversations
+POST   /ai/assistant/turns/preview
 POST   /ai/assistant/turns/prepare
 POST   /ai/assistant/turns/submit
 POST   /ai/assistant/plans/apply
 POST   /ai/assistant/plans/undo
 ```
 
-`POST /ai/assistant/turns/prepare` 请求示例：
+`POST /ai/assistant/turns/preview` 请求示例：
 
 ```json
 {
-  "conversation_id": null,
-  "message": "帮我统一当前范围内的字段命名",
   "mode": "assistant",
   "scope": "current_view",
   "filters": {}
 }
 ```
 
-响应包含 `turn_token`、目标厂商、目标 host、数据类型、条目数量、风险提示和 `source_revision`。若 `requires_confirmation=false`，前端可直接提交；若为 `sensitive_create` 或元数据疑似包含敏感文本，必须展示发送清单并由用户确认。
+响应包含 `preview_token`、目标厂商、目标 host、模型、数据类型、条目数量、风险提示和 `source_revision`，但该请求及服务端待处理项均不包含用户提示词。前端必须展示发送清单和仍保留在浏览器内的提示词，不允许自动跳过确认。
 
-`POST /ai/assistant/turns/submit` 只接收 `turn_token` 和 `acknowledge_risk`。模型允许返回密码组管理、标签管理、条目/字段重命名、空字段、字段属性、空条目模板、本地字段拆分和条目定位动作；不提供删除条目、删除字段、字段值写入、已有 URL/备注修改或密码组删除动作。
+用户确认后的 `POST /ai/assistant/turns/prepare` 请求：
+
+```json
+{
+  "preview_token": "server-side-preview-token",
+  "conversation_id": null,
+  "message": "帮我统一当前范围内的字段命名"
+}
+```
+
+`prepare` 会校验 Vault revision 与 AI 厂商、Base URL、模型是否仍和确认页一致，然后返回一次性 `turn_token`。配置或密码库变化时必须重新预览和确认。
+
+`POST /ai/assistant/turns/submit` 只接收 `turn_token` 和值为 `true` 的 `acknowledge_risk`。该令牌在进入模型调用前原子消费，重复点击、重放或并发请求不会再次调用第三方 AI。模型允许返回密码组管理、标签管理、条目/字段重命名、空字段、字段属性、空条目模板、本地字段拆分和条目定位动作；不提供删除条目、删除字段、字段值写入、已有 URL/备注修改或密码组删除动作。
 
 计划应用请求统一为：
 

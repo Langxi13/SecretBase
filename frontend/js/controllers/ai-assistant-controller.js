@@ -107,6 +107,10 @@
         }
 
         function closeAiAssistant() {
+            if (aiAssistantBusy.value) {
+                showToast('AI 请求正在处理中，请稍候', 'warning');
+                return;
+            }
             showAiAssistant.value = false;
             aiAssistantPrepared.value = null;
             aiAssistantPlan.value = null;
@@ -141,41 +145,110 @@
             }
         }
 
-        async function submitPreparedTurn(acknowledgeRisk = false) {
-            const prepared = aiAssistantPrepared.value;
-            if (!prepared?.turn_token) return;
-            aiAssistantBusy.value = true;
-            aiAssistantStage.value = 'AI 正在分析并校验计划';
-            aiAssistantError.value = '';
-            try {
-                const result = await api.post('/ai/assistant/turns/submit', {
-                    turn_token: prepared.turn_token,
-                    acknowledge_risk: acknowledgeRisk
-                });
-                const data = result.data || {};
-                aiAssistantConversationId.value = data.conversation_id || aiAssistantConversationId.value;
-                aiAssistantPrepared.value = null;
-                aiAssistantInput.value = '';
-                aiAssistantMode.value = 'assistant';
-                if (data.plan_token) {
-                    aiAssistantPlan.value = {
-                        ...data,
-                        actions: (data.actions || []).map(action => ({
-                            ...action,
-                            selected: true,
-                            fields: (action.fields || []).map(field => ({
-                                ...field,
-                                revealed: !field.hidden
-                            }))
-                        }))
-                    };
-                } else {
-                    aiAssistantPlan.value = null;
+        function refreshAssistantContext(conversationId) {
+            Promise.allSettled([
+                loadConversation(conversationId, true),
+                loadConversations()
+            ]).then(results => {
+                if (results.some(result => result.status === 'rejected')) {
+                    showToast('AI 回复已完成，但对话历史刷新失败', 'warning');
                 }
-                aiAssistantLastResult.value = data.navigation ? { navigation: data.navigation } : null;
-                await Promise.all([loadConversation(aiAssistantConversationId.value, true), loadConversations()]);
+            });
+        }
+
+        async function requestSendPreview(draft) {
+            const result = await api.post('/ai/assistant/turns/preview', {
+                mode: draft.mode,
+                scope: draft.scope,
+                filters: draft.filters
+            }, { timeoutMs: 20000 });
+            const data = result.data || {};
+            return {
+                ...draft,
+                previewToken: data.preview_token,
+                manifest: data.manifest || {}
+            };
+        }
+
+        function applyAssistantTurnResult(data) {
+            aiAssistantConversationId.value = data.conversation_id || aiAssistantConversationId.value;
+            aiAssistantPrepared.value = null;
+            aiAssistantInput.value = '';
+            aiAssistantMode.value = 'assistant';
+            if (data.plan_token) {
+                aiAssistantPlan.value = {
+                    ...data,
+                    actions: (data.actions || []).map(action => ({
+                        ...action,
+                        selected: true,
+                        fields: (action.fields || []).map(field => ({
+                            ...field,
+                            revealed: !field.hidden
+                        }))
+                    }))
+                };
+            } else {
+                aiAssistantPlan.value = null;
+            }
+            aiAssistantLastResult.value = data.navigation
+                ? { navigation: data.navigation }
+                : (data.message ? { message: data.message } : null);
+            refreshAssistantContext(aiAssistantConversationId.value);
+        }
+
+        async function restorePreparedReview(draft) {
+            aiAssistantStage.value = '正在恢复发送确认';
+            try {
+                aiAssistantPrepared.value = await requestSendPreview(draft);
+            } catch (_error) {
+                aiAssistantPrepared.value = null;
+            }
+        }
+
+        async function submitPreparedTurn() {
+            const prepared = aiAssistantPrepared.value;
+            if (!prepared?.previewToken || aiAssistantBusy.value) return;
+            const draft = {
+                originalMessage: prepared.originalMessage,
+                mode: prepared.mode,
+                scope: prepared.scope,
+                filters: prepared.filters
+            };
+            aiAssistantBusy.value = true;
+            aiAssistantStage.value = '正在提交已确认的发送内容';
+            aiAssistantError.value = '';
+            aiAssistantPrepared.value = null;
+            try {
+                const preparedResult = await api.post('/ai/assistant/turns/prepare', {
+                    preview_token: prepared.previewToken,
+                    conversation_id: aiAssistantConversationId.value || null,
+                    message: prepared.originalMessage
+                }, { timeoutMs: 20000 });
+                const turn = preparedResult.data || {};
+                aiAssistantConversationId.value = turn.conversation_id || aiAssistantConversationId.value;
+                if (turn.local_result) {
+                    aiAssistantPrepared.value = null;
+                    aiAssistantInput.value = '';
+                    aiAssistantMode.value = 'assistant';
+                    aiAssistantLastResult.value = {
+                        navigation: turn.local_result.navigation || null,
+                        localAction: turn.local_result.local_action || null,
+                        message: turn.local_result.message || ''
+                    };
+                    refreshAssistantContext(aiAssistantConversationId.value);
+                    return;
+                }
+                if (!turn.turn_token) throw new Error('AI 请求令牌生成失败');
+
+                aiAssistantStage.value = 'AI 正在分析并校验计划';
+                const result = await api.post('/ai/assistant/turns/submit', {
+                    turn_token: turn.turn_token,
+                    acknowledge_risk: true
+                }, { timeoutMs: 150000 });
+                applyAssistantTurnResult(result.data || {});
             } catch (error) {
                 aiAssistantError.value = error.message || 'AI 请求失败';
+                await restorePreparedReview(draft);
             } finally {
                 aiAssistantBusy.value = false;
                 aiAssistantStage.value = '';
@@ -184,7 +257,7 @@
 
         async function sendAssistantMessage() {
             const message = aiAssistantInput.value.trim();
-            if (!message || aiAssistantBusy.value) return;
+            if (!message || aiAssistantBusy.value || aiAssistantPrepared.value) return;
             if (!aiStatus.value?.configured) {
                 aiAssistantError.value = '请先配置 AI 服务。';
                 return;
@@ -194,38 +267,20 @@
                 return;
             }
             aiAssistantBusy.value = true;
-            aiAssistantStage.value = '正在本地整理发送范围';
+            aiAssistantStage.value = '正在核对发送范围';
             aiAssistantError.value = '';
             aiAssistantPlan.value = null;
             aiAssistantLastResult.value = null;
+            const draft = {
+                originalMessage: message,
+                mode: aiAssistantMode.value,
+                scope: aiAssistantScope.value,
+                filters: currentFilters()
+            };
             try {
-                const result = await api.post('/ai/assistant/turns/prepare', {
-                    conversation_id: aiAssistantConversationId.value || null,
-                    message,
-                    mode: aiAssistantMode.value,
-                    scope: aiAssistantScope.value,
-                    filters: currentFilters()
-                });
-                const data = result.data || {};
-                aiAssistantConversationId.value = data.conversation_id || aiAssistantConversationId.value;
-                if (data.local_result) {
-                    aiAssistantInput.value = '';
-                    aiAssistantMode.value = 'assistant';
-                    aiAssistantLastResult.value = {
-                        navigation: data.local_result.navigation || null,
-                        localAction: data.local_result.local_action || null,
-                        message: data.local_result.message || ''
-                    };
-                    await Promise.all([loadConversation(aiAssistantConversationId.value, true), loadConversations()]);
-                    return;
-                }
-                aiAssistantPrepared.value = { ...data, originalMessage: message };
-                if (!data.requires_confirmation) {
-                    aiAssistantBusy.value = false;
-                    await submitPreparedTurn(false);
-                }
+                aiAssistantPrepared.value = await requestSendPreview(draft);
             } catch (error) {
-                aiAssistantError.value = error.message || '无法准备 AI 请求';
+                aiAssistantError.value = error.message || '无法核对 AI 发送范围';
             } finally {
                 aiAssistantBusy.value = false;
                 aiAssistantStage.value = '';
@@ -238,6 +293,7 @@
         }
 
         async function applyAssistantPlan() {
+            if (aiAssistantBusy.value) return;
             const plan = aiAssistantPlan.value;
             const selectedIds = (plan?.actions || []).filter(action => action.selected).map(action => action.id);
             if (!plan?.plan_token || selectedIds.length === 0) {
@@ -277,6 +333,7 @@
         }
 
         async function undoAssistantPlan() {
+            if (aiAssistantBusy.value) return;
             const resultState = aiAssistantLastResult.value;
             if (!resultState?.undoToken || !resultState.revision) return;
             aiAssistantBusy.value = true;
@@ -370,7 +427,6 @@
         }
 
         async function openProfessionalAiTools() {
-            showAiAssistant.value = false;
             showAiParse.value = true;
             try {
                 const result = await api.get('/ai/status');
@@ -381,7 +437,6 @@
         }
 
         async function openAssistantSettings() {
-            showAiAssistant.value = false;
             await openSettings();
             selectSettingsTab('ai');
         }

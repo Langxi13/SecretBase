@@ -401,12 +401,18 @@ class AiConversationCreateRequest(BaseModel):
     title: str = Field(default="", max_length=60)
 
 
-class AiTurnPrepareRequest(BaseModel):
-    conversation_id: Optional[str] = Field(default=None, max_length=100)
-    message: str = Field(..., min_length=1, max_length=6000)
+class AiTurnPreviewRequest(BaseModel):
+    """生成不包含用户提示词的 AI 发送清单。"""
     mode: str = Field(default="assistant", pattern="^(assistant|sensitive_create)$")
     filters: dict = Field(default_factory=dict)
     scope: str = Field(default="current_view", pattern="^(current_view|selection|all)$")
+
+
+class AiTurnPrepareRequest(BaseModel):
+    """用户确认发送清单后，绑定本轮提示词。"""
+    preview_token: str = Field(..., min_length=20, max_length=200)
+    conversation_id: Optional[str] = Field(default=None, max_length=100)
+    message: str = Field(..., min_length=1, max_length=6000)
 
 
 class AiTurnSubmitRequest(BaseModel):

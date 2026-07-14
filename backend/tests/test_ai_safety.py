@@ -1,7 +1,9 @@
+import asyncio
 import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from unittest.mock import patch
+from types import SimpleNamespace
+from unittest.mock import AsyncMock, patch
 
 from fastapi import HTTPException
 
@@ -10,7 +12,7 @@ from ai_services import history as ai_history
 from ai_services import pending as ai_pending
 from ai_services.privacy import entry_metadata
 from ai_services.providers import normalize_base_url
-from models import AiTurnPrepareRequest, Entry, FieldItem, VaultData
+from models import AiTurnPrepareRequest, AiTurnPreviewRequest, Entry, FieldItem, VaultData
 
 
 class AiSafetyTests(unittest.TestCase):
@@ -155,7 +157,7 @@ class AiSafetyTests(unittest.TestCase):
         self.assertEqual(raised.exception.status_code, 422)
         self.assertIn("端口", raised.exception.detail)
 
-    def test_prepare_turn_stores_only_metadata_and_alias_maps(self):
+    def test_preview_turn_stores_only_metadata_and_alias_maps_without_prompt(self):
         captured = {}
 
         def capture_pending(kind, payload, source_revision=None):
@@ -163,8 +165,7 @@ class AiSafetyTests(unittest.TestCase):
             captured["payload"] = payload
             return "pending-token"
 
-        request = AiTurnPrepareRequest(
-            message="请整理密码组",
+        request = AiTurnPreviewRequest(
             mode="assistant",
             scope="all",
         )
@@ -181,19 +182,18 @@ class AiSafetyTests(unittest.TestCase):
                 },
             ),
             patch.object(conversation, "get_vault_data", return_value=self.vault),
-            patch.object(
-                conversation,
-                "ensure_conversation",
-                return_value={"id": "conversation"},
-            ),
             patch.object(conversation, "put_pending", side_effect=capture_pending),
             patch.object(conversation, "vault_revision", return_value=3),
         ):
-            result = conversation.prepare_turn(request)
+            result = conversation.preview_turn(request)
 
         serialized = repr(captured["payload"])
-        self.assertEqual(captured["kind"], "assistant-turn")
+        self.assertEqual(captured["kind"], "assistant-preview")
         self.assertEqual(result["source_revision"], 3)
+        self.assertEqual(result["preview_token"], "pending-token")
+        self.assertNotIn("message", captured["payload"])
+        self.assertNotIn("conversation_id", captured["payload"])
+        self.assertIn("本轮提示词", result["manifest"]["data_types"])
         self.assertIn("E001", serialized)
         self.assertNotIn(self.entry.id, repr(captured["payload"]["metadata"]))
         self.assertNotIn("never-send-this-value", serialized)
@@ -202,20 +202,31 @@ class AiSafetyTests(unittest.TestCase):
 
     def test_normal_mode_rejects_user_supplied_secret_before_pending_plan(self):
         request = AiTurnPrepareRequest(
+            preview_token="p" * 32,
             message="password: never-send-this-value",
-            mode="assistant",
-            scope="all",
+        )
+        config = {
+            "provider_id": "custom",
+            "base_url": "https://api.example.test/v1",
+            "api_key": "test-key",
+            "model": "test-model",
+        }
+        preview = SimpleNamespace(
+            source_revision=3,
+            payload={
+                "mode": "assistant",
+                "entry_ids": [self.entry.id],
+                "ai_target": conversation._config_identity(config),
+                "manifest": {},
+            },
         )
         with (
             patch.object(
                 conversation.ai_client,
                 "_load_ai_config",
-                return_value={
-                    "base_url": "https://api.example.test/v1",
-                    "api_key": "test-key",
-                    "model": "test-model",
-                },
+                return_value=config,
             ),
+            patch.object(conversation, "consume_pending", return_value=preview),
             patch.object(conversation, "get_vault_data", return_value=self.vault),
             patch.object(
                 conversation,
@@ -230,6 +241,51 @@ class AiSafetyTests(unittest.TestCase):
         self.assertEqual(raised.exception.status_code, 422)
         self.assertIn("AI 新建", raised.exception.detail)
         pending.assert_not_called()
+
+    def test_pending_turn_can_only_be_consumed_once(self):
+        ai_pending._ITEMS.clear()
+        with (
+            patch.object(ai_pending, "vault_session_id", return_value="session-a"),
+            patch.object(ai_pending, "vault_revision", return_value=4),
+        ):
+            token = ai_pending.put_pending("assistant-turn", {"message": "test"})
+            item = ai_pending.consume_pending(token, "assistant-turn")
+            with self.assertRaises(HTTPException) as raised:
+                ai_pending.consume_pending(token, "assistant-turn")
+
+        self.assertEqual(item.payload["message"], "test")
+        self.assertEqual(raised.exception.status_code, 410)
+
+    def test_submit_turn_requires_explicit_user_confirmation(self):
+        request_model = AsyncMock()
+        pending = SimpleNamespace(payload={"mode": "assistant"})
+        with (
+            patch.object(conversation, "consume_pending", return_value=pending),
+            patch.object(conversation.ai_client, "_request_chat_completion", request_model),
+        ):
+            with self.assertRaises(HTTPException) as raised:
+                asyncio.run(conversation.submit_turn("t" * 32, False))
+
+        self.assertEqual(raised.exception.status_code, 422)
+        self.assertIn("确认", raised.exception.detail)
+        request_model.assert_not_awaited()
+
+    def test_changed_ai_target_requires_a_new_confirmation(self):
+        expected = {
+            "provider_id": "custom",
+            "base_url": "https://first.example.test/v1",
+            "model": "model-a",
+        }
+        current = {
+            "provider_id": "custom",
+            "base_url": "https://second.example.test/v1",
+            "model": "model-a",
+        }
+        with self.assertRaises(HTTPException) as raised:
+            conversation._require_same_ai_target(expected, current)
+
+        self.assertEqual(raised.exception.status_code, 409)
+        self.assertIn("重新确认", raised.exception.detail)
 
     def test_conversation_history_is_encrypted_at_rest(self):
         key = bytes(range(32))

@@ -5,73 +5,74 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="referrer" content="no-referrer">
     <title>SecretBase - 密码管理工具</title>
-    <script src="js/early-security.js?v=20260714-ai-v1"></script>
+    <script src="js/early-security.js?v=20260714-ai-v2"></script>
     <script src="vendor/vue/vue.global.prod.js?v=3.5.39"></script>
-    <script src="/secretbase-runtime-config.js?v=20260714-ai-v1"></script>
-    <script src="js/desktop-zoom-indicator.js?v=20260714-ai-v1"></script>
-    <link rel="stylesheet" href="css/base.css?v=20260714-ai-v1">
-    <link rel="stylesheet" href="css/workspace.css?v=20260714-ai-v1">
-    <link rel="stylesheet" href="css/workspace-responsive.css?v=20260714-ai-v1">
-    <link rel="stylesheet" href="css/workspace-polish.css?v=20260714-ai-v1">
-    <link rel="stylesheet" href="css/modals.css?v=20260714-ai-v1">
-    <link rel="stylesheet" href="css/form-controls.css?v=20260714-ai-v1">
-    <link rel="stylesheet" href="css/ai-components.css?v=20260714-ai-v1">
-    <link rel="stylesheet" href="css/ai-workspace.css?v=20260714-ai-v1">
-    <link rel="stylesheet" href="css/management-components.css?v=20260714-ai-v1">
-    <link rel="stylesheet" href="css/desktop-components.css?v=20260714-ai-v1">
-    <link rel="stylesheet" href="css/component-responsive.css?v=20260714-ai-v1">
-    <link rel="stylesheet" href="css/themes/variables.css?v=20260714-ai-v1">
-    <link rel="stylesheet" href="css/themes/dark.css?v=20260714-ai-v1">
-    <link rel="stylesheet" href="css/themes/light.css?v=20260714-ai-v1">
-    <link rel="stylesheet" href="css/visual-polish.css?v=20260714-ai-v1">
-    <link rel="stylesheet" href="css/component-polish.css?v=20260714-ai-v1">
+    <script src="/secretbase-runtime-config.js?v=20260714-ai-v2"></script>
+    <script src="js/desktop-zoom-indicator.js?v=20260714-ai-v2"></script>
+    <link rel="stylesheet" href="css/base.css?v=20260714-ai-v2">
+    <link rel="stylesheet" href="css/workspace.css?v=20260714-ai-v2">
+    <link rel="stylesheet" href="css/workspace-responsive.css?v=20260714-ai-v2">
+    <link rel="stylesheet" href="css/workspace-polish.css?v=20260714-ai-v2">
+    <link rel="stylesheet" href="css/modals.css?v=20260714-ai-v2">
+    <link rel="stylesheet" href="css/form-controls.css?v=20260714-ai-v2">
+    <link rel="stylesheet" href="css/ai-components.css?v=20260714-ai-v2">
+    <link rel="stylesheet" href="css/ai-workspace.css?v=20260714-ai-v2">
+    <link rel="stylesheet" href="css/ai-send-review.css?v=20260714-ai-v2">
+    <link rel="stylesheet" href="css/management-components.css?v=20260714-ai-v2">
+    <link rel="stylesheet" href="css/desktop-components.css?v=20260714-ai-v2">
+    <link rel="stylesheet" href="css/component-responsive.css?v=20260714-ai-v2">
+    <link rel="stylesheet" href="css/themes/variables.css?v=20260714-ai-v2">
+    <link rel="stylesheet" href="css/themes/dark.css?v=20260714-ai-v2">
+    <link rel="stylesheet" href="css/themes/light.css?v=20260714-ai-v2">
+    <link rel="stylesheet" href="css/visual-polish.css?v=20260714-ai-v2">
+    <link rel="stylesheet" href="css/component-polish.css?v=20260714-ai-v2">
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🔐</text></svg>">
 </head>
 <body>
     <div id="app" aria-busy="true">
         <div class="loading-screen"><div class="loading-spinner"></div><p>加载中...</p></div>
     </div>
-    <script src="js/api.js?v=20260714-ai-v1"></script>
-    <script src="js/utils.js?v=20260714-ai-v1"></script>
-    <script src="js/download-helper.js?v=20260714-ai-v1"></script>
-    <script src="js/pagination.js?v=20260714-ai-v1"></script>
-    <script src="js/toast.js?v=20260714-ai-v1"></script>
-    <script src="js/auto-lock.js?v=20260714-ai-v1"></script>
-    <script src="js/view-helpers.js?v=20260714-ai-v1"></script>
-    <script src="js/theme-controller.js?v=20260714-ai-v1"></script>
-    <script src="js/filter-controller.js?v=20260714-ai-v1"></script>
-    <script src="js/tag-view.js?v=20260714-ai-v1"></script>
-    <script src="js/controllers/tag-controller.js?v=20260714-ai-v1"></script>
-    <script src="js/group-view.js?v=20260714-ai-v1"></script>
-    <script src="js/controllers/trash-controller.js?v=20260714-ai-v1"></script>
-    <script src="js/controllers/transfer-controller.js?v=20260714-ai-v1"></script>
-    <script src="js/controllers/maintenance-controller.js?v=20260714-ai-v1"></script>
-    <script src="js/controllers/desktop-controller.js?v=20260714-ai-v1"></script>
-    <script src="js/controllers/list-controller.js?v=20260714-ai-v1"></script>
-    <script src="js/controllers/entry-controller.js?v=20260714-ai-v1"></script>
-    <script src="js/controllers/group-controller.js?v=20260714-ai-v1"></script>
-    <script src="js/backup-view.js?v=20260714-ai-v1"></script>
-    <script src="js/controllers/backup-controller.js?v=20260714-ai-v1"></script>
-    <script src="js/ai-view.js?v=20260714-ai-v1"></script>
-    <script src="js/controllers/ai-settings-controller.js?v=20260714-ai-v1"></script>
-    <script src="js/controllers/ai-controller.js?v=20260714-ai-v1"></script>
-    <script src="js/controllers/ai-assistant-controller.js?v=20260714-ai-v1"></script>
-    <script src="js/store-state.js?v=20260714-ai-v1"></script>
-    <script src="js/store-auth-settings.js?v=20260714-ai-v1"></script>
-    <script src="js/store-entry-methods.js?v=20260714-ai-v1"></script>
-    <script src="js/store-taxonomy-methods.js?v=20260714-ai-v1"></script>
-    <script src="js/store-trash-methods.js?v=20260714-ai-v1"></script>
-    <script src="js/store.js?v=20260714-ai-v1"></script>
-    <script src="js/ai-state.js?v=20260714-ai-v1"></script>
-    <script src="js/app-state.js?v=20260714-ai-v1"></script>
-    <script src="js/app-ui-controller.js?v=20260714-ai-v1"></script>
-    <script src="js/app-data-controller.js?v=20260714-ai-v1"></script>
-    <script src="js/ai-feature-composition.js?v=20260714-ai-v1"></script>
-    <script src="js/app-feature-composition.js?v=20260714-ai-v1"></script>
-    <script src="js/app-session-controller.js?v=20260714-ai-v1"></script>
-    <script src="js/app-watchers.js?v=20260714-ai-v1"></script>
-    <script src="js/app-template-context.js?v=20260714-ai-v1"></script>
-    <script src="js/template-loader.js?v=20260714-ai-v1"></script>
-    <script src="js/app.js?v=20260714-ai-v1"></script>
+    <script src="js/api.js?v=20260714-ai-v2"></script>
+    <script src="js/utils.js?v=20260714-ai-v2"></script>
+    <script src="js/download-helper.js?v=20260714-ai-v2"></script>
+    <script src="js/pagination.js?v=20260714-ai-v2"></script>
+    <script src="js/toast.js?v=20260714-ai-v2"></script>
+    <script src="js/auto-lock.js?v=20260714-ai-v2"></script>
+    <script src="js/view-helpers.js?v=20260714-ai-v2"></script>
+    <script src="js/theme-controller.js?v=20260714-ai-v2"></script>
+    <script src="js/filter-controller.js?v=20260714-ai-v2"></script>
+    <script src="js/tag-view.js?v=20260714-ai-v2"></script>
+    <script src="js/controllers/tag-controller.js?v=20260714-ai-v2"></script>
+    <script src="js/group-view.js?v=20260714-ai-v2"></script>
+    <script src="js/controllers/trash-controller.js?v=20260714-ai-v2"></script>
+    <script src="js/controllers/transfer-controller.js?v=20260714-ai-v2"></script>
+    <script src="js/controllers/maintenance-controller.js?v=20260714-ai-v2"></script>
+    <script src="js/controllers/desktop-controller.js?v=20260714-ai-v2"></script>
+    <script src="js/controllers/list-controller.js?v=20260714-ai-v2"></script>
+    <script src="js/controllers/entry-controller.js?v=20260714-ai-v2"></script>
+    <script src="js/controllers/group-controller.js?v=20260714-ai-v2"></script>
+    <script src="js/backup-view.js?v=20260714-ai-v2"></script>
+    <script src="js/controllers/backup-controller.js?v=20260714-ai-v2"></script>
+    <script src="js/ai-view.js?v=20260714-ai-v2"></script>
+    <script src="js/controllers/ai-settings-controller.js?v=20260714-ai-v2"></script>
+    <script src="js/controllers/ai-controller.js?v=20260714-ai-v2"></script>
+    <script src="js/controllers/ai-assistant-controller.js?v=20260714-ai-v2"></script>
+    <script src="js/store-state.js?v=20260714-ai-v2"></script>
+    <script src="js/store-auth-settings.js?v=20260714-ai-v2"></script>
+    <script src="js/store-entry-methods.js?v=20260714-ai-v2"></script>
+    <script src="js/store-taxonomy-methods.js?v=20260714-ai-v2"></script>
+    <script src="js/store-trash-methods.js?v=20260714-ai-v2"></script>
+    <script src="js/store.js?v=20260714-ai-v2"></script>
+    <script src="js/ai-state.js?v=20260714-ai-v2"></script>
+    <script src="js/app-state.js?v=20260714-ai-v2"></script>
+    <script src="js/app-ui-controller.js?v=20260714-ai-v2"></script>
+    <script src="js/app-data-controller.js?v=20260714-ai-v2"></script>
+    <script src="js/ai-feature-composition.js?v=20260714-ai-v2"></script>
+    <script src="js/app-feature-composition.js?v=20260714-ai-v2"></script>
+    <script src="js/app-session-controller.js?v=20260714-ai-v2"></script>
+    <script src="js/app-watchers.js?v=20260714-ai-v2"></script>
+    <script src="js/app-template-context.js?v=20260714-ai-v2"></script>
+    <script src="js/template-loader.js?v=20260714-ai-v2"></script>
+    <script src="js/app.js?v=20260714-ai-v2"></script>
 </body>
 </html>

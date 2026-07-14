@@ -24,6 +24,7 @@ const cssPaths = [
     'frontend/css/form-controls.css',
     'frontend/css/ai-components.css',
     'frontend/css/ai-workspace.css',
+    'frontend/css/ai-send-review.css',
     'frontend/css/management-components.css',
     'frontend/css/desktop-components.css',
     'frontend/css/component-responsive.css',

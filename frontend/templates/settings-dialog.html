@@ -1,5 +1,5 @@
         <!-- 设置弹窗 -->
-        <div v-if="showSettings" class="modal-overlay">
+        <div v-if="showSettings" class="modal-overlay" :class="{ 'ai-subpanel-overlay': showAiAssistant }">
             <div class="modal-content settings-modal">
                 <div class="modal-header">
                     <h2>⚙️ 设置</h2>

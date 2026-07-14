@@ -66,7 +66,7 @@ class ApiClient {
     /**
      * 发送请求
      */
-    async request(method, path, data = null) {
+    async request(method, path, data = null, requestOptions = {}) {
         const headers = {
             'Content-Type': 'application/json'
         };
@@ -82,12 +82,32 @@ class ApiClient {
             credentials: 'same-origin'
         };
 
+        const timeoutMs = Number(requestOptions.timeoutMs || 0);
+        const controller = timeoutMs > 0 && typeof AbortController !== 'undefined'
+            ? new AbortController()
+            : null;
+        const timeoutId = controller
+            ? window.setTimeout(() => controller.abort(), timeoutMs)
+            : null;
+        if (controller) options.signal = controller.signal;
+
         if (data && method !== 'GET') {
             options.body = JSON.stringify(data);
         }
 
-        const response = await fetch(`${this.baseUrl}${path}`, options);
-        const result = await response.json();
+        let response;
+        let result;
+        try {
+            response = await fetch(`${this.baseUrl}${path}`, options);
+            result = await response.json();
+        } catch (error) {
+            if (error?.name === 'AbortError') {
+                throw new ApiError('REQUEST_TIMEOUT', '请求处理超时，请稍后重试', 408);
+            }
+            throw new ApiError('NETWORK_ERROR', '网络连接失败，请检查连接后重试', 0);
+        } finally {
+            if (timeoutId !== null) window.clearTimeout(timeoutId);
+        }
 
         if (!response.ok) {
             this.notifyUnauthorized(response.status, result.message);
@@ -107,8 +127,8 @@ class ApiClient {
     /**
      * POST 请求
      */
-    post(path, data) {
-        return this.request('POST', path, data);
+    post(path, data, requestOptions = {}) {
+        return this.request('POST', path, data, requestOptions);
     }
 
     /**

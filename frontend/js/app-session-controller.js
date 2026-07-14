@@ -36,6 +36,8 @@
             state.showCreateModal.value = false;
             state.showEditModal.value = false;
             state.showAiParse.value = false;
+            state.showAiAssistant.value = false;
+            state.resetAiAssistantSession();
             state.showSettings.value = false;
             state.showDesktopStatus.value = false;
             state.showDesktopCloseConfirm.value = false;

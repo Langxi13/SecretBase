@@ -1,4 +1,12 @@
-        <div v-if="showAiAssistant" class="ai-workspace-overlay" role="dialog" aria-modal="true" aria-label="AI 管家">
+        <div
+            v-if="showAiAssistant"
+            class="ai-workspace-overlay"
+            :class="{ 'has-subpanel': showAiParse || showSettings }"
+            role="dialog"
+            aria-modal="true"
+            aria-label="AI 管家"
+            :aria-hidden="showAiParse || showSettings ? 'true' : 'false'"
+        >
             <section class="ai-workspace-shell">
                 <header class="ai-workspace-header">
                     <div class="ai-workspace-title">
@@ -10,10 +18,14 @@
                         </div>
                     </div>
                     <div class="ai-workspace-actions">
-                        <button class="btn-icon compact" @click="aiAssistantHistoryOpen = !aiAssistantHistoryOpen" title="对话历史" aria-label="对话历史">◷</button>
-                        <button class="btn-icon compact" @click="openProfessionalAiTools" title="打开专业工具" aria-label="打开专业工具">⌘</button>
-                        <button class="btn-icon compact" @click="openAssistantSettings" title="AI 服务设置" aria-label="AI 服务设置">⚙</button>
-                        <button class="modal-close" @click="closeAiAssistant" title="关闭">✕</button>
+                        <button class="btn-icon compact" :class="{ active: aiAssistantHistoryOpen }" @click="aiAssistantHistoryOpen = !aiAssistantHistoryOpen" title="对话历史" aria-label="对话历史">◷</button>
+                        <button class="ai-header-action" @click="openProfessionalAiTools" :disabled="aiAssistantBusy" title="打开专业工具">
+                            <span aria-hidden="true">⌘</span><span>专业工具</span>
+                        </button>
+                        <button class="ai-header-action" @click="openAssistantSettings" :disabled="aiAssistantBusy" title="AI 服务设置">
+                            <span aria-hidden="true">⚙</span><span>服务设置</span>
+                        </button>
+                        <button class="modal-close" @click="closeAiAssistant" :disabled="aiAssistantBusy" title="关闭">✕</button>
                     </div>
                 </header>
 
@@ -80,25 +92,6 @@
                             {{ aiAssistantError }}
                         </div>
 
-                        <div v-if="aiAssistantPrepared" class="ai-send-review">
-                            <div class="ai-send-review-header">
-                                <strong>{{ aiAssistantPrepared.manifest.includes_field_values ? '确认发送敏感新建内容' : '发现疑似敏感元数据' }}</strong>
-                                <span>{{ aiAssistantPrepared.manifest.provider_name }} · {{ aiAssistantPrepared.manifest.target_host }}</span>
-                            </div>
-                            <p>本轮将发送：{{ aiAssistantPrepared.manifest.data_types.join('、') }}</p>
-                            <p v-if="aiAssistantPrepared.manifest.entry_count">范围：{{ aiAssistantPrepared.manifest.entry_count }} 个条目</p>
-                            <div v-if="aiAssistantPrepared.manifest.warnings?.length" class="ai-risk-list">
-                                <span v-for="warning in aiAssistantPrepared.manifest.warnings" :key="warning.location">
-                                    {{ warning.location }}：{{ warning.preview }}
-                                </span>
-                            </div>
-                            <pre v-if="aiAssistantPrepared.manifest.includes_field_values">{{ aiAssistantPrepared.originalMessage }}</pre>
-                            <div class="ai-send-review-actions">
-                                <button class="btn-secondary" @click="cancelPreparedTurn">取消</button>
-                                <button class="btn-primary" @click="submitPreparedTurn(true)">确认并发送一次</button>
-                            </div>
-                        </div>
-
                         <footer class="ai-composer">
                             <div class="ai-composer-toolbar">
                                 <div class="ai-mode-switch" role="group" aria-label="AI 输入模式">
@@ -111,7 +104,7 @@
                                     <option value="all">全部条目</option>
                                 </select>
                                 <span class="ai-privacy-indicator" :class="{ sensitive: aiAssistantMode === 'sensitive_create' }">
-                                    {{ aiAssistantMode === 'sensitive_create' ? '可能发送新建字段值' : '仅发送受限元数据' }}
+                                    {{ aiAssistantMode === 'sensitive_create' ? '逐次确认 · 可能发送新建字段值' : '逐次确认 · 仅发送受限元数据（不含字段值）' }}
                                 </span>
                             </div>
                             <div class="ai-composer-input">
@@ -119,17 +112,18 @@
                                     v-model="aiAssistantInput"
                                     :placeholder="aiAssistantMode === 'sensitive_create' ? '描述要新建的条目，可包含字段值；发送前会再次确认' : '告诉 AI 管家你想查找、整理或调整什么'"
                                     rows="3"
+                                    :disabled="aiAssistantBusy"
                                     @keydown.ctrl.enter.prevent="sendAssistantMessage"
                                     @keydown.meta.enter.prevent="sendAssistantMessage"
                                 ></textarea>
-                                <button class="btn-primary ai-send-button" @click="sendAssistantMessage" :disabled="aiAssistantBusy || !aiAssistantInput.trim()">
-                                    发送
+                                <button class="btn-primary ai-send-button" @click="sendAssistantMessage" :disabled="aiAssistantBusy || !!aiAssistantPrepared || !aiAssistantInput.trim()">
+                                    预览
                                 </button>
                             </div>
                         </footer>
                     </main>
 
-                    <aside class="ai-plan-panel" :class="{ 'is-empty': !aiAssistantPlan && !aiAssistantLastResult }" aria-label="AI 计划审核">
+                    <aside v-if="aiAssistantPlan || aiAssistantLastResult" class="ai-plan-panel" aria-label="AI 计划审核">
                         <div class="ai-plan-heading">
                             <div>
                                 <span>本轮审核</span>
@@ -203,6 +197,74 @@
                             <span>计划会在通过安全校验后显示在这里</span>
                         </div>
                     </aside>
+                </div>
+
+                <div v-if="aiAssistantPrepared" class="ai-send-review-layer" role="alertdialog" aria-modal="true" aria-labelledby="ai-send-review-title">
+                    <section class="ai-send-review" :class="{ sensitive: aiAssistantPrepared.manifest.includes_field_values }">
+                        <div class="ai-send-review-header">
+                            <div>
+                                <span class="ai-send-state" :class="{ sending: aiAssistantBusy }">
+                                    {{ aiAssistantBusy ? '正在处理' : '尚未发送' }}
+                                </span>
+                                <h3 id="ai-send-review-title">
+                                    {{ aiAssistantPrepared.manifest.includes_field_values ? '确认发送可能含字段值的内容' : '确认发送到第三方 AI' }}
+                                </h3>
+                            </div>
+                            <button class="modal-close" @click="cancelPreparedTurn" :disabled="aiAssistantBusy" title="返回修改">✕</button>
+                        </div>
+
+                        <dl class="ai-send-destination">
+                            <div>
+                                <dt>目标服务</dt>
+                                <dd>{{ aiAssistantPrepared.manifest.provider_name || '自定义接口' }}</dd>
+                            </div>
+                            <div>
+                                <dt>目标域名</dt>
+                                <dd>{{ aiAssistantPrepared.manifest.target_host || '未知' }}</dd>
+                            </div>
+                            <div>
+                                <dt>模型</dt>
+                                <dd>{{ aiAssistantPrepared.manifest.model || aiStatus?.model || '未记录' }}</dd>
+                            </div>
+                            <div>
+                                <dt>分析范围</dt>
+                                <dd>
+                                    {{ aiAssistantPrepared.scope === 'all' ? '全部条目' : aiAssistantPrepared.scope === 'selection' ? '已选条目' : '当前视图' }}
+                                    <span v-if="aiAssistantPrepared.manifest.entry_count"> · {{ aiAssistantPrepared.manifest.entry_count }} 个</span>
+                                </dd>
+                            </div>
+                        </dl>
+
+                        <div class="ai-send-section">
+                            <strong>本轮将发送</strong>
+                            <div class="ai-send-data-types">
+                                <span v-for="dataType in aiAssistantPrepared.manifest.data_types" :key="dataType">{{ dataType }}</span>
+                            </div>
+                        </div>
+
+                        <div class="ai-send-section">
+                            <strong>本轮提示词</strong>
+                            <pre>{{ aiAssistantPrepared.originalMessage }}</pre>
+                        </div>
+
+                        <div v-if="aiAssistantPrepared.manifest.warnings?.length" class="ai-risk-list">
+                            <strong>需要注意</strong>
+                            <span v-for="warning in aiAssistantPrepared.manifest.warnings" :key="warning.location">
+                                {{ warning.location }}：{{ warning.preview }}
+                            </span>
+                        </div>
+                        <p v-if="aiAssistantError" class="error-message ai-send-review-error">{{ aiAssistantError }}</p>
+                        <div v-if="aiAssistantBusy" class="ai-send-progress">
+                            <span class="loading-spinner small"></span>
+                            <span>{{ aiAssistantStage || '正在处理已确认的请求' }}</span>
+                        </div>
+                        <div class="ai-send-review-actions">
+                            <button class="btn-secondary" @click="cancelPreparedTurn" :disabled="aiAssistantBusy">返回修改</button>
+                            <button class="btn-primary" @click="submitPreparedTurn" :disabled="aiAssistantBusy">
+                                {{ aiAssistantBusy ? '处理中...' : '确认并发送一次' }}
+                            </button>
+                        </div>
+                    </section>
                 </div>
             </section>
         </div>
