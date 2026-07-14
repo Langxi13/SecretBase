@@ -293,6 +293,10 @@
     font-size: 32px;
 }
 
+.ai-empty-configure {
+    min-width: 168px;
+}
+
 .ai-starter-row {
     display: flex;
     flex-wrap: wrap;
@@ -416,6 +420,7 @@
 }
 
 .ai-send-button {
+    width: auto;
     flex: 0 0 auto;
     min-width: 96px;
     min-height: 34px;

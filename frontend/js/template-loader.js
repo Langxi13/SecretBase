@@ -5,7 +5,7 @@
  * 但入口页不再承担全部页面和弹窗的标记。
  */
 (function () {
-    const TEMPLATE_VERSION = '20260714-ai-v3';
+    const TEMPLATE_VERSION = '20260714-ai-v4';
     const templatePaths = [
         'templates/app-layout.html',
         'templates/workspace-list.html',

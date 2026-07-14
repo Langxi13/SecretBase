@@ -32,6 +32,7 @@ assertIncludes(markup, '本轮提示词', '确认页必须展示本轮提示词'
 assertIncludes(markup, "class=\"modal-overlay\" :class=\"{ 'ai-subpanel-overlay': showAiAssistant }\"", '专业工具和服务设置必须在 AI 管家上层打开');
 assertIncludes(markup, 'class="ai-composer-surface"', 'AI 输入器必须使用独立的居中输入表面');
 assertIncludes(markup, 'class="ai-composer-footer"', '模式、范围和发送操作必须收敛到输入器控制栏');
+assertIncludes(markup, 'class="btn-primary inline ai-send-button"', 'AI 发送按钮必须使用行内按钮语义');
 assertIncludes(markup, '应用已选计划', 'AI 写入必须经过逐项计划审核');
 assertIncludes(markup, '撤销本次操作', 'AI 写入后必须提供恢复快照撤销入口');
 assertIncludes(controller, '/ai/assistant/turns/preview', '前端必须先请求不含提示词的发送清单');
@@ -58,6 +59,11 @@ assertMatches(
     aiWorkspaceCss,
     /\.ai-composer-inner\s*\{[\s\S]*?width:\s*min\(920px,\s*100%\)[\s\S]*?margin:\s*0\s+auto/,
     'AI 输入器必须居中限宽，避免宽屏输入行过长'
+);
+assertMatches(
+    aiWorkspaceCss,
+    /\.ai-send-button\s*\{[\s\S]*?width:\s*auto;[\s\S]*?flex:\s*0\s+0\s+auto/,
+    'AI 发送按钮必须覆盖全局全宽按钮规则，避免挤压输入器工具栏'
 );
 assertNotIncludes(aiWorkspaceCss, '.ai-composer-input', '旧的分离式输入栏样式必须删除');
 assertIncludes(aiState, "const aiAssistantMode = ref('assistant')", 'AI 管家必须默认使用普通隐私模式');

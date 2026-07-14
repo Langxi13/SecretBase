@@ -61,7 +61,7 @@
                         <div v-if="!aiStatus?.configured" class="ai-empty-state">
                             <span class="ai-empty-icon">✦</span>
                             <h3>配置 AI 服务后开始使用</h3>
-                            <button class="btn-primary" @click="openAssistantSettings">配置 AI 服务</button>
+                            <button class="btn-primary inline ai-empty-configure" @click="openAssistantSettings">配置 AI 服务</button>
                         </div>
                         <div v-else class="ai-chat-thread" aria-live="polite">
                             <div v-if="aiAssistantMessages.length === 0" class="ai-empty-state compact">
@@ -121,7 +121,7 @@
                                                 {{ aiAssistantMode === 'sensitive_create' ? '逐次确认 · 可能含新字段值' : '逐次确认 · 不含已有字段值' }}
                                             </span>
                                         </div>
-                                        <button class="btn-primary ai-send-button" @click="sendAssistantMessage" :disabled="aiAssistantBusy || !!aiAssistantPrepared || !aiAssistantInput.trim()">
+                                        <button class="btn-primary inline ai-send-button" @click="sendAssistantMessage" :disabled="aiAssistantBusy || !!aiAssistantPrepared || !aiAssistantInput.trim()">
                                             {{ aiAssistantBusy ? '处理中' : '预览发送' }}
                                         </button>
                                     </div>
