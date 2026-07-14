@@ -12,6 +12,8 @@ const settingsController = read('frontend/js/controllers/ai-settings-controller.
 const aiState = read('frontend/js/ai-state.js');
 const sessionController = read('frontend/js/app-session-controller.js');
 const aiWorkspaceCss = read('frontend/css/ai-workspace.css');
+const aiReviewCss = read('frontend/css/ai-send-review.css');
+const aiComponentsCss = read('frontend/css/ai-components.css');
 
 function assertIncludes(content, needle, message) {
     if (!content.includes(needle)) throw new Error(message);
@@ -33,6 +35,14 @@ assertIncludes(markup, "class=\"modal-overlay\" :class=\"{ 'ai-subpanel-overlay'
 assertIncludes(markup, 'class="ai-composer-surface"', 'AI 输入器必须使用独立的居中输入表面');
 assertIncludes(markup, 'class="ai-composer-footer"', '模式、范围和发送操作必须收敛到输入器控制栏');
 assertIncludes(markup, 'class="btn-primary inline ai-send-button"', 'AI 发送按钮必须使用行内按钮语义');
+assertIncludes(markup, 'class="ai-quick-command-bar"', '常用 AI 整理指令必须固定显示在输入框上方');
+assertIncludes(markup, '>分类</button>', '快捷整理栏必须提供分类体检入口');
+assertIncludes(markup, '>标签清理</button>', '快捷整理栏必须提供标签清理入口');
+assertIncludes(markup, '>字段名</button>', '快捷整理栏必须提供字段规范入口');
+assertIncludes(markup, "'计划已降级'", '不可执行计划必须在审核栏明确标记为已降级');
+assertNotIncludes(markup, 'class="ai-starter-row"', '快捷指令不应只在空会话中央显示一次');
+assertIncludes(markup, 'message.meta?.warnings?.length', '计划降级警告必须跟随 AI 回复显示在聊天区');
+assertIncludes(markup, 'class="btn-secondary ai-review-back"', '发送确认页必须提供不换行的返回修改操作');
 assertIncludes(markup, 'class="ai-history-rail"', '对话历史收起后必须保留清晰的侧栏展开入口');
 assertIncludes(markup, 'class="btn-icon compact ai-history-collapse"', '对话历史侧栏必须提供内嵌收起操作');
 assertNotIncludes(markup, ':class="{ active: aiAssistantHistoryOpen }"', '顶部不应继续保留不直观的历史切换小按钮');
@@ -52,6 +62,7 @@ assertMatches(
 );
 assertIncludes(controller, 'const limit = Math.floor(0x100000000 / alphabet.length)', '本地密码生成必须使用无取模偏差的拒绝采样');
 assertIncludes(controller, "if (!prepared?.previewToken || aiAssistantBusy.value) return", '确认操作必须防止重复并发提交');
+assertIncludes(controller, 'const warnings = Array.isArray(data.warnings)', '前端必须保留服务端计划纠正与降级警告');
 assertNotIncludes(controller, 'requires_confirmation', '前端不得根据服务端条件跳过用户发送确认');
 assertMatches(
     aiWorkspaceCss,
@@ -69,6 +80,17 @@ assertMatches(
     'AI 发送按钮必须覆盖全局全宽按钮规则，避免挤压输入器工具栏'
 );
 assertNotIncludes(aiWorkspaceCss, '.ai-composer-input', '旧的分离式输入栏样式必须删除');
+assertNotIncludes(aiWorkspaceCss, '.ai-starter-row', '旧的空会话快捷按钮样式必须删除');
+assertMatches(
+    aiReviewCss,
+    /\.ai-send-review-actions \.ai-review-back,[\s\S]*?white-space:\s*nowrap/,
+    '发送确认按钮必须保持单行并覆盖全宽按钮规则'
+);
+assertMatches(
+    aiComponentsCss,
+    /@media \(min-width: 768px\)[\s\S]*?\.ai-assistant-modal \.modal-footer \.btn-primary[\s\S]*?white-space:\s*nowrap/,
+    '桌面专业 AI 工具底部操作必须保持紧凑单行'
+);
 assertIncludes(aiState, "const aiAssistantMode = ref('assistant')", 'AI 管家必须默认使用普通隐私模式');
 assertIncludes(aiState, "!window.matchMedia('(max-width: 820px)').matches", '桌面端对话历史必须默认展开，窄屏默认收起');
 assertIncludes(sessionController, 'state.showAiAssistant.value = false', '锁定密码库时必须关闭 AI 管家');

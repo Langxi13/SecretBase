@@ -51,7 +51,8 @@ const api = {
                 data: {
                     conversation_id: 'conversation-1',
                     message: '已生成建议',
-                    actions: []
+                    actions: [],
+                    warnings: ['计划类型已自动纠正']
                 }
             };
         }
@@ -90,6 +91,8 @@ const aiAssistantInput = ref('请整理密码组，内部提示词 XYZ');
 const aiAssistantBusy = ref(false);
 const aiAssistantPrepared = ref(null);
 const aiAssistantMessages = ref([]);
+const aiAssistantPlan = ref(null);
+const aiAssistantLastResult = ref(null);
 let settingsOpened = 0;
 
 const controller = context.window.SecretBaseAiAssistantController.createAiAssistantController({
@@ -114,8 +117,8 @@ const controller = context.window.SecretBaseAiAssistantController.createAiAssist
     aiAssistantConversationId: ref('conversation-1'),
     aiAssistantMessages,
     aiAssistantPrepared,
-    aiAssistantPlan: ref(null),
-    aiAssistantLastResult: ref(null),
+    aiAssistantPlan,
+    aiAssistantLastResult,
     aiAssistantHistoryOpen: ref(false),
     searchQuery: ref(''),
     selectedSearchScopes: ref([]),
@@ -172,6 +175,9 @@ const controller = context.window.SecretBaseAiAssistantController.createAiAssist
     if (aiAssistantBusy.value) throw new Error('请求完成后必须解除忙碌状态');
     if (aiAssistantMessages.value.some(message => message.pending)) {
         throw new Error('请求完成后必须移除临时用户消息');
+    }
+    if (aiAssistantLastResult.value?.warnings?.[0] !== '计划类型已自动纠正') {
+        throw new Error('无可执行计划时仍必须保留 AI 回复及计划纠正警告');
     }
 
     await controller.openProfessionalAiTools();

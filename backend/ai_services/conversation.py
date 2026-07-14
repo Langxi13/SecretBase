@@ -448,10 +448,11 @@ def _normalize_assistant_response(payload: dict, turn: dict) -> tuple[str, str, 
         })
 
     if len(domains) > 1:
-        raise HTTPException(status_code=422, detail="AI 将不同类型的管理任务混在同一计划中，已拒绝")
+        warnings.append("AI 将不同类型的管理任务混在同一计划中；系统已保留文字回复，但不会生成可执行计划。请按标签、密码组或条目结构分开询问。")
+        return message, "none", [], [], warnings
     actual_domain = next(iter(domains), "none")
     if domain not in {"none", actual_domain}:
-        raise HTTPException(status_code=422, detail="AI 返回的计划类型与动作不一致")
+        warnings.append("AI 声明的计划类型与实际动作不一致；系统已按实际动作类型重新归类，请在应用前仔细审核。")
     return message, actual_domain, normalized, display, warnings
 
 
@@ -540,7 +541,15 @@ async def submit_turn(turn_token: str, acknowledge_risk: bool) -> dict:
     }) if actions else None
     append_messages(turn["conversation_id"], [
         {"role": "user", "content": turn["message"]},
-        {"role": "assistant", "content": message, "meta": {"domain": domain, "action_count": len(actions)}},
+        {
+            "role": "assistant",
+            "content": message,
+            "meta": {
+                "domain": domain,
+                "action_count": len(actions),
+                "warnings": warnings,
+            },
+        },
     ])
     navigation = None
     if domain == "navigation" and len(actions) == 1:

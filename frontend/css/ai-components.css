@@ -360,3 +360,12 @@
     margin: 6px 0;
     color: var(--text-primary);
 }
+
+@media (min-width: 768px) {
+    .ai-assistant-modal .modal-footer .btn-primary,
+    .ai-assistant-modal .modal-footer .btn-secondary {
+        width: auto;
+        flex: 0 0 auto;
+        white-space: nowrap;
+    }
+}

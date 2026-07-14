@@ -220,9 +220,11 @@
             aiAssistantPrepared.value = null;
             aiAssistantInput.value = '';
             aiAssistantMode.value = 'assistant';
+            const warnings = Array.isArray(data.warnings) ? data.warnings.filter(Boolean) : [];
             if (data.plan_token) {
                 aiAssistantPlan.value = {
                     ...data,
+                    warnings,
                     actions: (data.actions || []).map(action => ({
                         ...action,
                         selected: true,
@@ -236,8 +238,10 @@
                 aiAssistantPlan.value = null;
             }
             aiAssistantLastResult.value = data.navigation
-                ? { navigation: data.navigation }
-                : (data.message ? { message: data.message } : null);
+                ? { navigation: data.navigation, warnings }
+                : (data.message || warnings.length
+                    ? { message: data.message || 'AI 回复已保留，但没有生成可执行计划。', warnings }
+                    : null);
             refreshAssistantContext(aiAssistantConversationId.value);
         }
 

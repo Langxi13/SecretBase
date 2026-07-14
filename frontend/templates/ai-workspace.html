@@ -93,11 +93,6 @@
                             <div v-if="aiAssistantMessages.length === 0" class="ai-empty-state compact">
                                 <span class="ai-empty-icon">✦</span>
                                 <h3>今天想整理什么？</h3>
-                                <div class="ai-starter-row">
-                                    <button @click="useAssistantQuickReply('统计当前范围内未分组和未加标签的条目')">检查分类</button>
-                                    <button @click="useAssistantQuickReply('帮我检查当前范围内的字段命名是否统一')">检查字段名</button>
-                                    <button @click="useAssistantQuickReply('帮我整理当前范围内的密码组')">整理密码组</button>
-                                </div>
                             </div>
                             <article
                                 v-for="message in aiAssistantMessages"
@@ -110,6 +105,9 @@
                                     <span v-if="message.pending"> · 已确认</span>
                                 </div>
                                 <p>{{ message.content }}</p>
+                                <div v-if="message.role === 'assistant' && message.meta?.warnings?.length" class="ai-message-warnings">
+                                    <span v-for="warning in message.meta.warnings" :key="warning">{{ warning }}</span>
+                                </div>
                             </article>
                             <div v-if="aiAssistantBusy" class="ai-chat-progress">
                                 <span class="loading-spinner small"></span>
@@ -123,6 +121,16 @@
 
                         <footer class="ai-composer">
                             <div class="ai-composer-inner">
+                                <div class="ai-quick-command-bar" aria-label="AI 快捷整理指令">
+                                    <span class="ai-quick-command-label">快捷整理</span>
+                                    <div class="ai-quick-command-list">
+                                        <button type="button" @click="useAssistantQuickReply('统计当前范围内未分组和未加标签的条目')" :disabled="aiAssistantBusy || !!aiAssistantPrepared || !aiStatus?.configured" title="统计未分类条目">分类</button>
+                                        <button type="button" @click="useAssistantQuickReply('检查当前范围内重复、近义、过细或无效的标签，只生成标签管理计划')" :disabled="aiAssistantBusy || !!aiAssistantPrepared || !aiStatus?.configured" title="生成标签清理计划">标签清理</button>
+                                        <button type="button" @click="useAssistantQuickReply('检查当前范围内密码组的分类是否合理，只生成密码组管理计划')" :disabled="aiAssistantBusy || !!aiAssistantPrepared || !aiStatus?.configured" title="生成密码组整理计划">密码组</button>
+                                        <button type="button" @click="useAssistantQuickReply('检查当前范围内字段命名是否统一，只生成字段结构调整计划')" :disabled="aiAssistantBusy || !!aiAssistantPrepared || !aiStatus?.configured" title="生成字段规范计划">字段名</button>
+                                        <button type="button" @click="useAssistantQuickReply('检查当前范围内适合拆分或复用为空条目模板的结构，只生成条目创建计划')" :disabled="aiAssistantBusy || !!aiAssistantPrepared || !aiStatus?.configured" title="查找可复用条目模板">条目模板</button>
+                                    </div>
+                                </div>
                                 <div class="ai-composer-surface">
                                     <textarea
                                         v-model="aiAssistantInput"
@@ -159,14 +167,17 @@
                     <aside v-if="aiAssistantPlan || aiAssistantLastResult" class="ai-plan-panel" aria-label="AI 计划审核">
                         <div class="ai-plan-heading">
                             <div>
-                                <span>本轮审核</span>
-                                <strong>{{ aiAssistantPlan ? aiAssistantPlan.actions.length + ' 项计划' : '暂无计划' }}</strong>
+                                <span>{{ aiAssistantPlan ? '本轮审核' : 'AI 回复' }}</span>
+                                <strong>{{ aiAssistantPlan ? aiAssistantPlan.actions.length + ' 项计划' : aiAssistantLastResult?.warnings?.length ? '计划已降级' : '无需操作' }}</strong>
                             </div>
                             <span class="ai-scope-badge">{{ aiAssistantScope === 'all' ? '全部条目' : aiAssistantScope === 'selection' ? '已选条目' : '当前视图' }}</span>
                         </div>
                         <div v-if="aiAssistantPlan" class="ai-plan-content">
                             <p>{{ aiAssistantPlan.message }}</p>
                             <p class="info-message">{{ aiAssistantPlan.privacy_note }}</p>
+                            <div v-if="aiAssistantPlan.warnings?.length" class="ai-plan-warning-list">
+                                <span v-for="warning in aiAssistantPlan.warnings" :key="warning">{{ warning }}</span>
+                            </div>
                             <div
                                 v-for="action in aiAssistantPlan.actions"
                                 :key="action.id"
@@ -215,6 +226,9 @@
                         </div>
                         <div v-else-if="aiAssistantLastResult?.message" class="ai-plan-empty">
                             <p>{{ aiAssistantLastResult.message }}</p>
+                            <div v-if="aiAssistantLastResult.warnings?.length" class="ai-plan-warning-list">
+                                <span v-for="warning in aiAssistantLastResult.warnings" :key="warning">{{ warning }}</span>
+                            </div>
                             <div v-if="aiAssistantLastResult.emptyGroups?.length" class="ai-empty-group-actions">
                                 <span>以下密码组已经为空，可单独确认删除：</span>
                                 <button
@@ -292,8 +306,8 @@
                             <span>{{ aiAssistantStage || '正在处理已确认的请求' }}</span>
                         </div>
                         <div class="ai-send-review-actions">
-                            <button class="btn-secondary" @click="cancelPreparedTurn" :disabled="aiAssistantBusy">返回修改</button>
-                            <button class="btn-primary" @click="submitPreparedTurn" :disabled="aiAssistantBusy">
+                            <button class="btn-secondary ai-review-back" @click="cancelPreparedTurn" :disabled="aiAssistantBusy">返回修改</button>
+                            <button class="btn-primary inline ai-review-submit" @click="submitPreparedTurn" :disabled="aiAssistantBusy">
                                 {{ aiAssistantBusy ? '处理中...' : '确认并发送一次' }}
                             </button>
                         </div>

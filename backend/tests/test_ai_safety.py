@@ -102,7 +102,7 @@ class AiSafetyTests(unittest.TestCase):
         self.assertIn("生产控制台", display[0]["title"])
         self.assertNotIn(self.entry.id, display[0]["title"])
 
-    def test_mixed_tag_and_group_plan_is_rejected(self):
+    def test_mixed_tag_and_group_plan_keeps_reply_but_discards_actions(self):
         payload = {
             "message": "混合建议",
             "domain": "tags",
@@ -114,11 +114,36 @@ class AiSafetyTests(unittest.TestCase):
         }
 
         with patch.object(conversation, "get_vault_data", return_value=self.vault):
-            with self.assertRaises(HTTPException) as raised:
-                conversation._normalize_assistant_response(payload, self.turn)
+            message, domain, actions, display, warnings = conversation._normalize_assistant_response(
+                payload,
+                self.turn,
+            )
 
-        self.assertEqual(raised.exception.status_code, 422)
-        self.assertIn("不同类型", raised.exception.detail)
+        self.assertEqual(message, "混合建议")
+        self.assertEqual(domain, "none")
+        self.assertEqual(actions, [])
+        self.assertEqual(display, [])
+        self.assertTrue(any("不会生成可执行计划" in warning for warning in warnings))
+
+    def test_mismatched_domain_is_corrected_without_losing_plan(self):
+        payload = {
+            "message": "建议整理密码组",
+            "domain": "tags",
+            "actions": [{"type": "create_group", "name": "工作"}],
+            "warnings": [],
+        }
+
+        with patch.object(conversation, "get_vault_data", return_value=self.vault):
+            message, domain, actions, display, warnings = conversation._normalize_assistant_response(
+                payload,
+                self.turn,
+            )
+
+        self.assertEqual(message, "建议整理密码组")
+        self.assertEqual(domain, "groups")
+        self.assertEqual(actions[0]["type"], "create_group")
+        self.assertEqual(display[0]["title"], "新建密码组「工作」")
+        self.assertTrue(any("重新归类" in warning for warning in warnings))
 
     def test_unknown_or_blacklisted_action_is_rejected(self):
         payload = {

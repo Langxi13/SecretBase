@@ -294,6 +294,21 @@
     background: color-mix(in srgb, var(--color-primary) 10%, var(--bg-secondary));
 }
 
+.ai-message-warnings {
+    display: flex;
+    max-width: 100%;
+    flex-direction: column;
+    gap: 4px;
+    margin-top: 6px;
+    padding: 7px 10px;
+    border-left: 3px solid var(--color-warning);
+    background: color-mix(in srgb, var(--color-warning) 7%, var(--bg-secondary));
+    color: var(--color-warning);
+    font-size: var(--font-size-xs);
+    line-height: 1.5;
+    overflow-wrap: anywhere;
+}
+
 .ai-chat-message.is-pending p {
     opacity: 0.78;
 }
@@ -347,20 +362,53 @@
     min-width: 168px;
 }
 
-.ai-starter-row {
+.ai-quick-command-bar,
+.ai-quick-command-list {
     display: flex;
-    flex-wrap: wrap;
-    justify-content: center;
-    gap: 8px;
+    align-items: center;
 }
 
-.ai-starter-row button {
-    padding: 8px 10px;
+.ai-quick-command-bar {
+    gap: 9px;
+    min-height: 32px;
+    margin-bottom: 8px;
+}
+
+.ai-quick-command-label {
+    flex: 0 0 auto;
+    color: var(--text-secondary);
+    font-size: var(--font-size-xs);
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+.ai-quick-command-list {
+    flex: 1;
+    min-width: 0;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.ai-quick-command-list button {
+    min-height: 28px;
+    padding: 4px 9px;
     border: 1px solid var(--border-color);
     border-radius: 6px;
-    background: var(--bg-elevated);
+    background: var(--bg-secondary);
     color: var(--text-secondary);
-    font-size: var(--font-size-sm);
+    font-size: var(--font-size-xs);
+    white-space: nowrap;
+}
+
+.ai-quick-command-list button:hover:not(:disabled) {
+    border-color: color-mix(in srgb, var(--color-primary) 42%, var(--border-color));
+    background: color-mix(in srgb, var(--color-primary) 7%, var(--bg-secondary));
+    color: var(--text-primary);
+}
+
+.ai-quick-command-list button:disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
 }
 
 .ai-assistant-error {
@@ -524,6 +572,21 @@
 .ai-plan-content > p {
     margin: 0 0 10px;
     line-height: 1.5;
+}
+
+.ai-plan-warning-list {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    margin: 10px 0;
+    padding: 9px 10px;
+    border: 1px solid color-mix(in srgb, var(--color-warning) 42%, var(--border-color));
+    border-radius: 6px;
+    background: color-mix(in srgb, var(--color-warning) 7%, var(--bg-secondary));
+    color: var(--color-warning);
+    font-size: var(--font-size-xs);
+    line-height: 1.5;
+    overflow-wrap: anywhere;
 }
 
 .ai-plan-item {
@@ -774,6 +837,10 @@
     .ai-send-button {
         min-width: 84px;
         padding-inline: 8px;
+    }
+
+    .ai-quick-command-bar {
+        display: none;
     }
 
     .ai-base-url-row {
