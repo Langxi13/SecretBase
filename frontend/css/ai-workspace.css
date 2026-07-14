@@ -133,6 +133,56 @@
     background: var(--bg-secondary);
 }
 
+.ai-history-backdrop {
+    display: none;
+}
+
+.ai-history-toolbar-actions {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.ai-history-collapse {
+    font-size: 20px;
+    line-height: 1;
+}
+
+.ai-history-rail {
+    display: flex;
+    flex: 0 0 44px;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 10px;
+    padding: 14px 6px;
+    border-right: 1px solid var(--border-color);
+    background: var(--bg-secondary);
+    color: var(--text-secondary);
+}
+
+.ai-history-rail:hover {
+    background: var(--bg-elevated);
+    color: var(--color-primary);
+}
+
+.ai-history-rail-icon {
+    font-size: 18px;
+    line-height: 1;
+}
+
+.ai-history-rail-label {
+    writing-mode: vertical-rl;
+    letter-spacing: 0;
+    font-size: var(--font-size-xs);
+}
+
+.ai-history-rail-arrow {
+    margin-top: 2px;
+    font-size: 18px;
+    line-height: 1;
+}
+
 .ai-history-toolbar,
 .ai-history-footer {
     display: flex;
@@ -635,6 +685,28 @@
         left: 0;
         width: min(290px, 88vw);
         box-shadow: var(--shadow-lg);
+    }
+
+    .ai-history-backdrop {
+        position: absolute;
+        z-index: 3;
+        inset: 0;
+        display: block;
+        background: color-mix(in srgb, var(--bg-primary) 58%, transparent);
+    }
+
+    .ai-history-rail {
+        position: absolute;
+        z-index: 3;
+        top: 10px;
+        left: 0;
+        width: 38px;
+        min-height: 92px;
+        padding: 10px 5px;
+        border: 1px solid var(--border-color);
+        border-left: 0;
+        border-radius: 0 6px 6px 0;
+        box-shadow: var(--shadow-sm);
     }
 
     .ai-workspace-body {

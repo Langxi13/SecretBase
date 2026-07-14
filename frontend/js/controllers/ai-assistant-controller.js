@@ -65,6 +65,16 @@
             pendingMessageId = '';
         }
 
+        function collapseHistoryOnNarrowScreen() {
+            if (
+                typeof window !== 'undefined'
+                && typeof window.matchMedia === 'function'
+                && window.matchMedia('(max-width: 820px)').matches
+            ) {
+                aiAssistantHistoryOpen.value = false;
+            }
+        }
+
         function currentFilters() {
             if (aiAssistantScope.value === 'all') return {};
             const filters = {
@@ -94,6 +104,7 @@
             aiAssistantPlan.value = null;
             aiAssistantLastResult.value = null;
             await loadConversations();
+            collapseHistoryOnNarrowScreen();
             return result.data;
         }
 
@@ -108,6 +119,7 @@
                 aiAssistantPlan.value = null;
                 aiAssistantLastResult.value = null;
             }
+            collapseHistoryOnNarrowScreen();
             scrollAssistantToBottom();
         }
 

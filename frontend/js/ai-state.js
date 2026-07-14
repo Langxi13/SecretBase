@@ -51,7 +51,11 @@
         const aiAssistantPrepared = ref(null);
         const aiAssistantPlan = ref(null);
         const aiAssistantLastResult = ref(null);
-        const aiAssistantHistoryOpen = ref(false);
+        const aiAssistantHistoryOpen = ref(
+            typeof window === 'undefined'
+            || typeof window.matchMedia !== 'function'
+            || !window.matchMedia('(max-width: 820px)').matches
+        );
 
         function resetAiAssistantSession() {
             aiAssistantInput.value = '';

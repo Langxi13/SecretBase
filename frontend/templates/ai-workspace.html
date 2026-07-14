@@ -18,7 +18,6 @@
                         </div>
                     </div>
                     <div class="ai-workspace-actions">
-                        <button class="btn-icon compact" :class="{ active: aiAssistantHistoryOpen }" @click="aiAssistantHistoryOpen = !aiAssistantHistoryOpen" title="对话历史" aria-label="对话历史">◷</button>
                         <button class="ai-header-action" @click="openProfessionalAiTools" :disabled="aiAssistantBusy" title="打开专业工具">
                             <span aria-hidden="true">⌘</span><span>专业工具</span>
                         </button>
@@ -30,10 +29,25 @@
                 </header>
 
                 <div class="ai-workspace-body">
-                    <aside v-if="aiAssistantHistoryOpen" class="ai-history-panel" aria-label="AI 对话历史">
+                    <button
+                        v-if="aiAssistantHistoryOpen"
+                        class="ai-history-backdrop"
+                        @click="aiAssistantHistoryOpen = false"
+                        aria-label="收起对话历史"
+                    ></button>
+                    <aside v-if="aiAssistantHistoryOpen" id="ai-assistant-history" class="ai-history-panel" aria-label="AI 对话历史">
                         <div class="ai-history-toolbar">
                             <strong>对话历史</strong>
-                            <button class="btn-icon compact" @click="createAssistantConversation" title="新建对话">＋</button>
+                            <div class="ai-history-toolbar-actions">
+                                <button class="btn-icon compact" @click="createAssistantConversation" title="新建对话" aria-label="新建对话">＋</button>
+                                <button
+                                    class="btn-icon compact ai-history-collapse"
+                                    @click="aiAssistantHistoryOpen = false"
+                                    title="收起对话历史"
+                                    aria-label="收起对话历史"
+                                    aria-controls="ai-assistant-history"
+                                >‹</button>
+                            </div>
                         </div>
                         <div class="ai-history-list">
                             <button
@@ -56,6 +70,18 @@
                             <button class="btn-small" @click="clearAssistantHistory">清除全部</button>
                         </div>
                     </aside>
+                    <button
+                        v-else
+                        class="ai-history-rail"
+                        @click="aiAssistantHistoryOpen = true"
+                        title="展开对话历史"
+                        aria-label="展开对话历史"
+                        aria-controls="ai-assistant-history"
+                    >
+                        <span class="ai-history-rail-icon" aria-hidden="true">◷</span>
+                        <span class="ai-history-rail-label">对话</span>
+                        <span class="ai-history-rail-arrow" aria-hidden="true">›</span>
+                    </button>
 
                     <main class="ai-chat-column">
                         <div v-if="!aiStatus?.configured" class="ai-empty-state">

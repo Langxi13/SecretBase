@@ -33,6 +33,9 @@ assertIncludes(markup, "class=\"modal-overlay\" :class=\"{ 'ai-subpanel-overlay'
 assertIncludes(markup, 'class="ai-composer-surface"', 'AI 输入器必须使用独立的居中输入表面');
 assertIncludes(markup, 'class="ai-composer-footer"', '模式、范围和发送操作必须收敛到输入器控制栏');
 assertIncludes(markup, 'class="btn-primary inline ai-send-button"', 'AI 发送按钮必须使用行内按钮语义');
+assertIncludes(markup, 'class="ai-history-rail"', '对话历史收起后必须保留清晰的侧栏展开入口');
+assertIncludes(markup, 'class="btn-icon compact ai-history-collapse"', '对话历史侧栏必须提供内嵌收起操作');
+assertNotIncludes(markup, ':class="{ active: aiAssistantHistoryOpen }"', '顶部不应继续保留不直观的历史切换小按钮');
 assertIncludes(markup, '应用已选计划', 'AI 写入必须经过逐项计划审核');
 assertIncludes(markup, '撤销本次操作', 'AI 写入后必须提供恢复快照撤销入口');
 assertIncludes(controller, '/ai/assistant/turns/preview', '前端必须先请求不含提示词的发送清单');
@@ -67,6 +70,7 @@ assertMatches(
 );
 assertNotIncludes(aiWorkspaceCss, '.ai-composer-input', '旧的分离式输入栏样式必须删除');
 assertIncludes(aiState, "const aiAssistantMode = ref('assistant')", 'AI 管家必须默认使用普通隐私模式');
+assertIncludes(aiState, "!window.matchMedia('(max-width: 820px)').matches", '桌面端对话历史必须默认展开，窄屏默认收起');
 assertIncludes(sessionController, 'state.showAiAssistant.value = false', '锁定密码库时必须关闭 AI 管家');
 assertIncludes(sessionController, 'state.resetAiAssistantSession()', '锁定密码库时必须清除 AI 管家敏感状态');
 assertIncludes(aiState, "aiAssistantInput.value = ''", 'AI 会话重置必须清除页面内待确认提示词');
