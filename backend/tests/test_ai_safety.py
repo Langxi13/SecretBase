@@ -44,6 +44,24 @@ class AiSafetyTests(unittest.TestCase):
             },
         }
 
+    def test_group_management_prompt_is_not_misclassified_as_password_generation(self):
+        result = conversation._local_response(
+            "检查当前范围内密码组的分类是否合理，只生成密码组管理计划",
+            [self.entry],
+        )
+
+        self.assertIsNone(result)
+
+    def test_password_generation_remains_a_local_action(self):
+        result = conversation._local_response("帮我生成一个新密码", [self.entry])
+
+        self.assertEqual(result["local_action"]["type"], "generate_password")
+
+    def test_password_generation_inside_a_group_remains_a_local_action(self):
+        result = conversation._local_response("在工作密码组中生成一个新密码", [self.entry])
+
+        self.assertEqual(result["local_action"]["type"], "generate_password")
+
     def test_metadata_dto_excludes_values_full_urls_remarks_and_real_ids(self):
         metadata = entry_metadata(self.entry, "E001")
         serialized = repr(metadata)

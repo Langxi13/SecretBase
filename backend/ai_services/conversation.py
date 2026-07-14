@@ -109,7 +109,12 @@ def _local_response(message: str, entries: list) -> dict | None:
         return {
             "message": f"当前范围共有 {len(entries)} 个条目，其中 {untagged} 个没有标签，{ungrouped} 个没有密码组。",
         }
-    if "生成" in compact and any(word in compact for word in ("密码", "口令", "密钥")):
+    password_generation_text = compact
+    for taxonomy_term in ("密码组", "密码分组", "口令组", "密钥组"):
+        password_generation_text = password_generation_text.replace(taxonomy_term, "")
+    if "生成" in password_generation_text and any(
+        word in password_generation_text for word in ("密码", "口令", "密钥")
+    ):
         return {
             "message": "真实密码不会交给 AI 生成。你可以使用本机加密安全随机数生成器创建一个新密码。",
             "local_action": {"type": "generate_password", "length": 20},
