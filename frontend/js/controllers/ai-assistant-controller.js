@@ -238,9 +238,13 @@
                 aiAssistantPlan.value = null;
             }
             aiAssistantLastResult.value = data.navigation
-                ? { navigation: data.navigation, warnings }
+                ? { navigation: data.navigation, warnings, privacyNote: data.privacy_note || '' }
                 : (data.message || warnings.length
-                    ? { message: data.message || 'AI 回复已保留，但没有生成可执行计划。', warnings }
+                    ? {
+                        message: data.message || 'AI 回复已保留，但没有生成可执行计划。',
+                        warnings,
+                        privacyNote: data.privacy_note || ''
+                    }
                     : null);
             refreshAssistantContext(aiAssistantConversationId.value);
         }
@@ -284,7 +288,8 @@
                     aiAssistantLastResult.value = {
                         navigation: turn.local_result.navigation || null,
                         localAction: turn.local_result.local_action || null,
-                        message: turn.local_result.message || ''
+                        message: turn.local_result.message || '',
+                        privacyNote: turn.local_result.privacy_note || ''
                     };
                     refreshAssistantContext(aiAssistantConversationId.value);
                     return;

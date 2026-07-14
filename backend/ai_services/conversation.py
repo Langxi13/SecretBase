@@ -13,6 +13,11 @@ from fastapi import HTTPException
 from ai_services import client as ai_client
 from ai_services.actions import _apply_group_update, _ensure_group_meta, _group_exists
 from ai_services.history import append_messages, ensure_conversation, model_context
+from ai_services.instruction_policy import (
+    FIELD_VALUE_ACTIONS_BLOCKED_WARNING,
+    FIELD_VALUE_REQUEST_MESSAGE,
+    requests_existing_field_values as _requests_existing_field_values,
+)
 from ai_services.organize import _clean_name_list, _filter_entries_for_organize
 from ai_services.parsing import _clean_text, _normalize_ai_payload, _to_bool
 from ai_services.pending import consume_pending, discard_pending, put_pending
@@ -74,7 +79,8 @@ ASSISTANT_SYSTEM_PROMPT = """你是 SecretBase 的对话式密码库管家。你
 4. 不得编造 ref，只能引用输入中存在的 ref。
 5. 标签任务和密码组任务不能出现在同一计划中。
 6. 没有必要写入时 actions 返回空数组；不要用虚构动作代替解释。
-7. 所有文字使用中文，不要输出 Markdown 或代码块。"""
+7. 所有文字使用中文，不要输出 Markdown 或代码块。
+8. 用户要求读取、列出、显示、复制或导出已有字段值时，必须明确拒绝并返回 domain="none"、actions=[]；不得用 open_entry 规避限制。"""
 
 
 DOMAIN_ACTIONS = {
@@ -106,12 +112,6 @@ def _local_response(message: str, entries: list) -> dict | None:
             "message": "标签和密码组需要分开处理，请先选择一个方向。",
             "quick_replies": ["先整理标签", "先整理密码组"],
         }
-    if any(word in compact for word in ("多少", "数量", "统计")):
-        untagged = sum(1 for entry in entries if not (entry.tags or []))
-        ungrouped = sum(1 for entry in entries if not (getattr(entry, "groups", []) or []))
-        return {
-            "message": f"当前范围共有 {len(entries)} 个条目，其中 {untagged} 个没有标签，{ungrouped} 个没有密码组。",
-        }
     password_generation_text = compact
     for taxonomy_term in ("密码组", "密码分组", "口令组", "密钥组"):
         password_generation_text = password_generation_text.replace(taxonomy_term, "")
@@ -130,6 +130,17 @@ def _local_response(message: str, entries: list) -> dict | None:
                 "message": f"已定位到「{entry.title}」。敏感值需要在条目详情中由你查看或复制。",
                 "navigation": {"entry_id": entry.id, "entry_title": entry.title},
             }
+    if _requests_existing_field_values(message):
+        return {
+            "message": FIELD_VALUE_REQUEST_MESSAGE,
+            "privacy_note": "本轮请求仅在本地处理，未发送给第三方 AI。",
+        }
+    if any(word in compact for word in ("多少", "数量", "统计")):
+        untagged = sum(1 for entry in entries if not (entry.tags or []))
+        ungrouped = sum(1 for entry in entries if not (getattr(entry, "groups", []) or []))
+        return {
+            "message": f"当前范围共有 {len(entries)} 个条目，其中 {untagged} 个没有标签，{ungrouped} 个没有密码组。",
+        }
     return None
 
 
@@ -329,7 +340,7 @@ def _assistant_payload_from_content(content: str) -> dict:
             len(content) if isinstance(content, str) else 0,
         )
         return {
-            "message": message or "AI 服务未返回可读取的回答，请重试或更换模型。",
+            "message": message or "AI 服务本轮返回了空内容，系统未生成任何操作；请将问题描述得更具体，或更换模型后重试。",
             "domain": "none",
             "actions": [],
             "warnings": [UNSTRUCTURED_RESPONSE_WARNING],
@@ -349,9 +360,18 @@ def _normalize_assistant_response(
     payload: dict,
     turn: dict,
     vault=None,
+    instruction: str = "",
 ) -> tuple[str, str, list[dict], list[dict], list[str]]:
     if not isinstance(payload, dict) or _has_forbidden_key(payload):
         raise HTTPException(status_code=422, detail="AI 返回包含禁止的字段值或无效结构")
+    if _requests_existing_field_values(instruction):
+        return (
+            FIELD_VALUE_REQUEST_MESSAGE,
+            "none",
+            [],
+            [],
+            [FIELD_VALUE_ACTIONS_BLOCKED_WARNING],
+        )
     message = _clean_text(payload.get("message"), 4000) or "已生成建议，请检查后再应用。"
     domain = _clean_text(payload.get("domain"), 40) or "none"
     raw_actions = payload.get("actions") or []
@@ -577,7 +597,11 @@ async def submit_turn(turn_token: str, acknowledge_risk: bool) -> dict:
         ai_config.get("structured_output", "prompt_json"),
     )
     payload = _assistant_payload_from_content(content)
-    message, domain, actions, display, warnings = _normalize_assistant_response(payload, turn)
+    message, domain, actions, display, warnings = _normalize_assistant_response(
+        payload,
+        turn,
+        instruction=turn["message"],
+    )
     plan_token = put_pending("assistant-plan", {
         "mode": "assistant",
         "conversation_id": turn["conversation_id"],

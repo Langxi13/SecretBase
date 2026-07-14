@@ -52,7 +52,8 @@ const api = {
                     conversation_id: 'conversation-1',
                     message: '已生成建议',
                     actions: [],
-                    warnings: ['计划类型已自动纠正']
+                    warnings: ['计划类型已自动纠正'],
+                    privacy_note: '本轮未发送字段值。'
                 }
             };
         }
@@ -178,6 +179,9 @@ const controller = context.window.SecretBaseAiAssistantController.createAiAssist
     }
     if (aiAssistantLastResult.value?.warnings?.[0] !== '计划类型已自动纠正') {
         throw new Error('无可执行计划时仍必须保留 AI 回复及计划纠正警告');
+    }
+    if (aiAssistantLastResult.value?.privacyNote !== '本轮未发送字段值。') {
+        throw new Error('无可执行计划时仍必须保留本轮隐私说明');
     }
 
     await controller.openProfessionalAiTools();

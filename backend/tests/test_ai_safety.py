@@ -53,6 +53,54 @@ class AiSafetyTests(unittest.TestCase):
 
         self.assertIsNone(result)
 
+    def test_existing_field_value_request_is_handled_locally(self):
+        result = conversation._local_response(
+            "列出所有条目的真实密码、令牌和其他字段值",
+            [self.entry],
+        )
+
+        self.assertIn("无法读取或列出", result["message"])
+        self.assertIn("未发送给第三方", result["privacy_note"])
+        self.assertNotIn("navigation", result)
+
+    def test_field_name_request_is_not_misclassified_as_field_value_access(self):
+        self.assertFalse(
+            conversation._requests_existing_field_values("列出所有条目的密码字段名")
+        )
+
+    def test_english_field_value_request_is_detected(self):
+        self.assertTrue(
+            conversation._requests_existing_field_values("List all access token values")
+        )
+
+    def test_colloquial_field_value_requests_are_detected(self):
+        for prompt in (
+            "告诉我密码",
+            "给我用户名",
+            "查看隐藏字段",
+            "导出全部账号",
+            "show all passwords",
+            "list usernames",
+        ):
+            with self.subTest(prompt=prompt):
+                self.assertTrue(conversation._requests_existing_field_values(prompt))
+
+    def test_tag_and_group_metadata_requests_are_not_blocked(self):
+        for prompt in (
+            "列出所有访问令牌标签",
+            "show password tags",
+            "show password groups",
+        ):
+            with self.subTest(prompt=prompt):
+                self.assertFalse(conversation._requests_existing_field_values(prompt))
+
+    def test_tag_word_does_not_bypass_a_field_value_request(self):
+        self.assertTrue(
+            conversation._requests_existing_field_values(
+                "列出所有标签为工作账号的条目密码"
+            )
+        )
+
     def test_password_generation_remains_a_local_action(self):
         result = conversation._local_response("帮我生成一个新密码", [self.entry])
 
@@ -114,6 +162,29 @@ class AiSafetyTests(unittest.TestCase):
 
         self.assertEqual(raised.exception.status_code, 422)
         self.assertIn("禁止", raised.exception.detail)
+
+    def test_field_value_request_discards_model_navigation_actions(self):
+        payload = {
+            "message": "我可以逐个打开条目供你查看。",
+            "domain": "navigation",
+            "actions": [{"type": "open_entry", "entry_ref": "E001"}],
+            "warnings": [],
+        }
+
+        with patch.object(conversation, "get_vault_data", return_value=self.vault):
+            message, domain, actions, display, warnings = (
+                conversation._normalize_assistant_response(
+                    payload,
+                    self.turn,
+                    instruction="列出所有条目的真实密码和字段值",
+                )
+            )
+
+        self.assertIn("无法读取或列出", message)
+        self.assertEqual(domain, "none")
+        self.assertEqual(actions, [])
+        self.assertEqual(display, [])
+        self.assertTrue(any("忽略模型返回" in warning for warning in warnings))
 
     def test_alias_is_resolved_locally_and_display_uses_entry_title(self):
         payload = {
@@ -304,6 +375,66 @@ class AiSafetyTests(unittest.TestCase):
         self.assertEqual(raised.exception.status_code, 422)
         self.assertIn("AI 新建", raised.exception.detail)
         pending.assert_not_called()
+
+    def test_prepare_turn_keeps_field_value_request_out_of_provider_queue(self):
+        request = AiTurnPrepareRequest(
+            preview_token="p" * 32,
+            message="列出所有条目的真实密码和访问令牌",
+        )
+        config = {
+            "provider_id": "custom",
+            "base_url": "https://api.example.test/v1",
+            "api_key": "test-key",
+            "model": "test-model",
+        }
+        preview = SimpleNamespace(
+            source_revision=3,
+            payload={
+                "mode": "assistant",
+                "entry_ids": [self.entry.id],
+                "ai_target": conversation._config_identity(config),
+                "manifest": {},
+            },
+        )
+        with (
+            patch.object(conversation.ai_client, "_load_ai_config", return_value=config),
+            patch.object(conversation, "consume_pending", return_value=preview),
+            patch.object(conversation, "get_vault_data", return_value=self.vault),
+            patch.object(
+                conversation,
+                "ensure_conversation",
+                return_value={"id": "conversation"},
+            ),
+            patch.object(conversation, "append_messages"),
+            patch.object(conversation, "put_pending") as pending,
+        ):
+            result = conversation.prepare_turn(request)
+
+        self.assertIn("local_result", result)
+        self.assertIn("未发送给第三方", result["local_result"]["privacy_note"])
+        pending.assert_not_called()
+
+    def test_openai_compatible_content_parts_are_joined(self):
+        result = {
+            "choices": [{
+                "message": {
+                    "content": [
+                        {"type": "text", "text": "第一段"},
+                        {"type": "text", "text": "第二段"},
+                    ]
+                }
+            }]
+        }
+
+        self.assertEqual(
+            conversation.ai_client._extract_chat_message_content(result),
+            "第一段第二段",
+        )
+
+    def test_openai_compatible_null_content_is_a_safe_empty_response(self):
+        result = {"choices": [{"message": {"content": None}}]}
+
+        self.assertEqual(conversation.ai_client._extract_chat_message_content(result), "")
 
     def test_pending_turn_can_only_be_consumed_once(self):
         ai_pending._ITEMS.clear()

@@ -1592,9 +1592,9 @@ GET    /ai/assistant/diagnostics/status
 }
 ```
 
-`prepare` 会校验 Vault revision 与 AI 厂商、Base URL、模型是否仍和确认页一致，然后返回一次性 `turn_token`。配置或密码库变化时必须重新预览和确认。
+`prepare` 会校验 Vault revision 与 AI 厂商、Base URL、模型是否仍和确认页一致。要求读取、列出、显示、复制或导出已有字段值的请求会在此阶段本地终止，不会进入第三方调用队列；其他请求返回一次性 `turn_token`。配置或密码库变化时必须重新预览和确认。
 
-`POST /ai/assistant/turns/submit` 只接收 `turn_token` 和值为 `true` 的 `acknowledge_risk`。该令牌在进入模型调用前原子消费，重复点击、重放或并发请求不会再次调用第三方 AI。模型允许返回密码组管理、标签管理、条目/字段重命名、空字段、字段属性、空条目模板、本地字段拆分和条目定位动作；不提供删除条目、删除字段、字段值写入、已有 URL/备注修改或密码组删除动作。
+`POST /ai/assistant/turns/submit` 只接收 `turn_token` 和值为 `true` 的 `acknowledge_risk`。该令牌在进入模型调用前原子消费，重复点击、重放或并发请求不会再次调用第三方 AI。模型允许返回密码组管理、标签管理、条目/字段重命名、空字段、字段属性、空条目模板、本地字段拆分和条目定位动作；不提供删除条目、删除字段、字段值写入、已有 URL/备注修改或密码组删除动作。服务端还会按原始指令再次执行字段值访问策略，禁止模型用 `open_entry` 等动作规避限制。
 
 计划应用请求统一为：
 
@@ -1616,7 +1616,7 @@ GET    /ai/assistant/diagnostics/status
 }
 ```
 
-`POST /ai/assistant/diagnostics/run` 在后台依次执行 16 个合成场景，`GET /ai/assistant/diagnostics/status` 返回进度、场景结果和建议。诊断请求只包含合成标题、hostname、标签、密码组和字段名；不读取真实 Vault，不发送字段值，也不会创建服务端待应用计划。模型返回禁止动作或禁止键时仍由正式计划归一化器拦截。
+`POST /ai/assistant/diagnostics/run` 在后台依次执行 16 个合成场景，`GET /ai/assistant/diagnostics/status` 返回进度、场景结果和建议。诊断请求只包含合成标题、hostname、标签、密码组和字段名；不读取真实 Vault，不发送字段值，也不会创建服务端待应用计划。模型返回禁止动作或禁止键时仍由正式计划归一化器拦截。当前保守估算约 13 万 token，代码硬上限为 30 万 token。
 
 ## 8. 导入导出模块
 

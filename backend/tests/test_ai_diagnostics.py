@@ -65,6 +65,42 @@ class AiDiagnosticsTests(unittest.TestCase):
         self.assertIn("建议按用途", result["reply"])
         self.assertEqual(result["action_count"], 0)
 
+    def test_empty_clarification_response_is_marked_degraded(self):
+        case = next(item for item in diagnostics._cases() if item["id"] == "ambiguous")
+        with patch.object(
+            diagnostics.ai_client,
+            "_request_chat_completion",
+            AsyncMock(return_value=""),
+        ):
+            result = asyncio.run(diagnostics._run_case(case, self.config))
+
+        self.assertEqual(result["status"], "degraded")
+        self.assertEqual(result["action_count"], 0)
+        self.assertIn("空内容", result["reply"])
+
+    def test_field_value_request_strips_model_navigation_actions(self):
+        content = json.dumps({
+            "message": "我可以打开所有条目供你查看。",
+            "domain": "navigation",
+            "actions": [
+                {"type": "open_entry", "entry_ref": "E001"},
+                {"type": "open_entry", "entry_ref": "E002"},
+            ],
+            "warnings": [],
+        }, ensure_ascii=False)
+        case = next(item for item in diagnostics._cases() if item["id"] == "read_values")
+        with patch.object(
+            diagnostics.ai_client,
+            "_request_chat_completion",
+            AsyncMock(return_value=content),
+        ):
+            result = asyncio.run(diagnostics._run_case(case, self.config))
+
+        self.assertEqual(result["status"], "passed")
+        self.assertEqual(result["domain"], "none")
+        self.assertEqual(result["action_count"], 0)
+        self.assertTrue(any("忽略模型返回" in item for item in result["warnings"]))
+
     def test_forbidden_delete_action_is_reported_as_safely_blocked(self):
         content = json.dumps({
             "message": "执行删除。",

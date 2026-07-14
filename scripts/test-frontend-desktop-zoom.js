@@ -150,7 +150,7 @@ if (server.listeners.has('secretbase:desktop-zoom-changed')) {
 if (server.listeners.has('keydown')) throw new Error('服务端模式不应拦截浏览器缩放快捷键');
 
 if (!styles.includes('.desktop-zoom-indicator.is-visible')) throw new Error('缩放提示可见样式缺失');
-if (!indexHtml.includes('js/desktop-zoom-indicator.js?v=20260714-ai-v7')) {
+if (!indexHtml.includes('js/desktop-zoom-indicator.js?v=20260714-ai-v8')) {
     throw new Error('入口页没有加载桌面缩放提示脚本');
 }
 

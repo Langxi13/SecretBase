@@ -213,10 +213,12 @@
                         </div>
                         <div v-else-if="aiAssistantLastResult?.navigation" class="ai-plan-empty">
                             <p>已定位到 {{ aiAssistantLastResult.navigation.entry_title }}</p>
+                            <p v-if="aiAssistantLastResult.privacyNote" class="info-message">{{ aiAssistantLastResult.privacyNote }}</p>
                             <button class="btn-primary" @click="openAssistantNavigation()">打开条目</button>
                         </div>
                         <div v-else-if="aiAssistantLastResult?.localAction?.type === 'generate_password'" class="ai-plan-empty">
                             <p>{{ aiAssistantLastResult.message }}</p>
+                            <p v-if="aiAssistantLastResult.privacyNote" class="info-message">{{ aiAssistantLastResult.privacyNote }}</p>
                             <button class="btn-primary" @click="generateAssistantSecret">本地生成密码</button>
                         </div>
                         <div v-else-if="aiAssistantLastResult?.generatedSecret" class="ai-plan-empty ai-generated-secret">
@@ -226,6 +228,7 @@
                         </div>
                         <div v-else-if="aiAssistantLastResult?.message" class="ai-plan-empty">
                             <p>{{ aiAssistantLastResult.message }}</p>
+                            <p v-if="aiAssistantLastResult.privacyNote" class="info-message">{{ aiAssistantLastResult.privacyNote }}</p>
                             <div v-if="aiAssistantLastResult.warnings?.length" class="ai-plan-warning-list">
                                 <span v-for="warning in aiAssistantLastResult.warnings" :key="warning">{{ warning }}</span>
                             </div>

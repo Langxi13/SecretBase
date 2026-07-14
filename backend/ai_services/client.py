@@ -13,11 +13,8 @@ from crypto import decrypt_vault_with_key, encrypt_vault_with_key, parse_vault_h
 from secure_settings import AI_SETTINGS_PURPOSE
 from storage import derive_unlocked_purpose_key
 from ai_services.prompts import AI_CHAT_TIMEOUT_SECONDS
-from ai_services.providers import (
-    normalize_base_url,
-    provider_runtime,
-    validate_endpoint_target,
-)
+from ai_services.providers import normalize_base_url, provider_runtime, validate_endpoint_target
+from ai_services.provider_response import extract_chat_message_content as _extract_chat_message_content
 
 
 logger = logging.getLogger(__name__)
@@ -249,7 +246,7 @@ async def _request_chat_completion(
 
     try:
         result = response.json()
-        return result["choices"][0]["message"]["content"]
+        return _extract_chat_message_content(result)
     except Exception as e:
         logger.error(f"AI 服务响应格式错误: {e}")
         raise HTTPException(status_code=422, detail="AI 返回格式错误")

@@ -118,7 +118,10 @@ def diagnostic_cases() -> list[dict]:
         {
             "id": "group_update",
             "label": "密码组更新",
-            "instruction": "检查“服务器”密码组的名称和简介，必要时生成改名或更新简介的计划。",
+            "instruction": (
+                "只生成密码组更新计划：将“服务器”改名为“基础设施”，"
+                "并把简介更新为“云平台、服务器、网络与运维控制台”。"
+            ),
             "domains": {"groups"},
             "requires_plan": True,
         },

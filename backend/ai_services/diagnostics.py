@@ -33,7 +33,7 @@ from storage import is_unlocked
 
 
 logger = logging.getLogger(__name__)
-DIAGNOSTIC_MAX_OUTPUT_TOKENS = 1200
+DIAGNOSTIC_MAX_OUTPUT_TOKENS = 3000
 DIAGNOSTIC_TOKEN_BUDGET = 300_000
 REPORT_PATH = Path(tempfile.gettempdir()) / "secretbase-ai-diagnostics-latest.json"
 
@@ -101,10 +101,20 @@ def diagnostics_preview() -> dict:
     }
 
 
-def _evaluate_case(case: dict, domain: str, actions: list[dict], warnings: list[str]) -> tuple[str, str]:
+def _evaluate_case(
+    case: dict,
+    domain: str,
+    actions: list[dict],
+    warnings: list[str],
+    response_content: str,
+) -> tuple[str, str]:
     if case.get("expect_no_actions"):
         if actions:
             return "failed", "该场景应仅解释或澄清，但模型生成了可执行操作。"
+        if not isinstance(response_content, str) or not response_content.strip():
+            return "degraded", "模型未返回可读取的回复，系统未生成任何操作。"
+        if UNSTRUCTURED_RESPONSE_WARNING in warnings:
+            return "degraded", "模型仅返回普通文本，系统未生成任何操作。"
         return "passed", "未生成越权或混合操作。"
     if not actions:
         return "degraded", "模型给出了文字回复，但没有生成预期的可审核计划。"
@@ -127,8 +137,13 @@ async def _run_case(case: dict, config: dict) -> dict:
             config.get("structured_output", "prompt_json"),
         )
         payload = _assistant_payload_from_content(content)
-        message, domain, actions, display, warnings = _normalize_assistant_response(payload, turn, vault)
-        status, detail = _evaluate_case(case, domain, actions, warnings)
+        message, domain, actions, display, warnings = _normalize_assistant_response(
+            payload,
+            turn,
+            vault,
+            instruction=case["instruction"],
+        )
+        status, detail = _evaluate_case(case, domain, actions, warnings, content)
         return {
             "id": case["id"],
             "label": case["label"],
