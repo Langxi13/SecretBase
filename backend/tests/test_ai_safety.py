@@ -1,9 +1,10 @@
 import asyncio
+import json
 import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from types import SimpleNamespace
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, Mock, patch
 
 from fastapi import HTTPException
 
@@ -61,6 +62,25 @@ class AiSafetyTests(unittest.TestCase):
         result = conversation._local_response("在工作密码组中生成一个新密码", [self.entry])
 
         self.assertEqual(result["local_action"]["type"], "generate_password")
+
+    def test_plain_text_ai_response_is_preserved_without_executable_actions(self):
+        payload = conversation._assistant_payload_from_content("建议先整理现有密码组，再逐项确认。")
+
+        self.assertEqual(payload["message"], "建议先整理现有密码组，再逐项确认。")
+        self.assertEqual(payload["domain"], "none")
+        self.assertEqual(payload["actions"], [])
+        self.assertTrue(any("未生成任何可执行操作" in item for item in payload["warnings"]))
+
+    def test_non_object_json_ai_response_is_discarded_as_a_plan(self):
+        payload = conversation._assistant_payload_from_content('[{"type":"create_group"}]')
+
+        self.assertEqual(payload["domain"], "none")
+        self.assertEqual(payload["actions"], [])
+        self.assertIn("无法识别", payload["message"])
+
+    def test_json_extractor_treats_non_string_content_as_invalid_json(self):
+        with self.assertRaises(json.JSONDecodeError):
+            conversation.ai_client._extract_json_content(None)
 
     def test_metadata_dto_excludes_values_full_urls_remarks_and_real_ids(self):
         metadata = entry_metadata(self.entry, "E001")
@@ -312,6 +332,48 @@ class AiSafetyTests(unittest.TestCase):
         self.assertEqual(raised.exception.status_code, 422)
         self.assertIn("确认", raised.exception.detail)
         request_model.assert_not_awaited()
+
+    def test_submit_turn_returns_plain_text_ai_reply_without_a_server_error(self):
+        config = {
+            "provider_id": "deepseek",
+            "base_url": "https://api.deepseek.com",
+            "api_key": "test-key",
+            "model": "test-model",
+            "structured_output": "response_format",
+        }
+        pending = SimpleNamespace(payload={
+            "mode": "assistant",
+            "conversation_id": "conversation",
+            "message": "只生成密码组管理计划",
+            "metadata": [],
+            "taxonomy": {},
+            "entry_map": {},
+            "field_map": {},
+            "ai_target": conversation._config_identity(config),
+        })
+        append_messages = Mock()
+        with (
+            patch.object(conversation, "consume_pending", return_value=pending),
+            patch.object(conversation.ai_client, "_load_ai_config", return_value=config),
+            patch.object(
+                conversation.ai_client,
+                "_request_chat_completion",
+                AsyncMock(return_value="建议按用途整理密码组。"),
+            ),
+            patch.object(conversation, "model_context", return_value=[]),
+            patch.object(conversation, "get_vault_data", return_value=self.vault),
+            patch.object(conversation, "append_messages", append_messages),
+            patch.object(conversation, "put_pending") as put_pending,
+            patch.object(conversation, "vault_revision", return_value=4),
+        ):
+            result = asyncio.run(conversation.submit_turn("t" * 32, True))
+
+        self.assertEqual(result["message"], "建议按用途整理密码组。")
+        self.assertIsNone(result["plan_token"])
+        self.assertEqual(result["actions"], [])
+        self.assertTrue(result["warnings"])
+        put_pending.assert_not_called()
+        append_messages.assert_called_once()
 
     def test_changed_ai_target_requires_a_new_confirmation(self):
         expected = {

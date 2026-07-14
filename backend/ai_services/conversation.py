@@ -86,6 +86,9 @@ DOMAIN_ACTIONS = {
 }
 ALLOWED_ACTIONS = set().union(*DOMAIN_ACTIONS.values())
 FORBIDDEN_RESPONSE_KEYS = {"value", "field_value", "new_value", "old_value", "values"}
+UNSTRUCTURED_RESPONSE_WARNING = (
+    "AI 未按可执行计划格式返回内容；系统已仅保留文字回复，未生成任何可执行操作。"
+)
 
 
 def _now() -> str:
@@ -316,6 +319,32 @@ def _normalize_template_fields(raw_fields) -> list[dict]:
     return fields
 
 
+def _assistant_payload_from_content(content: str) -> dict:
+    try:
+        payload = ai_client._extract_json_content(content)
+    except json.JSONDecodeError:
+        message = _clean_text(content, 4000)
+        logger.warning(
+            "AI 管家响应不是有效 JSON，已降级为纯文本，响应长度=%s",
+            len(content) if isinstance(content, str) else 0,
+        )
+        return {
+            "message": message or "AI 服务未返回可读取的回答，请重试或更换模型。",
+            "domain": "none",
+            "actions": [],
+            "warnings": [UNSTRUCTURED_RESPONSE_WARNING],
+        }
+    if isinstance(payload, dict):
+        return payload
+    logger.warning("AI 管家响应的 JSON 顶层不是对象，已拒绝生成计划")
+    return {
+        "message": "AI 返回了无法识别的计划格式，本轮没有生成任何操作。",
+        "domain": "none",
+        "actions": [],
+        "warnings": [UNSTRUCTURED_RESPONSE_WARNING],
+    }
+
+
 def _normalize_assistant_response(payload: dict, turn: dict) -> tuple[str, str, list[dict], list[dict], list[str]]:
     if not isinstance(payload, dict) or _has_forbidden_key(payload):
         raise HTTPException(status_code=422, detail="AI 返回包含禁止的字段值或无效结构")
@@ -481,7 +510,14 @@ async def submit_turn(turn_token: str, acknowledge_risk: bool) -> dict:
             3000,
             ai_config.get("structured_output", "prompt_json"),
         )
-        parsed = _normalize_ai_payload(ai_client._extract_json_content(content))
+        try:
+            parsed = _normalize_ai_payload(ai_client._extract_json_content(content))
+        except json.JSONDecodeError as error:
+            logger.warning("AI 新建响应不是有效 JSON，已拒绝创建条目")
+            raise HTTPException(
+                status_code=422,
+                detail="AI 未按可审核的条目格式返回，未创建任何内容，请重试或更换模型",
+            ) from error
         for index, entry in enumerate(parsed):
             entry["id"] = f"create-{index + 1}"
         plan_token = put_pending("assistant-plan", {
@@ -536,7 +572,7 @@ async def submit_turn(turn_token: str, acknowledge_risk: bool) -> dict:
         5000,
         ai_config.get("structured_output", "prompt_json"),
     )
-    payload = ai_client._extract_json_content(content)
+    payload = _assistant_payload_from_content(content)
     message, domain, actions, display, warnings = _normalize_assistant_response(payload, turn)
     plan_token = put_pending("assistant-plan", {
         "mode": "assistant",

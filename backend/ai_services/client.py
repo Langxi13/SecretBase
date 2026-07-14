@@ -25,6 +25,8 @@ logger = logging.getLogger(__name__)
 
 def _extract_json_content(content: str):
     """Extract the first JSON object/array from an AI response."""
+    if not isinstance(content, str):
+        content = ""
     content = content.strip()
     if content.startswith("```"):
         content = content.split("\n", 1)[1] if "\n" in content else ""
