@@ -14,8 +14,87 @@
         aiModelsLoading,
         aiSettingsSaving,
         aiSettingsError,
-        aiSettingsMessage
+        aiSettingsMessage,
+        aiDiagnosticsPreview,
+        aiDiagnosticsReport,
+        aiDiagnosticsBusy,
+        aiDiagnosticsError
     }) {
+        let diagnosticsPollTimer = null;
+
+        function stopDiagnosticsPolling() {
+            if (diagnosticsPollTimer) {
+                clearTimeout(diagnosticsPollTimer);
+                diagnosticsPollTimer = null;
+            }
+        }
+
+        function resetAiDiagnosticsState() {
+            stopDiagnosticsPolling();
+            aiDiagnosticsPreview.value = null;
+            aiDiagnosticsReport.value = null;
+            aiDiagnosticsBusy.value = false;
+            aiDiagnosticsError.value = '';
+        }
+
+        function scheduleDiagnosticsPolling() {
+            stopDiagnosticsPolling();
+            diagnosticsPollTimer = setTimeout(() => {
+                refreshAiDiagnosticsStatus(true);
+            }, 1500);
+        }
+
+        async function refreshAiDiagnosticsStatus(keepPolling = false) {
+            try {
+                const result = await api.get('/ai/assistant/diagnostics/status');
+                const report = result.data || null;
+                aiDiagnosticsReport.value = report;
+                aiDiagnosticsBusy.value = report?.status === 'running';
+                if (keepPolling && aiDiagnosticsBusy.value) {
+                    scheduleDiagnosticsPolling();
+                } else {
+                    stopDiagnosticsPolling();
+                }
+            } catch (error) {
+                stopDiagnosticsPolling();
+                aiDiagnosticsBusy.value = false;
+                aiDiagnosticsError.value = error.message || '无法读取 AI 诊断状态';
+            }
+        }
+
+        async function previewAiDiagnostics() {
+            aiDiagnosticsError.value = '';
+            try {
+                const result = await api.get('/ai/assistant/diagnostics/preview');
+                aiDiagnosticsPreview.value = result.data || null;
+            } catch (error) {
+                aiDiagnosticsPreview.value = null;
+                aiDiagnosticsError.value = error.message || '无法准备 AI 兼容性诊断';
+            }
+        }
+
+        function cancelAiDiagnosticsPreview() {
+            aiDiagnosticsPreview.value = null;
+        }
+
+        async function runAiDiagnostics() {
+            if (!aiDiagnosticsPreview.value || aiDiagnosticsBusy.value) return;
+            aiDiagnosticsError.value = '';
+            aiDiagnosticsBusy.value = true;
+            try {
+                const result = await api.post('/ai/assistant/diagnostics/run', {
+                    acknowledge_cost: true
+                }, { timeoutMs: 20000 });
+                aiDiagnosticsPreview.value = null;
+                aiDiagnosticsReport.value = result.data || null;
+                scheduleDiagnosticsPolling();
+                showToast('AI 兼容性诊断已开始', 'success');
+            } catch (error) {
+                aiDiagnosticsBusy.value = false;
+                aiDiagnosticsError.value = error.message || 'AI 兼容性诊断启动失败';
+            }
+        }
+
         async function loadAiProviders() {
             try {
                 const result = await api.get('/ai/providers');
@@ -46,6 +125,9 @@
                 aiModels.value = status.model ? [status.model] : [];
                 aiManualModel.value = false;
                 aiSettingsEditing.value = !status.configured;
+                if (status.configured) {
+                    refreshAiDiagnosticsStatus(true);
+                }
             } catch (error) {
                 aiSettingsStatus.value = null;
                 aiSettingsEditing.value = true;
@@ -150,6 +232,7 @@
                 aiSettingsForm.apiKey = '';
                 aiModels.value = result.data?.model ? [result.data.model] : [];
                 aiSettingsEditing.value = false;
+                resetAiDiagnosticsState();
                 aiSettingsMessage.value = 'AI 连通测试通过，设置已保存';
                 showToast('AI 设置已保存', 'success');
             } catch (error) {
@@ -172,6 +255,7 @@
                 aiModels.value = [];
                 aiManualModel.value = false;
                 aiSettingsEditing.value = true;
+                resetAiDiagnosticsState();
                 aiSettingsMessage.value = 'AI 设置已清除';
                 showToast('AI 设置已清除', 'success');
             } catch (error) {
@@ -201,7 +285,11 @@
             saveAiConfiguration,
             clearAiConfiguration,
             editAiConfiguration: () => resetConfigurationForm(true),
-            cancelAiConfigurationEdit: () => resetConfigurationForm(false)
+            cancelAiConfigurationEdit: () => resetConfigurationForm(false),
+            previewAiDiagnostics,
+            cancelAiDiagnosticsPreview,
+            runAiDiagnostics,
+            refreshAiDiagnosticsStatus
         };
     }
 

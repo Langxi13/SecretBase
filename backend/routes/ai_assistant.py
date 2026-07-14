@@ -3,6 +3,7 @@
 from fastapi import APIRouter, HTTPException
 
 from ai_services.conversation import apply_plan, prepare_turn, preview_turn, submit_turn, undo_plan
+from ai_services.diagnostics import diagnostics_preview, get_diagnostics_status, start_diagnostics
 from ai_services.history import (
     clear_history,
     create_conversation,
@@ -12,6 +13,7 @@ from ai_services.history import (
 )
 from models import (
     AiConversationCreateRequest,
+    AiDiagnosticsRunRequest,
     AiPendingPlanApplyRequest,
     AiTurnPrepareRequest,
     AiTurnPreviewRequest,
@@ -84,6 +86,24 @@ async def submit_assistant_turn(request: AiTurnSubmitRequest):
         "success": True,
         "data": await submit_turn(request.turn_token, request.acknowledge_risk),
     }
+
+
+@router.get("/assistant/diagnostics/preview")
+async def assistant_diagnostics_preview():
+    _require_unlocked()
+    return {"success": True, "data": diagnostics_preview()}
+
+
+@router.get("/assistant/diagnostics/status")
+async def assistant_diagnostics_status():
+    _require_unlocked()
+    return {"success": True, "data": get_diagnostics_status()}
+
+
+@router.post("/assistant/diagnostics/run")
+async def run_assistant_diagnostics(request: AiDiagnosticsRunRequest):
+    _require_unlocked()
+    return {"success": True, "data": start_diagnostics(request.acknowledge_cost)}
 
 
 @router.post("/assistant/plans/apply")

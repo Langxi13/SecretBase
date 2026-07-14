@@ -38,6 +38,8 @@ def main() -> None:
         "backend/ai_services/organize.py",
         "backend/ai_services/actions.py",
         "backend/ai_services/tag_governance.py",
+        "backend/ai_services/diagnostics.py",
+        "backend/ai_services/diagnostic_cases.py",
         "backend/routes/ai_settings.py",
         "backend/routes/ai_organize.py",
         "backend/routes/ai_actions.py",
@@ -64,6 +66,8 @@ def main() -> None:
     assert_less_than(line_count("backend/ai_services/actions.py"), 450, "AI 操作服务必须保持可审阅体量")
     assert_less_than(line_count("backend/ai_services/organize.py"), 400, "AI 整理服务必须保持可审阅体量")
     assert_less_than(line_count("backend/ai_services/client.py"), 300, "AI 客户端必须保持单一职责体量")
+    assert_less_than(line_count("backend/ai_services/diagnostics.py"), 340, "AI 诊断运行器必须保持可审阅体量")
+    assert_less_than(line_count("backend/ai_services/diagnostic_cases.py"), 260, "AI 诊断场景必须独立维护")
     assert_less_than(line_count("backend/storage.py"), 700, "加密存储核心不能继续无控制增长")
 
     for module_name in ("ai_settings", "ai_organize", "ai_actions", "ai_tags", "ai_parse"):

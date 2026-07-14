@@ -45,7 +45,11 @@
             aiModelsLoading: state.aiModelsLoading,
             aiSettingsSaving: state.aiSettingsSaving,
             aiSettingsError: state.aiSettingsError,
-            aiSettingsMessage: state.aiSettingsMessage
+            aiSettingsMessage: state.aiSettingsMessage,
+            aiDiagnosticsPreview: state.aiDiagnosticsPreview,
+            aiDiagnosticsReport: state.aiDiagnosticsReport,
+            aiDiagnosticsBusy: state.aiDiagnosticsBusy,
+            aiDiagnosticsError: state.aiDiagnosticsError
         });
 
         const professionalActions = window.SecretBaseAiController.createAiController({

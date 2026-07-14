@@ -420,6 +420,10 @@ class AiTurnSubmitRequest(BaseModel):
     acknowledge_risk: bool = False
 
 
+class AiDiagnosticsRunRequest(BaseModel):
+    acknowledge_cost: bool = False
+
+
 class AiUndoRequest(BaseModel):
     undo_token: str = Field(..., min_length=20, max_length=200)
     expected_revision: int = Field(..., ge=1)

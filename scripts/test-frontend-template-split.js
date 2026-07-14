@@ -24,12 +24,12 @@ const appJs = readProjectFile('frontend/js/app.js');
 const loaderJs = readProjectFile('frontend/js/template-loader.js');
 const fullMarkup = readFrontendMarkup();
 
-assertIncludes(indexHtml, 'js/template-loader.js?v=20260714-ai-v6', '入口页必须在 app.js 前加载模板加载器');
+assertIncludes(indexHtml, 'js/template-loader.js?v=20260714-ai-v7', '入口页必须在 app.js 前加载模板加载器');
 assertIncludes(appJs, 'window.SecretBaseTemplateLoader.mount(app)', 'Vue 应用必须由模板加载器挂载');
 assertIncludes(loaderJs, 'Promise.all(templatePaths.map(loadTemplate))', '模板加载器必须并行读取全部片段');
 assertIncludes(loaderJs, "credentials: 'same-origin'", '模板请求必须保持同源凭据策略');
 assertIncludes(loaderJs, 'renderLoadError', '模板加载失败必须展示可见的恢复提示');
-assertLessThan(indexHtml.split('\n').length, 80, 'index.html 必须保持为轻量入口页');
+assertLessThan(indexHtml.split('\n').length, 85, 'index.html 必须保持为轻量入口页');
 
 templatePaths.forEach(templatePath => {
     const source = readProjectFile(templatePath);

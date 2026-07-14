@@ -84,6 +84,10 @@
         const aiSettingsSaving = ref(false);
         const aiSettingsError = ref('');
         const aiSettingsMessage = ref('');
+        const aiDiagnosticsPreview = ref(null);
+        const aiDiagnosticsReport = ref(null);
+        const aiDiagnosticsBusy = ref(false);
+        const aiDiagnosticsError = ref('');
         const aiConfiguredBaseUrl = computed(
             () => aiSettingsStatus.value?.base_url || aiSettingsStatus.value?.baseUrl || ''
         );
@@ -134,6 +138,10 @@
             aiSettingsSaving,
             aiSettingsError,
             aiSettingsMessage,
+            aiDiagnosticsPreview,
+            aiDiagnosticsReport,
+            aiDiagnosticsBusy,
+            aiDiagnosticsError,
             aiConfiguredBaseUrl
         };
     }

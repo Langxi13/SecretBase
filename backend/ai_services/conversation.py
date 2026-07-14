@@ -345,7 +345,11 @@ def _assistant_payload_from_content(content: str) -> dict:
     }
 
 
-def _normalize_assistant_response(payload: dict, turn: dict) -> tuple[str, str, list[dict], list[dict], list[str]]:
+def _normalize_assistant_response(
+    payload: dict,
+    turn: dict,
+    vault=None,
+) -> tuple[str, str, list[dict], list[dict], list[str]]:
     if not isinstance(payload, dict) or _has_forbidden_key(payload):
         raise HTTPException(status_code=422, detail="AI 返回包含禁止的字段值或无效结构")
     message = _clean_text(payload.get("message"), 4000) or "已生成建议，请检查后再应用。"
@@ -360,7 +364,7 @@ def _normalize_assistant_response(payload: dict, turn: dict) -> tuple[str, str, 
     normalized = []
     display = []
     domains = set()
-    vault = get_vault_data()
+    vault = vault or get_vault_data()
     entries_by_id = {entry.id: entry for entry in vault.entries if not entry.deleted}
 
     for index, raw in enumerate(raw_actions):

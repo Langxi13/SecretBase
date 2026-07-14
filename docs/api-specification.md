@@ -1565,6 +1565,9 @@ POST   /ai/assistant/turns/prepare
 POST   /ai/assistant/turns/submit
 POST   /ai/assistant/plans/apply
 POST   /ai/assistant/plans/undo
+GET    /ai/assistant/diagnostics/preview
+POST   /ai/assistant/diagnostics/run
+GET    /ai/assistant/diagnostics/status
 ```
 
 `POST /ai/assistant/turns/preview` 请求示例：
@@ -1604,6 +1607,16 @@ POST   /ai/assistant/plans/undo
 ```
 
 成功写入会返回 `undo_token` 和新 revision。撤销接口只能在 Vault 未发生其他变化时使用。对话历史使用用途隔离密钥保存在本机加密文件中；AI 新建原文不会写入历史或后续模型上下文。
+
+真实模型兼容性诊断必须先调用 `GET /ai/assistant/diagnostics/preview` 展示测试数量、数据类型和保守 token 上限，再由用户提交：
+
+```json
+{
+  "acknowledge_cost": true
+}
+```
+
+`POST /ai/assistant/diagnostics/run` 在后台依次执行 16 个合成场景，`GET /ai/assistant/diagnostics/status` 返回进度、场景结果和建议。诊断请求只包含合成标题、hostname、标签、密码组和字段名；不读取真实 Vault，不发送字段值，也不会创建服务端待应用计划。模型返回禁止动作或禁止键时仍由正式计划归一化器拦截。
 
 ## 8. 导入导出模块
 

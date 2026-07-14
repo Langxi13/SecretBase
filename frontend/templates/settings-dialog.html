@@ -74,10 +74,67 @@
                                 </dl>
                                 <div class="setting-actions ai-settings-actions">
                                     <button class="btn-secondary" @click="loadAiSettingsStatus" :disabled="aiModelsLoading || aiSettingsSaving">刷新状态</button>
-                                    <button class="btn-secondary" @click="editAiConfiguration" :disabled="aiModelsLoading || aiSettingsSaving">修改配置</button>
-                                    <button class="btn-danger" @click="clearAiConfiguration" :disabled="aiSettingsSaving || aiModelsLoading">清除 API Key</button>
+                                    <button class="btn-secondary" @click="previewAiDiagnostics" :disabled="aiModelsLoading || aiSettingsSaving || aiDiagnosticsBusy">
+                                        {{ aiDiagnosticsBusy ? '诊断运行中' : '兼容性诊断' }}
+                                    </button>
+                                    <button class="btn-secondary" @click="editAiConfiguration" :disabled="aiModelsLoading || aiSettingsSaving || aiDiagnosticsBusy">修改配置</button>
+                                    <button class="btn-danger" @click="clearAiConfiguration" :disabled="aiSettingsSaving || aiModelsLoading || aiDiagnosticsBusy">清除 API Key</button>
                                 </div>
                             </div>
+                            <div v-if="aiDiagnosticsPreview" class="ai-diagnostics-confirm warning-panel">
+                                <div>
+                                    <strong>确认运行真实模型诊断</strong>
+                                    <p>将向当前模型发送 {{ aiDiagnosticsPreview.case_count }} 组合成测试，保守上限约 {{ aiDiagnosticsPreview.estimated_max_tokens.toLocaleString() }} token。</p>
+                                    <p>
+                                        {{ aiDiagnosticsPreview.includes_real_vault_data ? '包含真实密码库数据' : '不包含真实密码库数据' }}；
+                                        {{ aiDiagnosticsPreview.includes_field_values ? '包含字段值' : '不包含字段值' }}。
+                                    </p>
+                                </div>
+                                <div class="ai-diagnostics-confirm-actions">
+                                    <button class="btn-secondary" @click="cancelAiDiagnosticsPreview" :disabled="aiDiagnosticsBusy">取消</button>
+                                    <button class="btn-primary inline" @click="runAiDiagnostics" :disabled="aiDiagnosticsBusy">确认并运行</button>
+                                </div>
+                            </div>
+                            <section v-if="aiDiagnosticsReport && aiDiagnosticsReport.status !== 'idle'" class="ai-diagnostics-report">
+                                <header>
+                                    <div>
+                                        <strong>模型兼容性诊断</strong>
+                                        <span v-if="aiDiagnosticsReport.provider">{{ aiDiagnosticsReport.provider.provider_name }} · {{ aiDiagnosticsReport.provider.model }}</span>
+                                    </div>
+                                    <button class="btn-small" @click="refreshAiDiagnosticsStatus(false)" :disabled="aiDiagnosticsBusy">刷新</button>
+                                </header>
+                                <div v-if="aiDiagnosticsReport.status === 'running'" class="ai-diagnostics-progress">
+                                    <progress :value="aiDiagnosticsReport.progress" :max="aiDiagnosticsReport.total"></progress>
+                                    <span>{{ aiDiagnosticsReport.progress }} / {{ aiDiagnosticsReport.total }} · {{ aiDiagnosticsReport.current_case }}</span>
+                                </div>
+                                <div v-else-if="aiDiagnosticsReport.status === 'failed'" class="error-message">
+                                    {{ aiDiagnosticsReport.error || '诊断未完成' }}
+                                </div>
+                                <template v-else-if="aiDiagnosticsReport.status === 'completed'">
+                                    <div class="ai-diagnostics-summary">
+                                        <span class="is-passed">通过 {{ aiDiagnosticsReport.summary.passed }}</span>
+                                        <span class="is-degraded">降级 {{ aiDiagnosticsReport.summary.degraded }}</span>
+                                        <span class="is-blocked">拦截 {{ aiDiagnosticsReport.summary.blocked }}</span>
+                                        <span class="is-failed">失败 {{ aiDiagnosticsReport.summary.failed }}</span>
+                                    </div>
+                                    <p v-for="item in aiDiagnosticsReport.summary.recommendations" :key="item" class="muted-text">{{ item }}</p>
+                                    <details class="ai-diagnostics-details">
+                                        <summary>查看 {{ aiDiagnosticsReport.results.length }} 项测试明细</summary>
+                                        <div class="ai-diagnostics-case-list">
+                                            <article v-for="item in aiDiagnosticsReport.results" :key="item.id" class="ai-diagnostics-case">
+                                                <header>
+                                                    <strong>{{ item.label }}</strong>
+                                                    <span :class="'is-' + item.status">{{ item.status === 'passed' ? '通过' : item.status === 'degraded' ? '降级' : item.status === 'blocked' ? '拦截' : '失败' }}</span>
+                                                </header>
+                                                <p>{{ item.detail }}</p>
+                                                <p v-if="item.reply" class="ai-diagnostics-reply">AI：{{ item.reply }}</p>
+                                                <small v-if="item.action_types?.length">动作：{{ item.action_types.join('、') }}</small>
+                                            </article>
+                                        </div>
+                                    </details>
+                                </template>
+                            </section>
+                            <p v-if="aiDiagnosticsError" class="error-message">{{ aiDiagnosticsError }}</p>
                             <div v-else-if="!(aiSettingsStatus && aiSettingsStatus.configured)" class="warning-panel">
                                 AI 未配置。保存前会用所选模型执行一次无敏感连通测试。
                             </div>
