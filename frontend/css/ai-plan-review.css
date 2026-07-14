@@ -1,0 +1,115 @@
+/* AI 复合计划分组审核 */
+.ai-plan-conflict-list {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    margin: 10px 0;
+    padding: 9px 10px;
+    border-left: 3px solid var(--color-error);
+    background: color-mix(in srgb, var(--color-error) 7%, var(--bg-elevated));
+    color: var(--color-error);
+    font-size: var(--font-size-xs);
+    line-height: 1.5;
+}
+
+.ai-plan-conflict-list strong {
+    color: var(--text-primary);
+    font-size: var(--font-size-sm);
+}
+
+.ai-plan-group {
+    --plan-domain-color: var(--color-primary);
+    margin: 12px 0;
+    padding-left: 8px;
+    border-left: 3px solid var(--plan-domain-color);
+}
+
+.ai-plan-group.domain-groups {
+    --plan-domain-color: var(--color-success);
+}
+
+.ai-plan-group.domain-entry_structure {
+    --plan-domain-color: var(--color-warning);
+}
+
+.ai-plan-group.domain-entry_creation {
+    --plan-domain-color: var(--color-info);
+}
+
+.ai-plan-group-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    min-height: 34px;
+    margin-bottom: 7px;
+    padding: 5px 8px;
+    border-bottom: 1px solid color-mix(in srgb, var(--plan-domain-color) 30%, var(--border-color));
+    background: color-mix(in srgb, var(--plan-domain-color) 6%, var(--bg-secondary));
+}
+
+.ai-plan-group-header label {
+    display: inline-flex;
+    min-width: 0;
+    align-items: center;
+    gap: 7px;
+    color: var(--text-primary);
+    font-size: var(--font-size-sm);
+    font-weight: 700;
+}
+
+.ai-plan-group-header input {
+    width: 15px;
+    height: 15px;
+    margin: 0;
+}
+
+.ai-plan-group-header small {
+    flex: 0 0 auto;
+    color: var(--text-secondary);
+    font-size: 11px;
+}
+
+.ai-plan-group-items .ai-plan-item:last-child {
+    margin-bottom: 0;
+}
+
+.ai-plan-item-heading {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+.ai-plan-item-heading strong {
+    min-width: 0;
+}
+
+.ai-plan-risk-badge {
+    flex: 0 0 auto;
+    padding: 2px 5px;
+    border-radius: 4px;
+    background: color-mix(in srgb, var(--color-error) 10%, var(--bg-secondary));
+    color: var(--color-error);
+    font-size: 10px;
+    font-weight: 700;
+}
+
+.ai-plan-item.conflict {
+    border-color: color-mix(in srgb, var(--color-error) 55%, var(--border-color));
+    background: color-mix(in srgb, var(--color-error) 4%, var(--bg-elevated));
+}
+
+.ai-plan-item-conflict {
+    color: var(--color-error) !important;
+}
+
+@media (max-width: 520px) {
+    .ai-plan-group {
+        padding-left: 6px;
+    }
+
+    .ai-plan-group-header {
+        padding-inline: 6px;
+    }
+}

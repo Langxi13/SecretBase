@@ -27,6 +27,7 @@ const cssPaths = [
     'frontend/css/ai-components.css',
     'frontend/css/ai-workspace.css',
     'frontend/css/ai-entry-inspector.css',
+    'frontend/css/ai-plan-review.css',
     'frontend/css/ai-scope-picker.css',
     'frontend/css/ai-send-review.css',
     'frontend/css/management-components.css',

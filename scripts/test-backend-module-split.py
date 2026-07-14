@@ -37,6 +37,7 @@ def main() -> None:
         "backend/ai_services/parsing.py",
         "backend/ai_services/organize.py",
         "backend/ai_services/actions.py",
+        "backend/ai_services/composite_plan.py",
         "backend/ai_services/tag_governance.py",
         "backend/ai_services/diagnostics.py",
         "backend/ai_services/diagnostic_cases.py",
@@ -64,6 +65,7 @@ def main() -> None:
     assert_less_than(line_count("backend/entry_service.py"), 150, "条目服务必须保持单一职责体量")
     assert_less_than(line_count("backend/import_service.py"), 250, "明文导入服务必须保持可审阅体量")
     assert_less_than(line_count("backend/ai_services/actions.py"), 450, "AI 操作服务必须保持可审阅体量")
+    assert_less_than(line_count("backend/ai_services/composite_plan.py"), 260, "AI 复合计划校验器必须保持可审阅体量")
     assert_less_than(line_count("backend/ai_services/organize.py"), 400, "AI 整理服务必须保持可审阅体量")
     assert_less_than(line_count("backend/ai_services/client.py"), 300, "AI 客户端必须保持单一职责体量")
     assert_less_than(line_count("backend/ai_services/diagnostics.py"), 340, "AI 诊断运行器必须保持可审阅体量")

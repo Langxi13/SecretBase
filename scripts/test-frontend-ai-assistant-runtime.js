@@ -59,23 +59,11 @@ const api = {
         }
         if (path === '/ai/assistant/plans/apply') {
             return {
-                message: '已应用 1 项 AI 操作',
+                message: '已应用 2 项 AI 操作',
                 data: {
                     undo_token: 'undo-token',
                     revision: 5,
-                    next_plan: {
-                        message: '标签操作已独立成下一组计划，请再次确认。',
-                        domain: 'tags',
-                        plan_token: 'next-plan-token',
-                        source_revision: 5,
-                        actions: [{
-                            id: 'assistant-2',
-                            type: 'create_tag',
-                            title: '新建标签「测试」',
-                            entry_targets: []
-                        }],
-                        warnings: []
-                    }
+                    domains: ['groups', 'tags']
                 }
             };
         }
@@ -199,7 +187,8 @@ const controller = context.window.SecretBaseAiAssistantController.createAiAssist
     async openSettings() { settingsOpened += 1; },
     async selectSettingsTab() {},
     normalizeAssistantActionTargets: inspectorController.normalizeAssistantActionTargets,
-    resetAssistantInspector: inspectorController.resetAssistantInspector
+    resetAssistantInspector: inspectorController.resetAssistantInspector,
+    assistantPlanHasSelectedConflicts: inspectorController.assistantPlanHasSelectedConflicts
 });
 
 (async () => {
@@ -264,13 +253,19 @@ const controller = context.window.SecretBaseAiAssistantController.createAiAssist
         throw new Error('无可执行计划时仍必须保留本轮隐私说明');
     }
 
-    aiAssistantPlan.value = {
+    aiAssistantPlan.value = context.window.SecretBaseAiAssistantPlanHelpers.normalizeAssistantPlan({
+        message: '将创建测试密码组和测试标签',
         plan_token: 'first-plan-token',
         source_revision: 4,
-        requestScope: 'all',
-        scopeEntryCount: 1,
-        actions: [{ id: 'assistant-1', selected: true }]
-    };
+        actions: [
+            { id: 'assistant-1', type: 'create_group', domain: 'groups', title: '新建密码组「测试」' },
+            { id: 'assistant-2', type: 'create_tag', domain: 'tags', title: '新建标签「测试」' }
+        ],
+        conflicts: []
+    }, { scope: 'all', scopeEntryCount: 1 }, 'all', inspectorController.normalizeAssistantActionTargets);
+    if (aiAssistantPlan.value.actionGroups.length !== 2 || !aiAssistantPlan.value.actions.every(action => action.selected)) {
+        throw new Error('复合计划必须按领域分组，并默认选择普通操作');
+    }
     aiAssistantInput.value = '确认执行';
     const submitCountBeforeConfirmation = calls.filter(call => call.path === '/ai/assistant/turns/submit').length;
     await controller.sendAssistantMessage();
@@ -280,8 +275,27 @@ const controller = context.window.SecretBaseAiAssistantController.createAiAssist
     if (calls.filter(call => call.path === '/ai/assistant/turns/submit').length !== submitCountBeforeConfirmation) {
         throw new Error('确认执行不得再次发送给模型');
     }
-    if (aiAssistantPlan.value?.plan_token !== 'next-plan-token' || aiAssistantPlan.value?.actions?.[0]?.type !== 'create_tag') {
-        throw new Error('混合管理请求必须在应用后接续下一组独立计划');
+    const applyCall = calls.find(call => call.path === '/ai/assistant/plans/apply');
+    if (JSON.stringify(applyCall.data.selected_ids) !== JSON.stringify(['assistant-1', 'assistant-2'])) {
+        throw new Error('复合计划必须通过一个令牌一次提交全部选中领域操作');
+    }
+    if (aiAssistantPlan.value !== null || aiAssistantLastResult.value?.undoToken !== 'undo-token') {
+        throw new Error('复合计划应用后必须只保留一个统一撤销入口');
+    }
+
+    const conflictPlan = context.window.SecretBaseAiAssistantPlanHelpers.normalizeAssistantPlan({
+        actions: [
+            { id: 'rename-tag', type: 'update_tag', domain: 'tags', title: '重命名标签' },
+            { id: 'assign-tag', type: 'assign_tags', domain: 'tags', title: '分配新标签' }
+        ],
+        conflicts: [{ id: 'conflict-1', action_ids: ['rename-tag', 'assign-tag'], message: '标签目标冲突' }]
+    }, {}, 'all', inspectorController.normalizeAssistantActionTargets);
+    if (!inspectorController.assistantPlanHasSelectedConflicts(conflictPlan)) {
+        throw new Error('同时选中冲突操作时必须阻止复合计划提交');
+    }
+    inspectorController.toggleAssistantPlanGroup(conflictPlan.actionGroups[0], false);
+    if (inspectorController.assistantPlanHasSelectedConflicts(conflictPlan)) {
+        throw new Error('取消冲突分组后必须解除提交阻止状态');
     }
 
     await inspectorController.openAssistantActionEntries({

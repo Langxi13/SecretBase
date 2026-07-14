@@ -12,6 +12,12 @@ from fastapi import HTTPException
 
 from ai_services import client as ai_client
 from ai_services.actions import _apply_group_update, _ensure_group_meta, _group_exists
+from ai_services.composite_plan import (
+    ALLOWED_ACTIONS,
+    action_domain,
+    detect_conflicts,
+    ordered_actions,
+)
 from ai_services.history import append_messages, ensure_conversation, model_context
 from ai_services.instruction_policy import (
     FIELD_VALUE_ACTIONS_BLOCKED_WARNING,
@@ -20,7 +26,7 @@ from ai_services.instruction_policy import (
 )
 from ai_services.organize import _clean_name_list
 from ai_services.parsing import _clean_text, _normalize_ai_payload, _to_bool
-from ai_services.pending import consume_pending, put_pending
+from ai_services.pending import consume_pending, get_pending, put_pending
 from ai_services.privacy import (
     detect_sensitive_metadata,
     entry_metadata,
@@ -78,28 +84,16 @@ ASSISTANT_SYSTEM_PROMPT = """你是 SecretBase 的对话式密码库管家。你
 2. 禁止删除条目、字段、字段值或密码组，禁止清空或覆盖字段值。
 3. 禁止修改已有条目的 URL 或备注。
 4. 不得编造 ref，只能引用输入中存在的 ref。
-5. 用户明确同时要求多个管理领域时，可以在同一响应中列出不同领域的动作并使用 domain="mixed"；系统会把它们拆成多个独立计划逐次确认，绝不能声称已经执行。
+5. 用户明确同时要求多个管理领域时，可以在同一响应中列出不同领域的动作并使用 domain="mixed"；系统会组成一个仍需用户确认的原子复合计划，绝不能声称已经执行。
 6. 没有必要写入时 actions 返回空数组；不要用虚构动作代替解释。
 7. 所有文字使用中文，不要输出 Markdown 或代码块。
 8. 用户要求读取、列出、显示、复制或导出已有字段值时，必须明确拒绝并返回 domain="none"、actions=[]；不得用 open_entry 规避限制。"""
 
 
-DOMAIN_ACTIONS = {
-    "groups": {"create_group", "update_group", "assign_groups"},
-    "tags": {"create_tag", "update_tag", "delete_tag", "merge_tags", "assign_tags"},
-    "entry_structure": {"rename_entry", "rename_field", "add_empty_field", "set_field_flags"},
-    "entry_creation": {"create_entry_template", "create_entry_from_field"},
-    "navigation": {"open_entry"},
-}
-ALLOWED_ACTIONS = set().union(*DOMAIN_ACTIONS.values())
 FORBIDDEN_RESPONSE_KEYS = {"value", "field_value", "new_value", "old_value", "values"}
 UNSTRUCTURED_RESPONSE_WARNING = (
     "AI 未按可执行计划格式返回内容；系统已仅保留文字回复，未生成任何可执行操作。"
 )
-
-
-def _action_domain(action_type: str) -> str:
-    return next(name for name, action_types in DOMAIN_ACTIONS.items() if action_type in action_types)
 
 
 def _action_entry_targets(action: dict, entries_by_id: dict[str, Entry]) -> list[dict]:
@@ -137,22 +131,6 @@ def _action_entry_targets(action: dict, entries_by_id: dict[str, Entry]) -> list
             seen.add(entry_id)
             targets.append({"id": entry.id, "title": entry.title})
     return targets
-
-
-def _split_action_batches(actions: list[dict], display: list[dict]) -> list[dict]:
-    display_by_id = {item["id"]: item for item in display}
-    batches_by_domain: dict[str, dict] = {}
-    ordered_batches = []
-    for action in actions:
-        domain = _action_domain(action["type"])
-        batch = batches_by_domain.get(domain)
-        if batch is None:
-            batch = {"domain": domain, "actions": [], "display": []}
-            batches_by_domain[domain] = batch
-            ordered_batches.append(batch)
-        batch["actions"].append(action)
-        batch["display"].append(display_by_id[action["id"]])
-    return ordered_batches
 
 
 def _now() -> str:
@@ -452,8 +430,8 @@ def _normalize_assistant_response(
         action_type = _clean_text(raw.get("type"), 50)
         if action_type not in ALLOWED_ACTIONS:
             raise HTTPException(status_code=422, detail=f"AI 返回了不允许的操作：{action_type or '未知'}")
-        action_domain = _action_domain(action_type)
-        domains.add(action_domain)
+        action_domain_name = action_domain(action_type)
+        domains.add(action_domain_name)
         action = {"id": f"assistant-{index + 1}", "type": action_type, "reason": _clean_text(raw.get("reason"), 500)}
 
         if action_type == "create_group":
@@ -561,12 +539,13 @@ def _normalize_assistant_response(
             "type": action_type,
             "title": title,
             "reason": action["reason"],
-            "danger": action_type == "delete_tag",
+            "danger": action_type in {"delete_tag", "merge_tags"},
+            "domain": action_domain_name,
             "entry_targets": _action_entry_targets(action, entries_by_id),
         })
 
     if len(domains) > 1:
-        warnings.append("本轮包含不同类型的管理任务，系统已拆成多个独立计划；每组操作都需要单独确认。")
+        warnings.append("本轮包含多个管理领域，系统已组成一个原子复合计划；所有选中操作会一次应用或全部回滚。")
         return message, "mixed", normalized, display, warnings
     actual_domain = next(iter(domains), "none")
     if domain not in {"none", actual_domain}:
@@ -666,7 +645,8 @@ async def submit_turn(turn_token: str, acknowledge_risk: bool) -> dict:
     plan_token = None
     response_domain = domain
     response_actions = display
-    queued_plan_count = 0
+    response_domains = []
+    conflicts = []
 
     if domain == "navigation" and len(actions) == 1:
         action = actions[0]
@@ -674,21 +654,22 @@ async def submit_turn(turn_token: str, acknowledge_risk: bool) -> dict:
         navigation = {"entry_id": action["entry_id"], "entry_title": entry.title if entry else "条目"}
         response_actions = []
     elif actions:
-        batches = _split_action_batches(actions, display)
-        executable_batches = [batch for batch in batches if batch["domain"] != "navigation"]
-        if len(executable_batches) != len(batches):
+        executable_actions = [action for action in actions if action_domain(action["type"]) != "navigation"]
+        if len(executable_actions) != len(actions):
             warnings.append("混合计划中的打开条目动作未加入执行队列；可通过建议详情查看对应条目。")
-        if executable_batches:
-            primary, *remaining_batches = executable_batches
-            queued_plan_count = len(remaining_batches)
-            response_domain = primary["domain"]
-            response_actions = primary["display"]
+        if executable_actions:
+            executable_ids = {action["id"] for action in executable_actions}
+            response_actions = [item for item in display if item["id"] in executable_ids]
+            response_domains = list(dict.fromkeys(action_domain(action["type"]) for action in executable_actions))
+            response_domain = "mixed" if len(response_domains) > 1 else response_domains[0]
+            conflicts = detect_conflicts(executable_actions)
+            if conflicts:
+                warnings.append(f"复合计划中有 {len(conflicts)} 组操作存在冲突，请取消冲突项后再应用。")
             plan_token = put_pending("assistant-plan", {
                 "mode": "assistant",
                 "conversation_id": turn["conversation_id"],
-                "domain": primary["domain"],
-                "actions": primary["actions"],
-                "remaining_batches": remaining_batches,
+                "domain": response_domain,
+                "actions": executable_actions,
             })
         else:
             response_domain = "none"
@@ -701,7 +682,8 @@ async def submit_turn(turn_token: str, acknowledge_risk: bool) -> dict:
             "meta": {
                 "domain": domain,
                 "action_count": len(actions),
-                "queued_plan_count": queued_plan_count,
+                "domains": response_domains,
+                "conflict_count": len(conflicts),
                 "warnings": warnings,
             },
         },
@@ -713,7 +695,8 @@ async def submit_turn(turn_token: str, acknowledge_risk: bool) -> dict:
         "plan_token": plan_token,
         "source_revision": vault_revision(),
         "actions": response_actions,
-        "queued_plan_count": queued_plan_count,
+        "domains": response_domains,
+        "conflicts": conflicts,
         "warnings": warnings,
         "navigation": navigation,
         "privacy_note": "本轮未发送字段值、备注或完整网址。",
@@ -884,20 +867,30 @@ def _apply_assistant_actions(vault, actions: list[dict]) -> dict:
 
 
 def apply_plan(plan_token: str, selected_ids: list[str], expected_revision: int) -> dict:
-    pending = consume_pending(plan_token, "assistant-plan", expected_revision)
+    pending = get_pending(plan_token, "assistant-plan", expected_revision)
     selected = set(selected_ids)
-    snapshot = create_ai_snapshot()
-    vault = copy.deepcopy(get_vault_data())
     if pending.payload["mode"] == "sensitive_create":
         items = [entry for entry in pending.payload.get("entries", []) if entry.get("id") in selected]
         if not items:
             raise HTTPException(status_code=422, detail="请选择要创建的条目")
-        result = _apply_sensitive_entries(vault, items)
     else:
         items = [action for action in pending.payload.get("actions", []) if action.get("id") in selected]
         if not items:
             raise HTTPException(status_code=422, detail="请选择要应用的操作")
-        result = _apply_assistant_actions(vault, items)
+        conflicts = detect_conflicts(items)
+        if conflicts:
+            messages = "；".join(conflict["message"] for conflict in conflicts[:3])
+            raise HTTPException(status_code=422, detail=f"复合计划存在冲突：{messages}")
+        items = ordered_actions(items)
+
+    pending = consume_pending(plan_token, "assistant-plan", expected_revision)
+    snapshot = create_ai_snapshot()
+    vault = copy.deepcopy(get_vault_data())
+    result = (
+        _apply_sensitive_entries(vault, items)
+        if pending.payload["mode"] == "sensitive_create"
+        else _apply_assistant_actions(vault, items)
+    )
     if result["applied_count"] > 0:
         save_vault_data(vault)
         result["undo_token"] = put_pending(
@@ -909,32 +902,9 @@ def apply_plan(plan_token: str, selected_ids: list[str], expected_revision: int)
             vault_revision(),
         )
         result["revision"] = vault_revision()
-        remaining_batches = pending.payload.get("remaining_batches", [])
-        if remaining_batches:
-            next_batch, *later_batches = remaining_batches
-            next_token = put_pending("assistant-plan", {
-                "mode": "assistant",
-                "conversation_id": pending.payload.get("conversation_id"),
-                "domain": next_batch["domain"],
-                "actions": next_batch["actions"],
-                "remaining_batches": later_batches,
-            })
-            domain_label = {
-                "groups": "密码组",
-                "tags": "标签",
-                "entry_structure": "条目结构",
-                "entry_creation": "条目创建",
-            }.get(next_batch["domain"], "下一组")
-            result["next_plan"] = {
-                "message": f"{domain_label}操作已独立成下一组计划，请再次确认。",
-                "domain": next_batch["domain"],
-                "plan_token": next_token,
-                "source_revision": result["revision"],
-                "actions": next_batch["display"],
-                "queued_plan_count": len(later_batches),
-                "warnings": ["不同管理类型会逐组执行，本组不会与上一组同时应用。"],
-                "privacy_note": "本轮未发送字段值、备注或完整网址。",
-            }
+        result["domains"] = list(dict.fromkeys(
+            action_domain(item["type"]) for item in items if item.get("type") in ALLOWED_ACTIONS
+        )) if pending.payload["mode"] == "assistant" else ["entry_creation"]
         conversation_id = pending.payload.get("conversation_id")
         if conversation_id:
             append_messages(conversation_id, [{

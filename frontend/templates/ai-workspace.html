@@ -179,7 +179,7 @@
                                 <span>{{ aiAssistantPlan ? '本轮审核' : 'AI 回复' }}</span>
                                 <strong>
                                     {{ aiAssistantPlan
-                                        ? aiAssistantPlan.actions.length + ' 项计划' + (aiAssistantPlan.queued_plan_count ? ' · 后续 ' + aiAssistantPlan.queued_plan_count + ' 组' : '')
+                                        ? aiAssistantPlan.actions.length + ' 项 · ' + aiAssistantPlan.actionGroups.length + ' 类'
                                         : aiAssistantLastResult?.warnings?.length ? '计划已降级' : '无需操作' }}
                                 </strong>
                             </div>
@@ -190,52 +190,81 @@
                             </span>
                         </div>
                         <div v-if="aiAssistantPlan" class="ai-plan-content">
-                            <div v-if="aiAssistantLastResult?.undoToken" class="ai-plan-sequence-status">
-                                <span>上一组操作已应用，当前组仍需单独确认。</span>
-                                <button type="button" class="btn-small" @click="undoAssistantPlan" :disabled="aiAssistantBusy">撤销上一步</button>
-                            </div>
                             <p>{{ aiAssistantPlan.message }}</p>
                             <p class="info-message">{{ aiAssistantPlan.privacy_note }}</p>
                             <div v-if="aiAssistantPlan.warnings?.length" class="ai-plan-warning-list">
                                 <span v-for="warning in aiAssistantPlan.warnings" :key="warning">{{ warning }}</span>
                             </div>
-                            <div
-                                v-for="action in aiAssistantPlan.actions"
-                                :key="action.id"
-                                class="ai-plan-item"
-                                :class="{ danger: action.danger }"
-                            >
-                                <input type="checkbox" v-model="action.selected" :aria-label="'选择' + action.title">
-                                <div class="ai-plan-item-content">
-                                    <strong>{{ action.title }}</strong>
-                                    <small v-if="action.reason">{{ action.reason }}</small>
-                                    <button
-                                        v-if="action.entryTargets?.length"
-                                        type="button"
-                                        class="ai-plan-entry-link"
-                                        @click="openAssistantActionEntries(action)"
-                                    >查看条目{{ action.entryTargets.length > 1 ? '（' + action.entryTargets.length + '）' : '' }}</button>
-                                    <span v-if="action.sensitive" class="ai-sensitive-entry-preview">
-                                        <small v-if="action.url">网址：{{ action.url }}</small>
-                                        <small v-if="action.tags?.length">标签：{{ action.tags.join('、') }}</small>
-                                        <small v-if="action.groups?.length">密码组：{{ action.groups.join('、') }}</small>
-                                        <span v-for="(field, fieldIndex) in action.fields" :key="fieldIndex" class="ai-sensitive-field-row">
-                                            <span>{{ field.name }}</span>
-                                            <code>{{ field.hidden && !field.revealed ? '••••••••' : field.value }}</code>
-                                            <button
-                                                v-if="field.hidden"
-                                                type="button"
-                                                class="btn-icon compact"
-                                                @click.prevent="field.revealed = !field.revealed"
-                                                :title="field.revealed ? '隐藏字段值' : '显示字段值'"
-                                            >{{ field.revealed ? '◉' : '◎' }}</button>
-                                        </span>
-                                        <small v-if="action.remarks">备注：{{ action.remarks }}</small>
-                                    </span>
-                                </div>
+                            <div v-if="aiAssistantPlan.conflicts?.length" class="ai-plan-conflict-list">
+                                <strong>需要处理的冲突</strong>
+                                <span v-for="conflict in aiAssistantPlan.conflicts" :key="conflict.id">{{ conflict.message }}</span>
                             </div>
-                            <button class="btn-primary ai-plan-apply" @click="applyAssistantPlan" :disabled="aiAssistantBusy || !aiAssistantPlan.actions.some(item => item.selected)">
-                                应用已选计划
+                            <section
+                                v-for="group in aiAssistantPlan.actionGroups"
+                                :key="group.domain"
+                                class="ai-plan-group"
+                                :class="'domain-' + group.domain"
+                            >
+                                <header class="ai-plan-group-header">
+                                    <label>
+                                        <input
+                                            type="checkbox"
+                                            :checked="group.actions.every(item => item.selected)"
+                                            :indeterminate.prop="group.actions.some(item => item.selected) && !group.actions.every(item => item.selected)"
+                                            @change="toggleAssistantPlanGroup(group, $event.target.checked)"
+                                        >
+                                        <span>{{ group.label }}</span>
+                                    </label>
+                                    <small>{{ group.actions.filter(item => item.selected).length }} / {{ group.actions.length }}</small>
+                                </header>
+                                <div class="ai-plan-group-items">
+                                    <div
+                                        v-for="action in group.actions"
+                                        :key="action.id"
+                                        class="ai-plan-item"
+                                        :class="{ danger: action.danger, conflict: action.conflicts?.length }"
+                                    >
+                                        <input type="checkbox" v-model="action.selected" :aria-label="'选择' + action.title">
+                                        <div class="ai-plan-item-content">
+                                            <div class="ai-plan-item-heading">
+                                                <strong>{{ action.title }}</strong>
+                                                <span v-if="action.danger" class="ai-plan-risk-badge">高影响</span>
+                                            </div>
+                                            <small v-if="action.reason">{{ action.reason }}</small>
+                                            <small v-for="conflict in action.conflicts" :key="conflict.id" class="ai-plan-item-conflict">{{ conflict.message }}</small>
+                                            <button
+                                                v-if="action.entryTargets?.length"
+                                                type="button"
+                                                class="ai-plan-entry-link"
+                                                @click="openAssistantActionEntries(action)"
+                                            >查看条目{{ action.entryTargets.length > 1 ? '（' + action.entryTargets.length + '）' : '' }}</button>
+                                            <span v-if="action.sensitive" class="ai-sensitive-entry-preview">
+                                                <small v-if="action.url">网址：{{ action.url }}</small>
+                                                <small v-if="action.tags?.length">标签：{{ action.tags.join('、') }}</small>
+                                                <small v-if="action.groups?.length">密码组：{{ action.groups.join('、') }}</small>
+                                                <span v-for="(field, fieldIndex) in action.fields" :key="fieldIndex" class="ai-sensitive-field-row">
+                                                    <span>{{ field.name }}</span>
+                                                    <code>{{ field.hidden && !field.revealed ? '••••••••' : field.value }}</code>
+                                                    <button
+                                                        v-if="field.hidden"
+                                                        type="button"
+                                                        class="btn-icon compact"
+                                                        @click.prevent="field.revealed = !field.revealed"
+                                                        :title="field.revealed ? '隐藏字段值' : '显示字段值'"
+                                                    >{{ field.revealed ? '◉' : '◎' }}</button>
+                                                </span>
+                                                <small v-if="action.remarks">备注：{{ action.remarks }}</small>
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </section>
+                            <button
+                                class="btn-primary ai-plan-apply"
+                                @click="applyAssistantPlan"
+                                :disabled="aiAssistantBusy || !aiAssistantPlan.actions.some(item => item.selected) || assistantPlanHasSelectedConflicts(aiAssistantPlan)"
+                            >
+                                应用已选计划（{{ aiAssistantPlan.actions.filter(item => item.selected).length }}）
                             </button>
                         </div>
                         <div v-else-if="aiAssistantLastResult?.navigation" class="ai-plan-empty">

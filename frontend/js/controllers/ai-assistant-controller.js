@@ -38,7 +38,8 @@
             openSettings,
             selectSettingsTab,
             normalizeAssistantActionTargets,
-            resetAssistantInspector
+            resetAssistantInspector,
+            assistantPlanHasSelectedConflicts
         } = options;
         let pendingMessageId = '';
         const planHelpers = window.SecretBaseAiAssistantPlanHelpers;
@@ -364,6 +365,10 @@
                 showToast('请选择要应用的 AI 操作', 'warning');
                 return;
             }
+            if (assistantPlanHasSelectedConflicts(plan)) {
+                showToast('当前选中操作存在冲突，请取消冲突项后再应用', 'warning');
+                return;
+            }
             aiAssistantBusy.value = true;
             aiAssistantStage.value = '正在本地应用已确认的操作';
             aiAssistantError.value = '';
@@ -373,19 +378,13 @@
                     selected_ids: selectedIds,
                     expected_revision: plan.source_revision
                 });
-                const nextPlan = result.data?.next_plan || null;
                 aiAssistantLastResult.value = {
                     message: result.message,
                     undoToken: result.data?.undo_token || '',
                     revision: result.data?.revision || 0,
                     emptyGroups: result.data?.empty_groups || []
                 };
-                aiAssistantPlan.value = nextPlan
-                    ? normalizePlan(nextPlan, {
-                        scope: plan.requestScope,
-                        scopeEntryCount: plan.scopeEntryCount
-                    })
-                    : null;
+                aiAssistantPlan.value = null;
                 resetAssistantInspector();
                 await Promise.all([
                     loadEntries(currentPage.value),
@@ -395,10 +394,7 @@
                     loadConversations(),
                     refreshAssistantScopeCatalog({ silent: true })
                 ]);
-                showToast(
-                    nextPlan ? `${result.message || 'AI 操作已应用'}，请继续确认下一组计划` : (result.message || 'AI 操作已应用'),
-                    'success'
-                );
+                showToast(result.message || 'AI 操作已应用', 'success');
             } catch (error) {
                 aiAssistantError.value = error.message || '应用 AI 计划失败';
             } finally {

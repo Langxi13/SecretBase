@@ -5,9 +5,40 @@
     const confirmationMessages = new Set([
         '确认', '确认执行', '确认应用', '执行', '执行计划', '应用', '应用计划'
     ]);
+    const domainLabels = {
+        groups: '密码组',
+        tags: '标签',
+        entry_structure: '条目结构',
+        entry_creation: '条目创建',
+        navigation: '条目定位'
+    };
+    const domainOrder = ['groups', 'tags', 'entry_structure', 'entry_creation', 'navigation', 'other'];
 
     function normalizeAssistantPlan(data, requestContext, defaultScope, normalizeTargets) {
         const context = requestContext || {};
+        const conflicts = Array.isArray(data.conflicts) ? data.conflicts : [];
+        const actions = (data.actions || []).map(action => ({
+            ...action,
+            selected: !action.danger,
+            entryTargets: normalizeTargets(action),
+            conflicts: conflicts.filter(conflict => (conflict.action_ids || []).includes(action.id)),
+            fields: (action.fields || []).map(field => ({
+                ...field,
+                revealed: !field.hidden
+            }))
+        }));
+        const groupsByDomain = new Map();
+        actions.forEach(action => {
+            const domain = action.domain || (action.type === 'create_entry' ? 'entry_creation' : 'other');
+            if (!groupsByDomain.has(domain)) {
+                groupsByDomain.set(domain, {
+                    domain,
+                    label: domainLabels[domain] || '其他操作',
+                    actions: []
+                });
+            }
+            groupsByDomain.get(domain).actions.push(action);
+        });
         return {
             ...data,
             requestScope: context.scope || data.requestScope || defaultScope,
@@ -18,15 +49,11 @@
                 || 0
             ),
             warnings: Array.isArray(data.warnings) ? data.warnings.filter(Boolean) : [],
-            actions: (data.actions || []).map(action => ({
-                ...action,
-                selected: true,
-                entryTargets: normalizeTargets(action),
-                fields: (action.fields || []).map(field => ({
-                    ...field,
-                    revealed: !field.hidden
-                }))
-            }))
+            conflicts,
+            actions,
+            actionGroups: Array.from(groupsByDomain.values()).sort(
+                (left, right) => domainOrder.indexOf(left.domain) - domainOrder.indexOf(right.domain)
+            )
         };
     }
 
@@ -35,9 +62,25 @@
         return confirmationMessages.has(normalized);
     }
 
+    function assistantPlanHasSelectedConflicts(plan) {
+        const selectedIds = new Set((plan?.actions || []).filter(action => action.selected).map(action => action.id));
+        return (plan?.conflicts || []).some(conflict => {
+            const actionIds = conflict.action_ids || [];
+            return actionIds.length > 0 && actionIds.every(actionId => selectedIds.has(actionId));
+        });
+    }
+
+    function toggleAssistantPlanGroup(group, selected) {
+        (group?.actions || []).forEach(action => {
+            action.selected = Boolean(selected);
+        });
+    }
+
     window.SecretBaseAiAssistantPlanHelpers = {
         normalizeAssistantPlan,
-        isAssistantConfirmation
+        isAssistantConfirmation,
+        assistantPlanHasSelectedConflicts,
+        toggleAssistantPlanGroup
     };
 })();
 
@@ -154,7 +197,9 @@
             selectAssistantInspectorEntry,
             changeAssistantInspectorPage,
             closeAssistantActionEntries: resetAssistantInspector,
-            copyAssistantInspectorField
+            copyAssistantInspectorField,
+            assistantPlanHasSelectedConflicts: window.SecretBaseAiAssistantPlanHelpers.assistantPlanHasSelectedConflicts,
+            toggleAssistantPlanGroup: window.SecretBaseAiAssistantPlanHelpers.toggleAssistantPlanGroup
         };
     }
 

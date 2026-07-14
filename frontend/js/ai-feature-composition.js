@@ -155,7 +155,8 @@
             openSettings: (...args) => settingsActions.openSettings(...args),
             selectSettingsTab: (...args) => settingsActions.selectSettingsTab(...args),
             normalizeAssistantActionTargets: inspectorActions.normalizeAssistantActionTargets,
-            resetAssistantInspector: inspectorActions.resetAssistantInspector
+            resetAssistantInspector: inspectorActions.resetAssistantInspector,
+            assistantPlanHasSelectedConflicts: inspectorActions.assistantPlanHasSelectedConflicts
         });
 
         return {

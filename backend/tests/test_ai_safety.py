@@ -223,7 +223,7 @@ class AiSafetyTests(unittest.TestCase):
             [{"id": self.entry.id, "title": "生产控制台"}],
         )
 
-    def test_mixed_tag_and_group_plan_is_kept_for_sequential_confirmation(self):
+    def test_mixed_tag_and_group_plan_is_kept_as_atomic_composite(self):
         payload = {
             "message": "混合建议",
             "domain": "tags",
@@ -244,64 +244,120 @@ class AiSafetyTests(unittest.TestCase):
         self.assertEqual(domain, "mixed")
         self.assertEqual([action["type"] for action in actions], ["create_tag", "create_group"])
         self.assertEqual(len(display), 2)
-        self.assertTrue(any("多个独立计划" in warning for warning in warnings))
+        self.assertEqual([item["domain"] for item in display], ["tags", "groups"])
+        self.assertTrue(any("原子复合计划" in warning for warning in warnings))
 
-    def test_applying_one_batch_returns_the_next_independent_plan(self):
+    def test_composite_tag_and_group_plan_applies_in_one_snapshot(self):
         pending = SimpleNamespace(payload={
             "mode": "assistant",
             "conversation_id": "conversation",
-            "actions": [{
-                "id": "assistant-1",
-                "type": "create_group",
-                "name": "测试",
-                "description": "",
-                "reason": "",
-            }],
-            "remaining_batches": [{
-                "domain": "tags",
-                "actions": [{
+            "actions": [
+                {
+                    "id": "assistant-1",
+                    "type": "create_group",
+                    "name": "测试组",
+                    "description": "",
+                    "reason": "",
+                },
+                {
                     "id": "assistant-2",
                     "type": "create_tag",
-                    "name": "测试",
+                    "name": "测试标签",
                     "description": "",
                     "color": None,
                     "reason": "",
-                }],
-                "display": [{
-                    "id": "assistant-2",
-                    "type": "create_tag",
-                    "title": "新建标签「测试」",
-                    "reason": "",
-                    "danger": False,
-                    "entry_targets": [],
-                }],
-            }],
+                },
+            ],
         })
         snapshot = SimpleNamespace(name="snapshot.enc")
-        put_pending = Mock(side_effect=["undo-token", "next-plan-token"])
+        put_pending = Mock(return_value="undo-token")
+        save_vault_data = Mock()
 
         with (
+            patch.object(conversation, "get_pending", return_value=pending),
             patch.object(conversation, "consume_pending", return_value=pending),
             patch.object(conversation, "create_ai_snapshot", return_value=snapshot),
             patch.object(conversation, "get_vault_data", return_value=self.vault),
-            patch.object(conversation, "save_vault_data"),
+            patch.object(conversation, "save_vault_data", save_vault_data),
             patch.object(conversation, "put_pending", put_pending),
             patch.object(conversation, "vault_revision", return_value=5),
             patch.object(conversation, "append_messages"),
         ):
             result = conversation.apply_plan(
                 "plan-token",
-                ["assistant-1"],
+                ["assistant-1", "assistant-2"],
                 expected_revision=4,
             )
 
-        self.assertEqual(result["applied_count"], 1)
-        self.assertEqual(result["next_plan"]["domain"], "tags")
-        self.assertEqual(result["next_plan"]["plan_token"], "next-plan-token")
-        self.assertEqual(result["next_plan"]["actions"][0]["title"], "新建标签「测试」")
-        next_payload = put_pending.call_args_list[1].args[1]
-        self.assertEqual(next_payload["actions"][0]["type"], "create_tag")
-        self.assertEqual(next_payload["remaining_batches"], [])
+        self.assertEqual(result["applied_count"], 2)
+        self.assertEqual(result["domains"], ["groups", "tags"])
+        self.assertNotIn("next_plan", result)
+        self.assertEqual(put_pending.call_count, 1)
+        saved_vault = save_vault_data.call_args.args[0]
+        self.assertIn("测试组", saved_vault.groups_meta)
+        self.assertIn("测试标签", saved_vault.tags_meta)
+
+    def test_selected_composite_conflict_does_not_consume_plan(self):
+        actions = [
+            {
+                "id": "assistant-1",
+                "type": "update_tag",
+                "tag": "开发",
+                "new_name": "研发",
+                "description": "",
+                "color": None,
+            },
+            {
+                "id": "assistant-2",
+                "type": "assign_tags",
+                "entry_ids": [self.entry.id],
+                "add": ["研发"],
+                "remove": [],
+            },
+        ]
+        pending = SimpleNamespace(payload={
+            "mode": "assistant",
+            "conversation_id": "conversation",
+            "actions": actions,
+        })
+        consume_pending = Mock()
+        create_snapshot = Mock()
+
+        with (
+            patch.object(conversation, "get_pending", return_value=pending),
+            patch.object(conversation, "consume_pending", consume_pending),
+            patch.object(conversation, "create_ai_snapshot", create_snapshot),
+        ):
+            with self.assertRaises(HTTPException) as raised:
+                conversation.apply_plan(
+                    "plan-token",
+                    ["assistant-1", "assistant-2"],
+                    expected_revision=4,
+                )
+
+        self.assertEqual(raised.exception.status_code, 422)
+        self.assertIn("复合计划存在冲突", raised.exception.detail)
+        consume_pending.assert_not_called()
+        create_snapshot.assert_not_called()
+
+    def test_composite_execution_order_reads_fields_before_renaming(self):
+        actions = [
+            {"id": "rename", "type": "rename_field"},
+            {"id": "copy", "type": "create_entry_from_field"},
+        ]
+
+        ordered = conversation.ordered_actions(actions)
+
+        self.assertEqual([item["id"] for item in ordered], ["copy", "rename"])
+
+    def test_composite_conflict_message_hides_internal_entry_id(self):
+        conflicts = conversation.detect_conflicts([
+            {"id": "rename-1", "type": "rename_entry", "entry_id": self.entry.id},
+            {"id": "rename-2", "type": "rename_entry", "entry_id": self.entry.id},
+        ])
+
+        self.assertEqual(len(conflicts), 1)
+        self.assertNotIn(self.entry.id, conflicts[0]["message"])
 
     def test_mismatched_domain_is_corrected_without_losing_plan(self):
         payload = {
@@ -576,6 +632,55 @@ class AiSafetyTests(unittest.TestCase):
         self.assertTrue(result["warnings"])
         put_pending.assert_not_called()
         append_messages.assert_called_once()
+
+    def test_submit_turn_uses_one_token_for_mixed_composite_plan(self):
+        config = {
+            "provider_id": "deepseek",
+            "base_url": "https://api.deepseek.com",
+            "api_key": "test-key",
+            "model": "test-model",
+            "structured_output": "response_format",
+        }
+        pending = SimpleNamespace(payload={
+            "mode": "assistant",
+            "conversation_id": "conversation",
+            "message": "创建测试密码组和测试标签",
+            "metadata": [],
+            "taxonomy": {},
+            "entry_map": self.turn["entry_map"],
+            "field_map": self.turn["field_map"],
+            "ai_target": conversation._config_identity(config),
+        })
+        response = json.dumps({
+            "message": "已生成复合计划，请确认。",
+            "domain": "mixed",
+            "actions": [
+                {"type": "create_group", "name": "测试组"},
+                {"type": "create_tag", "name": "测试标签"},
+            ],
+            "warnings": [],
+        }, ensure_ascii=False)
+        put_pending = Mock(return_value="composite-plan-token")
+
+        with (
+            patch.object(conversation, "consume_pending", return_value=pending),
+            patch.object(conversation.ai_client, "_load_ai_config", return_value=config),
+            patch.object(conversation.ai_client, "_request_chat_completion", AsyncMock(return_value=response)),
+            patch.object(conversation, "model_context", return_value=[]),
+            patch.object(conversation, "get_vault_data", return_value=self.vault),
+            patch.object(conversation, "append_messages"),
+            patch.object(conversation, "put_pending", put_pending),
+            patch.object(conversation, "vault_revision", return_value=4),
+        ):
+            result = asyncio.run(conversation.submit_turn("t" * 32, True))
+
+        self.assertEqual(result["plan_token"], "composite-plan-token")
+        self.assertEqual(result["domain"], "mixed")
+        self.assertEqual(result["domains"], ["groups", "tags"])
+        self.assertEqual(len(result["actions"]), 2)
+        plan_payload = put_pending.call_args.args[1]
+        self.assertEqual([item["type"] for item in plan_payload["actions"]], ["create_group", "create_tag"])
+        self.assertNotIn("remaining_batches", plan_payload)
 
     def test_changed_ai_target_requires_a_new_confirmation(self):
         expected = {
