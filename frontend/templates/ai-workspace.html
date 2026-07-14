@@ -146,11 +146,20 @@
                                                 <button :class="{ active: aiAssistantMode === 'assistant' }" @click="aiAssistantMode = 'assistant'">管家</button>
                                                 <button :class="{ active: aiAssistantMode === 'sensitive_create' }" @click="aiAssistantMode = 'sensitive_create'">AI 新建</button>
                                             </div>
-                                            <select v-if="aiAssistantMode === 'assistant'" v-model="aiAssistantScope" aria-label="AI 分析范围">
-                                                <option value="current_view">当前视图</option>
-                                                <option value="selection">已选条目</option>
-                                                <option value="all">全部条目</option>
-                                            </select>
+                                            <button
+                                                v-if="aiAssistantMode === 'assistant'"
+                                                type="button"
+                                                class="ai-scope-trigger"
+                                                @click="openAssistantScopePicker"
+                                                :disabled="aiAssistantBusy || !!aiAssistantPrepared"
+                                                title="选择 AI 分析范围"
+                                                aria-haspopup="dialog"
+                                                :aria-expanded="aiAssistantScopePicker.open"
+                                            >
+                                                <span>范围</span>
+                                                <strong>{{ assistantScopeSummary() }}</strong>
+                                                <span aria-hidden="true">⌄</span>
+                                            </button>
                                             <span class="ai-privacy-indicator" :class="{ sensitive: aiAssistantMode === 'sensitive_create' }">
                                                 {{ aiAssistantMode === 'sensitive_create' ? '逐次确认 · 可能含新字段值' : '逐次确认 · 不含已有字段值' }}
                                             </span>
@@ -170,7 +179,11 @@
                                 <span>{{ aiAssistantPlan ? '本轮审核' : 'AI 回复' }}</span>
                                 <strong>{{ aiAssistantPlan ? aiAssistantPlan.actions.length + ' 项计划' : aiAssistantLastResult?.warnings?.length ? '计划已降级' : '无需操作' }}</strong>
                             </div>
-                            <span class="ai-scope-badge">{{ aiAssistantScope === 'all' ? '全部条目' : aiAssistantScope === 'selection' ? '已选条目' : '当前视图' }}</span>
+                            <span class="ai-scope-badge">
+                                {{ aiAssistantPlan
+                                    ? assistantScopeLabel(aiAssistantPlan.requestScope) + (aiAssistantPlan.scopeEntryCount ? ' · ' + aiAssistantPlan.scopeEntryCount : '')
+                                    : assistantScopeSummary() }}
+                            </span>
                         </div>
                         <div v-if="aiAssistantPlan" class="ai-plan-content">
                             <p>{{ aiAssistantPlan.message }}</p>
@@ -279,11 +292,19 @@
                             <div>
                                 <dt>分析范围</dt>
                                 <dd>
-                                    {{ aiAssistantPrepared.scope === 'all' ? '全部条目' : aiAssistantPrepared.scope === 'selection' ? '已选条目' : '当前视图' }}
+                                    {{ assistantScopeLabel(aiAssistantPrepared.scope) }}
                                     <span v-if="aiAssistantPrepared.manifest.entry_count"> · {{ aiAssistantPrepared.manifest.entry_count }} 个</span>
                                 </dd>
                             </div>
                         </dl>
+
+                        <div v-if="aiAssistantPrepared.manifest.entry_preview?.length" class="ai-send-section ai-scope-preview-section">
+                            <strong>范围内条目</strong>
+                            <div class="ai-scope-preview-titles">
+                                <span v-for="(title, index) in aiAssistantPrepared.manifest.entry_preview" :key="index + '-' + title">{{ title }}</span>
+                                <span v-if="aiAssistantPrepared.manifest.entry_preview_remaining">另有 {{ aiAssistantPrepared.manifest.entry_preview_remaining }} 条</span>
+                            </div>
+                        </div>
 
                         <div class="ai-send-section">
                             <strong>本轮将发送</strong>

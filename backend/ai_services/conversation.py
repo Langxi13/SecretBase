@@ -18,7 +18,7 @@ from ai_services.instruction_policy import (
     FIELD_VALUE_REQUEST_MESSAGE,
     requests_existing_field_values as _requests_existing_field_values,
 )
-from ai_services.organize import _clean_name_list, _filter_entries_for_organize
+from ai_services.organize import _clean_name_list
 from ai_services.parsing import _clean_text, _normalize_ai_payload, _to_bool
 from ai_services.pending import consume_pending, discard_pending, put_pending
 from ai_services.privacy import (
@@ -28,6 +28,7 @@ from ai_services.privacy import (
     taxonomy_metadata,
 )
 from ai_services.prompts import SYSTEM_PROMPT
+from ai_services.scope_catalog import entries_for_assistant_scope
 from ai_services.tag_governance import _clean_color, apply_tag_governance
 from models import AiTagGovernanceSuggestion, Entry, FieldItem
 from storage import (
@@ -145,16 +146,16 @@ def _local_response(message: str, entries: list) -> dict | None:
 
 
 def _scope_entries(vault, filters: dict, scope: str) -> list:
-    if scope == "all":
-        entries = [entry for entry in vault.entries if not entry.deleted]
-    else:
-        entries = _filter_entries_for_organize(vault, filters)
-    if scope == "selection" and not (filters.get("entryIds") or filters.get("entry_ids")):
-        return []
-    return entries
+    return entries_for_assistant_scope(vault, filters, scope)
 
 
-def _manifest(ai_config: dict, mode: str, entry_count: int, warnings: list[dict]) -> dict:
+def _manifest(
+    ai_config: dict,
+    mode: str,
+    entry_count: int,
+    warnings: list[dict],
+    entry_titles: list[str] | None = None,
+) -> dict:
     host = urlsplit(ai_config["base_url"]).hostname or ai_config["base_url"]
     return {
         "provider_id": ai_config.get("provider_id", "custom"),
@@ -169,6 +170,8 @@ def _manifest(ai_config: dict, mode: str, entry_count: int, warnings: list[dict]
             else ["本轮提示词", "标题", "网址 hostname", "标签", "密码组", "字段名", "隐藏/可复制状态", "分类简介"]
         ),
         "warnings": warnings,
+        "entry_preview": list(entry_titles or [])[:8],
+        "entry_preview_remaining": max(0, len(entry_titles or []) - 8),
     }
 
 
@@ -220,7 +223,13 @@ def preview_turn(request) -> dict:
             "mode": "sensitive_create",
         }
 
-    manifest = _manifest(ai_config, request.mode, len(payload.get("metadata", [])), warnings)
+    manifest = _manifest(
+        ai_config,
+        request.mode,
+        len(payload.get("metadata", [])),
+        warnings,
+        [item["title"] for item in payload.get("metadata", [])],
+    )
     payload["ai_target"] = _config_identity(ai_config)
     payload["manifest"] = manifest
     token = put_pending("assistant-preview", payload)

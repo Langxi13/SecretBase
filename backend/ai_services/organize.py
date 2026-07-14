@@ -138,7 +138,7 @@ def _filter_entries_for_organize(vault, filters: dict) -> list:
     starred = filters.get("starred")
     if starred in ("true", True):
         entries = [entry for entry in entries if entry.starred]
-    elif starred in ("false", False):
+    elif starred == "false":
         entries = [entry for entry in entries if not entry.starred]
 
     created_from = str(filters.get("createdFrom") or filters.get("created_from") or "").strip()
@@ -147,6 +147,13 @@ def _filter_entries_for_organize(vault, filters: dict) -> list:
         entries = [entry for entry in entries if entry.created_at >= created_from]
     if created_to:
         entries = [entry for entry in entries if entry.created_at <= created_to]
+
+    updated_from = str(filters.get("updatedFrom") or filters.get("updated_from") or "").strip()
+    updated_to = str(filters.get("updatedTo") or filters.get("updated_to") or "").strip()
+    if updated_from:
+        entries = [entry for entry in entries if entry.updated_at >= updated_from]
+    if updated_to:
+        entries = [entry for entry in entries if entry.updated_at <= updated_to]
 
     has_url = filters.get("hasUrl") if "hasUrl" in filters else filters.get("has_url")
     if has_url in ("yes", True, "true"):

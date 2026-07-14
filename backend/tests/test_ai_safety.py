@@ -325,6 +325,8 @@ class AiSafetyTests(unittest.TestCase):
         self.assertEqual(captured["kind"], "assistant-preview")
         self.assertEqual(result["source_revision"], 3)
         self.assertEqual(result["preview_token"], "pending-token")
+        self.assertEqual(result["manifest"]["entry_preview"], ["生产控制台"])
+        self.assertEqual(result["manifest"]["entry_preview_remaining"], 0)
         self.assertNotIn("message", captured["payload"])
         self.assertNotIn("conversation_id", captured["payload"])
         self.assertIn("本轮提示词", result["manifest"]["data_types"])

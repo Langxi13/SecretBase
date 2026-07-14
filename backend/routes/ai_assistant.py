@@ -11,16 +11,18 @@ from ai_services.history import (
     get_conversation,
     list_conversations,
 )
+from ai_services.scope_catalog import assistant_scope_catalog
 from models import (
     AiConversationCreateRequest,
     AiDiagnosticsRunRequest,
     AiPendingPlanApplyRequest,
+    AiScopeCatalogRequest,
     AiTurnPrepareRequest,
     AiTurnPreviewRequest,
     AiTurnSubmitRequest,
     AiUndoRequest,
 )
-from storage import is_unlocked
+from storage import get_vault_data, is_unlocked
 
 
 router = APIRouter()
@@ -77,6 +79,25 @@ async def prepare_assistant_turn(request: AiTurnPrepareRequest):
 async def preview_assistant_turn(request: AiTurnPreviewRequest):
     _require_unlocked()
     return {"success": True, "data": preview_turn(request)}
+
+
+@router.post("/assistant/scope/catalog")
+async def assistant_scope_options(request: AiScopeCatalogRequest):
+    _require_unlocked()
+    return {
+        "success": True,
+        "data": assistant_scope_catalog(
+            get_vault_data(),
+            current_filters=request.filters,
+            search=request.search,
+            tag=request.tag,
+            group=request.group,
+            starred=request.starred,
+            selected_ids=request.selected_ids,
+            page=request.page,
+            page_size=request.page_size,
+        ),
+    }
 
 
 @router.post("/assistant/turns/submit")

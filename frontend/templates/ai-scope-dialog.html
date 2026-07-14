@@ -1,0 +1,169 @@
+        <div
+            v-if="aiAssistantScopePicker.open"
+            class="modal-overlay ai-scope-picker-overlay"
+            @click.self="closeAssistantScopePicker"
+        >
+            <div class="modal-content ai-scope-picker-modal" role="dialog" aria-modal="true" aria-labelledby="ai-scope-picker-title">
+                <div class="modal-header">
+                    <div>
+                        <h2 id="ai-scope-picker-title">选择 AI 分析范围</h2>
+                        <p>只会向 AI 发送所选条目的结构元数据，不包含已有字段值。</p>
+                    </div>
+                    <button type="button" class="modal-close" @click="closeAssistantScopePicker" aria-label="关闭">✕</button>
+                </div>
+
+                <div class="modal-body ai-scope-picker-body">
+                    <div class="ai-scope-mode-tabs" role="radiogroup" aria-label="分析范围模式">
+                        <button
+                            type="button"
+                            role="radio"
+                            :aria-checked="aiAssistantScopePicker.draftScope === 'all'"
+                            :class="{ active: aiAssistantScopePicker.draftScope === 'all' }"
+                            @click="selectAssistantScopeMode('all')"
+                        >
+                            <strong>全部条目</strong>
+                            <span>{{ aiAssistantScopePicker.loaded ? aiAssistantScopePicker.counts.all + ' 条' : '正在统计' }}</span>
+                        </button>
+                        <button
+                            type="button"
+                            role="radio"
+                            :aria-checked="aiAssistantScopePicker.draftScope === 'current_view'"
+                            :class="{ active: aiAssistantScopePicker.draftScope === 'current_view' }"
+                            @click="selectAssistantScopeMode('current_view')"
+                        >
+                            <strong>当前筛选结果</strong>
+                            <span>{{ aiAssistantScopePicker.loaded ? aiAssistantScopePicker.counts.currentView + ' 条' : '正在统计' }}</span>
+                        </button>
+                        <button
+                            type="button"
+                            role="radio"
+                            :aria-checked="aiAssistantScopePicker.draftScope === 'selection'"
+                            :class="{ active: aiAssistantScopePicker.draftScope === 'selection' }"
+                            @click="selectAssistantScopeMode('selection')"
+                        >
+                            <strong>自定义选择</strong>
+                            <span>已选 {{ aiAssistantScopePicker.draftSelectedIds.length }} 条</span>
+                        </button>
+                    </div>
+
+                    <div v-if="aiAssistantScopePicker.draftScope === 'all'" class="ai-scope-mode-summary">
+                        <strong>分析全部未删除条目</strong>
+                        <span>适合进行全局分类检查、标签治理和密码组规划。</span>
+                    </div>
+                    <div v-else-if="aiAssistantScopePicker.draftScope === 'current_view'" class="ai-scope-mode-summary">
+                        <strong>沿用主页当前筛选条件</strong>
+                        <span>包含所有分页中的匹配条目，不仅限于主页当前页。</span>
+                    </div>
+
+                    <template v-else>
+                        <div class="ai-scope-picker-toolbar">
+                            <label class="ai-scope-search-field">
+                                <span>搜索条目</span>
+                                <input
+                                    type="search"
+                                    v-model.trim="aiAssistantScopePicker.search"
+                                    placeholder="按标题或域名搜索"
+                                    @keydown.enter.prevent="filterAssistantScopeEntries"
+                                >
+                            </label>
+                            <label>
+                                <span>标签</span>
+                                <select v-model="aiAssistantScopePicker.tag" @change="filterAssistantScopeEntries">
+                                    <option value="">全部标签</option>
+                                    <option v-for="tag in aiAssistantScopePicker.tags" :key="tag" :value="tag">{{ tag }}</option>
+                                </select>
+                            </label>
+                            <label>
+                                <span>密码组</span>
+                                <select v-model="aiAssistantScopePicker.group" @change="filterAssistantScopeEntries">
+                                    <option value="">全部密码组</option>
+                                    <option v-for="group in aiAssistantScopePicker.groups" :key="group" :value="group">{{ group }}</option>
+                                </select>
+                            </label>
+                            <label>
+                                <span>收藏</span>
+                                <select v-model="aiAssistantScopePicker.starred" @change="filterAssistantScopeEntries">
+                                    <option value="">全部</option>
+                                    <option value="true">仅收藏</option>
+                                    <option value="false">仅未收藏</option>
+                                </select>
+                            </label>
+                            <button type="button" class="btn-secondary ai-scope-filter-button" @click="filterAssistantScopeEntries">筛选</button>
+                        </div>
+
+                        <div class="ai-scope-picker-list-actions">
+                            <span>当前结果 {{ aiAssistantScopePicker.pagination.total }} 条</span>
+                            <div>
+                                <button
+                                    type="button"
+                                    class="btn-small"
+                                    @click="importCurrentEntrySelection"
+                                    :disabled="selectedEntryIds.length === 0"
+                                >导入主页已选（{{ selectedEntryIds.length }}）</button>
+                                <button type="button" class="btn-small" @click="toggleAssistantScopePage" :disabled="aiAssistantScopePicker.items.length === 0">
+                                    {{ assistantScopePageFullySelected() ? '取消本页全选' : '全选本页' }}
+                                </button>
+                                <button type="button" class="btn-small danger" @click="clearAssistantScopeSelection" :disabled="aiAssistantScopePicker.draftSelectedIds.length === 0">清空</button>
+                            </div>
+                        </div>
+
+                        <div v-if="aiAssistantScopePicker.loading" class="ai-scope-picker-state">
+                            <span class="loading-spinner small"></span>
+                            <span>正在加载条目...</span>
+                        </div>
+                        <div v-else-if="aiAssistantScopePicker.items.length === 0" class="ai-scope-picker-state">
+                            <strong>没有匹配的条目</strong>
+                            <span>调整搜索词或筛选条件后重试。</span>
+                        </div>
+                        <div v-else class="ai-scope-entry-list">
+                            <label
+                                v-for="entry in aiAssistantScopePicker.items"
+                                :key="entry.id"
+                                class="ai-scope-entry-row"
+                                :class="{ selected: aiAssistantScopePicker.draftSelectedIds.includes(entry.id) }"
+                            >
+                                <input
+                                    type="checkbox"
+                                    :checked="aiAssistantScopePicker.draftSelectedIds.includes(entry.id)"
+                                    @change="toggleAssistantScopeEntry(entry.id)"
+                                >
+                                <span class="ai-scope-entry-main">
+                                    <span class="ai-scope-entry-title">
+                                        <strong>{{ entry.title }}</strong>
+                                        <span v-if="entry.starred" title="已收藏">★</span>
+                                    </span>
+                                    <small>{{ entry.hostname || '无域名' }}</small>
+                                </span>
+                                <span class="ai-scope-entry-taxonomy">
+                                    <span v-for="tag in entry.tags.slice(0, 2)" :key="entry.id + '-tag-' + tag">{{ tag }}</span>
+                                    <span v-for="group in entry.groups.slice(0, 1)" :key="entry.id + '-group-' + group" class="group">{{ group }}</span>
+                                    <small v-if="entry.extra_taxonomy_count">+{{ entry.extra_taxonomy_count }}</small>
+                                </span>
+                            </label>
+                        </div>
+
+                        <div class="ai-scope-picker-pagination">
+                            <label>
+                                <span>每页</span>
+                                <select :value="aiAssistantScopePicker.pageSize" @change="changeAssistantScopePageSize($event.target.value)">
+                                    <option v-for="size in assistantScopePageSizeOptions" :key="size" :value="size">{{ size }}</option>
+                                </select>
+                            </label>
+                            <button type="button" class="btn-secondary" @click="goToAssistantScopePage(aiAssistantScopePicker.page - 1)" :disabled="aiAssistantScopePicker.page <= 1 || aiAssistantScopePicker.loading">上一页</button>
+                            <span>第 {{ aiAssistantScopePicker.pagination.page }} / {{ aiAssistantScopePicker.pagination.totalPages }} 页</span>
+                            <button type="button" class="btn-secondary" @click="goToAssistantScopePage(aiAssistantScopePicker.page + 1)" :disabled="aiAssistantScopePicker.page >= aiAssistantScopePicker.pagination.totalPages || aiAssistantScopePicker.loading">下一页</button>
+                        </div>
+                    </template>
+
+                    <p v-if="aiAssistantScopePicker.error" class="error-message ai-scope-picker-error">{{ aiAssistantScopePicker.error }}</p>
+                </div>
+
+                <div class="modal-footer ai-scope-picker-footer">
+                    <span>{{ aiAssistantScopePicker.draftScope === 'selection' ? '已选择 ' + aiAssistantScopePicker.draftSelectedIds.length + ' 条' : assistantScopeLabel(aiAssistantScopePicker.draftScope) }}</span>
+                    <div>
+                        <button type="button" class="btn-secondary" @click="closeAssistantScopePicker">取消</button>
+                        <button type="button" class="btn-primary" @click="confirmAssistantScopePicker">使用此范围</button>
+                    </div>
+                </div>
+            </div>
+        </div>

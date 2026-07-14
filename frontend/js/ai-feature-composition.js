@@ -99,6 +99,19 @@
             selectSettingsTab: (...args) => settingsActions.selectSettingsTab(...args)
         });
 
+        const scopeActions = window.SecretBaseAiScopeController.createAiScopeController({
+            api,
+            store,
+            aiAssistantScope: state.aiAssistantScope,
+            aiAssistantScopePicker: state.aiAssistantScopePicker,
+            searchQuery: state.searchQuery,
+            selectedSearchScopes: state.selectedSearchScopes,
+            sortBy: state.sortBy,
+            sortOrder: state.sortOrder,
+            selectedEntryIds: state.selectedEntryIds,
+            resetAiAssistantScope: state.resetAiAssistantScope
+        });
+
         const assistantActions = window.SecretBaseAiAssistantController.createAiAssistantController({
             nextTick,
             api,
@@ -121,13 +134,13 @@
             aiAssistantPlan: state.aiAssistantPlan,
             aiAssistantLastResult: state.aiAssistantLastResult,
             aiAssistantHistoryOpen: state.aiAssistantHistoryOpen,
-            searchQuery: state.searchQuery,
-            selectedSearchScopes: state.selectedSearchScopes,
-            sortBy: state.sortBy,
-            sortOrder: state.sortOrder,
-            selectedEntryIds: state.selectedEntryIds,
             selectedEntry: state.selectedEntry,
             currentPage: state.currentPage,
+            assistantFiltersForScope: scopeActions.assistantFiltersForScope,
+            assistantScopeCount: scopeActions.assistantScopeCount,
+            refreshAssistantScopeCatalog: scopeActions.refreshAssistantScopeCatalog,
+            closeAssistantScopePicker: scopeActions.closeAssistantScopePicker,
+            resetAssistantScopeForConversation: scopeActions.resetAssistantScopeForConversation,
             loadEntries: data.loadEntries,
             loadTags: data.loadTags,
             loadGroups: data.loadGroups,
@@ -140,6 +153,7 @@
             actions: {
                 ...providerActions,
                 ...professionalActions,
+                ...scopeActions,
                 ...assistantActions
             }
         };

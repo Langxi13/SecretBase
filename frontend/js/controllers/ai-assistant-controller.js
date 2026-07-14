@@ -25,13 +25,13 @@
             aiAssistantPlan,
             aiAssistantLastResult,
             aiAssistantHistoryOpen,
-            searchQuery,
-            selectedSearchScopes,
-            sortBy,
-            sortOrder,
-            selectedEntryIds,
             selectedEntry,
             currentPage,
+            assistantFiltersForScope,
+            assistantScopeCount,
+            refreshAssistantScopeCatalog,
+            closeAssistantScopePicker,
+            resetAssistantScopeForConversation,
             loadEntries,
             loadTags,
             loadGroups,
@@ -75,21 +75,6 @@
             }
         }
 
-        function currentFilters() {
-            if (aiAssistantScope.value === 'all') return {};
-            const filters = {
-                ...store.state.filters,
-                search: searchQuery.value,
-                searchScopes: [...selectedSearchScopes.value],
-                sortBy: sortBy.value,
-                sortOrder: sortOrder.value
-            };
-            if (aiAssistantScope.value === 'selection') {
-                filters.entryIds = [...selectedEntryIds.value];
-            }
-            return filters;
-        }
-
         async function loadConversations() {
             const result = await api.get('/ai/assistant/conversations');
             aiAssistantConversations.value = result.data?.conversations || [];
@@ -98,18 +83,24 @@
 
         async function createConversation() {
             const result = await api.post('/ai/assistant/conversations', { title: '' });
+            resetAssistantScopeForConversation();
             aiAssistantConversationId.value = result.data.id;
             aiAssistantMessages.value = [];
             pendingMessageId = '';
             aiAssistantPlan.value = null;
             aiAssistantLastResult.value = null;
             await loadConversations();
+            await refreshAssistantScopeCatalog({ silent: true });
             collapseHistoryOnNarrowScreen();
             return result.data;
         }
 
         async function loadConversation(conversationId, preserveReview = false) {
             if (!conversationId) return;
+            const changedConversation = conversationId !== aiAssistantConversationId.value;
+            if (changedConversation) {
+                resetAssistantScopeForConversation();
+            }
             const result = await api.get(`/ai/assistant/conversations/${encodeURIComponent(conversationId)}`);
             aiAssistantConversationId.value = conversationId;
             aiAssistantMessages.value = result.data?.messages || [];
@@ -118,6 +109,9 @@
             if (!preserveReview) {
                 aiAssistantPlan.value = null;
                 aiAssistantLastResult.value = null;
+            }
+            if (changedConversation) {
+                await refreshAssistantScopeCatalog({ silent: true });
             }
             collapseHistoryOnNarrowScreen();
             scrollAssistantToBottom();
@@ -143,6 +137,7 @@
                 const status = await api.get('/ai/status');
                 aiStatus.value = status.data;
                 await ensureConversation();
+                await refreshAssistantScopeCatalog({ silent: true });
                 scrollAssistantToBottom();
             } catch (error) {
                 aiAssistantError.value = error.message || '无法加载 AI 管家';
@@ -156,6 +151,7 @@
             }
             showAiAssistant.value = false;
             aiAssistantPrepared.value = null;
+            closeAssistantScopePicker();
             clearPendingUserMessage();
             aiAssistantPlan.value = null;
             aiAssistantLastResult.value = null;
@@ -214,7 +210,7 @@
             };
         }
 
-        function applyAssistantTurnResult(data) {
+        function applyAssistantTurnResult(data, requestContext = {}) {
             clearPendingUserMessage();
             aiAssistantConversationId.value = data.conversation_id || aiAssistantConversationId.value;
             aiAssistantPrepared.value = null;
@@ -224,6 +220,8 @@
             if (data.plan_token) {
                 aiAssistantPlan.value = {
                     ...data,
+                    requestScope: requestContext.scope || aiAssistantScope.value,
+                    scopeEntryCount: Number(requestContext.manifest?.entry_count || 0),
                     warnings,
                     actions: (data.actions || []).map(action => ({
                         ...action,
@@ -301,7 +299,7 @@
                     turn_token: turn.turn_token,
                     acknowledge_risk: true
                 }, { timeoutMs: 150000 });
-                applyAssistantTurnResult(result.data || {});
+                applyAssistantTurnResult(result.data || {}, prepared);
             } catch (error) {
                 clearPendingUserMessage();
                 aiAssistantError.value = error.message || 'AI 请求失败';
@@ -319,8 +317,8 @@
                 aiAssistantError.value = '请先配置 AI 服务。';
                 return;
             }
-            if (aiAssistantScope.value === 'selection' && selectedEntryIds.value.length === 0) {
-                aiAssistantError.value = '选择范围模式下，请先在条目列表勾选至少一个条目。';
+            if (aiAssistantScope.value === 'selection' && assistantScopeCount('selection') === 0) {
+                aiAssistantError.value = '自定义选择范围下，请先选择至少一个条目。';
                 return;
             }
             aiAssistantBusy.value = true;
@@ -332,7 +330,7 @@
                 originalMessage: message,
                 mode: aiAssistantMode.value,
                 scope: aiAssistantScope.value,
-                filters: currentFilters()
+                filters: assistantFiltersForScope()
             };
             try {
                 aiAssistantPrepared.value = await requestSendPreview(draft);
@@ -378,7 +376,8 @@
                     loadTags(),
                     loadGroups(),
                     loadConversation(aiAssistantConversationId.value, true),
-                    loadConversations()
+                    loadConversations(),
+                    refreshAssistantScopeCatalog({ silent: true })
                 ]);
                 showToast(result.message || 'AI 操作已应用', 'success');
             } catch (error) {
@@ -403,7 +402,8 @@
                 aiAssistantLastResult.value = { message: result.message };
                 await Promise.all([
                     loadEntries(currentPage.value), loadTags(), loadGroups(),
-                    loadConversation(aiAssistantConversationId.value, true), loadConversations()
+                    loadConversation(aiAssistantConversationId.value, true), loadConversations(),
+                    refreshAssistantScopeCatalog({ silent: true })
                 ]);
                 showToast('已撤销本次 AI 操作', 'success');
             } catch (error) {
@@ -422,6 +422,7 @@
                     .filter(name => name !== groupName);
                 aiAssistantLastResult.value.undoToken = '';
                 await loadGroups();
+                await refreshAssistantScopeCatalog({ silent: true });
                 showToast(result.message || '空密码组已删除', 'success');
             } catch (error) {
                 showToast(error.message || '删除空密码组失败', 'error');

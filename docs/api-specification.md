@@ -1560,6 +1560,7 @@ POST   /ai/assistant/conversations
 GET    /ai/assistant/conversations/{conversation_id}
 DELETE /ai/assistant/conversations/{conversation_id}
 DELETE /ai/assistant/conversations
+POST   /ai/assistant/scope/catalog
 POST   /ai/assistant/turns/preview
 POST   /ai/assistant/turns/prepare
 POST   /ai/assistant/turns/submit
@@ -1575,10 +1576,14 @@ GET    /ai/assistant/diagnostics/status
 ```json
 {
   "mode": "assistant",
-  "scope": "current_view",
+  "scope": "all",
   "filters": {}
 }
 ```
+
+`scope` 默认为 `all`。`current_view` 表示主页当前筛选条件命中的全部分页结果，不等同于当前可见页；`selection` 只使用 `filters.entryIds` 指定的自定义条目，不继续叠加主页筛选条件。
+
+`POST /ai/assistant/scope/catalog` 用于范围选择弹窗，请求可包含主页筛选条件、标题或 hostname 搜索、标签、密码组、收藏状态、分页和已选 ID。响应仅返回条目 ID、标题、hostname、标签、密码组和收藏状态，同时返回全部条目数、当前筛选结果数和仍然有效的已选 ID；不得返回字段、字段值、备注或完整 URL。该接口只访问本地密码库，不调用第三方 AI。
 
 响应包含 `preview_token`、目标厂商、目标 host、模型、数据类型、条目数量、风险提示和 `source_revision`，但该请求及服务端待处理项均不包含用户提示词。前端必须展示发送清单和仍保留在浏览器内的提示词，不允许自动跳过确认。
 

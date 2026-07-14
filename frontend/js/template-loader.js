@@ -5,11 +5,12 @@
  * 但入口页不再承担全部页面和弹窗的标记。
  */
 (function () {
-    const TEMPLATE_VERSION = '20260714-ai-v8';
+    const TEMPLATE_VERSION = '20260714-ai-v9';
     const templatePaths = [
         'templates/app-layout.html',
         'templates/workspace-list.html',
         'templates/ai-workspace.html',
+        'templates/ai-scope-dialog.html',
         'templates/entry-dialogs.html',
         'templates/ai-dialog.html',
         'templates/tag-browser-dialog.html',

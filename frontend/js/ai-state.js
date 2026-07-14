@@ -40,7 +40,27 @@
         });
 
         const aiAssistantMode = ref('assistant');
-        const aiAssistantScope = ref('current_view');
+        const aiAssistantScope = ref('all');
+        const aiAssistantScopePicker = reactive({
+            open: false,
+            loaded: false,
+            loading: false,
+            error: '',
+            draftScope: 'all',
+            selectedIds: [],
+            draftSelectedIds: [],
+            search: '',
+            tag: '',
+            group: '',
+            starred: '',
+            page: 1,
+            pageSize: 10,
+            items: [],
+            pagination: { page: 1, pageSize: 10, total: 0, totalPages: 1 },
+            counts: { all: 0, currentView: 0 },
+            tags: [],
+            groups: []
+        });
         const aiAssistantInput = ref('');
         const aiAssistantBusy = ref(false);
         const aiAssistantStage = ref('');
@@ -57,6 +77,30 @@
             || !window.matchMedia('(max-width: 820px)').matches
         );
 
+        function resetAiAssistantScope() {
+            aiAssistantScope.value = 'all';
+            Object.assign(aiAssistantScopePicker, {
+                open: false,
+                loaded: false,
+                loading: false,
+                error: '',
+                draftScope: 'all',
+                selectedIds: [],
+                draftSelectedIds: [],
+                search: '',
+                tag: '',
+                group: '',
+                starred: '',
+                page: 1,
+                pageSize: 10,
+                items: [],
+                pagination: { page: 1, pageSize: 10, total: 0, totalPages: 1 },
+                counts: { all: 0, currentView: 0 },
+                tags: [],
+                groups: []
+            });
+        }
+
         function resetAiAssistantSession() {
             aiAssistantInput.value = '';
             aiAssistantPrepared.value = null;
@@ -67,6 +111,7 @@
             aiAssistantBusy.value = false;
             aiAssistantStage.value = '';
             aiAssistantError.value = '';
+            resetAiAssistantScope();
         }
 
         const aiSettingsForm = reactive({
@@ -116,6 +161,7 @@
             currentAiOrganizePrompt,
             aiAssistantMode,
             aiAssistantScope,
+            aiAssistantScopePicker,
             aiAssistantInput,
             aiAssistantBusy,
             aiAssistantStage,
@@ -127,6 +173,7 @@
             aiAssistantPlan,
             aiAssistantLastResult,
             aiAssistantHistoryOpen,
+            resetAiAssistantScope,
             resetAiAssistantSession,
             aiSettingsForm,
             aiProviders,

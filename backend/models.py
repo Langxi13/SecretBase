@@ -405,7 +405,30 @@ class AiTurnPreviewRequest(BaseModel):
     """生成不包含用户提示词的 AI 发送清单。"""
     mode: str = Field(default="assistant", pattern="^(assistant|sensitive_create)$")
     filters: dict = Field(default_factory=dict)
-    scope: str = Field(default="current_view", pattern="^(current_view|selection|all)$")
+    scope: str = Field(default="all", pattern="^(current_view|selection|all)$")
+
+
+class AiScopeCatalogRequest(BaseModel):
+    """查询仅含元数据的 AI 条目选择目录。"""
+    filters: dict = Field(default_factory=dict)
+    search: str = Field(default="", max_length=200)
+    tag: str = Field(default="", max_length=50)
+    group: str = Field(default="", max_length=50)
+    starred: Optional[bool] = None
+    selected_ids: List[str] = Field(default_factory=list, max_length=1000)
+    page: int = Field(default=1, ge=1)
+    page_size: int = Field(default=10, ge=5, le=50)
+
+    @validator('selected_ids')
+    def validate_selected_ids(cls, value):
+        cleaned = []
+        for item in value:
+            entry_id = str(item or '').strip()
+            if not entry_id or len(entry_id) > 100:
+                raise ValueError('条目 ID 无效')
+            if entry_id not in cleaned:
+                cleaned.append(entry_id)
+        return cleaned
 
 
 class AiTurnPrepareRequest(BaseModel):
