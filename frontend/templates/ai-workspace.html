@@ -18,10 +18,10 @@
                         </div>
                     </div>
                     <div class="ai-workspace-actions">
-                        <button class="ai-header-action" @click="openProfessionalAiTools" :disabled="aiAssistantBusy" title="打开专业工具">
+                        <button type="button" class="ai-header-action" @click="openProfessionalAiTools" title="打开专业工具">
                             <span aria-hidden="true">⌘</span><span>专业工具</span>
                         </button>
-                        <button class="ai-header-action" @click="openAssistantSettings" :disabled="aiAssistantBusy" title="AI 服务设置">
+                        <button type="button" class="ai-header-action" @click="openAssistantSettings" title="AI 服务设置">
                             <span aria-hidden="true">⚙</span><span>服务设置</span>
                         </button>
                         <button class="modal-close" @click="closeAiAssistant" :disabled="aiAssistantBusy" title="关闭">✕</button>
@@ -177,7 +177,11 @@
                         <div class="ai-plan-heading">
                             <div>
                                 <span>{{ aiAssistantPlan ? '本轮审核' : 'AI 回复' }}</span>
-                                <strong>{{ aiAssistantPlan ? aiAssistantPlan.actions.length + ' 项计划' : aiAssistantLastResult?.warnings?.length ? '计划已降级' : '无需操作' }}</strong>
+                                <strong>
+                                    {{ aiAssistantPlan
+                                        ? aiAssistantPlan.actions.length + ' 项计划' + (aiAssistantPlan.queued_plan_count ? ' · 后续 ' + aiAssistantPlan.queued_plan_count + ' 组' : '')
+                                        : aiAssistantLastResult?.warnings?.length ? '计划已降级' : '无需操作' }}
+                                </strong>
                             </div>
                             <span class="ai-scope-badge">
                                 {{ aiAssistantPlan
@@ -186,6 +190,10 @@
                             </span>
                         </div>
                         <div v-if="aiAssistantPlan" class="ai-plan-content">
+                            <div v-if="aiAssistantLastResult?.undoToken" class="ai-plan-sequence-status">
+                                <span>上一组操作已应用，当前组仍需单独确认。</span>
+                                <button type="button" class="btn-small" @click="undoAssistantPlan" :disabled="aiAssistantBusy">撤销上一步</button>
+                            </div>
                             <p>{{ aiAssistantPlan.message }}</p>
                             <p class="info-message">{{ aiAssistantPlan.privacy_note }}</p>
                             <div v-if="aiAssistantPlan.warnings?.length" class="ai-plan-warning-list">
@@ -198,9 +206,15 @@
                                 :class="{ danger: action.danger }"
                             >
                                 <input type="checkbox" v-model="action.selected" :aria-label="'选择' + action.title">
-                                <span>
+                                <div class="ai-plan-item-content">
                                     <strong>{{ action.title }}</strong>
                                     <small v-if="action.reason">{{ action.reason }}</small>
+                                    <button
+                                        v-if="action.entryTargets?.length"
+                                        type="button"
+                                        class="ai-plan-entry-link"
+                                        @click="openAssistantActionEntries(action)"
+                                    >查看条目{{ action.entryTargets.length > 1 ? '（' + action.entryTargets.length + '）' : '' }}</button>
                                     <span v-if="action.sensitive" class="ai-sensitive-entry-preview">
                                         <small v-if="action.url">网址：{{ action.url }}</small>
                                         <small v-if="action.tags?.length">标签：{{ action.tags.join('、') }}</small>
@@ -218,7 +232,7 @@
                                         </span>
                                         <small v-if="action.remarks">备注：{{ action.remarks }}</small>
                                     </span>
-                                </span>
+                                </div>
                             </div>
                             <button class="btn-primary ai-plan-apply" @click="applyAssistantPlan" :disabled="aiAssistantBusy || !aiAssistantPlan.actions.some(item => item.selected)">
                                 应用已选计划

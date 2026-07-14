@@ -112,6 +112,14 @@
             resetAiAssistantScope: state.resetAiAssistantScope
         });
 
+        const inspectorActions = window.SecretBaseAiAssistantInspectorController.createAiAssistantInspectorController({
+            store,
+            showToast,
+            copyToClipboard,
+            aiAssistantInspector: state.aiAssistantInspector,
+            resetAiAssistantInspector: state.resetAiAssistantInspector
+        });
+
         const assistantActions = window.SecretBaseAiAssistantController.createAiAssistantController({
             nextTick,
             api,
@@ -145,7 +153,9 @@
             loadTags: data.loadTags,
             loadGroups: data.loadGroups,
             openSettings: (...args) => settingsActions.openSettings(...args),
-            selectSettingsTab: (...args) => settingsActions.selectSettingsTab(...args)
+            selectSettingsTab: (...args) => settingsActions.selectSettingsTab(...args),
+            normalizeAssistantActionTargets: inspectorActions.normalizeAssistantActionTargets,
+            resetAssistantInspector: inspectorActions.resetAssistantInspector
         });
 
         return {
@@ -154,6 +164,7 @@
                 ...providerActions,
                 ...professionalActions,
                 ...scopeActions,
+                ...inspectorActions,
                 ...assistantActions
             }
         };

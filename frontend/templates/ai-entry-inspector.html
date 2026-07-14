@@ -1,0 +1,125 @@
+        <div
+            v-if="aiAssistantInspector.open"
+            class="ai-entry-inspector-overlay"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="ai-entry-inspector-title"
+            @click.self="closeAssistantActionEntries"
+        >
+            <section class="ai-entry-inspector">
+                <header class="ai-entry-inspector-header">
+                    <div>
+                        <span>建议关联条目</span>
+                        <h3 id="ai-entry-inspector-title">{{ aiAssistantInspector.actionTitle }}</h3>
+                        <p v-if="aiAssistantInspector.actionReason">{{ aiAssistantInspector.actionReason }}</p>
+                    </div>
+                    <button type="button" class="modal-close" @click="closeAssistantActionEntries" title="关闭">✕</button>
+                </header>
+                <div class="ai-entry-inspector-body">
+                    <aside class="ai-entry-target-panel" aria-label="关联条目列表">
+                        <div class="ai-entry-target-heading">
+                            <span>影响条目</span>
+                            <strong>{{ aiAssistantInspector.targets.length }}</strong>
+                        </div>
+                        <div class="ai-entry-target-list">
+                            <button
+                                v-for="target in aiAssistantInspectorPageTargets"
+                                :key="target.id"
+                                type="button"
+                                :class="{ active: aiAssistantInspector.activeEntryId === target.id }"
+                                @click="selectAssistantInspectorEntry(target.id)"
+                                :title="target.title"
+                            >
+                                <span>{{ target.title }}</span>
+                                <small>{{ aiAssistantInspector.activeEntryId === target.id ? '正在查看' : '查看完整信息' }}</small>
+                            </button>
+                        </div>
+                        <div v-if="aiAssistantInspectorTotalPages > 1" class="ai-entry-target-pagination">
+                            <button
+                                type="button"
+                                class="btn-icon compact"
+                                @click="changeAssistantInspectorPage(aiAssistantInspector.page - 1)"
+                                :disabled="aiAssistantInspector.page <= 1"
+                                title="上一页"
+                            >‹</button>
+                            <span>{{ aiAssistantInspector.page }} / {{ aiAssistantInspectorTotalPages }}</span>
+                            <button
+                                type="button"
+                                class="btn-icon compact"
+                                @click="changeAssistantInspectorPage(aiAssistantInspector.page + 1)"
+                                :disabled="aiAssistantInspector.page >= aiAssistantInspectorTotalPages"
+                                title="下一页"
+                            >›</button>
+                        </div>
+                    </aside>
+
+                    <main class="ai-entry-inspector-detail">
+                        <div v-if="aiAssistantInspector.loading" class="ai-entry-inspector-state">
+                            <span class="loading-spinner small"></span>
+                            <span>正在从本机读取条目</span>
+                        </div>
+                        <div v-else-if="aiAssistantInspector.error" class="warning-panel">
+                            {{ aiAssistantInspector.error }}
+                        </div>
+                        <template v-else-if="aiAssistantInspector.entry">
+                            <div class="ai-entry-detail-heading">
+                                <div>
+                                    <span>完整条目信息</span>
+                                    <h4>{{ aiAssistantInspector.entry.title }}</h4>
+                                </div>
+                                <span v-if="aiAssistantInspector.entry.starred" class="ai-entry-favorite">已收藏</span>
+                            </div>
+                            <div v-if="aiAssistantInspector.entry.url" class="ai-entry-detail-section">
+                                <strong>网址</strong>
+                                <code>{{ aiAssistantInspector.entry.url }}</code>
+                            </div>
+                            <div v-if="aiAssistantInspector.entry.tags?.length" class="ai-entry-detail-section">
+                                <strong>标签</strong>
+                                <div class="ai-entry-detail-chips">
+                                    <span v-for="tag in aiAssistantInspector.entry.tags" :key="tag">{{ tag }}</span>
+                                </div>
+                            </div>
+                            <div v-if="aiAssistantInspector.entry.groups?.length" class="ai-entry-detail-section">
+                                <strong>密码组</strong>
+                                <div class="ai-entry-detail-chips groups">
+                                    <span v-for="group in aiAssistantInspector.entry.groups" :key="group">{{ group }}</span>
+                                </div>
+                            </div>
+                            <div class="ai-entry-detail-section">
+                                <strong>全部字段（{{ aiAssistantInspector.entry.fields?.length || 0 }}）</strong>
+                                <div v-if="aiAssistantInspector.entry.fields?.length" class="ai-entry-detail-fields">
+                                    <div v-for="(field, fieldIndex) in aiAssistantInspector.entry.fields" :key="fieldIndex + '-' + field.name" class="ai-entry-detail-field">
+                                        <div>
+                                            <strong>{{ field.name }}</strong>
+                                            <small>{{ field.hidden ? '隐藏字段' : '普通字段' }} · {{ field.copyable ? '可复制' : '不可复制' }}</small>
+                                        </div>
+                                        <code>{{ field.hidden && !field.revealed ? '••••••••' : field.value }}</code>
+                                        <div class="ai-entry-detail-field-actions">
+                                            <button
+                                                v-if="field.hidden"
+                                                type="button"
+                                                class="btn-icon compact"
+                                                @click="field.revealed = !field.revealed"
+                                                :title="field.revealed ? '隐藏字段值' : '显示字段值'"
+                                            >{{ field.revealed ? '◉' : '◎' }}</button>
+                                            <button
+                                                v-if="field.copyable"
+                                                type="button"
+                                                class="btn-small"
+                                                @click="copyAssistantInspectorField(field)"
+                                            >复制</button>
+                                        </div>
+                                    </div>
+                                </div>
+                                <span v-else class="ai-entry-detail-empty">该条目没有自定义字段</span>
+                            </div>
+                            <div v-if="aiAssistantInspector.entry.remarks" class="ai-entry-detail-section">
+                                <strong>备注</strong>
+                                <p>{{ aiAssistantInspector.entry.remarks }}</p>
+                            </div>
+                            <p class="ai-entry-local-note">完整内容仅从当前本机密码库读取，不会补发给 AI。</p>
+                        </template>
+                    </main>
+                </div>
+            </section>
+        </div>

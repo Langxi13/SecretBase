@@ -36,9 +36,17 @@
             loadTags,
             loadGroups,
             openSettings,
-            selectSettingsTab
+            selectSettingsTab,
+            normalizeAssistantActionTargets,
+            resetAssistantInspector
         } = options;
         let pendingMessageId = '';
+        const planHelpers = window.SecretBaseAiAssistantPlanHelpers;
+        function normalizePlan(data, requestContext = {}) {
+            return planHelpers.normalizeAssistantPlan(
+                data, requestContext, aiAssistantScope.value, normalizeAssistantActionTargets
+            );
+        }
 
         async function scrollAssistantToBottom() {
             await nextTick();
@@ -89,6 +97,7 @@
             pendingMessageId = '';
             aiAssistantPlan.value = null;
             aiAssistantLastResult.value = null;
+            resetAssistantInspector();
             await loadConversations();
             await refreshAssistantScopeCatalog({ silent: true });
             collapseHistoryOnNarrowScreen();
@@ -109,6 +118,7 @@
             if (!preserveReview) {
                 aiAssistantPlan.value = null;
                 aiAssistantLastResult.value = null;
+                resetAssistantInspector();
             }
             if (changedConversation) {
                 await refreshAssistantScopeCatalog({ silent: true });
@@ -155,6 +165,7 @@
             clearPendingUserMessage();
             aiAssistantPlan.value = null;
             aiAssistantLastResult.value = null;
+            resetAssistantInspector();
             aiAssistantStage.value = '';
         }
 
@@ -218,23 +229,11 @@
             aiAssistantMode.value = 'assistant';
             const warnings = Array.isArray(data.warnings) ? data.warnings.filter(Boolean) : [];
             if (data.plan_token) {
-                aiAssistantPlan.value = {
-                    ...data,
-                    requestScope: requestContext.scope || aiAssistantScope.value,
-                    scopeEntryCount: Number(requestContext.manifest?.entry_count || 0),
-                    warnings,
-                    actions: (data.actions || []).map(action => ({
-                        ...action,
-                        selected: true,
-                        fields: (action.fields || []).map(field => ({
-                            ...field,
-                            revealed: !field.hidden
-                        }))
-                    }))
-                };
+                aiAssistantPlan.value = normalizePlan({ ...data, warnings }, requestContext);
             } else {
                 aiAssistantPlan.value = null;
             }
+            resetAssistantInspector();
             aiAssistantLastResult.value = data.navigation
                 ? { navigation: data.navigation, warnings, privacyNote: data.privacy_note || '' }
                 : (data.message || warnings.length
@@ -313,6 +312,15 @@
         async function sendAssistantMessage() {
             const message = aiAssistantInput.value.trim();
             if (!message || aiAssistantBusy.value || aiAssistantPrepared.value) return;
+            if (planHelpers.isAssistantConfirmation(message)) {
+                aiAssistantInput.value = '';
+                if (aiAssistantPlan.value) {
+                    await applyAssistantPlan();
+                } else {
+                    aiAssistantError.value = '当前没有可执行计划，请先让 AI 生成建议，再确认应用。';
+                }
+                return;
+            }
             if (!aiStatus.value?.configured) {
                 aiAssistantError.value = '请先配置 AI 服务。';
                 return;
@@ -326,6 +334,7 @@
             aiAssistantError.value = '';
             aiAssistantPlan.value = null;
             aiAssistantLastResult.value = null;
+            resetAssistantInspector();
             const draft = {
                 originalMessage: message,
                 mode: aiAssistantMode.value,
@@ -364,13 +373,20 @@
                     selected_ids: selectedIds,
                     expected_revision: plan.source_revision
                 });
+                const nextPlan = result.data?.next_plan || null;
                 aiAssistantLastResult.value = {
                     message: result.message,
                     undoToken: result.data?.undo_token || '',
                     revision: result.data?.revision || 0,
                     emptyGroups: result.data?.empty_groups || []
                 };
-                aiAssistantPlan.value = null;
+                aiAssistantPlan.value = nextPlan
+                    ? normalizePlan(nextPlan, {
+                        scope: plan.requestScope,
+                        scopeEntryCount: plan.scopeEntryCount
+                    })
+                    : null;
+                resetAssistantInspector();
                 await Promise.all([
                     loadEntries(currentPage.value),
                     loadTags(),
@@ -379,7 +395,10 @@
                     loadConversations(),
                     refreshAssistantScopeCatalog({ silent: true })
                 ]);
-                showToast(result.message || 'AI 操作已应用', 'success');
+                showToast(
+                    nextPlan ? `${result.message || 'AI 操作已应用'}，请继续确认下一组计划` : (result.message || 'AI 操作已应用'),
+                    'success'
+                );
             } catch (error) {
                 aiAssistantError.value = error.message || '应用 AI 计划失败';
             } finally {
@@ -400,6 +419,8 @@
                     expected_revision: resultState.revision
                 });
                 aiAssistantLastResult.value = { message: result.message };
+                aiAssistantPlan.value = null;
+                resetAssistantInspector();
                 await Promise.all([
                     loadEntries(currentPage.value), loadTags(), loadGroups(),
                     loadConversation(aiAssistantConversationId.value, true), loadConversations(),

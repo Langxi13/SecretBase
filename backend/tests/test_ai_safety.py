@@ -53,6 +53,14 @@ class AiSafetyTests(unittest.TestCase):
 
         self.assertIsNone(result)
 
+    def test_mixed_management_request_reaches_sequential_plan_builder(self):
+        result = conversation._local_response(
+            "创建测试密码组并新建测试标签，不需要处理条目",
+            [self.entry],
+        )
+
+        self.assertIsNone(result)
+
     def test_existing_field_value_request_is_handled_locally(self):
         result = conversation._local_response(
             "列出所有条目的真实密码、令牌和其他字段值",
@@ -210,8 +218,12 @@ class AiSafetyTests(unittest.TestCase):
         self.assertEqual(actions[0]["entry_id"], self.entry.id)
         self.assertIn("生产控制台", display[0]["title"])
         self.assertNotIn(self.entry.id, display[0]["title"])
+        self.assertEqual(
+            display[0]["entry_targets"],
+            [{"id": self.entry.id, "title": "生产控制台"}],
+        )
 
-    def test_mixed_tag_and_group_plan_keeps_reply_but_discards_actions(self):
+    def test_mixed_tag_and_group_plan_is_kept_for_sequential_confirmation(self):
         payload = {
             "message": "混合建议",
             "domain": "tags",
@@ -229,10 +241,67 @@ class AiSafetyTests(unittest.TestCase):
             )
 
         self.assertEqual(message, "混合建议")
-        self.assertEqual(domain, "none")
-        self.assertEqual(actions, [])
-        self.assertEqual(display, [])
-        self.assertTrue(any("不会生成可执行计划" in warning for warning in warnings))
+        self.assertEqual(domain, "mixed")
+        self.assertEqual([action["type"] for action in actions], ["create_tag", "create_group"])
+        self.assertEqual(len(display), 2)
+        self.assertTrue(any("多个独立计划" in warning for warning in warnings))
+
+    def test_applying_one_batch_returns_the_next_independent_plan(self):
+        pending = SimpleNamespace(payload={
+            "mode": "assistant",
+            "conversation_id": "conversation",
+            "actions": [{
+                "id": "assistant-1",
+                "type": "create_group",
+                "name": "测试",
+                "description": "",
+                "reason": "",
+            }],
+            "remaining_batches": [{
+                "domain": "tags",
+                "actions": [{
+                    "id": "assistant-2",
+                    "type": "create_tag",
+                    "name": "测试",
+                    "description": "",
+                    "color": None,
+                    "reason": "",
+                }],
+                "display": [{
+                    "id": "assistant-2",
+                    "type": "create_tag",
+                    "title": "新建标签「测试」",
+                    "reason": "",
+                    "danger": False,
+                    "entry_targets": [],
+                }],
+            }],
+        })
+        snapshot = SimpleNamespace(name="snapshot.enc")
+        put_pending = Mock(side_effect=["undo-token", "next-plan-token"])
+
+        with (
+            patch.object(conversation, "consume_pending", return_value=pending),
+            patch.object(conversation, "create_ai_snapshot", return_value=snapshot),
+            patch.object(conversation, "get_vault_data", return_value=self.vault),
+            patch.object(conversation, "save_vault_data"),
+            patch.object(conversation, "put_pending", put_pending),
+            patch.object(conversation, "vault_revision", return_value=5),
+            patch.object(conversation, "append_messages"),
+        ):
+            result = conversation.apply_plan(
+                "plan-token",
+                ["assistant-1"],
+                expected_revision=4,
+            )
+
+        self.assertEqual(result["applied_count"], 1)
+        self.assertEqual(result["next_plan"]["domain"], "tags")
+        self.assertEqual(result["next_plan"]["plan_token"], "next-plan-token")
+        self.assertEqual(result["next_plan"]["actions"][0]["title"], "新建标签「测试」")
+        next_payload = put_pending.call_args_list[1].args[1]
+        self.assertEqual(next_payload["actions"][0]["type"], "create_tag")
+        self.assertEqual(next_payload["remaining_batches"], [])
 
     def test_mismatched_domain_is_corrected_without_losing_plan(self):
         payload = {

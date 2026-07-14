@@ -71,6 +71,12 @@
         const aiAssistantPrepared = ref(null);
         const aiAssistantPlan = ref(null);
         const aiAssistantLastResult = ref(null);
+        const {
+            aiAssistantInspector,
+            aiAssistantInspectorTotalPages,
+            aiAssistantInspectorPageTargets,
+            resetAiAssistantInspector
+        } = window.SecretBaseAiAssistantInspectorState.createAiAssistantInspectorState({ reactive, computed });
         const aiAssistantHistoryOpen = ref(
             typeof window === 'undefined'
             || typeof window.matchMedia !== 'function'
@@ -106,6 +112,7 @@
             aiAssistantPrepared.value = null;
             aiAssistantPlan.value = null;
             aiAssistantLastResult.value = null;
+            resetAiAssistantInspector();
             aiAssistantMessages.value = [];
             aiAssistantConversationId.value = '';
             aiAssistantBusy.value = false;
@@ -172,6 +179,10 @@
             aiAssistantPrepared,
             aiAssistantPlan,
             aiAssistantLastResult,
+            aiAssistantInspector,
+            aiAssistantInspectorTotalPages,
+            aiAssistantInspectorPageTargets,
+            resetAiAssistantInspector,
             aiAssistantHistoryOpen,
             resetAiAssistantScope,
             resetAiAssistantSession,

@@ -57,6 +57,28 @@ const api = {
                 }
             };
         }
+        if (path === '/ai/assistant/plans/apply') {
+            return {
+                message: '已应用 1 项 AI 操作',
+                data: {
+                    undo_token: 'undo-token',
+                    revision: 5,
+                    next_plan: {
+                        message: '标签操作已独立成下一组计划，请再次确认。',
+                        domain: 'tags',
+                        plan_token: 'next-plan-token',
+                        source_revision: 5,
+                        actions: [{
+                            id: 'assistant-2',
+                            type: 'create_tag',
+                            title: '新建标签「测试」',
+                            entry_targets: []
+                        }],
+                        warnings: []
+                    }
+                }
+            };
+        }
         if (path === '/ai/assistant/conversations') {
             return { data: { id: 'conversation-1' } };
         }
@@ -82,6 +104,9 @@ sandbox.window = {
     crypto: require('crypto').webcrypto
 };
 const context = vm.createContext(sandbox);
+vm.runInContext(readProjectFile('frontend/js/controllers/ai-assistant-inspector-controller.js'), context, {
+    filename: 'ai-assistant-inspector-controller.js'
+});
 vm.runInContext(readProjectFile('frontend/js/controllers/ai-assistant-controller.js'), context, {
     filename: 'ai-assistant-controller.js'
 });
@@ -94,15 +119,55 @@ const aiAssistantPrepared = ref(null);
 const aiAssistantMessages = ref([]);
 const aiAssistantPlan = ref(null);
 const aiAssistantLastResult = ref(null);
+const aiAssistantInspector = {
+    open: false,
+    loading: false,
+    error: '',
+    actionTitle: '',
+    actionReason: '',
+    targets: [],
+    page: 1,
+    pageSize: 8,
+    activeEntryId: '',
+    entry: null
+};
 let settingsOpened = 0;
+const store = {
+    state: { filters: {} },
+    async getEntry(id) {
+        return {
+            id,
+            title: '生产控制台',
+            tags: ['开发'],
+            groups: ['服务器'],
+            fields: [{ name: '登录密码', value: 'local-only', hidden: true, copyable: true }]
+        };
+    }
+};
+const resetAiAssistantInspector = () => Object.assign(aiAssistantInspector, {
+    open: false,
+    loading: false,
+    error: '',
+    actionTitle: '',
+    actionReason: '',
+    targets: [],
+    page: 1,
+    pageSize: 8,
+    activeEntryId: '',
+    entry: null
+});
+const inspectorController = context.window.SecretBaseAiAssistantInspectorController.createAiAssistantInspectorController({
+    store,
+    showToast() {},
+    async copyToClipboard() {},
+    aiAssistantInspector,
+    resetAiAssistantInspector
+});
 
 const controller = context.window.SecretBaseAiAssistantController.createAiAssistantController({
     nextTick: async () => {},
     api,
-    store: {
-        state: { filters: {} },
-        async getEntry() { return {}; }
-    },
+    store,
     showToast() {},
     async copyToClipboard() {},
     showAiAssistant,
@@ -132,7 +197,9 @@ const controller = context.window.SecretBaseAiAssistantController.createAiAssist
     async loadTags() {},
     async loadGroups() {},
     async openSettings() { settingsOpened += 1; },
-    async selectSettingsTab() {}
+    async selectSettingsTab() {},
+    normalizeAssistantActionTargets: inspectorController.normalizeAssistantActionTargets,
+    resetAssistantInspector: inspectorController.resetAssistantInspector
 });
 
 (async () => {
@@ -171,6 +238,19 @@ const controller = context.window.SecretBaseAiAssistantController.createAiAssist
         throw new Error('确认发送后必须进入明确的处理中状态');
     }
 
+    await controller.openProfessionalAiTools();
+    if (!showAiAssistant.value || !showAiParse.value) {
+        throw new Error('发送过程中仍必须能打开专业工具，且 AI 管家保留在下层');
+    }
+
+    await controller.openAssistantSettings();
+    if (!showAiAssistant.value || settingsOpened !== 1) {
+        throw new Error('发送过程中仍必须能打开服务设置，且 AI 管家保留在下层');
+    }
+    if (calls.filter(call => call.path === '/ai/assistant/turns/submit').length !== 1) {
+        throw new Error('打开子面板不得取消或重发正在进行的 AI 请求');
+    }
+
     releaseSubmit();
     await firstSubmit;
     if (aiAssistantBusy.value) throw new Error('请求完成后必须解除忙碌状态');
@@ -184,14 +264,33 @@ const controller = context.window.SecretBaseAiAssistantController.createAiAssist
         throw new Error('无可执行计划时仍必须保留本轮隐私说明');
     }
 
-    await controller.openProfessionalAiTools();
-    if (!showAiAssistant.value || !showAiParse.value) {
-        throw new Error('打开专业工具时 AI 管家必须保留在下层');
+    aiAssistantPlan.value = {
+        plan_token: 'first-plan-token',
+        source_revision: 4,
+        requestScope: 'all',
+        scopeEntryCount: 1,
+        actions: [{ id: 'assistant-1', selected: true }]
+    };
+    aiAssistantInput.value = '确认执行';
+    const submitCountBeforeConfirmation = calls.filter(call => call.path === '/ai/assistant/turns/submit').length;
+    await controller.sendAssistantMessage();
+    if (calls.filter(call => call.path === '/ai/assistant/plans/apply').length !== 1) {
+        throw new Error('确认执行必须直接应用当前本地计划');
+    }
+    if (calls.filter(call => call.path === '/ai/assistant/turns/submit').length !== submitCountBeforeConfirmation) {
+        throw new Error('确认执行不得再次发送给模型');
+    }
+    if (aiAssistantPlan.value?.plan_token !== 'next-plan-token' || aiAssistantPlan.value?.actions?.[0]?.type !== 'create_tag') {
+        throw new Error('混合管理请求必须在应用后接续下一组独立计划');
     }
 
-    await controller.openAssistantSettings();
-    if (!showAiAssistant.value || settingsOpened !== 1) {
-        throw new Error('打开服务设置时 AI 管家必须保留在下层');
+    await inspectorController.openAssistantActionEntries({
+        title: '重命名生产控制台',
+        reason: '统一名称',
+        entryTargets: [{ id: 'entry-1', title: '生产控制台' }]
+    });
+    if (!aiAssistantInspector.open || aiAssistantInspector.entry?.fields?.[0]?.revealed !== false) {
+        throw new Error('建议详情必须从本机加载完整条目，隐藏字段默认保持遮罩');
     }
 
     console.log('PASS frontend ai assistant runtime');

@@ -1,3 +1,5 @@
+@import url('./ai-entry-inspector.css?v=20260714-ai-v10');
+
 /* 对话式 AI 管家 */
 .sidebar-ai-entry {
     margin: 0;
@@ -574,6 +576,25 @@
     line-height: 1.5;
 }
 
+.ai-plan-sequence-status {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 10px;
+    padding: 8px 9px;
+    border-left: 3px solid var(--color-success);
+    background: color-mix(in srgb, var(--color-success) 7%, var(--bg-elevated));
+    color: var(--text-secondary);
+    font-size: var(--font-size-xs);
+    line-height: 1.45;
+}
+
+.ai-plan-sequence-status button {
+    flex: 0 0 auto;
+    white-space: nowrap;
+}
+
 .ai-plan-warning-list {
     display: flex;
     flex-direction: column;
@@ -603,6 +624,10 @@
 
 .ai-plan-item.danger {
     border-color: color-mix(in srgb, var(--color-error) 50%, var(--border-color));
+}
+
+.ai-plan-item-content {
+    min-width: 0;
 }
 
 .ai-plan-item input {
@@ -656,6 +681,26 @@
     margin-top: 4px;
     color: var(--text-secondary);
     line-height: 1.45;
+}
+
+.ai-plan-entry-link {
+    display: inline-flex;
+    align-items: center;
+    min-height: 26px;
+    margin-top: 8px;
+    padding: 3px 8px;
+    border: 1px solid color-mix(in srgb, var(--color-primary) 35%, var(--border-color));
+    border-radius: 5px;
+    background: color-mix(in srgb, var(--color-primary) 7%, var(--bg-secondary));
+    color: var(--color-primary);
+    font-size: var(--font-size-xs);
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+.ai-plan-entry-link:hover {
+    border-color: color-mix(in srgb, var(--color-primary) 58%, var(--border-color));
+    background: color-mix(in srgb, var(--color-primary) 12%, var(--bg-secondary));
 }
 
 .ai-plan-apply {
@@ -807,6 +852,7 @@
     .ai-privacy-indicator {
         white-space: normal;
     }
+
 }
 
 @media (max-width: 520px) {

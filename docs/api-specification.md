@@ -1601,6 +1601,8 @@ GET    /ai/assistant/diagnostics/status
 
 `POST /ai/assistant/turns/submit` 只接收 `turn_token` 和值为 `true` 的 `acknowledge_risk`。该令牌在进入模型调用前原子消费，重复点击、重放或并发请求不会再次调用第三方 AI。模型允许返回密码组管理、标签管理、条目/字段重命名、空字段、字段属性、空条目模板、本地字段拆分和条目定位动作；不提供删除条目、删除字段、字段值写入、已有 URL/备注修改或密码组删除动作。服务端还会按原始指令再次执行字段值访问策略，禁止模型用 `open_entry` 等动作规避限制。
 
+若模型对一句请求返回多个管理领域，服务端按动作首次出现顺序拆成独立批次。`submit` 只返回第一批的 `plan_token`、`actions` 和 `queued_plan_count`；每个 action 可带仅用于本地详情定位的 `entry_targets: [{"id": "...", "title": "..."}]`，不包含字段、字段值、备注或完整 URL。前端点击“查看条目”后复用 `GET /entries/{entry_id}` 在本地按需读取完整详情，不得将读取结果加入后续 AI 请求。
+
 计划应用请求统一为：
 
 ```json
@@ -1611,7 +1613,7 @@ GET    /ai/assistant/diagnostics/status
 }
 ```
 
-成功写入会返回 `undo_token` 和新 revision。撤销接口只能在 Vault 未发生其他变化时使用。对话历史使用用途隔离密钥保存在本机加密文件中；AI 新建原文不会写入历史或后续模型上下文。
+成功写入会返回 `undo_token` 和新 revision。若仍有其他管理领域待确认，响应的 `data.next_plan` 包含下一批独立的 `plan_token`、`source_revision`、`actions` 和剩余 `queued_plan_count`；前端不得自动应用。用户输入精确的“确认”“确认执行”等确认词时，前端只调用当前 `/plans/apply`，不得把确认词再次发送给模型。撤销接口只能在 Vault 未发生其他变化时使用；撤销上一批后，尚未应用的下一批计划因 revision 变化而失效。对话历史使用用途隔离密钥保存在本机加密文件中；AI 新建原文不会写入历史或后续模型上下文。
 
 真实模型兼容性诊断必须先调用 `GET /ai/assistant/diagnostics/preview` 展示测试数量、数据类型和保守 token 上限，再由用户提交：
 
