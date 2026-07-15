@@ -6,6 +6,7 @@ import 'package:secretbase/src/core/mobile_error_presenter.dart';
 import 'package:secretbase/src/core/widgets/async_content.dart';
 import 'package:secretbase/src/data/vault_providers.dart';
 import 'package:secretbase/src/features/ai/ai_confirmation_sheets.dart';
+import 'package:secretbase/src/features/ai/ai_activity_controller.dart';
 import 'package:secretbase/src/features/ai/ai_manager_composer.dart';
 import 'package:secretbase/src/features/ai/ai_manager_dialogs.dart';
 import 'package:secretbase/src/features/ai/ai_manager_widgets.dart';
@@ -13,6 +14,7 @@ import 'package:secretbase/src/features/ai/ai_plan_panel.dart';
 import 'package:secretbase/src/features/ai/ai_screen.dart';
 import 'package:secretbase/src/features/ai/ai_settings_dialog.dart';
 import 'package:secretbase/src/features/ai/ai_transport.dart';
+import 'package:secretbase/src/features/ai/ai_undo_controller.dart';
 import 'package:secretbase/src/features/entries/entry_detail_dialog.dart';
 import 'package:secretbase/src/rust/api/mobile.dart' as rust_api;
 import 'package:secretbase/src/rust/mobile/models.dart';
@@ -97,7 +99,7 @@ class _AiManagerScreenState extends ConsumerState<AiManagerScreen> {
           status: _status,
           onNewConversation: _working ? null : _newConversation,
           onHistory: _working ? null : _openHistory,
-          onTools: _working || _preview != null ? null : _openProfessionalTools,
+          onTools: _preview != null ? null : _openProfessionalTools,
           onSettings: _openSettings,
         ),
         if (_loading)
@@ -132,6 +134,7 @@ class _AiManagerScreenState extends ConsumerState<AiManagerScreen> {
                       onModeChanged: (value) => setState(() => _mode = value),
                       onScope: _openScope,
                       onPrompt: _usePrompt,
+                      onTools: _openProfessionalTools,
                       onSend: _send,
                     ),
                   ],
@@ -145,10 +148,12 @@ class _AiManagerScreenState extends ConsumerState<AiManagerScreen> {
   }
 
   Widget _buildConversation() {
+    final undo = ref.watch(aiUndoControllerProvider);
     final hasContent =
         _messages.isNotEmpty ||
         _pendingUserMessage != null ||
         _preview != null ||
+        undo.pending != null ||
         _error != null;
     if (!hasContent) {
       return const AiManagerWelcome();
@@ -180,6 +185,11 @@ class _AiManagerScreenState extends ConsumerState<AiManagerScreen> {
           icon: Icons.error_outline,
           message: _error!,
           error: true,
+        ),
+      if (undo.pending != null)
+        AiUndoBanner(
+          state: undo.pending!,
+          onUndo: _working || undo.working ? null : _undoLastOperation,
         ),
       if (_preview != null)
         Padding(
@@ -235,6 +245,11 @@ class _AiManagerScreenState extends ConsumerState<AiManagerScreen> {
     final message = _messageController.text.trim();
     if (message.isEmpty || _working) return;
     if (!await _ensurePrivacyConsent()) return;
+    final activity = ref.read(aiActivityControllerProvider.notifier);
+    if (!activity.start()) {
+      setState(() => _error = '已有 AI 请求正在处理中，请稍后再试');
+      return;
+    }
     setState(() {
       _working = true;
       _pendingUserMessage = message;
@@ -293,6 +308,8 @@ class _AiManagerScreenState extends ConsumerState<AiManagerScreen> {
         _error = _errorMessage(error);
       });
       _scrollToBottom();
+    } finally {
+      activity.finish();
     }
   }
 
@@ -314,12 +331,18 @@ class _AiManagerScreenState extends ConsumerState<AiManagerScreen> {
         selectedItemIds: _selectedPlanItems.toList(),
         expectedRevision: ref.read(vaultControllerProvider).revision,
       );
+      ref.read(aiUndoControllerProvider.notifier).record(result);
       await ref.read(vaultControllerProvider.notifier).refreshStatus();
       ref.invalidate(entryPageProvider);
       ref.invalidate(taxonomyProvider);
+      AiConversation? conversation;
+      if (_conversationId != null) {
+        conversation = await rust_api.getAiConversation(id: _conversationId!);
+      }
       if (!mounted) return;
       setState(() {
         _working = false;
+        if (conversation != null) _messages = conversation.messages;
         _preview = null;
         _selectedPlanItems.clear();
         _revealedDetails.clear();
@@ -328,6 +351,40 @@ class _AiManagerScreenState extends ConsumerState<AiManagerScreen> {
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text(result.message)));
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _working = false;
+        _error = _errorMessage(error);
+      });
+    }
+  }
+
+  Future<void> _undoLastOperation() async {
+    if (_working) return;
+    setState(() {
+      _working = true;
+      _error = null;
+    });
+    try {
+      final message = await ref.read(aiUndoControllerProvider.notifier).undo();
+      AiConversation? conversation;
+      if (_conversationId != null) {
+        conversation = await rust_api.getAiConversation(id: _conversationId!);
+      }
+      if (!mounted) return;
+      setState(() {
+        _working = false;
+        _preview = null;
+        _selectedPlanItems.clear();
+        _revealedDetails.clear();
+        _expandedPlanItems.clear();
+        if (conversation != null) _messages = conversation.messages;
+      });
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(message)));
+      _scrollToBottom();
     } catch (error) {
       if (!mounted) return;
       setState(() {

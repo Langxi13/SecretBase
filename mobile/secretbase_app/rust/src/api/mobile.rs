@@ -1,9 +1,10 @@
 use crate::mobile::{
     error::MobileError,
     models::{
-        AiAssistantRequestPlan, AiAssistantTurnResult, AiConversation, AiConversationSummary,
-        AiHttpRequest, AiPreview, AiRequestPlan, AiStatus, EntryDraft, EntryPage, EntryRecord,
-        ImportPreview, OperationResult, RecoverySnapshot, TaxonomyRecord, VaultStatus,
+        AiApplyResult, AiAssistantRequestPlan, AiAssistantTurnResult, AiConversation,
+        AiConversationSummary, AiHttpRequest, AiPreview, AiRequestPlan, AiStatus, AiUndoState,
+        EntryDraft, EntryPage, EntryRecord, ImportPreview, OperationResult, RecoverySnapshot,
+        TaxonomyRecord, VaultStatus,
     },
     runtime,
 };
@@ -27,6 +28,16 @@ pub fn create_vault(password: String) -> Result<VaultStatus, MobileError> {
 
 pub fn unlock_vault(password: String) -> Result<VaultStatus, MobileError> {
     runtime::unlock_vault(password)
+}
+
+pub fn prepare_device_unlock_credential(password: String) -> Result<Vec<u8>, MobileError> {
+    runtime::prepare_device_unlock_credential(password)
+}
+
+pub fn unlock_vault_with_device_credential(
+    credential: Vec<u8>,
+) -> Result<VaultStatus, MobileError> {
+    runtime::unlock_vault_with_device_credential(credential)
 }
 
 pub fn lock_vault() -> Result<VaultStatus, MobileError> {
@@ -200,8 +211,19 @@ pub fn apply_ai_preview(
     token: String,
     selected_item_ids: Vec<String>,
     expected_revision: u64,
-) -> Result<OperationResult, MobileError> {
+) -> Result<AiApplyResult, MobileError> {
     runtime::apply_ai_preview(token, selected_item_ids, expected_revision)
+}
+
+pub fn pending_ai_undo() -> Result<Option<AiUndoState>, MobileError> {
+    runtime::pending_ai_undo()
+}
+
+pub fn undo_ai_preview(
+    undo_token: String,
+    expected_revision: u64,
+) -> Result<OperationResult, MobileError> {
+    runtime::undo_ai_preview(undo_token, expected_revision)
 }
 
 pub fn list_ai_conversations() -> Result<Vec<AiConversationSummary>, MobileError> {

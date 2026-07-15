@@ -24,6 +24,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   String dco_decode_String(dynamic raw);
 
   @protected
+  AiApplyResult dco_decode_ai_apply_result(dynamic raw);
+
+  @protected
   AiAssistantRequestPlan dco_decode_ai_assistant_request_plan(dynamic raw);
 
   @protected
@@ -63,10 +66,16 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   AiStatus dco_decode_ai_status(dynamic raw);
 
   @protected
+  AiUndoState dco_decode_ai_undo_state(dynamic raw);
+
+  @protected
   bool dco_decode_bool(dynamic raw);
 
   @protected
   AiPreview dco_decode_box_autoadd_ai_preview(dynamic raw);
+
+  @protected
+  AiUndoState dco_decode_box_autoadd_ai_undo_state(dynamic raw);
 
   @protected
   bool dco_decode_box_autoadd_bool(dynamic raw);
@@ -151,6 +160,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   AiPreview? dco_decode_opt_box_autoadd_ai_preview(dynamic raw);
 
   @protected
+  AiUndoState? dco_decode_opt_box_autoadd_ai_undo_state(dynamic raw);
+
+  @protected
   bool? dco_decode_opt_box_autoadd_bool(dynamic raw);
 
   @protected
@@ -182,6 +194,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   String sse_decode_String(SseDeserializer deserializer);
+
+  @protected
+  AiApplyResult sse_decode_ai_apply_result(SseDeserializer deserializer);
 
   @protected
   AiAssistantRequestPlan sse_decode_ai_assistant_request_plan(
@@ -231,10 +246,18 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   AiStatus sse_decode_ai_status(SseDeserializer deserializer);
 
   @protected
+  AiUndoState sse_decode_ai_undo_state(SseDeserializer deserializer);
+
+  @protected
   bool sse_decode_bool(SseDeserializer deserializer);
 
   @protected
   AiPreview sse_decode_box_autoadd_ai_preview(SseDeserializer deserializer);
+
+  @protected
+  AiUndoState sse_decode_box_autoadd_ai_undo_state(
+    SseDeserializer deserializer,
+  );
 
   @protected
   bool sse_decode_box_autoadd_bool(SseDeserializer deserializer);
@@ -333,6 +356,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  AiUndoState? sse_decode_opt_box_autoadd_ai_undo_state(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   bool? sse_decode_opt_box_autoadd_bool(SseDeserializer deserializer);
 
   @protected
@@ -369,6 +397,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void sse_encode_String(String self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_ai_apply_result(AiApplyResult self, SseSerializer serializer);
 
   @protected
   void sse_encode_ai_assistant_request_plan(
@@ -428,11 +459,20 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void sse_encode_ai_status(AiStatus self, SseSerializer serializer);
 
   @protected
+  void sse_encode_ai_undo_state(AiUndoState self, SseSerializer serializer);
+
+  @protected
   void sse_encode_bool(bool self, SseSerializer serializer);
 
   @protected
   void sse_encode_box_autoadd_ai_preview(
     AiPreview self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_box_autoadd_ai_undo_state(
+    AiUndoState self,
     SseSerializer serializer,
   );
 
@@ -556,6 +596,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   void sse_encode_opt_box_autoadd_ai_preview(
     AiPreview? self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_opt_box_autoadd_ai_undo_state(
+    AiUndoState? self,
     SseSerializer serializer,
   );
 

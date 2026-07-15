@@ -1,7 +1,10 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
+import 'package:secretbase/src/core/biometric_unlock.dart';
 import 'package:secretbase/src/core/mobile_error_presenter.dart';
 import 'package:secretbase/src/core/theme/app_theme.dart';
 import 'package:secretbase/src/core/widgets/async_content.dart';
@@ -10,6 +13,7 @@ import 'package:secretbase/src/core/widgets/responsive_dialog.dart';
 import 'package:secretbase/src/data/vault_providers.dart';
 import 'package:secretbase/src/features/settings/transfer_service.dart';
 import 'package:secretbase/src/rust/api/mobile.dart' as rust_api;
+import 'package:secretbase/src/rust/mobile/error.dart';
 import 'package:secretbase/src/rust/mobile/models.dart';
 import 'package:secretbase/src/state/preferences_controller.dart';
 import 'package:secretbase/src/state/vault_controller.dart';
@@ -28,6 +32,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   Widget build(BuildContext context) {
     final preferences = ref.watch(preferencesProvider);
     final vault = ref.watch(vaultControllerProvider);
+    final biometric = ref.watch(biometricStatusProvider);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -146,6 +151,23 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                                       .setClipboardClearSeconds(value);
                                 }
                               },
+                            ),
+                          ),
+                          const Divider(height: 1, indent: 56),
+                          ListTile(
+                            leading: const Icon(Icons.fingerprint),
+                            title: const Text('指纹解锁'),
+                            subtitle: Text(_biometricSubtitle(biometric)),
+                            trailing: Switch(
+                              value: biometric.value?.credentialStored ?? false,
+                              onChanged:
+                                  _working ||
+                                      biometric.isLoading ||
+                                      biometric.value?.enrolled != true
+                                  ? null
+                                  : (value) => value
+                                        ? _enableBiometric()
+                                        : _disableBiometric(),
                             ),
                           ),
                           const Divider(height: 1, indent: 56),
@@ -312,9 +334,122 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         newPassword: password,
         expectedRevision: ref.read(vaultControllerProvider).revision,
       );
+      try {
+        await ref.read(biometricPlatformProvider).deleteCredential();
+      } catch (_) {
+        // The rekeyed Vault salt also makes any stale device credential unusable.
+      }
+      ref.invalidate(biometricStatusProvider);
       await ref.read(vaultControllerProvider.notifier).refreshStatus();
-      return result.message;
+      return '${result.message}；请按需重新开启指纹解锁';
     });
+  }
+
+  String _biometricSubtitle(AsyncValue<BiometricStatus> value) {
+    return value.when(
+      loading: () => '正在检查设备能力',
+      error: (error, stackTrace) => '无法读取生物识别状态',
+      data: (status) {
+        if (!status.supported) return '当前设备不支持强生物识别';
+        if (!status.enrolled) return '请先在系统设置中录入指纹';
+        if (!status.credentialStored) return '使用 Android Keystore 保护本机解锁密钥';
+        return status.hardwareBacked
+            ? '已开启 · 安全硬件保护'
+            : '已开启 · Android Keystore 保护';
+      },
+    );
+  }
+
+  Future<void> _enableBiometric() async {
+    final password = await _requestCurrentMasterPassword();
+    if (password == null || password.isEmpty || !mounted) return;
+    setState(() => _working = true);
+    Uint8List? credential;
+    try {
+      credential = await rust_api.prepareDeviceUnlockCredential(
+        password: password,
+      );
+      await ref.read(biometricPlatformProvider).storeCredential(credential);
+      ref.invalidate(biometricStatusProvider);
+      if (mounted) _showMessage('指纹解锁已开启');
+    } catch (error) {
+      if (error is BiometricException && error.canceled) return;
+      if (mounted) {
+        _showMessage(
+          error is MobileError_Failure
+              ? mobileUnlockErrorMessage(error)
+              : biometricErrorMessage(error),
+        );
+      }
+    } finally {
+      if (credential != null) clearSensitiveBytes(credential);
+      if (mounted) setState(() => _working = false);
+    }
+  }
+
+  Future<void> _disableBiometric() async {
+    setState(() => _working = true);
+    try {
+      await ref.read(biometricPlatformProvider).deleteCredential();
+      ref.invalidate(biometricStatusProvider);
+      if (mounted) _showMessage('指纹解锁已关闭');
+    } catch (error) {
+      if (mounted) _showMessage(biometricErrorMessage(error));
+    } finally {
+      if (mounted) setState(() => _working = false);
+    }
+  }
+
+  Future<String?> _requestCurrentMasterPassword() async {
+    final controller = TextEditingController();
+    var obscure = true;
+    final password = await showDialog<String>(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text('开启指纹解锁'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const Text('请先验证当前主密码。SecretBase 不会保存主密码。'),
+              const SizedBox(height: 14),
+              TextField(
+                controller: controller,
+                autofocus: true,
+                obscureText: obscure,
+                decoration: InputDecoration(
+                  labelText: '当前主密码',
+                  prefixIcon: const Icon(Icons.lock_outline),
+                  suffixIcon: IconButton(
+                    tooltip: obscure ? '显示主密码' : '隐藏主密码',
+                    onPressed: () => setDialogState(() => obscure = !obscure),
+                    icon: Icon(
+                      obscure
+                          ? Icons.visibility_outlined
+                          : Icons.visibility_off_outlined,
+                    ),
+                  ),
+                ),
+                onSubmitted: (value) => Navigator.of(context).pop(value),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('取消'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(context).pop(controller.text),
+              child: const Text('继续'),
+            ),
+          ],
+        ),
+      ),
+    );
+    controller.dispose();
+    return password;
   }
 
   Future<void> _showRecovery() async {

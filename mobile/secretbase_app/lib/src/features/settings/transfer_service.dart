@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
+import 'package:secretbase/src/core/biometric_unlock.dart';
 import 'package:secretbase/src/core/mobile_error_presenter.dart';
 import 'package:secretbase/src/data/vault_providers.dart';
 import 'package:secretbase/src/rust/api/mobile.dart' as rust_api;
@@ -51,6 +52,7 @@ Future<String?> importVaultBackup({
   final confirmed = await _confirmImport(context, preview);
   if (!confirmed) return null;
   final result = await rust_api.applyImport(token: preview.token);
+  await _clearBiometricCredential(ref);
   await ref.read(vaultControllerProvider.notifier).refreshStatus();
   ref.invalidate(entryPageProvider);
   ref.invalidate(taxonomyProvider);
@@ -78,11 +80,21 @@ Future<String?> restoreRecoverySnapshot({
   final confirmed = await _confirmImport(context, preview, recovery: true);
   if (!confirmed) return null;
   final result = await rust_api.applyImport(token: preview.token);
+  await _clearBiometricCredential(ref);
   await ref.read(vaultControllerProvider.notifier).refreshStatus();
   ref.invalidate(entryPageProvider);
   ref.invalidate(taxonomyProvider);
   ref.invalidate(recoverySnapshotsProvider);
   return result.message;
+}
+
+Future<void> _clearBiometricCredential(WidgetRef ref) async {
+  try {
+    await ref.read(biometricPlatformProvider).deleteCredential();
+  } catch (_) {
+    // The imported Vault salt still prevents a stale device credential from unlocking.
+  }
+  ref.invalidate(biometricStatusProvider);
 }
 
 Future<String?> _requestPassword(

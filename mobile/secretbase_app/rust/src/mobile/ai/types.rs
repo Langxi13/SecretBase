@@ -105,6 +105,7 @@ pub struct PreparedAssistantRequest {
 pub struct PendingAiPreview {
     pub preview: AiPreview,
     pub data: PreviewData,
+    pub conversation_id: Option<String>,
 }
 
 #[derive(Debug, Clone)]

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:typed_data';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:secretbase/src/rust/api/mobile.dart' as rust_api;
@@ -77,6 +78,12 @@ class VaultController extends Notifier<VaultUiState> {
 
   Future<void> unlock(String password) async {
     await _runAuth(() => rust_api.unlockVault(password: password));
+  }
+
+  Future<void> unlockWithDeviceCredential(Uint8List credential) async {
+    await _runAuth(
+      () => rust_api.unlockVaultWithDeviceCredential(credential: credential),
+    );
   }
 
   Future<void> _runAuth(Future<VaultStatus> Function() operation) async {

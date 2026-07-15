@@ -68,7 +68,7 @@ class RustLib extends BaseEntrypoint<RustLibApi, RustLibApiImpl, RustLibWire> {
   String get codegenVersion => '2.12.0';
 
   @override
-  int get rustContentHash => 1610353470;
+  int get rustContentHash => 577874386;
 
   static const kDefaultExternalLibraryLoaderConfig =
       ExternalLibraryLoaderConfig(
@@ -82,7 +82,7 @@ class RustLib extends BaseEntrypoint<RustLibApi, RustLibApiImpl, RustLibWire> {
 abstract class RustLibApi extends BaseApi {
   Future<AiStatus> crateApiMobileAiStatus();
 
-  Future<OperationResult> crateApiMobileApplyAiPreview({
+  Future<AiApplyResult> crateApiMobileApplyAiPreview({
     required String token,
     required List<String> selectedItemIds,
     required BigInt expectedRevision,
@@ -167,6 +167,8 @@ abstract class RustLibApi extends BaseApi {
 
   Future<AiPreview?> crateApiMobilePendingAiPreview();
 
+  Future<AiUndoState?> crateApiMobilePendingAiUndo();
+
   Future<ImportPreview?> crateApiMobilePendingImportPreview();
 
   Future<AiAssistantRequestPlan> crateApiMobilePrepareAiAssistantRequest({
@@ -192,6 +194,10 @@ abstract class RustLibApi extends BaseApi {
     required String baseUrl,
     required String apiKey,
     required String model,
+  });
+
+  Future<Uint8List> crateApiMobilePrepareDeviceUnlockCredential({
+    required String password,
   });
 
   Future<ImportPreview> crateApiMobilePreviewImport({
@@ -245,7 +251,16 @@ abstract class RustLibApi extends BaseApi {
     required BigInt expectedRevision,
   });
 
+  Future<OperationResult> crateApiMobileUndoAiPreview({
+    required String undoToken,
+    required BigInt expectedRevision,
+  });
+
   Future<VaultStatus> crateApiMobileUnlockVault({required String password});
+
+  Future<VaultStatus> crateApiMobileUnlockVaultWithDeviceCredential({
+    required List<int> credential,
+  });
 
   Future<VaultStatus> crateApiMobileVaultStatus();
 
@@ -288,7 +303,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       const TaskConstMeta(debugName: "ai_status", argNames: []);
 
   @override
-  Future<OperationResult> crateApiMobileApplyAiPreview({
+  Future<AiApplyResult> crateApiMobileApplyAiPreview({
     required String token,
     required List<String> selectedItemIds,
     required BigInt expectedRevision,
@@ -308,7 +323,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           );
         },
         codec: SseCodec(
-          decodeSuccessData: sse_decode_operation_result,
+          decodeSuccessData: sse_decode_ai_apply_result,
           decodeErrorData: sse_decode_mobile_error,
         ),
         constMeta: kCrateApiMobileApplyAiPreviewConstMeta,
@@ -1044,7 +1059,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       const TaskConstMeta(debugName: "pending_ai_preview", argNames: []);
 
   @override
-  Future<ImportPreview?> crateApiMobilePendingImportPreview() {
+  Future<AiUndoState?> crateApiMobilePendingAiUndo() {
     return handler.executeNormal(
       NormalTask(
         callFfi: (port_) {
@@ -1053,6 +1068,33 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
             generalizedFrbRustBinding,
             serializer,
             funcId: 26,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_opt_box_autoadd_ai_undo_state,
+          decodeErrorData: sse_decode_mobile_error,
+        ),
+        constMeta: kCrateApiMobilePendingAiUndoConstMeta,
+        argValues: [],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiMobilePendingAiUndoConstMeta =>
+      const TaskConstMeta(debugName: "pending_ai_undo", argNames: []);
+
+  @override
+  Future<ImportPreview?> crateApiMobilePendingImportPreview() {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 27,
             port: port_,
           );
         },
@@ -1088,7 +1130,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 27,
+            funcId: 28,
             port: port_,
           );
         },
@@ -1123,7 +1165,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 28,
+            funcId: 29,
             port: port_,
           );
         },
@@ -1162,7 +1204,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 29,
+            funcId: 30,
             port: port_,
           );
         },
@@ -1199,7 +1241,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 30,
+            funcId: 31,
             port: port_,
           );
         },
@@ -1221,6 +1263,39 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       );
 
   @override
+  Future<Uint8List> crateApiMobilePrepareDeviceUnlockCredential({
+    required String password,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(password, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 32,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_list_prim_u_8_strict,
+          decodeErrorData: sse_decode_mobile_error,
+        ),
+        constMeta: kCrateApiMobilePrepareDeviceUnlockCredentialConstMeta,
+        argValues: [password],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiMobilePrepareDeviceUnlockCredentialConstMeta =>
+      const TaskConstMeta(
+        debugName: "prepare_device_unlock_credential",
+        argNames: ["password"],
+      );
+
+  @override
   Future<ImportPreview> crateApiMobilePreviewImport({
     required List<int> content,
     required String password,
@@ -1234,7 +1309,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 31,
+            funcId: 33,
             port: port_,
           );
         },
@@ -1269,7 +1344,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 32,
+            funcId: 34,
             port: port_,
           );
         },
@@ -1304,7 +1379,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 33,
+            funcId: 35,
             port: port_,
           );
         },
@@ -1338,7 +1413,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 34,
+            funcId: 36,
             port: port_,
           );
         },
@@ -1374,7 +1449,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 35,
+            funcId: 37,
             port: port_,
           );
         },
@@ -1411,7 +1486,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 36,
+            funcId: 38,
             port: port_,
           );
         },
@@ -1445,7 +1520,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 37,
+            funcId: 39,
             port: port_,
           );
         },
@@ -1488,7 +1563,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 38,
+            funcId: 40,
             port: port_,
           );
         },
@@ -1529,7 +1604,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 39,
+            funcId: 41,
             port: port_,
           );
         },
@@ -1550,6 +1625,41 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   );
 
   @override
+  Future<OperationResult> crateApiMobileUndoAiPreview({
+    required String undoToken,
+    required BigInt expectedRevision,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(undoToken, serializer);
+          sse_encode_u_64(expectedRevision, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 42,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_operation_result,
+          decodeErrorData: sse_decode_mobile_error,
+        ),
+        constMeta: kCrateApiMobileUndoAiPreviewConstMeta,
+        argValues: [undoToken, expectedRevision],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiMobileUndoAiPreviewConstMeta =>
+      const TaskConstMeta(
+        debugName: "undo_ai_preview",
+        argNames: ["undoToken", "expectedRevision"],
+      );
+
+  @override
   Future<VaultStatus> crateApiMobileUnlockVault({required String password}) {
     return handler.executeNormal(
       NormalTask(
@@ -1559,7 +1669,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 40,
+            funcId: 43,
             port: port_,
           );
         },
@@ -1578,6 +1688,39 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       const TaskConstMeta(debugName: "unlock_vault", argNames: ["password"]);
 
   @override
+  Future<VaultStatus> crateApiMobileUnlockVaultWithDeviceCredential({
+    required List<int> credential,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_list_prim_u_8_loose(credential, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 44,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_vault_status,
+          decodeErrorData: sse_decode_mobile_error,
+        ),
+        constMeta: kCrateApiMobileUnlockVaultWithDeviceCredentialConstMeta,
+        argValues: [credential],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiMobileUnlockVaultWithDeviceCredentialConstMeta =>
+      const TaskConstMeta(
+        debugName: "unlock_vault_with_device_credential",
+        argNames: ["credential"],
+      );
+
+  @override
   Future<VaultStatus> crateApiMobileVaultStatus() {
     return handler.executeNormal(
       NormalTask(
@@ -1586,7 +1729,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 41,
+            funcId: 45,
             port: port_,
           );
         },
@@ -1614,7 +1757,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 42,
+            funcId: 46,
             port: port_,
           );
         },
@@ -1639,6 +1782,20 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   String dco_decode_String(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return raw as String;
+  }
+
+  @protected
+  AiApplyResult dco_decode_ai_apply_result(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 4)
+      throw Exception('unexpected arr length: expect 4 but see ${arr.length}');
+    return AiApplyResult(
+      revision: dco_decode_u_64(arr[0]),
+      message: dco_decode_String(arr[1]),
+      undoToken: dco_decode_String(arr[2]),
+      appliedCount: dco_decode_u_32(arr[3]),
+    );
   }
 
   @protected
@@ -1833,6 +1990,20 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  AiUndoState dco_decode_ai_undo_state(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 4)
+      throw Exception('unexpected arr length: expect 4 but see ${arr.length}');
+    return AiUndoState(
+      revision: dco_decode_u_64(arr[0]),
+      message: dco_decode_String(arr[1]),
+      undoToken: dco_decode_String(arr[2]),
+      appliedCount: dco_decode_u_32(arr[3]),
+    );
+  }
+
+  @protected
   bool dco_decode_bool(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return raw as bool;
@@ -1842,6 +2013,12 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   AiPreview dco_decode_box_autoadd_ai_preview(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return dco_decode_ai_preview(raw);
+  }
+
+  @protected
+  AiUndoState dco_decode_box_autoadd_ai_undo_state(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return dco_decode_ai_undo_state(raw);
   }
 
   @protected
@@ -2079,6 +2256,12 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  AiUndoState? dco_decode_opt_box_autoadd_ai_undo_state(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return raw == null ? null : dco_decode_box_autoadd_ai_undo_state(raw);
+  }
+
+  @protected
   bool? dco_decode_opt_box_autoadd_bool(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return raw == null ? null : dco_decode_box_autoadd_bool(raw);
@@ -2168,6 +2351,21 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     // Codec=Sse (Serialization based), see doc to use other codecs
     var inner = sse_decode_list_prim_u_8_strict(deserializer);
     return utf8.decoder.convert(inner);
+  }
+
+  @protected
+  AiApplyResult sse_decode_ai_apply_result(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_revision = sse_decode_u_64(deserializer);
+    var var_message = sse_decode_String(deserializer);
+    var var_undoToken = sse_decode_String(deserializer);
+    var var_appliedCount = sse_decode_u_32(deserializer);
+    return AiApplyResult(
+      revision: var_revision,
+      message: var_message,
+      undoToken: var_undoToken,
+      appliedCount: var_appliedCount,
+    );
   }
 
   @protected
@@ -2389,6 +2587,21 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  AiUndoState sse_decode_ai_undo_state(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_revision = sse_decode_u_64(deserializer);
+    var var_message = sse_decode_String(deserializer);
+    var var_undoToken = sse_decode_String(deserializer);
+    var var_appliedCount = sse_decode_u_32(deserializer);
+    return AiUndoState(
+      revision: var_revision,
+      message: var_message,
+      undoToken: var_undoToken,
+      appliedCount: var_appliedCount,
+    );
+  }
+
+  @protected
   bool sse_decode_bool(SseDeserializer deserializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     return deserializer.buffer.getUint8() != 0;
@@ -2398,6 +2611,14 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   AiPreview sse_decode_box_autoadd_ai_preview(SseDeserializer deserializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     return (sse_decode_ai_preview(deserializer));
+  }
+
+  @protected
+  AiUndoState sse_decode_box_autoadd_ai_undo_state(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    return (sse_decode_ai_undo_state(deserializer));
   }
 
   @protected
@@ -2738,6 +2959,19 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  AiUndoState? sse_decode_opt_box_autoadd_ai_undo_state(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    if (sse_decode_bool(deserializer)) {
+      return (sse_decode_box_autoadd_ai_undo_state(deserializer));
+    } else {
+      return null;
+    }
+  }
+
+  @protected
   bool? sse_decode_opt_box_autoadd_bool(SseDeserializer deserializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
 
@@ -2852,6 +3086,18 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   void sse_encode_String(String self, SseSerializer serializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     sse_encode_list_prim_u_8_strict(utf8.encoder.convert(self), serializer);
+  }
+
+  @protected
+  void sse_encode_ai_apply_result(
+    AiApplyResult self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_u_64(self.revision, serializer);
+    sse_encode_String(self.message, serializer);
+    sse_encode_String(self.undoToken, serializer);
+    sse_encode_u_32(self.appliedCount, serializer);
   }
 
   @protected
@@ -3011,6 +3257,15 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  void sse_encode_ai_undo_state(AiUndoState self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_u_64(self.revision, serializer);
+    sse_encode_String(self.message, serializer);
+    sse_encode_String(self.undoToken, serializer);
+    sse_encode_u_32(self.appliedCount, serializer);
+  }
+
+  @protected
   void sse_encode_bool(bool self, SseSerializer serializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     serializer.buffer.putUint8(self ? 1 : 0);
@@ -3023,6 +3278,15 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   ) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     sse_encode_ai_preview(self, serializer);
+  }
+
+  @protected
+  void sse_encode_box_autoadd_ai_undo_state(
+    AiUndoState self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_ai_undo_state(self, serializer);
   }
 
   @protected
@@ -3309,6 +3573,19 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     sse_encode_bool(self != null, serializer);
     if (self != null) {
       sse_encode_box_autoadd_ai_preview(self, serializer);
+    }
+  }
+
+  @protected
+  void sse_encode_opt_box_autoadd_ai_undo_state(
+    AiUndoState? self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    sse_encode_bool(self != null, serializer);
+    if (self != null) {
+      sse_encode_box_autoadd_ai_undo_state(self, serializer);
     }
   }
 

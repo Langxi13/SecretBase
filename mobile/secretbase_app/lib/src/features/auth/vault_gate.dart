@@ -1,8 +1,13 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:secretbase/src/core/biometric_unlock.dart';
 import 'package:secretbase/src/core/mobile_error_presenter.dart';
+import 'package:secretbase/src/core/widgets/android_back_exit_guard.dart';
 import 'package:secretbase/src/core/widgets/brand_mark.dart';
+import 'package:secretbase/src/rust/mobile/error.dart';
 import 'package:secretbase/src/state/vault_controller.dart';
 
 class VaultGate extends ConsumerStatefulWidget {
@@ -18,6 +23,9 @@ class _VaultGateState extends ConsumerState<VaultGate> {
   final _confirmController = TextEditingController();
   bool _obscurePassword = true;
   bool _obscureConfirm = true;
+  bool _biometricBusy = false;
+  bool _biometricAttempted = false;
+  bool _biometricPromptScheduled = false;
   String? _error;
 
   @override
@@ -43,11 +51,70 @@ class _VaultGateState extends ConsumerState<VaultGate> {
     }
   }
 
+  Future<void> _unlockWithBiometric({required bool automatic}) async {
+    if (_biometricBusy || !mounted) return;
+    if (automatic && _biometricAttempted) return;
+    if (automatic) _biometricAttempted = true;
+
+    final platform = ref.read(biometricPlatformProvider);
+    Uint8List? credential;
+    try {
+      final status = await platform.status();
+      if (!status.enrolled || !status.credentialStored || !mounted) return;
+      setState(() {
+        _biometricBusy = true;
+        _error = null;
+      });
+      credential = await platform.readCredential();
+      await ref
+          .read(vaultControllerProvider.notifier)
+          .unlockWithDeviceCredential(credential);
+      if (mounted) context.go('/vault');
+    } catch (error) {
+      if (error is BiometricException && error.canceled) return;
+      final invalidCredential =
+          (error is MobileError_Failure &&
+              error.code == 'BIOMETRIC_CREDENTIAL_INVALID') ||
+          (error is BiometricException &&
+              error.code == 'BIOMETRIC_CREDENTIAL_INVALID');
+      if (invalidCredential) {
+        try {
+          await platform.deleteCredential();
+        } catch (_) {
+          // The Rust salt check still prevents a stale credential from unlocking.
+        }
+        ref.invalidate(biometricStatusProvider);
+      }
+      if (mounted) {
+        setState(() {
+          _error = error is MobileError_Failure
+              ? mobileErrorMessage(error)
+              : biometricErrorMessage(error);
+        });
+      }
+    } finally {
+      if (credential != null) clearSensitiveBytes(credential);
+      if (mounted) setState(() => _biometricBusy = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(vaultControllerProvider);
-    return PopScope(
-      canPop: false,
+    final biometricStatus = ref.watch(biometricStatusProvider);
+    if (state.phase == VaultPhase.locked &&
+        !_biometricAttempted &&
+        !_biometricPromptScheduled) {
+      _biometricPromptScheduled = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _biometricPromptScheduled = false;
+        if (mounted) _unlockWithBiometric(automatic: true);
+      });
+    } else if (state.phase != VaultPhase.locked) {
+      _biometricAttempted = false;
+      _biometricPromptScheduled = false;
+    }
+    return AndroidBackExitGuard(
       child: Scaffold(
         body: switch (state.phase) {
           VaultPhase.booting => const _BootView(),
@@ -56,13 +123,21 @@ class _VaultGateState extends ConsumerState<VaultGate> {
             onRetry: ref.read(vaultControllerProvider.notifier).initialize,
           ),
           VaultPhase.unlocked => const _BootView(),
-          VaultPhase.setup || VaultPhase.locked => _buildForm(context, state),
+          VaultPhase.setup || VaultPhase.locked => _buildForm(
+            context,
+            state,
+            biometricStatus.value,
+          ),
         },
       ),
     );
   }
 
-  Widget _buildForm(BuildContext context, VaultUiState state) {
+  Widget _buildForm(
+    BuildContext context,
+    VaultUiState state,
+    BiometricStatus? biometricStatus,
+  ) {
     final creating = state.phase == VaultPhase.setup;
     final scheme = Theme.of(context).colorScheme;
     return SafeArea(
@@ -179,8 +254,28 @@ class _VaultGateState extends ConsumerState<VaultGate> {
                             _InlineError(message: _error!),
                           ],
                           const SizedBox(height: 22),
+                          if (!creating &&
+                              biometricStatus?.credentialStored == true) ...[
+                            OutlinedButton.icon(
+                              onPressed: state.busy || _biometricBusy
+                                  ? null
+                                  : () =>
+                                        _unlockWithBiometric(automatic: false),
+                              icon: _biometricBusy
+                                  ? const SizedBox(
+                                      width: 18,
+                                      height: 18,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                      ),
+                                    )
+                                  : const Icon(Icons.fingerprint),
+                              label: const Text('使用指纹解锁'),
+                            ),
+                            const SizedBox(height: 10),
+                          ],
                           FilledButton.icon(
-                            onPressed: state.busy
+                            onPressed: state.busy || _biometricBusy
                                 ? null
                                 : () => _submit(state.phase),
                             icon: state.busy

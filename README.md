@@ -238,7 +238,7 @@ cargo clippy --locked --all-targets --all-features -- -D warnings
 cargo test --locked --release --all-features
 ```
 
-V5.0 Android 客户端的核心实现已经完成，当前尚未正式发布。它使用 Flutter + Rust，完全脱离浏览器和 FastAPI，覆盖创建与解锁、条目、标签、密码组、回收站、加密迁移、生命周期锁定和五项需用户确认的 AI 辅助能力。移动界面使用适配手机与平板的 Material 3 导航、紧凑卡片、底部操作面板、来源感知返回和分组式 AI 计划审核；Vault 与恢复副本保存在 Android 应用私有目录，卸载应用会删除该目录，因此卸载前必须导出加密备份。
+V5.0 Android 客户端的核心实现已经完成，当前尚未正式发布。它使用 Flutter + Rust，完全脱离浏览器和 FastAPI，覆盖创建与解锁、Android Keystore 指纹解锁、条目、标签、密码组、回收站、加密迁移、生命周期锁定和五项需用户确认的 AI 辅助能力。移动界面使用适配手机与平板的 Material 3 导航、紧凑卡片、来源感知返回、双击返回退出和分组式 AI 计划审核；AI 输入器通过圆形 `+` 收纳快捷整理、模式和范围，应用后的计划可在 revision 未变化时撤回。Vault 与恢复副本保存在 Android 应用私有目录，卸载应用会删除该目录，因此卸载前必须导出加密备份。
 
 低内存 Linux 开发机只构建 arm64：
 
@@ -676,7 +676,7 @@ V3.3 adds a macOS 13+ Apple Silicon arm64 desktop app while preserving the same 
 
 V4.0 shared Vault preparation is complete. Existing Web, Windows, and macOS builds continue to use the Python production core. The normative Vault V1 contract, public golden vectors, and isolated Rust reference implementation now provide the compatibility boundary for future Flutter Android and iOS clients without migrating existing vaults or bundling Rust into current desktop packages. See `docs/v4-vault-core.md` for acceptance and `docs/v5-android-plan.md` for the next implementation phase.
 
-The V5 Android client is implemented but not released. It is a browser-free Flutter/Rust app for Android 10+ with private Vault storage, lifecycle locking, entries, tags, groups, trash, encrypted transfer, an adaptive Material 3 mobile interface, a conversational AI manager, and five focused review-before-apply AI tools. Android uninstall removes the private app directory, so users must export an encrypted backup first. The three-ABI build, APK privacy scan, and API 29/36 emulator smoke tests passed on 2026-07-13; `v5.0.0` remains blocked on arm64 hardware, cross-desktop migration, and persistent signing acceptance.
+The V5 Android client is implemented but not released. It is a browser-free Flutter/Rust app for Android 10+ with private Vault storage, Android Keystore biometric unlock, lifecycle locking, entries, tags, groups, trash, encrypted transfer, an adaptive Material 3 interface, double-back exit handling, a conversational AI manager, and five focused review-before-apply AI tools. Mobile AI actions have a revision-bound one-step undo, and the compact composer moves quick tasks, mode, scope, and professional tools behind a `+` action surface. Android uninstall removes the private app directory, so users must export an encrypted backup first. The three-ABI build, APK privacy scan, and API 29/36 emulator smoke tests passed on 2026-07-13; `v5.0.0` remains blocked on arm64 biometric hardware, cross-desktop migration, and persistent signing acceptance.
 
 Build the macOS test package on Apple Silicon with Python 3.11:
 

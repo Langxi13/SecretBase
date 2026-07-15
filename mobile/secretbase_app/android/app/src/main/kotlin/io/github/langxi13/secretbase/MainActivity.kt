@@ -12,11 +12,11 @@ import android.os.Build
 import android.os.Bundle
 import android.os.PersistableBundle
 import android.view.WindowManager
-import io.flutter.embedding.android.FlutterActivity
+import io.flutter.embedding.android.FlutterFragmentActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 
-class MainActivity : FlutterActivity() {
+class MainActivity : FlutterFragmentActivity() {
     companion object {
         private const val PLATFORM_CHANNEL = "secretbase/platform"
         private const val SECURITY_CHANNEL = "secretbase/security"
@@ -24,6 +24,7 @@ class MainActivity : FlutterActivity() {
     }
 
     private var securityChannel: MethodChannel? = null
+    private var biometricCredentialStore: BiometricCredentialStore? = null
     private var receiverRegistered = false
     private var pendingExportResult: MethodChannel.Result? = null
     private var pendingExportBytes: ByteArray? = null
@@ -42,6 +43,7 @@ class MainActivity : FlutterActivity() {
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
+        biometricCredentialStore = BiometricCredentialStore(this)
         MethodChannel(
             flutterEngine.dartExecutor.binaryMessenger,
             PLATFORM_CHANNEL,
@@ -76,6 +78,24 @@ class MainActivity : FlutterActivity() {
                             startDocumentExport(filename, bytes, result)
                         }
                     }
+                    "biometricStatus" -> biometricCredentialStore?.status(result)
+                        ?: result.error("BIOMETRIC_UNAVAILABLE", "生物识别服务不可用", null)
+                    "storeBiometricCredential" -> {
+                        val credential = call.argument<ByteArray>("credential")
+                        if (credential == null || credential.isEmpty()) {
+                            result.error("BIOMETRIC_CREDENTIAL_INVALID", "设备解锁凭据无效", null)
+                        } else {
+                            biometricCredentialStore?.store(credential, result)
+                                ?: run {
+                                    credential.fill(0)
+                                    result.error("BIOMETRIC_UNAVAILABLE", "生物识别服务不可用", null)
+                                }
+                        }
+                    }
+                    "readBiometricCredential" -> biometricCredentialStore?.read(result)
+                        ?: result.error("BIOMETRIC_UNAVAILABLE", "生物识别服务不可用", null)
+                    "deleteBiometricCredential" -> biometricCredentialStore?.delete(result)
+                        ?: result.success(false)
                     else -> result.notImplemented()
                 }
             }
@@ -105,6 +125,8 @@ class MainActivity : FlutterActivity() {
         pendingExportResult?.error("EXPORT_INTERRUPTED", "导出操作已中断", null)
         pendingExportResult = null
         pendingExportBytes = null
+        biometricCredentialStore?.dispose()
+        biometricCredentialStore = null
         securityChannel = null
         super.onDestroy()
     }

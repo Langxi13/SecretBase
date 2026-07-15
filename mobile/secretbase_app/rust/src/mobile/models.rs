@@ -68,6 +68,22 @@ pub struct OperationResult {
 }
 
 #[derive(Debug, Clone)]
+pub struct AiApplyResult {
+    pub revision: u64,
+    pub message: String,
+    pub undo_token: String,
+    pub applied_count: u32,
+}
+
+#[derive(Debug, Clone)]
+pub struct AiUndoState {
+    pub revision: u64,
+    pub message: String,
+    pub undo_token: String,
+    pub applied_count: u32,
+}
+
+#[derive(Debug, Clone)]
 pub struct ImportPreview {
     pub token: String,
     pub entries: u32,

@@ -1,7 +1,10 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:secretbase/src/core/theme/app_theme.dart';
+import 'package:secretbase/src/core/biometric_unlock.dart';
 import 'package:secretbase/src/features/settings/settings_screen.dart';
 import 'package:secretbase/src/state/preferences_controller.dart';
 import 'package:secretbase/src/state/vault_controller.dart';
@@ -12,6 +15,25 @@ class _TestVaultController extends VaultController {
   VaultUiState build() {
     return const VaultUiState(phase: VaultPhase.unlocked);
   }
+}
+
+class _TestBiometricPlatform implements BiometricPlatform {
+  @override
+  Future<bool> deleteCredential() async => true;
+
+  @override
+  Future<Uint8List> readCredential() async => Uint8List(0);
+
+  @override
+  Future<BiometricStatus> status() async => const BiometricStatus(
+    supported: true,
+    enrolled: true,
+    credentialStored: true,
+    hardwareBacked: true,
+  );
+
+  @override
+  Future<void> storeCredential(Uint8List credential) async {}
 }
 
 void main() {
@@ -29,6 +51,7 @@ void main() {
         overrides: [
           sharedPreferencesProvider.overrideWithValue(preferences),
           vaultControllerProvider.overrideWith(_TestVaultController.new),
+          biometricPlatformProvider.overrideWithValue(_TestBiometricPlatform()),
         ],
         child: MaterialApp(
           theme: AppTheme.light(textSize: AppTextSize.large),
@@ -41,6 +64,8 @@ void main() {
     expect(find.text('跟随系统'), findsOneWidget);
     expect(find.text('标准'), findsOneWidget);
     expect(find.text('大字体'), findsOneWidget);
+    expect(find.text('指纹解锁'), findsOneWidget);
+    expect(find.text('已开启 · 安全硬件保护'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 }

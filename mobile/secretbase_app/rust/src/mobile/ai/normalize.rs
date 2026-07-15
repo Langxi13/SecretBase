@@ -85,7 +85,11 @@ pub fn normalize_response(
         warnings,
         privacy_note,
     };
-    Ok(PendingAiPreview { preview, data })
+    Ok(PendingAiPreview {
+        preview,
+        data,
+        conversation_id: None,
+    })
 }
 
 fn normalize_parse(

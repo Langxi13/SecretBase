@@ -20,6 +20,17 @@ Future<VaultStatus> createVault({required String password}) =>
 Future<VaultStatus> unlockVault({required String password}) =>
     RustLib.instance.api.crateApiMobileUnlockVault(password: password);
 
+Future<Uint8List> prepareDeviceUnlockCredential({required String password}) =>
+    RustLib.instance.api.crateApiMobilePrepareDeviceUnlockCredential(
+      password: password,
+    );
+
+Future<VaultStatus> unlockVaultWithDeviceCredential({
+  required List<int> credential,
+}) => RustLib.instance.api.crateApiMobileUnlockVaultWithDeviceCredential(
+  credential: credential,
+);
+
 Future<VaultStatus> lockVault() =>
     RustLib.instance.api.crateApiMobileLockVault();
 
@@ -223,13 +234,24 @@ Future<AiPreview> consumeAiResponse({
 Future<AiPreview?> pendingAiPreview() =>
     RustLib.instance.api.crateApiMobilePendingAiPreview();
 
-Future<OperationResult> applyAiPreview({
+Future<AiApplyResult> applyAiPreview({
   required String token,
   required List<String> selectedItemIds,
   required BigInt expectedRevision,
 }) => RustLib.instance.api.crateApiMobileApplyAiPreview(
   token: token,
   selectedItemIds: selectedItemIds,
+  expectedRevision: expectedRevision,
+);
+
+Future<AiUndoState?> pendingAiUndo() =>
+    RustLib.instance.api.crateApiMobilePendingAiUndo();
+
+Future<OperationResult> undoAiPreview({
+  required String undoToken,
+  required BigInt expectedRevision,
+}) => RustLib.instance.api.crateApiMobileUndoAiPreview(
+  undoToken: undoToken,
   expectedRevision: expectedRevision,
 );
 

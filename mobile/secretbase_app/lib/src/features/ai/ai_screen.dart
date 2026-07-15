@@ -5,10 +5,13 @@ import 'package:secretbase/src/core/widgets/async_content.dart';
 import 'package:secretbase/src/core/widgets/mobile_chrome.dart';
 import 'package:secretbase/src/data/vault_providers.dart';
 import 'package:secretbase/src/features/ai/ai_confirmation_sheets.dart';
+import 'package:secretbase/src/features/ai/ai_activity_controller.dart';
 import 'package:secretbase/src/features/ai/ai_entry_picker_dialog.dart';
+import 'package:secretbase/src/features/ai/ai_manager_widgets.dart';
 import 'package:secretbase/src/features/ai/ai_plan_panel.dart';
 import 'package:secretbase/src/features/ai/ai_settings_dialog.dart';
 import 'package:secretbase/src/features/ai/ai_transport.dart';
+import 'package:secretbase/src/features/ai/ai_undo_controller.dart';
 import 'package:secretbase/src/rust/api/mobile.dart' as rust_api;
 import 'package:secretbase/src/rust/mobile/models.dart';
 import 'package:secretbase/src/state/preferences_controller.dart';
@@ -121,6 +124,8 @@ class _AiScreenState extends ConsumerState<AiScreen> {
   }
 
   Widget _buildWorkspace(AiStatus status) {
+    final undo = ref.watch(aiUndoControllerProvider);
+    final anotherRequestActive = ref.watch(aiActivityControllerProvider);
     return Stack(
       children: [
         ListView(
@@ -132,6 +137,15 @@ class _AiScreenState extends ConsumerState<AiScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
+                    if (undo.pending != null) ...[
+                      AiUndoBanner(
+                        state: undo.pending!,
+                        onUndo: _working || undo.working
+                            ? null
+                            : _undoLastOperation,
+                      ),
+                      const SizedBox(height: 2),
+                    ],
                     _ToolSelector(selected: _tool, onSelected: _selectTool),
                     const SizedBox(height: 10),
                     _RequestPanel(
@@ -139,7 +153,7 @@ class _AiScreenState extends ConsumerState<AiScreen> {
                       inputController: _inputController,
                       preferenceController: _preferenceController,
                       selectedEntryTitle: _entryTitle,
-                      working: _working,
+                      working: _working || anotherRequestActive,
                       onPickEntry: _pickEntry,
                       onGenerate: () => _generate(status),
                     ),
@@ -235,6 +249,11 @@ class _AiScreenState extends ConsumerState<AiScreen> {
       return;
     }
     if (!await _ensurePrivacyConsent()) return;
+    final activity = ref.read(aiActivityControllerProvider.notifier);
+    if (!activity.start()) {
+      setState(() => _error = '另一个 AI 请求正在处理中，请等待完成');
+      return;
+    }
     setState(() {
       _working = true;
       _error = null;
@@ -270,6 +289,8 @@ class _AiScreenState extends ConsumerState<AiScreen> {
           _error = _errorMessage(error);
         });
       }
+    } finally {
+      activity.finish();
     }
   }
 
@@ -291,6 +312,7 @@ class _AiScreenState extends ConsumerState<AiScreen> {
         selectedItemIds: _selected.toList(),
         expectedRevision: ref.read(vaultControllerProvider).revision,
       );
+      ref.read(aiUndoControllerProvider.notifier).record(result);
       await ref.read(vaultControllerProvider.notifier).refreshStatus();
       ref.invalidate(entryPageProvider);
       ref.invalidate(taxonomyProvider);
@@ -313,6 +335,34 @@ class _AiScreenState extends ConsumerState<AiScreen> {
           _error = _errorMessage(error);
         });
       }
+    }
+  }
+
+  Future<void> _undoLastOperation() async {
+    if (_working) return;
+    setState(() {
+      _working = true;
+      _error = null;
+    });
+    try {
+      final message = await ref.read(aiUndoControllerProvider.notifier).undo();
+      if (!mounted) return;
+      setState(() {
+        _working = false;
+        _preview = null;
+        _selected.clear();
+        _revealed.clear();
+        _expanded.clear();
+      });
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(message)));
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _working = false;
+        _error = _errorMessage(error);
+      });
     }
   }
 

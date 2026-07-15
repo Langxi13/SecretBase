@@ -110,7 +110,7 @@ class AiManagerWelcome extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           Text(
-            '快捷整理始终位于输入框上方。普通管家只使用条目结构信息，不读取已有字段值。',
+            '输入你的整理需求，发送前会先展示本轮数据清单。',
             textAlign: TextAlign.center,
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
               color: Theme.of(context).colorScheme.onSurfaceVariant,
@@ -215,6 +215,56 @@ class AiManagerInlineNotice extends StatelessWidget {
           Icon(icon, size: 18),
           const SizedBox(width: 8),
           Expanded(child: Text(message)),
+        ],
+      ),
+    );
+  }
+}
+
+class AiUndoBanner extends StatelessWidget {
+  const AiUndoBanner({required this.state, required this.onUndo, super.key});
+
+  final AiUndoState state;
+  final VoidCallback? onUndo;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Container(
+      margin: const EdgeInsets.fromLTRB(12, 5, 12, 9),
+      padding: const EdgeInsets.fromLTRB(10, 8, 8, 8),
+      decoration: BoxDecoration(
+        color: scheme.tertiaryContainer,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: scheme.tertiary.withValues(alpha: 0.24)),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.restore, size: 19, color: scheme.onTertiaryContainer),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              '已应用 ${state.appliedCount} 项 AI 操作',
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: scheme.onTertiaryContainer,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+          const SizedBox(width: 6),
+          TextButton.icon(
+            onPressed: onUndo,
+            icon: onUndo == null
+                ? const SizedBox(
+                    width: 14,
+                    height: 14,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.undo, size: 17),
+            label: const Text('撤回'),
+          ),
         ],
       ),
     );

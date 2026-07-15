@@ -21,6 +21,10 @@ pub const SALT_LENGTH: usize = 32;
 pub const NONCE_LENGTH: usize = 12;
 pub const AUTH_TAG_LENGTH: usize = 16;
 pub const PURPOSE_KEY_ITERATIONS: u32 = 100_000;
+pub const DEVICE_UNLOCK_CREDENTIAL_LENGTH: usize = 69;
+
+const DEVICE_UNLOCK_MAGIC: &[u8; 4] = b"SBUK";
+const DEVICE_UNLOCK_VERSION: u8 = 1;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct HeaderInfo {
@@ -110,6 +114,50 @@ impl VaultSession {
     pub fn unlock(password: &str, content: &[u8]) -> Result<Self, VaultError> {
         let parsed = parse_header(content)?;
         let key = derive_key(password, &parsed.salt);
+        let plaintext = decrypt_bytes_with_key(key.as_ref(), &parsed)?;
+        let document = VaultDocument::from_json_bytes(&plaintext)?;
+        Ok(Self {
+            document,
+            key,
+            salt: parsed.salt,
+        })
+    }
+
+    /// Returns a device-only credential that must be wrapped by platform secure storage
+    /// before it is persisted. The credential is equivalent to the current vault key and
+    /// must never be logged, backed up, or written as plaintext.
+    pub fn device_unlock_credential(&self) -> Zeroizing<Vec<u8>> {
+        let mut credential = Zeroizing::new(Vec::with_capacity(DEVICE_UNLOCK_CREDENTIAL_LENGTH));
+        credential.extend_from_slice(DEVICE_UNLOCK_MAGIC);
+        credential.push(DEVICE_UNLOCK_VERSION);
+        credential.extend_from_slice(&self.salt);
+        credential.extend_from_slice(self.key.as_ref());
+        credential
+    }
+
+    pub fn unlock_with_device_credential(
+        credential: &[u8],
+        content: &[u8],
+    ) -> Result<Self, VaultError> {
+        if credential.len() != DEVICE_UNLOCK_CREDENTIAL_LENGTH
+            || &credential[..DEVICE_UNLOCK_MAGIC.len()] != DEVICE_UNLOCK_MAGIC
+            || credential[DEVICE_UNLOCK_MAGIC.len()] != DEVICE_UNLOCK_VERSION
+        {
+            return Err(VaultError::AuthenticationFailed);
+        }
+
+        let credential_salt: [u8; SALT_LENGTH] = credential[5..37]
+            .try_into()
+            .map_err(|_| VaultError::AuthenticationFailed)?;
+        let parsed = parse_header(content)?;
+        if parsed.salt != credential_salt {
+            return Err(VaultError::AuthenticationFailed);
+        }
+
+        let key_bytes: [u8; 32] = credential[37..69]
+            .try_into()
+            .map_err(|_| VaultError::AuthenticationFailed)?;
+        let key = Zeroizing::new(key_bytes);
         let plaintext = decrypt_bytes_with_key(key.as_ref(), &parsed)?;
         let document = VaultDocument::from_json_bytes(&plaintext)?;
         Ok(Self {

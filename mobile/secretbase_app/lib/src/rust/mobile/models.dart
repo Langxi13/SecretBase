@@ -6,6 +6,37 @@
 import '../frb_generated.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
+class AiApplyResult {
+  final BigInt revision;
+  final String message;
+  final String undoToken;
+  final int appliedCount;
+
+  const AiApplyResult({
+    required this.revision,
+    required this.message,
+    required this.undoToken,
+    required this.appliedCount,
+  });
+
+  @override
+  int get hashCode =>
+      revision.hashCode ^
+      message.hashCode ^
+      undoToken.hashCode ^
+      appliedCount.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is AiApplyResult &&
+          runtimeType == other.runtimeType &&
+          revision == other.revision &&
+          message == other.message &&
+          undoToken == other.undoToken &&
+          appliedCount == other.appliedCount;
+}
+
 class AiAssistantRequestPlan {
   final String conversationId;
   final String token;
@@ -432,6 +463,37 @@ class AiStatus {
           baseUrl == other.baseUrl &&
           model == other.model &&
           apiKeyMask == other.apiKeyMask;
+}
+
+class AiUndoState {
+  final BigInt revision;
+  final String message;
+  final String undoToken;
+  final int appliedCount;
+
+  const AiUndoState({
+    required this.revision,
+    required this.message,
+    required this.undoToken,
+    required this.appliedCount,
+  });
+
+  @override
+  int get hashCode =>
+      revision.hashCode ^
+      message.hashCode ^
+      undoToken.hashCode ^
+      appliedCount.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is AiUndoState &&
+          runtimeType == other.runtimeType &&
+          revision == other.revision &&
+          message == other.message &&
+          undoToken == other.undoToken &&
+          appliedCount == other.appliedCount;
 }
 
 class EntryDraft {

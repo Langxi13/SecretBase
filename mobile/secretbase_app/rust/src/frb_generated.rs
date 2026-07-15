@@ -38,7 +38,7 @@ flutter_rust_bridge::frb_generated_boilerplate!(
     default_rust_auto_opaque = RustAutoOpaqueMoi,
 );
 pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_VERSION: &str = "2.12.0";
-pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = 1610353470;
+pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = 577874386;
 
 // Section: executor
 
@@ -904,6 +904,38 @@ fn wire__crate__api__mobile__pending_ai_preview_impl(
         },
     )
 }
+fn wire__crate__api__mobile__pending_ai_undo_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "pending_ai_undo",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, crate::mobile::error::MobileError>((move || {
+                    let output_ok = crate::api::mobile::pending_ai_undo()?;
+                    Ok(output_ok)
+                })())
+            }
+        },
+    )
+}
 fn wire__crate__api__mobile__pending_import_preview_impl(
     port_: flutter_rust_bridge::for_generated::MessagePort,
     ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
@@ -1086,6 +1118,40 @@ fn wire__crate__api__mobile__prepare_ai_verify_request_impl(
                         api_api_key,
                         api_model,
                     )?;
+                    Ok(output_ok)
+                })())
+            }
+        },
+    )
+}
+fn wire__crate__api__mobile__prepare_device_unlock_credential_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "prepare_device_unlock_credential",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_password = <String>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, crate::mobile::error::MobileError>((move || {
+                    let output_ok =
+                        crate::api::mobile::prepare_device_unlock_credential(api_password)?;
                     Ok(output_ok)
                 })())
             }
@@ -1415,6 +1481,41 @@ fn wire__crate__api__mobile__trash_entry_impl(
         },
     )
 }
+fn wire__crate__api__mobile__undo_ai_preview_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "undo_ai_preview",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_undo_token = <String>::sse_decode(&mut deserializer);
+            let api_expected_revision = <u64>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, crate::mobile::error::MobileError>((move || {
+                    let output_ok =
+                        crate::api::mobile::undo_ai_preview(api_undo_token, api_expected_revision)?;
+                    Ok(output_ok)
+                })())
+            }
+        },
+    )
+}
 fn wire__crate__api__mobile__unlock_vault_impl(
     port_: flutter_rust_bridge::for_generated::MessagePort,
     ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
@@ -1442,6 +1543,40 @@ fn wire__crate__api__mobile__unlock_vault_impl(
             move |context| {
                 transform_result_sse::<_, crate::mobile::error::MobileError>((move || {
                     let output_ok = crate::api::mobile::unlock_vault(api_password)?;
+                    Ok(output_ok)
+                })())
+            }
+        },
+    )
+}
+fn wire__crate__api__mobile__unlock_vault_with_device_credential_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "unlock_vault_with_device_credential",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_credential = <Vec<u8>>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, crate::mobile::error::MobileError>((move || {
+                    let output_ok =
+                        crate::api::mobile::unlock_vault_with_device_credential(api_credential)?;
                     Ok(output_ok)
                 })())
             }
@@ -1521,6 +1656,22 @@ impl SseDecode for String {
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
         let mut inner = <Vec<u8>>::sse_decode(deserializer);
         return String::from_utf8(inner).unwrap();
+    }
+}
+
+impl SseDecode for crate::mobile::models::AiApplyResult {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut var_revision = <u64>::sse_decode(deserializer);
+        let mut var_message = <String>::sse_decode(deserializer);
+        let mut var_undoToken = <String>::sse_decode(deserializer);
+        let mut var_appliedCount = <u32>::sse_decode(deserializer);
+        return crate::mobile::models::AiApplyResult {
+            revision: var_revision,
+            message: var_message,
+            undo_token: var_undoToken,
+            applied_count: var_appliedCount,
+        };
     }
 }
 
@@ -1748,6 +1899,22 @@ impl SseDecode for crate::mobile::models::AiStatus {
             base_url: var_baseUrl,
             model: var_model,
             api_key_mask: var_apiKeyMask,
+        };
+    }
+}
+
+impl SseDecode for crate::mobile::models::AiUndoState {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut var_revision = <u64>::sse_decode(deserializer);
+        let mut var_message = <String>::sse_decode(deserializer);
+        let mut var_undoToken = <String>::sse_decode(deserializer);
+        let mut var_appliedCount = <u32>::sse_decode(deserializer);
+        return crate::mobile::models::AiUndoState {
+            revision: var_revision,
+            message: var_message,
+            undo_token: var_undoToken,
+            applied_count: var_appliedCount,
         };
     }
 }
@@ -2082,6 +2249,19 @@ impl SseDecode for Option<crate::mobile::models::AiPreview> {
     }
 }
 
+impl SseDecode for Option<crate::mobile::models::AiUndoState> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        if (<bool>::sse_decode(deserializer)) {
+            return Some(<crate::mobile::models::AiUndoState>::sse_decode(
+                deserializer,
+            ));
+        } else {
+            return None;
+        }
+    }
+}
+
 impl SseDecode for Option<bool> {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
@@ -2259,40 +2439,54 @@ fn pde_ffi_dispatcher_primary_impl(
             data_len,
         ),
         25 => wire__crate__api__mobile__pending_ai_preview_impl(port, ptr, rust_vec_len, data_len),
-        26 => {
+        26 => wire__crate__api__mobile__pending_ai_undo_impl(port, ptr, rust_vec_len, data_len),
+        27 => {
             wire__crate__api__mobile__pending_import_preview_impl(port, ptr, rust_vec_len, data_len)
         }
-        27 => wire__crate__api__mobile__prepare_ai_assistant_request_impl(
+        28 => wire__crate__api__mobile__prepare_ai_assistant_request_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        28 => wire__crate__api__mobile__prepare_ai_models_request_impl(
+        29 => wire__crate__api__mobile__prepare_ai_models_request_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        29 => wire__crate__api__mobile__prepare_ai_request_impl(port, ptr, rust_vec_len, data_len),
-        30 => wire__crate__api__mobile__prepare_ai_verify_request_impl(
+        30 => wire__crate__api__mobile__prepare_ai_request_impl(port, ptr, rust_vec_len, data_len),
+        31 => wire__crate__api__mobile__prepare_ai_verify_request_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        31 => wire__crate__api__mobile__preview_import_impl(port, ptr, rust_vec_len, data_len),
-        32 => wire__crate__api__mobile__preview_recovery_impl(port, ptr, rust_vec_len, data_len),
-        33 => wire__crate__api__mobile__purge_entry_impl(port, ptr, rust_vec_len, data_len),
-        34 => wire__crate__api__mobile__restore_entry_impl(port, ptr, rust_vec_len, data_len),
-        35 => wire__crate__api__mobile__save_ai_settings_impl(port, ptr, rust_vec_len, data_len),
-        36 => wire__crate__api__mobile__save_entry_impl(port, ptr, rust_vec_len, data_len),
-        37 => wire__crate__api__mobile__save_group_order_impl(port, ptr, rust_vec_len, data_len),
-        38 => wire__crate__api__mobile__save_taxonomy_impl(port, ptr, rust_vec_len, data_len),
-        39 => wire__crate__api__mobile__trash_entry_impl(port, ptr, rust_vec_len, data_len),
-        40 => wire__crate__api__mobile__unlock_vault_impl(port, ptr, rust_vec_len, data_len),
-        41 => wire__crate__api__mobile__vault_status_impl(port, ptr, rust_vec_len, data_len),
-        42 => wire__crate__api__mobile__verify_ai_response_impl(port, ptr, rust_vec_len, data_len),
+        32 => wire__crate__api__mobile__prepare_device_unlock_credential_impl(
+            port,
+            ptr,
+            rust_vec_len,
+            data_len,
+        ),
+        33 => wire__crate__api__mobile__preview_import_impl(port, ptr, rust_vec_len, data_len),
+        34 => wire__crate__api__mobile__preview_recovery_impl(port, ptr, rust_vec_len, data_len),
+        35 => wire__crate__api__mobile__purge_entry_impl(port, ptr, rust_vec_len, data_len),
+        36 => wire__crate__api__mobile__restore_entry_impl(port, ptr, rust_vec_len, data_len),
+        37 => wire__crate__api__mobile__save_ai_settings_impl(port, ptr, rust_vec_len, data_len),
+        38 => wire__crate__api__mobile__save_entry_impl(port, ptr, rust_vec_len, data_len),
+        39 => wire__crate__api__mobile__save_group_order_impl(port, ptr, rust_vec_len, data_len),
+        40 => wire__crate__api__mobile__save_taxonomy_impl(port, ptr, rust_vec_len, data_len),
+        41 => wire__crate__api__mobile__trash_entry_impl(port, ptr, rust_vec_len, data_len),
+        42 => wire__crate__api__mobile__undo_ai_preview_impl(port, ptr, rust_vec_len, data_len),
+        43 => wire__crate__api__mobile__unlock_vault_impl(port, ptr, rust_vec_len, data_len),
+        44 => wire__crate__api__mobile__unlock_vault_with_device_credential_impl(
+            port,
+            ptr,
+            rust_vec_len,
+            data_len,
+        ),
+        45 => wire__crate__api__mobile__vault_status_impl(port, ptr, rust_vec_len, data_len),
+        46 => wire__crate__api__mobile__verify_ai_response_impl(port, ptr, rust_vec_len, data_len),
         _ => unreachable!(),
     }
 }
@@ -2311,6 +2505,29 @@ fn pde_ffi_dispatcher_sync_impl(
 
 // Section: rust2dart
 
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::mobile::models::AiApplyResult {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        [
+            self.revision.into_into_dart().into_dart(),
+            self.message.into_into_dart().into_dart(),
+            self.undo_token.into_into_dart().into_dart(),
+            self.applied_count.into_into_dart().into_dart(),
+        ]
+        .into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for crate::mobile::models::AiApplyResult
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<crate::mobile::models::AiApplyResult>
+    for crate::mobile::models::AiApplyResult
+{
+    fn into_into_dart(self) -> crate::mobile::models::AiApplyResult {
+        self
+    }
+}
 // Codec=Dco (DartCObject based), see doc to use other codecs
 impl flutter_rust_bridge::IntoDart for crate::mobile::models::AiAssistantRequestPlan {
     fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
@@ -2620,6 +2837,29 @@ impl flutter_rust_bridge::IntoIntoDart<crate::mobile::models::AiStatus>
     }
 }
 // Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::mobile::models::AiUndoState {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        [
+            self.revision.into_into_dart().into_dart(),
+            self.message.into_into_dart().into_dart(),
+            self.undo_token.into_into_dart().into_dart(),
+            self.applied_count.into_into_dart().into_dart(),
+        ]
+        .into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for crate::mobile::models::AiUndoState
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<crate::mobile::models::AiUndoState>
+    for crate::mobile::models::AiUndoState
+{
+    fn into_into_dart(self) -> crate::mobile::models::AiUndoState {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
 impl flutter_rust_bridge::IntoDart for crate::mobile::models::EntryDraft {
     fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
         [
@@ -2880,6 +3120,16 @@ impl SseEncode for String {
     }
 }
 
+impl SseEncode for crate::mobile::models::AiApplyResult {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <u64>::sse_encode(self.revision, serializer);
+        <String>::sse_encode(self.message, serializer);
+        <String>::sse_encode(self.undo_token, serializer);
+        <u32>::sse_encode(self.applied_count, serializer);
+    }
+}
+
 impl SseEncode for crate::mobile::models::AiAssistantRequestPlan {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
@@ -3016,6 +3266,16 @@ impl SseEncode for crate::mobile::models::AiStatus {
         <String>::sse_encode(self.base_url, serializer);
         <String>::sse_encode(self.model, serializer);
         <String>::sse_encode(self.api_key_mask, serializer);
+    }
+}
+
+impl SseEncode for crate::mobile::models::AiUndoState {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <u64>::sse_encode(self.revision, serializer);
+        <String>::sse_encode(self.message, serializer);
+        <String>::sse_encode(self.undo_token, serializer);
+        <u32>::sse_encode(self.applied_count, serializer);
     }
 }
 
@@ -3253,6 +3513,16 @@ impl SseEncode for Option<crate::mobile::models::AiPreview> {
         <bool>::sse_encode(self.is_some(), serializer);
         if let Some(value) = self {
             <crate::mobile::models::AiPreview>::sse_encode(value, serializer);
+        }
+    }
+}
+
+impl SseEncode for Option<crate::mobile::models::AiUndoState> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <bool>::sse_encode(self.is_some(), serializer);
+        if let Some(value) = self {
+            <crate::mobile::models::AiUndoState>::sse_encode(value, serializer);
         }
     }
 }

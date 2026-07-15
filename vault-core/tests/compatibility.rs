@@ -124,6 +124,45 @@ fn vault_session_reuses_key_and_preserves_candidate_isolation(
 }
 
 #[test]
+fn device_unlock_credential_is_vault_bound_and_invalidated_by_rekey(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let document = validate_document(serde_json::json!({
+        "version": "1.0",
+        "created_at": "2026-07-15T00:00:00Z",
+        "app_name": "SecretBase",
+        "entries": [],
+        "deleted_entries": [],
+        "tags_meta": {},
+        "groups_meta": {}
+    }))?;
+    let mut session = VaultSession::create("device-password", document.clone())?;
+    let encrypted = session.encrypted_bytes()?;
+    let mut credential = session.device_unlock_credential();
+
+    let unlocked = VaultSession::unlock_with_device_credential(&credential, &encrypted)?;
+    assert_eq!(unlocked.document(), &document);
+
+    credential[68] ^= 1;
+    assert_eq!(
+        VaultSession::unlock_with_device_credential(&credential, &encrypted)
+            .err()
+            .ok_or("tampered device credential was accepted")?,
+        VaultError::AuthenticationFailed
+    );
+
+    let original_credential = session.device_unlock_credential();
+    session.rekey("new-device-password");
+    let rekeyed = session.encrypted_bytes()?;
+    assert_eq!(
+        VaultSession::unlock_with_device_credential(&original_credential, &rekeyed)
+            .err()
+            .ok_or("rekeyed vault accepted an old device credential")?,
+        VaultError::AuthenticationFailed
+    );
+    Ok(())
+}
+
+#[test]
 fn scoped_encryption_is_purpose_bound_and_rekeyed() -> Result<(), Box<dyn std::error::Error>> {
     let document = validate_document(serde_json::json!({
         "version": "1.0",

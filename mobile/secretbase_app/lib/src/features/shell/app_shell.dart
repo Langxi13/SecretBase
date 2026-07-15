@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:secretbase/src/core/widgets/android_back_exit_guard.dart';
 import 'package:secretbase/src/core/widgets/brand_mark.dart';
 import 'package:secretbase/src/features/ai/ai_manager_screen.dart';
 import 'package:secretbase/src/features/entries/entries_screen.dart';
@@ -20,6 +21,7 @@ class _AppShellState extends ConsumerState<AppShell> {
   int _index = 0;
   int _filterGeneration = 0;
   EntryFilterPreset _entryPreset = const EntryFilterPreset();
+  bool _exiting = false;
 
   static const _destinations = [
     NavigationDestination(
@@ -53,7 +55,8 @@ class _AppShellState extends ConsumerState<AppShell> {
   Widget build(BuildContext context) {
     ref.listen(vaultControllerProvider, (previous, next) {
       if (previous?.phase == VaultPhase.unlocked &&
-          next.phase != VaultPhase.unlocked) {
+          next.phase != VaultPhase.unlocked &&
+          !_exiting) {
         context.go('/');
       }
     });
@@ -75,69 +78,110 @@ class _AppShellState extends ConsumerState<AppShell> {
       ],
     );
 
-    if (wide) {
-      return Scaffold(
-        body: SafeArea(
-          child: Row(
-            children: [
-              NavigationRail(
-                selectedIndex: _index,
-                onDestinationSelected: (value) =>
-                    setState(() => _index = value),
-                extended: extendedRail,
-                leading: Padding(
-                  padding: const EdgeInsets.fromLTRB(10, 12, 10, 22),
-                  child: extendedRail
-                      ? const BrandMark(compact: true)
-                      : Container(
-                          width: 38,
-                          height: 38,
-                          decoration: BoxDecoration(
-                            color: Theme.of(context).colorScheme.primary,
-                            borderRadius: BorderRadius.circular(8),
+    final scaffold = wide
+        ? Scaffold(
+            body: SafeArea(
+              child: Row(
+                children: [
+                  NavigationRail(
+                    selectedIndex: _index,
+                    onDestinationSelected: _selectDestination,
+                    extended: extendedRail,
+                    leading: Padding(
+                      padding: const EdgeInsets.fromLTRB(10, 12, 10, 22),
+                      child: extendedRail
+                          ? const BrandMark(compact: true)
+                          : Container(
+                              width: 38,
+                              height: 38,
+                              decoration: BoxDecoration(
+                                color: Theme.of(context).colorScheme.primary,
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Icon(
+                                Icons.shield_outlined,
+                                color: Theme.of(context).colorScheme.onPrimary,
+                              ),
+                            ),
+                    ),
+                    destinations: _destinations
+                        .map(
+                          (item) => NavigationRailDestination(
+                            icon: item.icon,
+                            selectedIcon: item.selectedIcon,
+                            label: Text(item.label),
                           ),
-                          child: Icon(
-                            Icons.shield_outlined,
-                            color: Theme.of(context).colorScheme.onPrimary,
-                          ),
-                        ),
-                ),
-                destinations: _destinations
-                    .map(
-                      (item) => NavigationRailDestination(
-                        icon: item.icon,
-                        selectedIcon: item.selectedIcon,
-                        label: Text(item.label),
-                      ),
-                    )
-                    .toList(),
+                        )
+                        .toList(),
+                  ),
+                  const VerticalDivider(width: 1),
+                  Expanded(child: body),
+                ],
               ),
-              const VerticalDivider(width: 1),
-              Expanded(child: body),
-            ],
-          ),
-        ),
-      );
-    }
-
-    return Scaffold(
-      body: SafeArea(child: body),
-      bottomNavigationBar: DecoratedBox(
-        decoration: BoxDecoration(
-          border: Border(
-            top: BorderSide(
-              color: Theme.of(context).colorScheme.outlineVariant,
             ),
-          ),
-        ),
-        child: NavigationBar(
-          selectedIndex: _index,
-          labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
-          onDestinationSelected: (value) => setState(() => _index = value),
-          destinations: _destinations,
-        ),
-      ),
+          )
+        : Scaffold(
+            body: SafeArea(child: body),
+            bottomNavigationBar: DecoratedBox(
+              decoration: BoxDecoration(
+                border: Border(
+                  top: BorderSide(
+                    color: Theme.of(context).colorScheme.outlineVariant,
+                  ),
+                ),
+              ),
+              child: NavigationBar(
+                selectedIndex: _index,
+                labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
+                onDestinationSelected: _selectDestination,
+                destinations: _destinations,
+              ),
+            ),
+          );
+
+    return AndroidBackExitGuard(
+      resetToken: '$_index:$_filterGeneration',
+      onBeforeExit: _handleBackBeforeExit,
+      onExit: _lockBeforeExit,
+      child: scaffold,
     );
+  }
+
+  void _selectDestination(int value) {
+    if (value == _index) return;
+    setState(() => _index = value);
+  }
+
+  bool _handleBackBeforeExit() {
+    if (_entryPreset.origin != null) {
+      _returnFromEntryPreset();
+      return true;
+    }
+    if (_index != 0) {
+      setState(() {
+        _filterGeneration += 1;
+        _entryPreset = EntryFilterPreset(generation: _filterGeneration);
+        _index = 0;
+      });
+      return true;
+    }
+    return false;
+  }
+
+  Future<bool> _lockBeforeExit() async {
+    _exiting = true;
+    try {
+      await ref.read(vaultControllerProvider.notifier).lock();
+      return true;
+    } catch (_) {
+      _exiting = false;
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('无法安全锁定密码库，请重试')));
+      }
+      return false;
+    }
   }
 
   void _openGroup(String name) {

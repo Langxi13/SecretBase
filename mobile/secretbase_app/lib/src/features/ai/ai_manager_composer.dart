@@ -1,5 +1,12 @@
 import 'package:flutter/material.dart';
 
+const aiQuickPrompts = [
+  ('分类', Icons.category_outlined, '统计当前范围内未分组和未加标签的条目'),
+  ('标签', Icons.sell_outlined, '检查当前范围内重复、近义、过细或无效的标签，只生成标签管理计划'),
+  ('密码组', Icons.folder_outlined, '检查当前范围内密码组的分类是否合理，只生成密码组管理计划'),
+  ('字段', Icons.view_stream_outlined, '检查当前范围内字段命名是否统一，只生成字段结构调整计划'),
+];
+
 class AiManagerComposer extends StatelessWidget {
   const AiManagerComposer({
     required this.controller,
@@ -9,6 +16,7 @@ class AiManagerComposer extends StatelessWidget {
     required this.onModeChanged,
     required this.onScope,
     required this.onPrompt,
+    required this.onTools,
     required this.onSend,
     super.key,
   });
@@ -20,112 +28,51 @@ class AiManagerComposer extends StatelessWidget {
   final ValueChanged<String> onModeChanged;
   final VoidCallback onScope;
   final ValueChanged<String> onPrompt;
+  final VoidCallback onTools;
   final VoidCallback onSend;
 
   @override
   Widget build(BuildContext context) {
-    final prompts = [
-      ('分类', '统计当前范围内未分组和未加标签的条目'),
-      ('标签', '检查当前范围内重复、近义、过细或无效的标签，只生成标签管理计划'),
-      ('密码组', '检查当前范围内密码组的分类是否合理，只生成密码组管理计划'),
-      ('字段', '检查当前范围内字段命名是否统一，只生成字段结构调整计划'),
-    ];
     final scheme = Theme.of(context).colorScheme;
+    final sensitive = mode == 'sensitive_create';
     return SafeArea(
       top: false,
       child: Material(
         color: scheme.surfaceContainerLowest,
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
+          padding: const EdgeInsets.fromLTRB(10, 7, 10, 10),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Row(
-                children: prompts
-                    .map(
-                      (prompt) => Expanded(
-                        child: Padding(
-                          padding: EdgeInsets.only(
-                            right: prompt == prompts.last ? 0 : 5,
-                          ),
-                          child: _QuickPromptButton(
-                            label: prompt.$1,
-                            enabled: !working,
-                            onPressed: () => onPrompt(prompt.$2),
-                          ),
-                        ),
-                      ),
-                    )
-                    .toList(),
+              _ComposerContextLine(
+                sensitive: sensitive,
+                selectedEntryCount: selectedEntryCount,
               ),
-              const SizedBox(height: 7),
-              Row(
-                children: [
-                  Expanded(
-                    flex: 3,
-                    child: _ModeToggle(
-                      mode: mode,
-                      enabled: !working,
-                      onChanged: onModeChanged,
-                    ),
-                  ),
-                  const SizedBox(width: 7),
-                  Expanded(
-                    flex: 2,
-                    child: _ScopeButton(
-                      enabled: !working && mode == 'assistant',
-                      count: selectedEntryCount,
-                      onPressed: onScope,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 5),
-              Row(
-                children: [
-                  Icon(
-                    mode == 'sensitive_create'
-                        ? Icons.warning_amber_rounded
-                        : Icons.shield_outlined,
-                    size: 15,
-                    color: mode == 'sensitive_create'
-                        ? scheme.error
-                        : scheme.primary,
-                  ),
-                  const SizedBox(width: 5),
-                  Expanded(
-                    child: Text(
-                      mode == 'sensitive_create'
-                          ? '将发送本轮完整输入；已有字段值仍不会发送'
-                          : '发送前确认 · 不含已有字段值、备注和完整网址',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                        color: mode == 'sensitive_create'
-                            ? scheme.error
-                            : scheme.onSurfaceVariant,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 7),
+              const SizedBox(height: 6),
               Row(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
+                  IconButton.outlined(
+                    tooltip: '更多 AI 操作',
+                    onPressed: () => _openActions(context),
+                    icon: const Icon(Icons.add_rounded),
+                    style: IconButton.styleFrom(
+                      fixedSize: const Size(42, 42),
+                      minimumSize: const Size(42, 42),
+                      shape: const CircleBorder(),
+                    ),
+                  ),
+                  const SizedBox(width: 7),
                   Expanded(
                     child: TextField(
                       controller: controller,
                       enabled: !working,
                       minLines: 1,
-                      maxLines: mode == 'sensitive_create' ? 6 : 4,
+                      maxLines: sensitive ? 6 : 4,
                       maxLength: 6000,
                       textInputAction: TextInputAction.newline,
                       decoration: InputDecoration(
-                        hintText: mode == 'sensitive_create'
-                            ? '描述需要新建的条目'
-                            : '输入整理、定位或结构调整需求',
+                        hintText: sensitive ? '描述需要新建的条目' : '向 AI 管家描述整理需求',
                         counterText: '',
                       ),
                     ),
@@ -138,6 +85,7 @@ class AiManagerComposer extends StatelessWidget {
                     style: IconButton.styleFrom(
                       fixedSize: const Size(44, 44),
                       minimumSize: const Size(44, 44),
+                      shape: const CircleBorder(),
                     ),
                   ),
                 ],
@@ -148,200 +96,289 @@ class AiManagerComposer extends StatelessWidget {
       ),
     );
   }
-}
 
-class _QuickPromptButton extends StatelessWidget {
-  const _QuickPromptButton({
-    required this.label,
-    required this.enabled,
-    required this.onPressed,
-  });
-
-  final String label;
-  final bool enabled;
-  final VoidCallback onPressed;
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    return Material(
-      color: scheme.surfaceContainerLow,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(7),
-        side: BorderSide(color: scheme.outlineVariant),
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: enabled ? onPressed : null,
-        child: SizedBox(
-          height: 36,
-          child: Center(
-            child: Text(
-              label,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                color: enabled ? scheme.onSurface : scheme.outline,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
+  Future<void> _openActions(BuildContext context) async {
+    final panel = AiComposerActionPanel(
+      mode: mode,
+      selectedEntryCount: selectedEntryCount,
+      working: working,
+      onModeChanged: onModeChanged,
+      onScope: onScope,
+      onPrompt: onPrompt,
+      onTools: onTools,
+    );
+    if (MediaQuery.sizeOf(context).width >= 600) {
+      await showDialog<void>(
+        context: context,
+        builder: (context) => Dialog(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 440),
+            child: panel,
           ),
         ),
-      ),
+      );
+      return;
+    }
+    await showModalBottomSheet<void>(
+      context: context,
+      useSafeArea: true,
+      showDragHandle: true,
+      isScrollControlled: true,
+      builder: (context) => panel,
     );
   }
 }
 
-class _ModeToggle extends StatelessWidget {
-  const _ModeToggle({
-    required this.mode,
-    required this.enabled,
-    required this.onChanged,
+class _ComposerContextLine extends StatelessWidget {
+  const _ComposerContextLine({
+    required this.sensitive,
+    required this.selectedEntryCount,
   });
 
-  final String mode;
-  final bool enabled;
-  final ValueChanged<String> onChanged;
+  final bool sensitive;
+  final int selectedEntryCount;
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    return Container(
-      height: 38,
-      padding: const EdgeInsets.all(2),
-      decoration: BoxDecoration(
-        color: scheme.surfaceContainerLow,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: scheme.outlineVariant),
-      ),
-      child: Row(
-        children: [
-          _ModeOption(
-            label: '管家',
-            icon: Icons.auto_awesome_outlined,
-            selected: mode == 'assistant',
-            enabled: enabled,
-            onTap: () => onChanged('assistant'),
+    final scope = selectedEntryCount == 0 ? '全部条目' : '已选 $selectedEntryCount 条';
+    return Row(
+      children: [
+        Icon(
+          sensitive ? Icons.warning_amber_rounded : Icons.shield_outlined,
+          size: 15,
+          color: sensitive ? scheme.error : scheme.primary,
+        ),
+        const SizedBox(width: 5),
+        Expanded(
+          child: Text(
+            sensitive ? 'AI 新建 · 本轮完整输入 · 发送前确认' : '管家 · $scope · 不含已有字段值',
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: Theme.of(context).textTheme.labelSmall?.copyWith(
+              color: sensitive ? scheme.error : scheme.onSurfaceVariant,
+              fontWeight: FontWeight.w700,
+            ),
           ),
-          _ModeOption(
-            label: 'AI 新建',
-            icon: Icons.add_box_outlined,
-            selected: mode == 'sensitive_create',
-            enabled: enabled,
-            onTap: () => onChanged('sensitive_create'),
+        ),
+      ],
+    );
+  }
+}
+
+class AiComposerActionPanel extends StatelessWidget {
+  const AiComposerActionPanel({
+    required this.mode,
+    required this.selectedEntryCount,
+    required this.working,
+    required this.onModeChanged,
+    required this.onScope,
+    required this.onPrompt,
+    required this.onTools,
+    super.key,
+  });
+
+  final String mode;
+  final int selectedEntryCount;
+  final bool working;
+  final ValueChanged<String> onModeChanged;
+  final VoidCallback onScope;
+  final ValueChanged<String> onPrompt;
+  final VoidCallback onTools;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return SingleChildScrollView(
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 18),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            '更多操作',
+            style: Theme.of(
+              context,
+            ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
+          ),
+          const SizedBox(height: 12),
+          GridView.count(
+            crossAxisCount: 2,
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            mainAxisSpacing: 8,
+            crossAxisSpacing: 8,
+            childAspectRatio: 2.55,
+            children: aiQuickPrompts
+                .map(
+                  (prompt) => _PanelActionButton(
+                    label: prompt.$1,
+                    icon: prompt.$2,
+                    enabled: !working,
+                    onPressed: () =>
+                        _closeThen(context, () => onPrompt(prompt.$3)),
+                  ),
+                )
+                .toList(),
+          ),
+          const SizedBox(height: 14),
+          Text(
+            '输入模式',
+            style: Theme.of(
+              context,
+            ).textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w800),
+          ),
+          const SizedBox(height: 7),
+          Row(
+            children: [
+              Expanded(
+                child: _ModeButton(
+                  label: '管家',
+                  icon: Icons.auto_awesome_outlined,
+                  selected: mode == 'assistant',
+                  enabled: !working,
+                  onPressed: () =>
+                      _closeThen(context, () => onModeChanged('assistant')),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _ModeButton(
+                  label: 'AI 新建',
+                  icon: Icons.add_box_outlined,
+                  selected: mode == 'sensitive_create',
+                  enabled: !working,
+                  onPressed: () => _closeThen(
+                    context,
+                    () => onModeChanged('sensitive_create'),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          _PanelListAction(
+            icon: Icons.filter_alt_outlined,
+            title: '分析范围',
+            subtitle: selectedEntryCount == 0
+                ? '全部条目'
+                : '已选择 $selectedEntryCount 条',
+            enabled: !working && mode == 'assistant',
+            onTap: () => _closeThen(context, onScope),
+          ),
+          _PanelListAction(
+            icon: Icons.tune,
+            title: '专业工具',
+            subtitle: working ? '可查看；当前请求完成前不能发起新请求' : '打开五项独立整理工具',
+            enabled: true,
+            onTap: () => _closeThen(context, onTools),
+          ),
+          const SizedBox(height: 8),
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: mode == 'sensitive_create'
+                  ? scheme.errorContainer
+                  : scheme.surfaceContainerLow,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Text(
+              mode == 'sensitive_create'
+                  ? 'AI 新建会发送你本轮输入的完整原文；已有字段值仍不会发送。'
+                  : '普通管家只使用条目结构信息，不发送已有字段值、备注或完整网址。',
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
           ),
         ],
       ),
     );
   }
+
+  void _closeThen(BuildContext context, VoidCallback callback) {
+    Navigator.of(context).pop();
+    WidgetsBinding.instance.addPostFrameCallback((_) => callback());
+  }
 }
 
-class _ModeOption extends StatelessWidget {
-  const _ModeOption({
+class _PanelActionButton extends StatelessWidget {
+  const _PanelActionButton({
+    required this.label,
+    required this.icon,
+    required this.enabled,
+    required this.onPressed,
+  });
+
+  final String label;
+  final IconData icon;
+  final bool enabled;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return OutlinedButton.icon(
+      onPressed: enabled ? onPressed : null,
+      icon: Icon(icon, size: 19),
+      label: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis),
+    );
+  }
+}
+
+class _ModeButton extends StatelessWidget {
+  const _ModeButton({
     required this.label,
     required this.icon,
     required this.selected,
     required this.enabled,
-    required this.onTap,
+    required this.onPressed,
   });
 
   final String label;
   final IconData icon;
   final bool selected;
   final bool enabled;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    return Expanded(
-      child: Material(
-        color: selected ? scheme.primaryContainer : Colors.transparent,
-        borderRadius: BorderRadius.circular(6),
-        clipBehavior: Clip.antiAlias,
-        child: InkWell(
-          onTap: enabled ? onTap : null,
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                icon,
-                size: 15,
-                color: selected
-                    ? scheme.onPrimaryContainer
-                    : scheme.onSurfaceVariant,
-              ),
-              const SizedBox(width: 4),
-              Flexible(
-                child: Text(
-                  label,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                    color: selected
-                        ? scheme.onPrimaryContainer
-                        : scheme.onSurfaceVariant,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _ScopeButton extends StatelessWidget {
-  const _ScopeButton({
-    required this.enabled,
-    required this.count,
-    required this.onPressed,
-  });
-
-  final bool enabled;
-  final int count;
   final VoidCallback onPressed;
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    return Material(
-      color: scheme.surfaceContainerLow,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(8),
-        side: BorderSide(color: scheme.outlineVariant),
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: enabled ? onPressed : null,
-        child: SizedBox(
-          height: 38,
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                Icons.filter_alt_outlined,
-                size: 16,
-                color: enabled ? scheme.primary : scheme.outline,
-              ),
-              const SizedBox(width: 5),
-              Flexible(
-                child: Text(
-                  count == 0 ? '全部条目' : '已选 $count 项',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                    color: enabled ? scheme.onSurface : scheme.outline,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
+    return selected
+        ? FilledButton.tonalIcon(
+            onPressed: enabled ? onPressed : null,
+            icon: Icon(icon, size: 18),
+            label: Text(label),
+          )
+        : OutlinedButton.icon(
+            onPressed: enabled ? onPressed : null,
+            icon: Icon(icon, size: 18),
+            label: Text(label),
+          );
+  }
+}
+
+class _PanelListAction extends StatelessWidget {
+  const _PanelListAction({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.enabled,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final bool enabled;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return ListTile(
+      contentPadding: EdgeInsets.zero,
+      enabled: enabled,
+      leading: Icon(icon),
+      title: Text(title),
+      subtitle: Text(subtitle, maxLines: 2, overflow: TextOverflow.ellipsis),
+      trailing: const Icon(Icons.chevron_right),
+      onTap: enabled ? onTap : null,
     );
   }
 }

@@ -8,15 +8,17 @@ use chrono::{SecondsFormat, Utc};
 use secretbase_vault_core::{VaultDocument, VaultSession};
 use serde_json::Value;
 use uuid::Uuid;
+use zeroize::Zeroizing;
 
 use super::{
     ai::{self, PendingAiPreview, PendingAiRequest, PendingAssistantRequest},
     document,
     error::MobileError,
     models::{
-        AiAssistantRequestPlan, AiAssistantTurnResult, AiConversation, AiConversationSummary,
-        AiHttpRequest, AiPreview, AiRequestPlan, AiStatus, EntryDraft, EntryPage, EntryRecord,
-        ImportPreview, OperationResult, RecoverySnapshot, TaxonomyRecord, VaultStatus,
+        AiApplyResult, AiAssistantRequestPlan, AiAssistantTurnResult, AiConversation,
+        AiConversationSummary, AiHttpRequest, AiPreview, AiRequestPlan, AiStatus, AiUndoState,
+        EntryDraft, EntryPage, EntryRecord, ImportPreview, OperationResult, RecoverySnapshot,
+        TaxonomyRecord, VaultStatus,
     },
     storage,
 };
@@ -28,6 +30,16 @@ struct PendingImport {
     preview: ImportPreview,
 }
 
+#[derive(Debug, Clone)]
+struct PendingAiUndo {
+    token: String,
+    source_revision: u64,
+    document: Value,
+    conversation_id: Option<String>,
+    applied_count: u32,
+    message: String,
+}
+
 #[derive(Default)]
 struct MobileRuntime {
     root: Option<PathBuf>,
@@ -37,6 +49,7 @@ struct MobileRuntime {
     pending_ai_request: Option<PendingAiRequest>,
     pending_ai_assistant: Option<PendingAssistantRequest>,
     pending_ai_preview: Option<PendingAiPreview>,
+    pending_ai_undo: Option<PendingAiUndo>,
 }
 
 static RUNTIME: OnceLock<Mutex<MobileRuntime>> = OnceLock::new();
@@ -98,6 +111,7 @@ impl MobileRuntime {
         self.pending_ai_request = None;
         self.pending_ai_assistant = None;
         self.pending_ai_preview = None;
+        self.pending_ai_undo = None;
         Ok(OperationResult {
             revision: self.revision,
             message,
@@ -125,6 +139,7 @@ pub fn initialize_runtime(data_root: String) -> Result<VaultStatus, MobileError>
         runtime.pending_ai_request = None;
         runtime.pending_ai_assistant = None;
         runtime.pending_ai_preview = None;
+        runtime.pending_ai_undo = None;
         status(runtime)
     })
 }
@@ -161,6 +176,27 @@ fn validate_new_password(password: &str) -> Result<(), MobileError> {
     Ok(())
 }
 
+fn activate_session(
+    runtime: &mut MobileRuntime,
+    mut session: VaultSession,
+) -> Result<VaultStatus, MobileError> {
+    let root = runtime.root()?.to_path_buf();
+    let mut value = session.document().as_value().clone();
+    if document::prepare_for_mobile(&mut value, &now())? {
+        let migrated = VaultDocument::from_value(value.clone())?;
+        storage::persist_vault(&root, &session.encrypted_document_bytes(&migrated)?, true)?;
+        session.replace_document(value)?;
+    }
+    runtime.session = Some(session);
+    runtime.revision = runtime.revision.saturating_add(1).max(1);
+    runtime.pending_import = None;
+    runtime.pending_ai_request = None;
+    runtime.pending_ai_assistant = None;
+    runtime.pending_ai_preview = None;
+    runtime.pending_ai_undo = None;
+    status(runtime)
+}
+
 pub fn create_vault(password: String) -> Result<VaultStatus, MobileError> {
     validate_new_password(&password)?;
     with_runtime(|runtime| {
@@ -179,6 +215,7 @@ pub fn create_vault(password: String) -> Result<VaultStatus, MobileError> {
         runtime.pending_ai_request = None;
         runtime.pending_ai_assistant = None;
         runtime.pending_ai_preview = None;
+        runtime.pending_ai_undo = None;
         status(runtime)
     })
 }
@@ -187,23 +224,42 @@ pub fn unlock_vault(password: String) -> Result<VaultStatus, MobileError> {
     if password.is_empty() {
         return Err(MobileError::new("VALIDATION_FAILED", "请输入主密码"));
     }
+    let password = Zeroizing::new(password);
     with_runtime(|runtime| {
         let root = runtime.root()?.to_path_buf();
         let content = storage::read_vault(&root)?;
-        let mut session = VaultSession::unlock(&password, &content)?;
-        let mut value = session.document().as_value().clone();
-        if document::prepare_for_mobile(&mut value, &now())? {
-            let migrated = VaultDocument::from_value(value.clone())?;
-            storage::persist_vault(&root, &session.encrypted_document_bytes(&migrated)?, true)?;
-            session.replace_document(value)?;
-        }
-        runtime.session = Some(session);
-        runtime.revision = runtime.revision.saturating_add(1).max(1);
-        runtime.pending_import = None;
-        runtime.pending_ai_request = None;
-        runtime.pending_ai_assistant = None;
-        runtime.pending_ai_preview = None;
-        status(runtime)
+        let session = VaultSession::unlock(password.as_str(), &content)?;
+        activate_session(runtime, session)
+    })
+}
+
+pub fn prepare_device_unlock_credential(password: String) -> Result<Vec<u8>, MobileError> {
+    if password.is_empty() {
+        return Err(MobileError::new("VALIDATION_FAILED", "请输入当前主密码"));
+    }
+    let password = Zeroizing::new(password);
+    with_runtime(|runtime| {
+        let _ = runtime.session()?;
+        let content = storage::read_vault(runtime.root()?)?;
+        let session = VaultSession::unlock(password.as_str(), &content)?;
+        Ok(session.device_unlock_credential().to_vec())
+    })
+}
+
+pub fn unlock_vault_with_device_credential(
+    credential: Vec<u8>,
+) -> Result<VaultStatus, MobileError> {
+    let credential = Zeroizing::new(credential);
+    with_runtime(|runtime| {
+        let content = storage::read_vault(runtime.root()?)?;
+        let session =
+            VaultSession::unlock_with_device_credential(&credential, &content).map_err(|_| {
+                MobileError::new(
+                    "BIOMETRIC_CREDENTIAL_INVALID",
+                    "指纹解锁凭据已失效，请使用主密码并重新开启指纹解锁",
+                )
+            })?;
+        activate_session(runtime, session)
     })
 }
 
@@ -214,6 +270,7 @@ pub fn lock_vault() -> Result<VaultStatus, MobileError> {
         runtime.pending_ai_request = None;
         runtime.pending_ai_assistant = None;
         runtime.pending_ai_preview = None;
+        runtime.pending_ai_undo = None;
         runtime.revision = runtime.revision.saturating_add(1);
         status(runtime)
     })
@@ -450,6 +507,7 @@ pub fn apply_import(token: String) -> Result<OperationResult, MobileError> {
         runtime.pending_ai_request = None;
         runtime.pending_ai_assistant = None;
         runtime.pending_ai_preview = None;
+        runtime.pending_ai_undo = None;
         storage::delete_ai_history(&root)?;
         Ok(OperationResult {
             revision: runtime.revision,
@@ -494,6 +552,7 @@ pub fn change_password(
         runtime.pending_ai_request = None;
         runtime.pending_ai_assistant = None;
         runtime.pending_ai_preview = None;
+        runtime.pending_ai_undo = None;
         storage::delete_ai_history(&root)?;
         runtime.revision = runtime.revision.saturating_add(1);
         Ok(OperationResult {
@@ -763,7 +822,7 @@ pub fn apply_ai_preview(
     token: String,
     selected_item_ids: Vec<String>,
     expected_revision: u64,
-) -> Result<OperationResult, MobileError> {
+) -> Result<AiApplyResult, MobileError> {
     with_runtime(|runtime| {
         let pending = runtime
             .pending_ai_preview
@@ -778,9 +837,111 @@ pub fn apply_ai_preview(
                 "密码库已发生变化，请重新生成 AI 建议",
             ));
         }
-        runtime.transaction(expected_revision, |value| {
+        let previous_document = runtime.session()?.document().as_value().clone();
+        let conversation_id = pending.conversation_id.clone();
+        let applied_count = u32::try_from(selected_item_ids.len()).unwrap_or(u32::MAX);
+        let result = runtime.transaction(expected_revision, |value| {
             ai::apply_preview(value, &pending, &selected_item_ids, &now())
+        })?;
+        let undo_token = Uuid::new_v4().to_string();
+        let message = result.message.clone();
+        runtime.pending_ai_undo = Some(PendingAiUndo {
+            token: undo_token.clone(),
+            source_revision: result.revision,
+            document: previous_document,
+            conversation_id: conversation_id.clone(),
+            applied_count,
+            message: message.clone(),
+        });
+        if let Some(conversation_id) = conversation_id {
+            let root = runtime.root()?.to_path_buf();
+            if let Ok(session) = runtime.session() {
+                let _ = ai::history::append_assistant_message(
+                    &root,
+                    session,
+                    &conversation_id,
+                    &format!("已按你的确认应用 {applied_count} 项操作。"),
+                );
+            }
+        }
+        Ok(AiApplyResult {
+            revision: result.revision,
+            message,
+            undo_token,
+            applied_count,
         })
+    })
+}
+
+pub fn pending_ai_undo() -> Result<Option<AiUndoState>, MobileError> {
+    with_runtime(|runtime| {
+        let _ = runtime.session()?;
+        Ok(runtime.pending_ai_undo.as_ref().map(|pending| AiUndoState {
+            revision: pending.source_revision,
+            message: pending.message.clone(),
+            undo_token: pending.token.clone(),
+            applied_count: pending.applied_count,
+        }))
+    })
+}
+
+pub fn undo_ai_preview(
+    undo_token: String,
+    expected_revision: u64,
+) -> Result<OperationResult, MobileError> {
+    with_runtime(|runtime| undo_ai_preview_in_runtime(runtime, &undo_token, expected_revision))
+}
+
+fn undo_ai_preview_in_runtime(
+    runtime: &mut MobileRuntime,
+    undo_token: &str,
+    expected_revision: u64,
+) -> Result<OperationResult, MobileError> {
+    let pending = runtime
+        .pending_ai_undo
+        .as_ref()
+        .ok_or_else(|| MobileError::new("AI_UNDO_MISSING", "没有可撤回的 AI 操作"))?;
+    if pending.token != undo_token
+        || pending.source_revision != runtime.revision
+        || expected_revision != runtime.revision
+    {
+        return Err(MobileError::retryable(
+            "REVISION_CONFLICT",
+            "密码库已发生变化，无法撤回之前的 AI 操作",
+        ));
+    }
+
+    let root = runtime.root()?.to_path_buf();
+    let value = pending.document.clone();
+    let conversation_id = pending.conversation_id.clone();
+    let document = VaultDocument::from_value(value.clone())?;
+    let encrypted = runtime.session()?.encrypted_document_bytes(&document)?;
+    storage::persist_vault(&root, &encrypted, true)?;
+    runtime
+        .session
+        .as_mut()
+        .ok_or_else(|| MobileError::new("VAULT_LOCKED", "请先解锁密码库"))?
+        .replace_document(value)?;
+    runtime.revision = runtime.revision.saturating_add(1);
+    runtime.pending_import = None;
+    runtime.pending_ai_request = None;
+    runtime.pending_ai_assistant = None;
+    runtime.pending_ai_preview = None;
+    runtime.pending_ai_undo = None;
+
+    if let Some(conversation_id) = conversation_id {
+        if let Ok(session) = runtime.session() {
+            let _ = ai::history::append_assistant_message(
+                &root,
+                session,
+                &conversation_id,
+                "已撤回上一轮 AI 操作。",
+            );
+        }
+    }
+    Ok(OperationResult {
+        revision: runtime.revision,
+        message: "已撤回上一轮 AI 操作".to_string(),
     })
 }
 
@@ -821,6 +982,7 @@ mod tests {
             pending_ai_request: None,
             pending_ai_assistant: None,
             pending_ai_preview: None,
+            pending_ai_undo: None,
         };
 
         let result = runtime.transaction(3, |value| {
@@ -852,6 +1014,7 @@ mod tests {
             pending_ai_request: None,
             pending_ai_assistant: None,
             pending_ai_preview: None,
+            pending_ai_undo: None,
         };
 
         let result = runtime
@@ -870,5 +1033,59 @@ mod tests {
             document::summary(unlocked.document().as_value()).unwrap().0,
             1
         );
+    }
+
+    #[test]
+    fn ai_undo_restores_exact_document_once_and_rejects_stale_revision() {
+        let directory = tempfile::tempdir().unwrap();
+        let document = VaultDocument::from_value(document::new_document(&now())).unwrap();
+        let session = VaultSession::create("test-password", document).unwrap();
+        storage::persist_vault(directory.path(), &session.encrypted_bytes().unwrap(), false)
+            .unwrap();
+        let original = session.document().as_value().clone();
+        let mut runtime = MobileRuntime {
+            root: Some(directory.path().to_path_buf()),
+            session: Some(session),
+            revision: 1,
+            pending_import: None,
+            pending_ai_request: None,
+            pending_ai_assistant: None,
+            pending_ai_preview: None,
+            pending_ai_undo: None,
+        };
+
+        runtime
+            .transaction(1, |value| {
+                document::save_entry(value, None, &draft("AI 新建"), &now())?;
+                Ok("applied".to_string())
+            })
+            .unwrap();
+        runtime.pending_ai_undo = Some(PendingAiUndo {
+            token: "undo-token".to_string(),
+            source_revision: 2,
+            document: original.clone(),
+            conversation_id: None,
+            applied_count: 1,
+            message: "applied".to_string(),
+        });
+
+        let stale = undo_ai_preview_in_runtime(&mut runtime, "undo-token", 1);
+        assert!(matches!(
+            stale,
+            Err(MobileError::Failure { ref code, .. }) if code == "REVISION_CONFLICT"
+        ));
+        assert!(runtime.pending_ai_undo.is_some());
+
+        let result = undo_ai_preview_in_runtime(&mut runtime, "undo-token", 2).unwrap();
+        assert_eq!(result.revision, 3);
+        assert_eq!(runtime.session().unwrap().document().as_value(), &original);
+        assert!(runtime.pending_ai_undo.is_none());
+        assert_eq!(storage::list_recovery(directory.path()).unwrap().len(), 2);
+
+        let repeated = undo_ai_preview_in_runtime(&mut runtime, "undo-token", 3);
+        assert!(matches!(
+            repeated,
+            Err(MobileError::Failure { ref code, .. }) if code == "AI_UNDO_MISSING"
+        ));
     }
 }

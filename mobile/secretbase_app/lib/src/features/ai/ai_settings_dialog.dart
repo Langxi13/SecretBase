@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:secretbase/src/core/mobile_error_presenter.dart';
 import 'package:secretbase/src/core/widgets/responsive_dialog.dart';
+import 'package:secretbase/src/features/ai/ai_activity_controller.dart';
 import 'package:secretbase/src/features/ai/ai_transport.dart';
 import 'package:secretbase/src/features/ai/ai_providers.dart';
 import 'package:secretbase/src/rust/api/mobile.dart' as rust_api;
@@ -15,20 +16,18 @@ Future<AiStatus?> showAiSettingsDialog({
     context: context,
     dismissible: false,
     maxWidth: 660,
-    builder: (_) => AiSettingsDialog(ref: ref),
+    builder: (_) => const AiSettingsDialog(),
   );
 }
 
-class AiSettingsDialog extends StatefulWidget {
-  const AiSettingsDialog({required this.ref, super.key});
-
-  final WidgetRef ref;
+class AiSettingsDialog extends ConsumerStatefulWidget {
+  const AiSettingsDialog({super.key});
 
   @override
-  State<AiSettingsDialog> createState() => _AiSettingsDialogState();
+  ConsumerState<AiSettingsDialog> createState() => _AiSettingsDialogState();
 }
 
-class _AiSettingsDialogState extends State<AiSettingsDialog> {
+class _AiSettingsDialogState extends ConsumerState<AiSettingsDialog> {
   final _baseUrlController = TextEditingController();
   final _apiKeyController = TextEditingController();
   final _modelController = TextEditingController();
@@ -84,6 +83,11 @@ class _AiSettingsDialogState extends State<AiSettingsDialog> {
   }
 
   Future<void> _fetchModels() async {
+    final activity = ref.read(aiActivityControllerProvider.notifier);
+    if (!activity.start()) {
+      setState(() => _error = '当前 AI 请求完成后才能获取模型列表');
+      return;
+    }
     setState(() {
       _working = true;
       _error = null;
@@ -112,6 +116,8 @@ class _AiSettingsDialogState extends State<AiSettingsDialog> {
           _error = '${_errorMessage(error)}，可以手动填写模型 ID';
         });
       }
+    } finally {
+      activity.finish();
     }
   }
 
@@ -119,6 +125,11 @@ class _AiSettingsDialogState extends State<AiSettingsDialog> {
     final model = (_manualModel ? _modelController.text : _model ?? '').trim();
     if (model.isEmpty) {
       setState(() => _error = '请选择或填写模型 ID');
+      return;
+    }
+    final activity = ref.read(aiActivityControllerProvider.notifier);
+    if (!activity.start()) {
+      setState(() => _error = '当前 AI 请求完成后才能修改服务设置');
       return;
     }
     setState(() {
@@ -146,6 +157,8 @@ class _AiSettingsDialogState extends State<AiSettingsDialog> {
           _error = _errorMessage(error);
         });
       }
+    } finally {
+      activity.finish();
     }
   }
 
@@ -173,6 +186,10 @@ class _AiSettingsDialogState extends State<AiSettingsDialog> {
   }
 
   Future<void> _clear() async {
+    if (ref.read(aiActivityControllerProvider)) {
+      setState(() => _error = '当前 AI 请求完成后才能清除服务设置');
+      return;
+    }
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -197,6 +214,8 @@ class _AiSettingsDialogState extends State<AiSettingsDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final anotherRequestActive = ref.watch(aiActivityControllerProvider);
+    final blocked = _working || anotherRequestActive;
     return DialogFrame(
       title: 'AI 服务设置',
       onClose: _working ? () {} : null,
@@ -211,6 +230,19 @@ class _AiSettingsDialogState extends State<AiSettingsDialog> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
+                        if (anotherRequestActive && !_working) ...[
+                          Container(
+                            padding: const EdgeInsets.all(10),
+                            decoration: BoxDecoration(
+                              color: Theme.of(
+                                context,
+                              ).colorScheme.secondaryContainer,
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: const Text('当前 AI 请求正在后台处理，完成后即可修改服务设置。'),
+                          ),
+                          const SizedBox(height: 14),
+                        ],
                         DropdownButtonFormField<String>(
                           initialValue: _providerId,
                           isExpanded: true,
@@ -231,12 +263,12 @@ class _AiSettingsDialogState extends State<AiSettingsDialog> {
                                 ),
                               )
                               .toList(),
-                          onChanged: _working ? null : _selectProvider,
+                          onChanged: blocked ? null : _selectProvider,
                         ),
                         const SizedBox(height: 14),
                         TextField(
                           controller: _baseUrlController,
-                          enabled: !_working,
+                          enabled: !blocked,
                           keyboardType: TextInputType.url,
                           decoration: InputDecoration(
                             labelText: 'Base URL',
@@ -247,7 +279,7 @@ class _AiSettingsDialogState extends State<AiSettingsDialog> {
                                 ? null
                                 : IconButton(
                                     tooltip: '恢复官方地址',
-                                    onPressed: _working
+                                    onPressed: blocked
                                         ? null
                                         : _resetOfficialUrl,
                                     icon: const Icon(Icons.restart_alt),
@@ -257,7 +289,7 @@ class _AiSettingsDialogState extends State<AiSettingsDialog> {
                         const SizedBox(height: 14),
                         TextField(
                           controller: _apiKeyController,
-                          enabled: !_working,
+                          enabled: !blocked,
                           obscureText: _obscureKey,
                           decoration: InputDecoration(
                             labelText: 'API Key',
@@ -281,13 +313,13 @@ class _AiSettingsDialogState extends State<AiSettingsDialog> {
                         ),
                         const SizedBox(height: 14),
                         OutlinedButton.icon(
-                          onPressed: _working ? null : _fetchModels,
+                          onPressed: blocked ? null : _fetchModels,
                           icon: const Icon(Icons.sync, size: 18),
                           label: const Text('获取模型列表'),
                         ),
                         const SizedBox(height: 8),
                         TextButton.icon(
-                          onPressed: _working
+                          onPressed: blocked
                               ? null
                               : () => setState(() {
                                   _manualModel = true;
@@ -300,7 +332,7 @@ class _AiSettingsDialogState extends State<AiSettingsDialog> {
                         if (_manualModel)
                           TextField(
                             controller: _modelController,
-                            enabled: !_working,
+                            enabled: !blocked,
                             decoration: const InputDecoration(
                               labelText: '模型 ID',
                               prefixIcon: Icon(Icons.memory_outlined),
@@ -329,7 +361,7 @@ class _AiSettingsDialogState extends State<AiSettingsDialog> {
                                   ),
                                 )
                                 .toList(),
-                            onChanged: _working
+                            onChanged: blocked
                                 ? null
                                 : (value) => setState(() => _model = value),
                           ),
@@ -356,7 +388,7 @@ class _AiSettingsDialogState extends State<AiSettingsDialog> {
                       children: [
                         if (_status?.configured == true)
                           TextButton.icon(
-                            onPressed: _working ? null : _clear,
+                            onPressed: blocked ? null : _clear,
                             icon: const Icon(Icons.delete_outline, size: 18),
                             label: const Text('清除设置'),
                           ),
@@ -369,7 +401,7 @@ class _AiSettingsDialogState extends State<AiSettingsDialog> {
                         ),
                         const SizedBox(width: 8),
                         FilledButton.icon(
-                          onPressed: _working ? null : _save,
+                          onPressed: blocked ? null : _save,
                           icon: const Icon(Icons.verified_outlined, size: 18),
                           label: Text(_working ? '验证中' : '验证并保存'),
                         ),

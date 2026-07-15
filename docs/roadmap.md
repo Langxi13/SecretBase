@@ -27,7 +27,7 @@ SecretBase is intentionally scoped as a single-user encrypted vault. The priorit
 - Windows V3.2 per-user installer, desktop diagnostics, optional tray, safe uninstall flow, native zoom feedback, and Windows 10/11 hardware acceptance.
 - macOS V3.3 arm64 DMG/ZIP packaging, WKWebView lifecycle, native zoom controls, CI, and Apple Silicon hardware acceptance.
 - Normative Vault V1 format documentation, public Python-compatible golden vectors, and an isolated Rust reference core.
-- Android 10+ Flutter/Rust client with private storage, lifecycle locking, entries, tags, groups, trash, encrypted transfer, a conversational AI manager, and focused review-before-apply AI tools.
+- Android 10+ Flutter/Rust client with private storage, lifecycle locking, Keystore-backed biometric unlock, entries, tags, groups, trash, encrypted transfer, a conversational AI manager, and revision-bound AI undo.
 
 ## Later, If Needed
 
@@ -36,7 +36,7 @@ SecretBase is intentionally scoped as a single-user encrypted vault. The priorit
 - More compact and modular frontend organization.
 - Additional production health check automation.
 - macOS signing and notarization when an Apple Developer account is available.
-- Tablet-specific layouts, biometrics, and store distribution only after the signed Android MVP is stable.
+- Tablet-specific two-pane layouts and store distribution only after the signed Android MVP is stable.
 
 ## Out of Scope
 

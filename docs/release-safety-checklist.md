@@ -44,6 +44,9 @@ SecretBase 已进入真实生产使用阶段。后续任何迭代默认不得破
 - [x] Android Flutter 分析、Widget 测试、移动端 Rust 测试和 Clippy 是否全部通过。
 - [x] Android 三 ABI Release APK 是否包含对应的 `libsecretbase_mobile.so`，并通过 API 29/36 模拟器启动验证。
 - [x] Android Manifest 是否保持 `allowBackup=false`、`usesCleartextTraffic=false`、API 29 最低版本和 `FLAG_SECURE` 运行时保护。
+- [ ] Android 指纹解锁是否只保存 Keystore 加密的设备解锁密钥、不保存主密码，并在改密、导入、恢复和指纹变化后失效。
+- [ ] Android AI 撤回是否受一次性令牌和 revision 约束，且任何后续 Vault 写入都会使旧撤回失效。
+- [ ] Android 根页面双击返回退出是否不会截获弹窗、子页面和来源筛选的正常返回。
 - [x] Android APK 是否通过 `scripts/verify_android_apk.sh`，且不含真实工作区、用户目录、私人域名、Vault 或签名密钥。
 - [ ] 正式 Android APK 是否使用持久发布密钥；一次性 CI 密钥产物是否明确带 `-ci` 且未上传正式 Release。
 - [ ] Android 真机是否完成锁屏、后台超时、条目/标签/密码组、AI 确认、跨桌面备份和卸载删除私有数据验收。

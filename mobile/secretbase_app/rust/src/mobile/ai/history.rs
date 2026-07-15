@@ -221,6 +221,34 @@ pub fn append_turn(
     save(root, session, &mut history)
 }
 
+pub fn append_assistant_message(
+    root: &Path,
+    session: &VaultSession,
+    conversation_id: &str,
+    message: &str,
+) -> Result<(), MobileError> {
+    let mut history = load(root, session)?;
+    let conversation = history
+        .conversations
+        .iter_mut()
+        .find(|conversation| conversation.id == conversation_id)
+        .ok_or_else(|| MobileError::new("AI_CONVERSATION_NOT_FOUND", "AI 对话不存在"))?;
+    let content = message.trim();
+    if content.is_empty() {
+        return Ok(());
+    }
+    let timestamp = now();
+    conversation.messages.push(MessageRecord {
+        id: Uuid::new_v4().to_string(),
+        role: "assistant".to_string(),
+        content: content.chars().take(12_000).collect(),
+        mode: "assistant".to_string(),
+        created_at: timestamp.clone(),
+    });
+    conversation.updated_at = timestamp;
+    save(root, session, &mut history)
+}
+
 pub fn context(
     root: &Path,
     session: &VaultSession,

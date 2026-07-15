@@ -138,6 +138,7 @@ pub(crate) fn normalize_response(
         Some(PendingAiPreview {
             preview: public,
             data: PreviewData::Assistant(actions),
+            conversation_id: Some(pending.conversation_id.clone()),
         })
     };
     Ok(NormalizedAssistantResponse {
