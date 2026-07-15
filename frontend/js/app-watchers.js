@@ -38,6 +38,12 @@
             state.groupPickerSelectedIds.value = state.groupPickerSelectedIds.value.filter(id => visibleIds.has(id));
         });
 
+        watch(state.groups, () => {
+            if (state.groupCurrentPage.value > views.groupTotalPages.value) {
+                state.groupCurrentPage.value = views.groupTotalPages.value;
+            }
+        });
+
         watch(views.availableGroupPickerEntries, () => {
             if (state.groupPickerPage.value > views.groupPickerTotalPages.value) {
                 state.groupPickerPage.value = views.groupPickerTotalPages.value;

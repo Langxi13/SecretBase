@@ -319,6 +319,6 @@
                         <strong>当前列表状态</strong>
                         <span v-for="item in activeListStateItems" :key="item" class="state-pill">{{ item }}</span>
                     </div>
-                    <button class="btn-small" @click="clearListState">清除定位/筛选</button>
+                    <button class="btn-small" @click="clearListState">{{ filter === 'group' && activeGroupName ? '返回密码组' : '清除定位/筛选' }}</button>
                 </div>
             </div>

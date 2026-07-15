@@ -62,6 +62,38 @@ class MobilePageHeader extends StatelessWidget {
   }
 }
 
+class MobileManageButton extends StatelessWidget {
+  const MobileManageButton({
+    required this.onPressed,
+    this.label = '管理',
+    this.tooltip = '管理操作',
+    super.key,
+  });
+
+  final VoidCallback onPressed;
+  final String label;
+  final String tooltip;
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: tooltip,
+      child: OutlinedButton.icon(
+        onPressed: onPressed,
+        icon: const Icon(Icons.more_horiz, size: 17),
+        label: Text(label),
+        style: OutlinedButton.styleFrom(
+          minimumSize: const Size(72, 40),
+          padding: const EdgeInsets.symmetric(horizontal: 9),
+          textStyle: Theme.of(
+            context,
+          ).textTheme.labelMedium?.copyWith(fontWeight: FontWeight.w700),
+        ),
+      ),
+    );
+  }
+}
+
 class MobileAction {
   const MobileAction({
     required this.label,
@@ -86,15 +118,18 @@ Future<void> showMobileActionSheet({
   final selected = await showModalBottomSheet<int>(
     context: context,
     useSafeArea: true,
+    isScrollControlled: true,
     showDragHandle: true,
     constraints: const BoxConstraints(maxWidth: 560),
     builder: (sheetContext) {
       final scheme = Theme.of(sheetContext).colorScheme;
-      return Padding(
-        padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
+      return ConstrainedBox(
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.sizeOf(sheetContext).height * 0.82,
+        ),
+        child: ListView(
+          shrinkWrap: true,
+          padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
           children: [
             Padding(
               padding: const EdgeInsets.fromLTRB(8, 2, 8, 10),

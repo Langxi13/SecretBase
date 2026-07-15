@@ -64,7 +64,10 @@ class _AppShellState extends ConsumerState<AppShell> {
     final body = IndexedStack(
       index: _index,
       children: [
-        EntriesScreen(preset: _entryPreset),
+        EntriesScreen(
+          preset: _entryPreset,
+          onExitPreset: _returnFromEntryPreset,
+        ),
         GroupsScreen(onOpenGroup: _openGroup),
         TagsScreen(onOpenTag: _openTag),
         const AiManagerScreen(),
@@ -142,6 +145,7 @@ class _AppShellState extends ConsumerState<AppShell> {
       _filterGeneration += 1;
       _entryPreset = EntryFilterPreset(
         group: name,
+        origin: EntryFilterOrigin.groups,
         generation: _filterGeneration,
       );
       _index = 0;
@@ -153,9 +157,23 @@ class _AppShellState extends ConsumerState<AppShell> {
       _filterGeneration += 1;
       _entryPreset = EntryFilterPreset(
         tag: name,
+        origin: EntryFilterOrigin.tags,
         generation: _filterGeneration,
       );
       _index = 0;
+    });
+  }
+
+  void _returnFromEntryPreset() {
+    final origin = _entryPreset.origin;
+    setState(() {
+      _filterGeneration += 1;
+      _entryPreset = EntryFilterPreset(generation: _filterGeneration);
+      _index = switch (origin) {
+        EntryFilterOrigin.groups => 1,
+        EntryFilterOrigin.tags => 2,
+        null => 0,
+      };
     });
   }
 }

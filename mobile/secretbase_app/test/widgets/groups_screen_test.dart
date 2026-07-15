@@ -10,7 +10,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
   testWidgets('密码组默认每页五条并可切换到下一页', (tester) async {
-    tester.view.physicalSize = const Size(320, 760);
+    tester.view.physicalSize = const Size(320, 560);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
@@ -43,11 +43,13 @@ void main() {
 
     expect(find.text('密码组 1'), findsOneWidget);
     expect(find.text('密码组 6'), findsNothing);
-    await tester.tap(find.byTooltip('密码组操作').first);
+    expect(find.text('编辑/删除'), findsWidgets);
+    await tester.tap(find.byTooltip('管理密码组').first);
     await tester.pumpAndSettle();
     expect(find.text('查看组内条目'), findsOneWidget);
     expect(find.text('编辑密码组'), findsOneWidget);
     expect(find.text('删除密码组'), findsOneWidget);
+    expect(find.text('移除组关系，不会删除其中的条目'), findsOneWidget);
     Navigator.of(tester.element(find.text('查看组内条目'))).pop();
     await tester.pumpAndSettle();
     await tester.scrollUntilVisible(find.byTooltip('下一页'), 300);

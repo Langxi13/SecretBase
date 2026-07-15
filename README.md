@@ -238,7 +238,7 @@ cargo clippy --locked --all-targets --all-features -- -D warnings
 cargo test --locked --release --all-features
 ```
 
-V5.0 Android 客户端的核心实现已经完成，当前尚未正式发布。它使用 Flutter + Rust，完全脱离浏览器和 FastAPI，覆盖创建与解锁、条目、标签、密码组、回收站、加密迁移、生命周期锁定和五项需用户确认的 AI 辅助能力。移动界面使用适配手机与平板的 Material 3 导航、紧凑卡片、底部操作面板和分组式 AI 计划审核；Vault 与恢复副本保存在 Android 应用私有目录，卸载应用会删除该目录，因此卸载前必须导出加密备份。
+V5.0 Android 客户端的核心实现已经完成，当前尚未正式发布。它使用 Flutter + Rust，完全脱离浏览器和 FastAPI，覆盖创建与解锁、条目、标签、密码组、回收站、加密迁移、生命周期锁定和五项需用户确认的 AI 辅助能力。移动界面使用适配手机与平板的 Material 3 导航、紧凑卡片、底部操作面板、来源感知返回和分组式 AI 计划审核；Vault 与恢复副本保存在 Android 应用私有目录，卸载应用会删除该目录，因此卸载前必须导出加密备份。
 
 低内存 Linux 开发机只构建 arm64：
 

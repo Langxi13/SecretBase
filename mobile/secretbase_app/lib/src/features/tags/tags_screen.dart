@@ -452,10 +452,10 @@ class _TagRow extends StatelessWidget {
                 ),
               ),
               if (!selectionMode)
-                IconButton(
-                  tooltip: '标签操作',
+                MobileManageButton(
+                  label: '编辑/删除',
+                  tooltip: '管理标签',
                   onPressed: () => _showActions(context),
-                  icon: const Icon(Icons.more_vert, size: 20),
                 ),
             ],
           ),

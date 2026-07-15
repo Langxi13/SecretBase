@@ -10,6 +10,7 @@
             api,
             store,
             showToast,
+            showConfirmDialog,
             groups,
             activeGroupName,
             filter,
@@ -140,6 +141,25 @@
             }
         }
 
+        function confirmDeleteGroup(groupOrName) {
+            const name = String(
+                typeof groupOrName === 'string' ? groupOrName : groupOrName?.name || ''
+            ).trim();
+            if (!name) return;
+            const group = groups.value.find(item => item.name === name);
+            const count = Math.max(0, Number(group?.count || 0));
+            const relationNotice = count > 0
+                ? `该密码组当前关联 ${count} 个条目。删除后只会解除这些条目的密码组归属，不会删除条目。`
+                : '该操作只会删除密码组，不会删除任何条目。';
+            showConfirmDialog('删除密码组', `确认删除密码组「${name}」？\n\n${relationNotice}`, async () => {
+                const result = await store.deleteGroup(name);
+                if (!result) return;
+                if (filter.value === 'group' && activeGroupName.value === name) {
+                    await showGroupMode();
+                }
+            });
+        }
+
         async function filterByGroup(groupName) {
             const normalized = String(groupName || '').trim();
             if (!normalized) return;
@@ -241,6 +261,7 @@
             moveGroupOrder,
             resetGroupOrder,
             saveGroup,
+            confirmDeleteGroup,
             filterByGroup,
             openCreateEntryForActiveGroup,
             openGroupEntryPicker,

@@ -40,8 +40,9 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.byTooltip('标签操作'), findsOneWidget);
-    await tester.tap(find.byTooltip('标签操作'));
+    expect(find.text('编辑/删除'), findsOneWidget);
+    expect(find.byTooltip('管理标签'), findsOneWidget);
+    await tester.tap(find.byTooltip('管理标签'));
     await tester.pumpAndSettle();
     expect(find.text('查看标签条目'), findsOneWidget);
     expect(find.text('编辑标签'), findsOneWidget);

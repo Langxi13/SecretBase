@@ -22,7 +22,8 @@
             clearSelection,
             loadEntries,
             revealedFields,
-            isSidebarCollapsed
+            isSidebarCollapsed,
+            returnToGroupMode
         } = options;
 
         const debounceSearch = debounce(async () => {
@@ -129,6 +130,14 @@
         }
 
         async function clearListState() {
+            if (
+                filter.value === 'group'
+                && activeGroupName.value
+                && typeof returnToGroupMode === 'function'
+            ) {
+                await returnToGroupMode();
+                return;
+            }
             listContextNotice.value = '';
             activeTagName.value = '';
             activeGroupName.value = '';

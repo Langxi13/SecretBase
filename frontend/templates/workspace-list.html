@@ -43,6 +43,7 @@
                                 <button type="button" class="btn-small group-card-action-btn group-card-move-down" @click.stop="moveGroupOrder(group.name, 1)">下移</button>
                             </span>
                             <button type="button" class="btn-small group-card-edit group-card-action-btn group-card-edit-action" @click.stop="openEditGroupModal(group)">编辑</button>
+                            <button type="button" class="btn-small group-card-delete group-card-action-btn group-card-delete-action" @click.stop="confirmDeleteGroup(group)">删除</button>
                         </div>
                     </div>
 
@@ -118,7 +119,9 @@
                         <p>{{ (activeGroup && activeGroup.description) || '当前密码组' }} · {{ totalEntries }} 个条目</p>
                     </div>
                     <div class="active-group-actions">
+                        <button class="btn-secondary" @click="showGroupMode">返回密码组</button>
                         <button class="btn-secondary" @click="openGroupEntryPicker">选择已有条目</button>
+                        <button class="btn-danger" @click="confirmDeleteGroup(activeGroup)">删除密码组</button>
                     </div>
                 </section>
 

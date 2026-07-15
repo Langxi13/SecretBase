@@ -289,7 +289,8 @@
             clearSelection: entryActions.clearSelection,
             loadEntries: data.loadEntries,
             revealedFields: state.revealedFields,
-            isSidebarCollapsed: state.isSidebarCollapsed
+            isSidebarCollapsed: state.isSidebarCollapsed,
+            returnToGroupMode: (...args) => listActions.returnToGroupMode(...args)
         });
         Object.assign(listActions, {
             applyAdvancedFilters: listControllerActions.applyAdvancedFilters,
@@ -334,6 +335,7 @@
             api,
             store,
             showToast,
+            showConfirmDialog: ui.showConfirmDialog,
             groups: state.groups,
             activeGroupName: state.activeGroupName,
             filter: state.filter,
@@ -366,6 +368,9 @@
             groupPickerTotalPages,
             paginatedGroupPickerEntries,
             allGroupPickerEntriesSelected
+        });
+        Object.assign(listActions, {
+            returnToGroupMode: groupActions.showGroupMode
         });
 
         const selectedImportPreviewCount = computed(() => state.importPreviewSelectedIds.value.length);

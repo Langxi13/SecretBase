@@ -14,18 +14,31 @@ import 'package:secretbase/src/features/entries/entry_editor_dialog.dart';
 import 'package:secretbase/src/rust/mobile/models.dart';
 import 'package:secretbase/src/state/preferences_controller.dart';
 
+enum EntryFilterOrigin { groups, tags }
+
 class EntryFilterPreset {
-  const EntryFilterPreset({this.tag, this.group, this.generation = 0});
+  const EntryFilterPreset({
+    this.tag,
+    this.group,
+    this.origin,
+    this.generation = 0,
+  });
 
   final String? tag;
   final String? group;
+  final EntryFilterOrigin? origin;
   final int generation;
 }
 
 class EntriesScreen extends ConsumerStatefulWidget {
-  const EntriesScreen({required this.preset, super.key});
+  const EntriesScreen({
+    required this.preset,
+    this.onExitPreset,
+    super.key,
+  });
 
   final EntryFilterPreset preset;
+  final VoidCallback? onExitPreset;
 
   @override
   ConsumerState<EntriesScreen> createState() => _EntriesScreenState();
@@ -65,8 +78,12 @@ class _EntriesScreenState extends ConsumerState<EntriesScreen> {
   }
 
   void _applyPreset(EntryFilterPreset preset) {
+    _searchDebounce?.cancel();
+    _searchController.clear();
+    _search = '';
     _tag = preset.tag;
     _group = preset.group;
+    _starred = false;
     _page = 1;
   }
 
@@ -92,6 +109,23 @@ class _EntriesScreenState extends ConsumerState<EntriesScreen> {
         ref.watch(taxonomyProvider('groups')).asData?.value ??
         const <TaxonomyRecord>[];
     final compactFab = MediaQuery.sizeOf(context).width < 600;
+    final origin = widget.preset.origin;
+    final pageTitle = origin == EntryFilterOrigin.groups
+        ? (_group ?? '密码组条目')
+        : origin == EntryFilterOrigin.tags
+        ? (_tag ?? '标签条目')
+        : '全部条目';
+    final total = entries.asData?.value.total;
+    final subtitlePrefix = origin == EntryFilterOrigin.groups
+        ? '密码组'
+        : origin == EntryFilterOrigin.tags
+        ? '标签'
+        : null;
+    final pageSubtitle = total == null
+        ? '正在统计条目'
+        : subtitlePrefix == null
+        ? '共 $total 条'
+        : '$subtitlePrefix · 共 $total 条';
 
     return Scaffold(
       backgroundColor: Colors.transparent,
@@ -110,10 +144,15 @@ class _EntriesScreenState extends ConsumerState<EntriesScreen> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           MobilePageHeader(
-            title: '全部条目',
-            subtitle: entries.asData?.value.total == null
-                ? '正在统计条目'
-                : '共 ${entries.asData!.value.total} 条',
+            title: pageTitle,
+            subtitle: pageSubtitle,
+            leading: _canReturnToOrigin
+                ? IconButton(
+                    tooltip: _returnLabel,
+                    onPressed: _exitPreset,
+                    icon: const Icon(Icons.arrow_back),
+                  )
+                : null,
           ),
           _FilterBar(
             searchController: _searchController,
@@ -145,6 +184,10 @@ class _EntriesScreenState extends ConsumerState<EntriesScreen> {
               resetPagedScroll(_scrollController);
             },
             onClear: _hasFilters ? _clearFilters : null,
+            clearTooltip: _canReturnToOrigin ? _returnLabel : '清除筛选',
+            clearIcon: _canReturnToOrigin
+                ? Icons.arrow_back
+                : Icons.filter_alt_off,
           ),
           Expanded(
             child: entries.when(
@@ -186,8 +229,14 @@ class _EntriesScreenState extends ConsumerState<EntriesScreen> {
               action: _hasFilters
                   ? OutlinedButton.icon(
                       onPressed: _clearFilters,
-                      icon: const Icon(Icons.filter_alt_off),
-                      label: const Text('清除筛选'),
+                      icon: Icon(
+                        _canReturnToOrigin
+                            ? Icons.arrow_back
+                            : Icons.filter_alt_off,
+                      ),
+                      label: Text(
+                        _canReturnToOrigin ? _returnLabel : '清除筛选',
+                      ),
                     )
                   : FilledButton.icon(
                       onPressed: _createEntry,
@@ -244,6 +293,10 @@ class _EntriesScreenState extends ConsumerState<EntriesScreen> {
   }
 
   void _clearFilters() {
+    if (_canReturnToOrigin) {
+      _exitPreset();
+      return;
+    }
     _searchDebounce?.cancel();
     _searchController.clear();
     setState(() {
@@ -254,6 +307,19 @@ class _EntriesScreenState extends ConsumerState<EntriesScreen> {
       _page = 1;
     });
     resetPagedScroll(_scrollController);
+  }
+
+  bool get _canReturnToOrigin =>
+      widget.preset.origin != null && widget.onExitPreset != null;
+
+  String get _returnLabel => switch (widget.preset.origin) {
+    EntryFilterOrigin.groups => '返回密码组',
+    EntryFilterOrigin.tags => '返回标签',
+    null => '返回',
+  };
+
+  void _exitPreset() {
+    widget.onExitPreset?.call();
   }
 
   Future<void> _createEntry() async {
@@ -299,6 +365,8 @@ class _FilterBar extends StatelessWidget {
     required this.onTagChanged,
     required this.onGroupChanged,
     required this.onStarredChanged,
+    this.clearTooltip = '清除筛选',
+    this.clearIcon = Icons.filter_alt_off,
     this.onClear,
   });
 
@@ -312,6 +380,8 @@ class _FilterBar extends StatelessWidget {
   final ValueChanged<String?> onTagChanged;
   final ValueChanged<String?> onGroupChanged;
   final ValueChanged<bool> onStarredChanged;
+  final String clearTooltip;
+  final IconData clearIcon;
   final VoidCallback? onClear;
 
   @override
@@ -391,9 +461,9 @@ class _FilterBar extends StatelessWidget {
                       if (onClear != null) ...[
                         const SizedBox(width: 4),
                         IconButton.outlined(
-                          tooltip: '清除筛选',
+                          tooltip: clearTooltip,
                           onPressed: onClear,
-                          icon: const Icon(Icons.filter_alt_off, size: 18),
+                          icon: Icon(clearIcon, size: 18),
                           style: IconButton.styleFrom(
                             fixedSize: const Size(38, 38),
                             minimumSize: const Size(38, 38),

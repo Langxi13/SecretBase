@@ -30,28 +30,28 @@ function assertLessThan(actual, expected, message) {
 }
 
 [
-    'css/base.css?v=20260714-ai-v11',
-    'css/workspace.css?v=20260714-ai-v11',
-    'css/workspace-responsive.css?v=20260714-ai-v11',
-    'css/workspace-polish.css?v=20260714-ai-v11',
-    'css/modals.css?v=20260714-ai-v11',
-    'css/form-controls.css?v=20260714-ai-v11',
-    'css/ai-components.css?v=20260714-ai-v11',
-    'css/ai-workspace.css?v=20260714-ai-v11',
-    'css/ai-scope-picker.css?v=20260714-ai-v11',
-    'css/ai-send-review.css?v=20260714-ai-v11',
-    'css/management-components.css?v=20260714-ai-v11',
-    'css/ai-diagnostics.css?v=20260714-ai-v11',
-    'css/component-responsive.css?v=20260714-ai-v11',
-    'css/visual-polish.css?v=20260714-ai-v11',
-    'css/component-polish.css?v=20260714-ai-v11'
+    'css/base.css?v=20260715-nav-v1',
+    'css/workspace.css?v=20260715-nav-v1',
+    'css/workspace-responsive.css?v=20260715-nav-v1',
+    'css/workspace-polish.css?v=20260715-nav-v1',
+    'css/modals.css?v=20260715-nav-v1',
+    'css/form-controls.css?v=20260715-nav-v1',
+    'css/ai-components.css?v=20260715-nav-v1',
+    'css/ai-workspace.css?v=20260715-nav-v1',
+    'css/ai-scope-picker.css?v=20260715-nav-v1',
+    'css/ai-send-review.css?v=20260715-nav-v1',
+    'css/management-components.css?v=20260715-nav-v1',
+    'css/ai-diagnostics.css?v=20260715-nav-v1',
+    'css/component-responsive.css?v=20260715-nav-v1',
+    'css/visual-polish.css?v=20260715-nav-v1',
+    'css/component-polish.css?v=20260715-nav-v1'
 ].forEach(asset => assertIncludes(indexHtml, asset, `入口页必须加载 ${asset}`));
 assertNotIncludes(indexHtml, 'css/style.css', '入口页不应继续加载巨型 style.css');
 assertNotIncludes(indexHtml, 'css/components.css', '入口页不应继续加载巨型 components.css');
-assertIncludes(indexHtml, 'js/pagination.js?v=20260714-ai-v11', '分页偏好工具必须拆到独立 JS 模块');
-assertIncludes(indexHtml, 'js/toast.js?v=20260714-ai-v11', 'Toast 工具必须拆到独立 JS 模块');
-assertIncludes(aiWorkspaceCss, "@import url('./ai-entry-inspector.css?v=20260714-ai-v11')", 'AI 工作区必须加载独立建议详情样式');
-assertIncludes(aiWorkspaceCss, "@import url('./ai-plan-review.css?v=20260714-ai-v11')", 'AI 工作区必须加载独立复合计划审核样式');
+assertIncludes(indexHtml, 'js/pagination.js?v=20260715-nav-v1', '分页偏好工具必须拆到独立 JS 模块');
+assertIncludes(indexHtml, 'js/toast.js?v=20260715-nav-v1', 'Toast 工具必须拆到独立 JS 模块');
+assertIncludes(aiWorkspaceCss, "@import url('./ai-entry-inspector.css?v=20260715-nav-v1')", 'AI 工作区必须加载独立建议详情样式');
+assertIncludes(aiWorkspaceCss, "@import url('./ai-plan-review.css?v=20260715-nav-v1')", 'AI 工作区必须加载独立复合计划审核样式');
 
 assertIncludes(appJs, 'window.SecretBasePagination', 'app.js 必须复用分页偏好工具模块');
 assertNotIncludes(appJs, 'function normalizeUniversalPageSize', 'app.js 不应继续内联通用分页归一化函数');

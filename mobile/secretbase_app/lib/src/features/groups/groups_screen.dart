@@ -421,10 +421,10 @@ class _GroupCard extends StatelessWidget {
                       ],
                     ),
                   ),
-                  IconButton(
-                    tooltip: '密码组操作',
+                  MobileManageButton(
+                    label: '编辑/删除',
+                    tooltip: '管理密码组',
                     onPressed: () => _showActions(context),
-                    icon: const Icon(Icons.more_vert, size: 20),
                   ),
                 ],
               ),
@@ -469,7 +469,7 @@ class _GroupCard extends StatelessWidget {
         ),
         MobileAction(
           label: '删除密码组',
-          subtitle: '仅空密码组可以删除',
+          subtitle: '移除组关系，不会删除其中的条目',
           icon: Icons.delete_outline,
           color: scheme.error,
           onPressed: onDelete,

@@ -138,4 +138,134 @@ void main() {
     expect(centers.every((center) => (center.dy - firstY).abs() < 2), isTrue);
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets('从密码组进入条目后返回来源页而不是清成全部条目', (tester) async {
+    tester.view.physicalSize = const Size(320, 700);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    SharedPreferences.setMockInitialValues({});
+    final preferences = await SharedPreferences.getInstance();
+    const groupName = '工作账号';
+    const query = EntryQuery(
+      page: 1,
+      pageSize: 5,
+      search: '',
+      group: groupName,
+      deleted: false,
+    );
+    final page = EntryPage(
+      items: const [],
+      page: 1,
+      pageSize: 5,
+      total: 0,
+      totalPages: 1,
+      revision: BigInt.zero,
+    );
+    const groups = [
+      TaxonomyRecord(
+        name: groupName,
+        description: '',
+        color: '#315DA8',
+        count: 0,
+      ),
+    ];
+    var returned = false;
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          sharedPreferencesProvider.overrideWithValue(preferences),
+          entryPageProvider(query).overrideWith((ref) async => page),
+          taxonomyProvider('tags').overrideWith((ref) async => const []),
+          taxonomyProvider('groups').overrideWith((ref) async => groups),
+        ],
+        child: MaterialApp(
+          theme: AppTheme.light(),
+          home: EntriesScreen(
+            preset: const EntryFilterPreset(
+              group: groupName,
+              origin: EntryFilterOrigin.groups,
+            ),
+            onExitPreset: () => returned = true,
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text(groupName), findsWidgets);
+    expect(find.text('密码组 · 共 0 条'), findsOneWidget);
+    expect(find.byTooltip('返回密码组'), findsNWidgets(2));
+    await tester.tap(find.byTooltip('返回密码组').last);
+    await tester.pump();
+
+    expect(returned, isTrue);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('从标签进入条目后返回标签页', (tester) async {
+    tester.view.physicalSize = const Size(320, 700);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    SharedPreferences.setMockInitialValues({});
+    final preferences = await SharedPreferences.getInstance();
+    const tagName = '重要';
+    const query = EntryQuery(
+      page: 1,
+      pageSize: 5,
+      search: '',
+      tag: tagName,
+      deleted: false,
+    );
+    final page = EntryPage(
+      items: const [],
+      page: 1,
+      pageSize: 5,
+      total: 0,
+      totalPages: 1,
+      revision: BigInt.zero,
+    );
+    const tags = [
+      TaxonomyRecord(
+        name: tagName,
+        description: '',
+        color: '#006B68',
+        count: 0,
+      ),
+    ];
+    var returned = false;
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          sharedPreferencesProvider.overrideWithValue(preferences),
+          entryPageProvider(query).overrideWith((ref) async => page),
+          taxonomyProvider('tags').overrideWith((ref) async => tags),
+          taxonomyProvider('groups').overrideWith((ref) async => const []),
+        ],
+        child: MaterialApp(
+          theme: AppTheme.light(),
+          home: EntriesScreen(
+            preset: const EntryFilterPreset(
+              tag: tagName,
+              origin: EntryFilterOrigin.tags,
+            ),
+            onExitPreset: () => returned = true,
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('标签 · 共 0 条'), findsOneWidget);
+    await tester.tap(find.byTooltip('返回标签').last);
+    await tester.pump();
+
+    expect(returned, isTrue);
+    expect(tester.takeException(), isNull);
+  });
 }
