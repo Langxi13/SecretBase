@@ -40,7 +40,7 @@ tests/fixtures/vault-v1/   Python、Rust、Flutter 共用黄金向量
 - AI 配置和对话历史分别使用用途隔离密钥加密，默认只允许 HTTPS；敏感新建原文不写入历史或后续普通上下文。
 - Storage Access Framework 导入导出、敏感剪贴板标记与自动清理、明暗主题和中文响应式界面。
 
-本机已通过 Flutter 分析、26 项 Dart/Widget 测试、Vault Core 8 项测试和移动端 Rust 23 项测试。Android CI 已通过上一候选版的三 ABI Release APK、隐私扫描及 API 29/36 模拟器；新增生物识别候选版仍需重新通过相同 CI 和真机指纹验收。本机仅构建 arm64，避免在低内存服务器上并行编译。
+本机已通过 Flutter 分析、26 项 Dart/Widget 测试、Vault Core 8 项测试和移动端 Rust 23 项测试。当前生物识别候选版已于 2026-07-16 通过 Android CI 的三 ABI Release APK、隐私扫描及 API 29/36 模拟器；仍需真机指纹验收。本机仅构建 arm64，避免在低内存服务器上并行编译。
 
 ## 3. 分阶段实施
 
@@ -95,4 +95,4 @@ tests/fixtures/vault-v1/   Python、Rust、Flutter 共用黄金向量
 
 ## 5. 后续顺序
 
-下一步重新运行三 ABI CI 和 API 29/36 模拟器，并依次完成 Android 10+ arm64 指纹真机、桌面与手机加密备份双向迁移、安装升级、卸载数据语义和持久签名验收。上述门禁全部通过后再创建 `v5.0.0` 标签；Android MVP 稳定后才启动 iOS 适配。iOS 应复用同一 Flutter 页面、设备解锁抽象和 Rust API，只新增 Keychain、Touch ID/Face ID、文件选择和生命周期实现，不分叉 Vault 数据模型或业务规则。
+下一步依次完成 Android 10+ arm64 指纹真机、桌面与手机加密备份双向迁移、安装升级、卸载数据语义和持久签名验收。上述门禁全部通过后再创建 `v5.0.0` 标签；Android MVP 稳定后才启动 iOS 适配。iOS 应复用同一 Flutter 页面、设备解锁抽象和 Rust API，只新增 Keychain、Touch ID/Face ID、文件选择和生命周期实现，不分叉 Vault 数据模型或业务规则。

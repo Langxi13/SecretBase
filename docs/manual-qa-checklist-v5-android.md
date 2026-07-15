@@ -2,7 +2,7 @@
 
 本清单用于 Android 10+ arm64 真机和正式签名候选 APK。只使用空 Vault、公开测试向量或专用测试数据，不导入生产 Vault。
 
-状态：2026-07-15 已通过 GitHub 三 ABI 构建、APK 隐私扫描和 API 29/36 模拟器；移动 UI 已完成第二轮优化，下列真机、迁移和持久签名项目仍待验收。
+状态：2026-07-16 当前生物识别候选版已通过 GitHub 三 ABI 构建、APK 隐私扫描和 API 29/36 模拟器；移动 UI 已完成第二轮优化，下列真机、迁移和持久签名项目仍待验收。
 
 ## 安装与启动
 
@@ -81,7 +81,7 @@
 - [x] GitHub Android workflow 的 Flutter、Rust、Clippy 和三 ABI Release 构建全部通过。
 - [x] API 29/36 模拟器启动截图与日志无崩溃。
 - [x] 本机 `flutter analyze`、26 项 Dart/Widget 测试、Vault Core 8 项测试和 23 项移动端 Rust 测试通过。
-- [ ] 当前生物识别候选版重新通过三 ABI 构建及 API 29/36 模拟器启动验证。
+- [x] 当前生物识别候选版重新通过三 ABI 构建及 API 29/36 模拟器启动验证。
 - [x] `scripts/verify_android_apk.sh` 通过，APK 不含真实构建机路径或私人域名。
 - [ ] 正式 APK 使用持久发布密钥签名，签名证书指纹已离线记录并备份。
 - [ ] `SHA256SUMS.txt` 与实际 APK 一致，GitHub Release 不包含一次性 CI 签名产物。
