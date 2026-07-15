@@ -31,11 +31,7 @@ class EntryFilterPreset {
 }
 
 class EntriesScreen extends ConsumerStatefulWidget {
-  const EntriesScreen({
-    required this.preset,
-    this.onExitPreset,
-    super.key,
-  });
+  const EntriesScreen({required this.preset, this.onExitPreset, super.key});
 
   final EntryFilterPreset preset;
   final VoidCallback? onExitPreset;
@@ -234,9 +230,7 @@ class _EntriesScreenState extends ConsumerState<EntriesScreen> {
                             ? Icons.arrow_back
                             : Icons.filter_alt_off,
                       ),
-                      label: Text(
-                        _canReturnToOrigin ? _returnLabel : '清除筛选',
-                      ),
+                      label: Text(_canReturnToOrigin ? _returnLabel : '清除筛选'),
                     )
                   : FilledButton.icon(
                       onPressed: _createEntry,
