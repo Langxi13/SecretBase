@@ -3,9 +3,9 @@
             <div class="modal-content">
                 <div class="modal-header">
                     <h2>修改主密码</h2>
-                    <button class="modal-close" @click="showChangePassword = false">✕</button>
+                    <button class="modal-close" @click="showChangePassword = false" :disabled="passwordChanging">✕</button>
                 </div>
-                <div class="modal-body">
+                <div class="modal-body" :inert="passwordChanging ? '' : null">
                     <div class="form-group">
                         <label>旧密码</label>
                         <input type="password" v-model="passwordForm.oldPassword" placeholder="请输入旧密码">
@@ -21,8 +21,10 @@
                     <p v-if="passwordForm.error" class="error-message">{{ passwordForm.error }}</p>
                 </div>
                 <div class="modal-footer">
-                    <button class="btn-secondary" @click="showChangePassword = false">取消</button>
-                    <button class="btn-primary" @click="changePassword">确认修改</button>
+                    <button class="btn-secondary" @click="showChangePassword = false" :disabled="passwordChanging">取消</button>
+                    <button class="btn-primary" @click="changePassword" :disabled="passwordChanging">
+                        {{ passwordChanging ? '修改中...' : '确认修改' }}
+                    </button>
                 </div>
             </div>
         </div>
@@ -74,18 +76,20 @@
             <div class="modal-content tag-manager-modal">
                 <div class="modal-header">
                     <h2>🏷️ 标签管理</h2>
-                    <button class="modal-close" @click="closeTagManager">✕</button>
+                    <button class="modal-close" @click="closeTagManager" :disabled="tagMerging">✕</button>
                 </div>
                 <div class="modal-body">
                     <div class="tag-manager-segmented" role="tablist" aria-label="标签管理功能">
                         <button
                             type="button"
                             :class="{ active: tagManagerPanel === 'list' }"
+                            :disabled="tagMerging"
                             @click="tagManagerPanel = 'list'"
                         >标签列表</button>
                         <button
                             type="button"
                             :class="{ active: tagManagerPanel === 'merge' }"
+                            :disabled="tagMerging"
                             @click="tagManagerPanel = 'merge'"
                         >合并标签</button>
                     </div>
@@ -156,11 +160,12 @@
                             <div class="filter-tags-input tag-merge-source-input">
                                 <span v-for="tag in tagMergeSourceList" :key="tag" class="tag filter-chip">
                                     {{ tag }}
-                                    <button @click="removeTagMergeSourceTag(tag)">✕</button>
+                                    <button @click="removeTagMergeSourceTag(tag)" :disabled="tagMerging">✕</button>
                                 </span>
                                 <input
                                     type="text"
                                     v-model="tagMergeForm.sourceTags"
+                                    :disabled="tagMerging"
                                     placeholder="输入源标签后回车，支持中英文逗号"
                                     @keydown.enter.prevent="commitTagMergeSourceTags"
                                     @keydown.tab.prevent="commitTagMergeSourceTags"
@@ -173,10 +178,10 @@
                         </div>
                         <div class="form-group">
                             <label>目标标签</label>
-                            <input type="text" v-model="tagMergeForm.targetTag" placeholder="合并后的标签名" @keydown.enter.prevent="mergeTags">
+                            <input type="text" v-model="tagMergeForm.targetTag" :disabled="tagMerging" placeholder="合并后的标签名" @keydown.enter.prevent="mergeTags">
                         </div>
-                        <button class="btn-secondary" @click="mergeTags" :disabled="(!tagMergeForm.sourceTags && tagMergeSourceList.length === 0) || !tagMergeForm.targetTag">
-                            合并标签
+                        <button class="btn-secondary" @click="mergeTags" :disabled="tagMerging || (!tagMergeForm.sourceTags && tagMergeSourceList.length === 0) || !tagMergeForm.targetTag">
+                            {{ tagMerging ? '合并中...' : '合并标签' }}
                         </button>
                     </div>
                     </section>
@@ -186,12 +191,12 @@
 
         <!-- 标签新建/编辑弹窗 -->
         <div v-if="showTagEditorModal" class="modal-overlay">
-            <div class="modal-content tag-editor-modal">
+            <div class="modal-content tag-editor-modal" :aria-busy="tagSaving">
                 <div class="modal-header">
                     <h2>{{ tagEditorForm.mode === 'edit' ? '编辑标签' : '新建标签' }}</h2>
-                    <button class="modal-close" @click="closeTagEditorModal">✕</button>
+                    <button class="modal-close" @click="closeTagEditorModal" :disabled="tagSaving">✕</button>
                 </div>
-                <div class="modal-body">
+                <div class="modal-body" :inert="tagSaving ? '' : null">
                     <div class="tag-edit-grid">
                         <label>
                             <span>标签名称</span>
@@ -208,9 +213,13 @@
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <button class="btn-secondary" @click="closeTagEditorModal">取消</button>
-                    <button class="btn-primary" v-if="tagEditorForm.mode === 'create'" @click="createTagFromManager" :disabled="!tagEditorForm.name.trim()">新建</button>
-                    <button class="btn-primary" v-else @click="saveManagedTag" :disabled="!tagEditorForm.name.trim()">保存</button>
+                    <button class="btn-secondary" @click="closeTagEditorModal" :disabled="tagSaving">取消</button>
+                    <button class="btn-primary" v-if="tagEditorForm.mode === 'create'" @click="createTagFromManager" :disabled="tagSaving || !tagEditorForm.name.trim()">
+                        {{ tagSaving ? '新建中...' : '新建' }}
+                    </button>
+                    <button class="btn-primary" v-else @click="saveManagedTag" :disabled="tagSaving || !tagEditorForm.name.trim()">
+                        {{ tagSaving ? '保存中...' : '保存' }}
+                    </button>
                 </div>
             </div>
         </div>

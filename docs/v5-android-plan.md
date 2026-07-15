@@ -29,7 +29,7 @@ tests/fixtures/vault-v1/   Python、Rust、Flutter 共用黄金向量
 
 - Vault 会话、原子写入、revision 冲突、10 份恢复副本、主密码修改和加密导入导出。
 - 旧 Vault 缺失条目 ID 或默认字段时的安全补全，并继续保留未知 JSON 字段。
-- 创建与主密码解锁、Android Keystore 强生物识别解锁、后台遮挡、5 分钟锁定、设备锁屏立即锁定和 Android `FLAG_SECURE`。
+- 创建与主密码解锁、Android Keystore 强生物识别解锁、后台遮挡、5 分钟锁定、设备锁屏立即锁定和 Android `FLAG_SECURE`；重复锁屏事件及锁定态误入主界面会统一返回解锁页并释放保护遮罩。
 - 条目分页、搜索、筛选、详情、新建、编辑、模板复制、回收站、自定义字段隐藏与复制。
 - 标签分页和批量删除；密码组新建、编辑、删除、成员筛选和拖动排序。
 - Material 3 手机/平板自适应界面：统一页面标题与数量层级、底部导航、紧凑条目/分类卡片、底部操作面板、来源感知返回、根页面双击返回退出和大字体窄屏适配。
@@ -40,7 +40,7 @@ tests/fixtures/vault-v1/   Python、Rust、Flutter 共用黄金向量
 - AI 配置和对话历史分别使用用途隔离密钥加密，默认只允许 HTTPS；敏感新建原文不写入历史或后续普通上下文。
 - Storage Access Framework 导入导出、敏感剪贴板标记与自动清理、明暗主题和中文响应式界面。
 
-本机已通过 Flutter 分析、26 项 Dart/Widget 测试、Vault Core 8 项测试和移动端 Rust 23 项测试。当前生物识别候选版已于 2026-07-16 通过 Android CI 的三 ABI Release APK、隐私扫描及 API 29/36 模拟器；仍需真机指纹验收。本机仅构建 arm64，避免在低内存服务器上并行编译。
+本机已通过 Flutter 分析、29 项 Dart/Widget 测试、Vault Core 8 项测试和移动端 Rust 23 项测试。当前生物识别候选版已于 2026-07-16 通过 Android CI 的三 ABI Release APK、隐私扫描及 API 29/36 模拟器；仍需真机指纹验收。本机仅构建 arm64，避免在低内存服务器上并行编译。
 
 ## 3. 分阶段实施
 

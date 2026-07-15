@@ -34,7 +34,7 @@ function assertLessThan(actual, expected, message) {
     'css/workspace.css?v=20260715-sync-v1',
     'css/workspace-responsive.css?v=20260715-sync-v1',
     'css/workspace-polish.css?v=20260715-sync-v1',
-    'css/modals.css?v=20260715-sync-v1',
+    'css/modals.css?v=20260716-interaction-v1',
     'css/form-controls.css?v=20260715-sync-v1',
     'css/ai-components.css?v=20260715-sync-v1',
     'css/ai-workspace.css?v=20260715-sync-v1',
@@ -44,7 +44,7 @@ function assertLessThan(actual, expected, message) {
     'css/ai-diagnostics.css?v=20260715-sync-v1',
     'css/component-responsive.css?v=20260715-sync-v1',
     'css/visual-polish.css?v=20260715-sync-v1',
-    'css/component-polish.css?v=20260715-sync-v1'
+    'css/component-polish.css?v=20260716-interaction-v1'
 ].forEach(asset => assertIncludes(indexHtml, asset, `入口页必须加载 ${asset}`));
 assertNotIncludes(indexHtml, 'css/style.css', '入口页不应继续加载巨型 style.css');
 assertNotIncludes(indexHtml, 'css/components.css', '入口页不应继续加载巨型 components.css');

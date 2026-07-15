@@ -23,6 +23,7 @@
             groups,
             showCreateModal,
             showEditModal,
+            entrySaving,
             showOnboarding,
             importingSamples,
             selectedEntryIds,
@@ -212,35 +213,41 @@
         }
 
         async function saveEntry() {
+            if (entrySaving.value) return;
             if (!entryForm.title) {
                 showToast('请输入标题', 'error');
                 return;
             }
-            if (newTag.value.trim()) {
-                addTag();
-            }
-            if (newGroup.value.trim()) {
-                await addGroup();
-            }
+            entrySaving.value = true;
+            try {
+                if (newTag.value.trim()) {
+                    addTag();
+                }
+                if (newGroup.value.trim()) {
+                    await addGroup();
+                }
 
-            const data = {
-                title: entryForm.title,
-                url: entryForm.url || '',
-                starred: entryForm.starred,
-                tags: Array.from(new Set(entryForm.tags.map(tag => String(tag).trim()).filter(Boolean))),
-                groups: Array.from(new Set(entryForm.groups.map(group => String(group).trim()).filter(Boolean))),
-                fields: entryForm.fields.map(normalizeFieldForEdit).filter(field => field.name),
-                remarks: entryForm.remarks
-            };
+                const data = {
+                    title: entryForm.title,
+                    url: entryForm.url || '',
+                    starred: entryForm.starred,
+                    tags: Array.from(new Set(entryForm.tags.map(tag => String(tag).trim()).filter(Boolean))),
+                    groups: Array.from(new Set(entryForm.groups.map(group => String(group).trim()).filter(Boolean))),
+                    fields: entryForm.fields.map(normalizeFieldForEdit).filter(field => field.name),
+                    remarks: entryForm.remarks
+                };
 
-            const result = showEditModal.value && entryForm.id
-                ? await store.updateEntry(entryForm.id, data)
-                : await store.createEntry(data);
+                const result = showEditModal.value && entryForm.id
+                    ? await store.updateEntry(entryForm.id, data)
+                    : await store.createEntry(data);
 
-            if (result) {
-                closeEntryModal();
-                await loadEntries(currentPage.value);
-                await Promise.all([loadTags(), loadGroups()]);
+                if (result) {
+                    closeEntryModal();
+                    await loadEntries(currentPage.value);
+                    await Promise.all([loadTags(), loadGroups()]);
+                }
+            } finally {
+                entrySaving.value = false;
             }
         }
 

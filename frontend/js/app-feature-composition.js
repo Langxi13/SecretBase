@@ -178,6 +178,8 @@
             allManagedPageTagsSelected,
             tagMergeForm: state.tagMergeForm,
             tagMergeSourceList: state.tagMergeSourceList,
+            tagSaving: state.tagSaving,
+            tagMerging: state.tagMerging,
             currentPage: state.currentPage,
             loadTags: data.loadTags
         });
@@ -254,6 +256,7 @@
             groups: state.groups,
             showCreateModal: state.showCreateModal,
             showEditModal: state.showEditModal,
+            entrySaving: state.entrySaving,
             showOnboarding: state.showOnboarding,
             importingSamples: state.importingSamples,
             selectedEntryIds: state.selectedEntryIds,
@@ -351,6 +354,7 @@
             sortOrder: state.sortOrder,
             editingGroupName: state.editingGroupName,
             groupForm: state.groupForm,
+            groupSaving: state.groupSaving,
             showGroupModal: state.showGroupModal,
             loadGroups: data.loadGroups,
             loadEntries: data.loadEntries,
@@ -365,6 +369,7 @@
             groupPickerGroupFilter: state.groupPickerGroupFilter,
             groupPickerPage: state.groupPickerPage,
             groupPickerLoading: state.groupPickerLoading,
+            groupPickerSaving: state.groupPickerSaving,
             groupPickerTotalPages,
             paginatedGroupPickerEntries,
             allGroupPickerEntriesSelected

@@ -7,9 +7,14 @@ import 'package:go_router/go_router.dart';
 import 'package:secretbase/src/state/vault_controller.dart';
 
 class SecurityLifecycleGuard extends ConsumerStatefulWidget {
-  const SecurityLifecycleGuard({required this.child, super.key});
+  const SecurityLifecycleGuard({
+    required this.child,
+    this.backgroundLockDelay = const Duration(minutes: 5),
+    super.key,
+  });
 
   final Widget child;
+  final Duration backgroundLockDelay;
 
   @override
   ConsumerState<SecurityLifecycleGuard> createState() =>
@@ -19,7 +24,6 @@ class SecurityLifecycleGuard extends ConsumerStatefulWidget {
 class _SecurityLifecycleGuardState extends ConsumerState<SecurityLifecycleGuard>
     with WidgetsBindingObserver {
   static const _channel = MethodChannel('secretbase/security');
-  static const _backgroundLockDelay = Duration(minutes: 5);
 
   DateTime? _backgroundedAt;
   bool _obscured = false;
@@ -53,7 +57,8 @@ class _SecurityLifecycleGuardState extends ConsumerState<SecurityLifecycleGuard>
         final backgroundedAt = _backgroundedAt;
         _backgroundedAt = null;
         if (backgroundedAt != null &&
-            DateTime.now().difference(backgroundedAt) >= _backgroundLockDelay) {
+            DateTime.now().difference(backgroundedAt) >=
+                widget.backgroundLockDelay) {
           unawaited(_lockNow());
         } else {
           _setObscured(false);
@@ -69,22 +74,27 @@ class _SecurityLifecycleGuardState extends ConsumerState<SecurityLifecycleGuard>
   }
 
   Future<void> _lockNow() async {
-    if (_locking ||
-        ref.read(vaultControllerProvider).phase != VaultPhase.unlocked) {
+    if (_locking) return;
+    if (ref.read(vaultControllerProvider).phase != VaultPhase.unlocked) {
+      _showUnlockRoute();
       return;
     }
     _locking = true;
     try {
       await ref.read(vaultControllerProvider.notifier).lock();
-      if (mounted) {
-        GoRouter.of(context).go('/');
-      }
+      _showUnlockRoute();
     } finally {
       _locking = false;
       if (mounted) {
         _setObscured(false);
       }
     }
+  }
+
+  void _showUnlockRoute() {
+    if (!mounted) return;
+    GoRouter.maybeOf(context)?.go('/');
+    _setObscured(false);
   }
 
   void _setObscured(bool value) {

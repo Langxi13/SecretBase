@@ -13,6 +13,7 @@
         const passwordError = ref('');
         const unlockError = ref('');
         const submitting = ref(false);
+        const passwordChanging = ref(false);
         const isSidebarCollapsed = ref(localStorage.getItem('secretbase.sidebarCollapsed') === 'true');
         const runtimeConfig = window.SECRETBASE_RUNTIME_CONFIG || {};
         const isDesktopMode = runtimeConfig.mode === 'desktop';
@@ -78,7 +79,13 @@
         const showGroupModal = ref(false);
         const showTagBrowser = ref(false);
         const showGroupEntryPicker = ref(false);
+        const entrySaving = ref(false);
+        const groupSaving = ref(false);
+        const tagSaving = ref(false);
+        const tagMerging = ref(false);
+        const groupPickerSaving = ref(false);
         const showConfirm = ref(false);
+        const confirmSubmitting = ref(false);
         const showTools = ref(false);
         const showBackupCenter = ref(false);
         const showAdvancedFilters = ref(false);
@@ -255,6 +262,7 @@
             passwordError,
             unlockError,
             submitting,
+            passwordChanging,
             isSidebarCollapsed,
             isDesktopMode,
             desktopVersion,
@@ -301,7 +309,13 @@
             showGroupModal,
             showTagBrowser,
             showGroupEntryPicker,
+            entrySaving,
+            groupSaving,
+            tagSaving,
+            tagMerging,
+            groupPickerSaving,
             showConfirm,
+            confirmSubmitting,
             showTools,
             showBackupCenter,
             showAdvancedFilters,

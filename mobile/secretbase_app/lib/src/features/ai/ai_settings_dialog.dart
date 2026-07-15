@@ -186,6 +186,7 @@ class _AiSettingsDialogState extends ConsumerState<AiSettingsDialog> {
   }
 
   Future<void> _clear() async {
+    if (_working) return;
     if (ref.read(aiActivityControllerProvider)) {
       setState(() => _error = '当前 AI 请求完成后才能清除服务设置');
       return;
@@ -208,8 +209,21 @@ class _AiSettingsDialogState extends ConsumerState<AiSettingsDialog> {
       ),
     );
     if (confirmed != true) return;
-    final status = await rust_api.clearAiSettings();
-    if (mounted) Navigator.of(context).pop(status);
+    setState(() {
+      _working = true;
+      _error = null;
+    });
+    try {
+      final status = await rust_api.clearAiSettings();
+      if (mounted) Navigator.of(context).pop(status);
+    } catch (error) {
+      if (mounted) {
+        setState(() {
+          _working = false;
+          _error = mobileErrorMessage(error);
+        });
+      }
+    }
   }
 
   @override
@@ -218,7 +232,7 @@ class _AiSettingsDialogState extends ConsumerState<AiSettingsDialog> {
     final blocked = _working || anotherRequestActive;
     return DialogFrame(
       title: 'AI 服务设置',
-      onClose: _working ? () {} : null,
+      canClose: !_working,
       child: _loading
           ? const Center(child: CircularProgressIndicator())
           : Column(

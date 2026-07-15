@@ -117,7 +117,8 @@ assertIncludes(groupControllerJs, 'async function saveGroup', '必须提供保�
 assertIncludes(groupControllerJs, 'editingGroupName', '编辑密码组时必须记录原密码组名称');
 assertIncludes(storeTaxonomyMethodsJs, 'async updateGroup', 'Store 必须封装密码组更新接口');
 assertIncludes(indexHtml, '编辑密码组', '密码组弹窗必须支持编辑标题');
-assertIncludes(indexHtml, "{{ editingGroupName ? '保存' : '创建' }}", '密码组弹窗保存按钮必须区分创建和编辑');
+assertIncludes(indexHtml, "(editingGroupName ? '保存' : '创建')", '密码组弹窗保存按钮必须区分创建和编辑');
+assertIncludes(indexHtml, "groupSaving ? '保存中...'", '密码组弹窗保存期间必须提供明确反馈');
 assertIncludes(indexHtml, '@click.stop="moveGroupOrder(group.name, -1)"', '密码组卡片必须提供上移操作');
 assertIncludes(indexHtml, '@click.stop="moveGroupOrder(group.name, 1)"', '密码组卡片必须提供下移操作');
 assertIncludes(indexHtml, '@click="resetGroupOrder"', '密码组模式必须提供恢复默认排序入口');

@@ -77,6 +77,7 @@ class _TaxonomyEditorDialogState extends State<TaxonomyEditorDialog> {
   }
 
   Future<void> _save() async {
+    if (_saving) return;
     if (!(_formKey.currentState?.validate() ?? false)) return;
     setState(() {
       _saving = true;
@@ -110,7 +111,7 @@ class _TaxonomyEditorDialogState extends State<TaxonomyEditorDialog> {
     final entityName = _isTag ? '标签' : '密码组';
     return DialogFrame(
       title: '${widget.existing == null ? '新建' : '编辑'}$entityName',
-      onClose: _saving ? () {} : null,
+      canClose: !_saving,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [

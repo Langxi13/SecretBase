@@ -260,6 +260,7 @@ class _AiHistoryDialogState extends State<AiHistoryDialog> {
   void _reload() => setState(() => _future = rust_api.listAiConversations());
 
   Future<void> _delete(AiConversationSummary conversation) async {
+    if (_working) return;
     setState(() {
       _working = true;
       _error = null;
@@ -281,6 +282,7 @@ class _AiHistoryDialogState extends State<AiHistoryDialog> {
   }
 
   Future<void> _clear() async {
+    if (_working) return;
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -317,6 +319,7 @@ class _AiHistoryDialogState extends State<AiHistoryDialog> {
   Widget build(BuildContext context) {
     return DialogFrame(
       title: 'AI 对话历史',
+      canClose: !_working,
       actions: [
         IconButton(
           tooltip: '清除全部历史',

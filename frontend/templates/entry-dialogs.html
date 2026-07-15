@@ -80,12 +80,12 @@
 
         <!-- 创建/编辑条目弹窗 -->
         <div v-if="showCreateModal || showEditModal" class="modal-overlay">
-            <div class="modal-content entry-editor-modal">
+            <div class="modal-content entry-editor-modal" :aria-busy="entrySaving">
                 <div class="modal-header">
                     <h2>{{ showEditModal ? '编辑条目' : '新建条目' }}</h2>
-                    <button class="modal-close" @click="closeEntryModal">✕</button>
+                    <button class="modal-close" @click="closeEntryModal" :disabled="entrySaving">✕</button>
                 </div>
-                <div class="modal-body">
+                <div class="modal-body" :inert="entrySaving ? '' : null">
                     <div v-if="!showEditModal" class="form-group">
                         <label>条目模板</label>
                         <select v-model="selectedTemplate" @change="applyEntryTemplate">
@@ -194,12 +194,12 @@
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <button class="btn-secondary" @click="closeEntryModal">取消</button>
-                    <button v-if="showEditModal" class="btn-secondary" @click="createEntryFromCurrentEdit">
+                    <button class="btn-secondary" @click="closeEntryModal" :disabled="entrySaving">取消</button>
+                    <button v-if="showEditModal" class="btn-secondary" @click="createEntryFromCurrentEdit" :disabled="entrySaving">
                         在此基础上新建
                     </button>
-                    <button class="btn-primary" @click="saveEntry" :disabled="!entryForm.title">
-                        {{ showEditModal ? '保存' : '创建' }}
+                    <button class="btn-primary" @click="saveEntry" :disabled="entrySaving || !entryForm.title">
+                        {{ entrySaving ? '保存中...' : (showEditModal ? '保存' : '创建') }}
                     </button>
                 </div>
             </div>
@@ -207,12 +207,12 @@
 
         <!-- 新建/编辑密码组弹窗 -->
         <div v-if="showGroupModal" class="modal-overlay">
-            <div class="modal-content">
+            <div class="modal-content" :aria-busy="groupSaving">
                 <div class="modal-header">
                     <h2>{{ editingGroupName ? '编辑密码组' : '新建密码组' }}</h2>
-                    <button class="modal-close" @click="closeGroupModal">✕</button>
+                    <button class="modal-close" @click="closeGroupModal" :disabled="groupSaving">✕</button>
                 </div>
-                <div class="modal-body">
+                <div class="modal-body" :inert="groupSaving ? '' : null">
                     <div class="form-group">
                         <label>名称 *</label>
                         <input type="text" v-model="groupForm.name" placeholder="例如：工作账号" @keydown.enter.prevent="saveGroup">
@@ -223,41 +223,43 @@
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <button class="btn-secondary" @click="closeGroupModal">取消</button>
-                    <button class="btn-primary" @click="saveGroup" :disabled="!groupForm.name.trim()">{{ editingGroupName ? '保存' : '创建' }}</button>
+                    <button class="btn-secondary" @click="closeGroupModal" :disabled="groupSaving">取消</button>
+                    <button class="btn-primary" @click="saveGroup" :disabled="groupSaving || !groupForm.name.trim()">
+                        {{ groupSaving ? '保存中...' : (editingGroupName ? '保存' : '创建') }}
+                    </button>
                 </div>
             </div>
         </div>
 
         <!-- 选择条目加入密码组弹窗 -->
         <div v-if="showGroupEntryPicker" class="modal-overlay">
-            <div class="modal-content group-entry-picker-modal">
+            <div class="modal-content group-entry-picker-modal" :aria-busy="groupPickerSaving">
                 <div class="modal-header">
                     <div>
                         <h2>选择已有条目</h2>
                         <p>加入当前密码组：{{ activeGroupName }}</p>
                     </div>
-                    <button class="modal-close" @click="closeGroupEntryPicker">✕</button>
+                    <button class="modal-close" @click="closeGroupEntryPicker" :disabled="groupPickerSaving">✕</button>
                 </div>
-                <div class="modal-body">
+                <div class="modal-body" :inert="groupPickerSaving ? '' : null">
                     <div class="group-entry-picker-toolbar">
                         <label class="filter-select-field">
                             <span>按标签</span>
-                            <select v-model="groupPickerTagFilter">
+                            <select v-model="groupPickerTagFilter" :disabled="groupPickerSaving">
                                 <option value="">全部标签</option>
                                 <option v-for="tag in tags" :key="tag.name" :value="tag.name">{{ tag.name }}</option>
                             </select>
                         </label>
                         <label class="filter-select-field">
                             <span>按密码组</span>
-                            <select v-model="groupPickerGroupFilter">
+                            <select v-model="groupPickerGroupFilter" :disabled="groupPickerSaving">
                                 <option value="">全部密码组</option>
                                 <option v-for="group in selectableGroupPickerGroups" :key="group.name" :value="group.name">
                                     {{ group.name }}
                                 </option>
                             </select>
                         </label>
-                        <button class="btn-secondary" @click="toggleAllGroupPickerEntries" :disabled="availableGroupPickerEntries.length === 0">
+                        <button class="btn-secondary" @click="toggleAllGroupPickerEntries" :disabled="groupPickerSaving || availableGroupPickerEntries.length === 0">
                             {{ allGroupPickerEntriesSelected ? '取消本页全选' : '全选本页' }}
                         </button>
                     </div>
@@ -275,6 +277,7 @@
                             <input
                                 type="checkbox"
                                 :checked="groupPickerSelectedIds.includes(entry.id)"
+                                :disabled="groupPickerSaving"
                                 @change="toggleGroupPickerEntry(entry.id)"
                             >
                             <span>
@@ -286,26 +289,26 @@
                     <div v-if="!groupPickerLoading && availableGroupPickerEntries.length > 0" class="group-entry-picker-pagination">
                         <label class="tag-page-size-control" title="输入自定义条数或选择">
                             <span>每页</span>
-                            <input type="number" class="page-size-input" v-model.number="groupPickerPageSize" min="1" max="500">
-                            <select class="page-size-quick-select" :value="groupPickerPageSize" @change="groupPickerPageSize = Number($event.target.value)">
+                            <input type="number" class="page-size-input" v-model.number="groupPickerPageSize" min="1" max="500" :disabled="groupPickerSaving">
+                            <select class="page-size-quick-select" :value="groupPickerPageSize" :disabled="groupPickerSaving" @change="groupPickerPageSize = Number($event.target.value)">
                                 <option :value="groupPickerPageSize" v-if="!(groupPickerPageSizeOptions || [5, 10, 20, 50, 100]).includes(groupPickerPageSize)">{{ groupPickerPageSize }} (自定)</option>
                                 <option v-for="size in (groupPickerPageSizeOptions || [5, 10, 20, 50, 100])" :key="'picker-size-' + size" :value="size">{{ size }}</option>
                             </select>
                             <span>条</span>
                         </label>
-                        <button class="btn-secondary" @click="goToGroupPickerPage(groupPickerPage - 1)" :disabled="groupPickerPage <= 1">
+                        <button class="btn-secondary" @click="goToGroupPickerPage(groupPickerPage - 1)" :disabled="groupPickerSaving || groupPickerPage <= 1">
                             上一页
                         </button>
                         <span>第 {{ groupPickerPage }} / {{ groupPickerTotalPages }} 页</span>
-                        <button class="btn-secondary" @click="goToGroupPickerPage(groupPickerPage + 1)" :disabled="groupPickerPage >= groupPickerTotalPages">
+                        <button class="btn-secondary" @click="goToGroupPickerPage(groupPickerPage + 1)" :disabled="groupPickerSaving || groupPickerPage >= groupPickerTotalPages">
                             下一页
                         </button>
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <button class="btn-secondary" @click="closeGroupEntryPicker">取消</button>
-                    <button class="btn-primary" @click="assignSelectedEntriesToActiveGroup" :disabled="groupPickerSelectedIds.length === 0">
-                        加入当前密码组（{{ groupPickerSelectedIds.length }} 条）
+                    <button class="btn-secondary" @click="closeGroupEntryPicker" :disabled="groupPickerSaving">取消</button>
+                    <button class="btn-primary" @click="assignSelectedEntriesToActiveGroup" :disabled="groupPickerSaving || groupPickerSelectedIds.length === 0">
+                        {{ groupPickerSaving ? '正在加入...' : `加入当前密码组（${groupPickerSelectedIds.length} 条）` }}
                     </button>
                 </div>
             </div>

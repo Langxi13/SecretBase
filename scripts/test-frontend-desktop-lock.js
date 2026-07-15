@@ -4,6 +4,7 @@ const vm = require('vm');
 
 const root = path.resolve(__dirname, '..');
 const source = fs.readFileSync(path.join(root, 'frontend/js/app-session-controller.js'), 'utf8');
+const coverSource = fs.readFileSync(path.join(root, 'frontend/js/desktop-lock-cover.js'), 'utf8');
 
 function ref(value) {
     return { value };
@@ -12,6 +13,9 @@ function ref(value) {
 const windowListeners = new Map();
 const documentListeners = new Map();
 let animationFrame = null;
+let fallbackTimeout = null;
+let finishPasswordChange = null;
+let passwordChangeCalls = 0;
 const attributes = new Set();
 
 const sandbox = {
@@ -27,6 +31,10 @@ const sandbox = {
         requestAnimationFrame(callback) {
             animationFrame = callback;
             return 1;
+        },
+        setTimeout(callback) {
+            fallbackTimeout = callback;
+            return 2;
         },
         setInterval() {
             return 1;
@@ -48,7 +56,9 @@ const sandbox = {
     }
 };
 sandbox.window.window = sandbox.window;
-vm.runInContext(source, vm.createContext(sandbox));
+const context = vm.createContext(sandbox);
+vm.runInContext(coverSource, context);
+vm.runInContext(source, context);
 
 const state = {
     initialized: ref(true),
@@ -58,6 +68,7 @@ const state = {
     passwordError: ref(''),
     unlockError: ref(''),
     submitting: ref(false),
+    passwordChanging: ref(false),
     entries: ref([{ id: 'sensitive-entry' }]),
     tags: ref([{ name: 'sensitive-tag' }]),
     groups: ref([{ name: 'sensitive-group' }]),
@@ -86,9 +97,15 @@ const state = {
     showGroupModal: ref(true),
     showTagBrowser: ref(true),
     showGroupEntryPicker: ref(true),
+    entrySaving: ref(true),
+    groupSaving: ref(true),
+    tagSaving: ref(true),
+    tagMerging: ref(true),
+    groupPickerSaving: ref(true),
     showChangePassword: ref(true),
     showBackupCenter: ref(true),
     showConfirm: ref(true),
+    confirmSubmitting: ref(true),
     showTools: ref(true),
     showImportPreview: ref(true),
     showImportConflicts: ref(true),
@@ -102,7 +119,12 @@ const state = {
     aiNow: ref(0),
     loading: ref(true),
     activeSettingsTab: ref('general'),
-    passwordForm: {}
+    passwordForm: {
+        oldPassword: 'old-password',
+        newPassword: 'new-password',
+        confirmPassword: 'new-password',
+        error: ''
+    }
 };
 
 const api = {
@@ -112,6 +134,10 @@ const api = {
     },
     getToken() {
         return this.token;
+    },
+    post() {
+        passwordChangeCalls += 1;
+        return new Promise(resolve => { finishPasswordChange = resolve; });
     }
 };
 const store = {
@@ -168,12 +194,32 @@ controller.registerLifecycle({
 });
 
 (async () => {
+    attributes.add('data-secretbase-desktop-locking');
     await mounted();
     if (sandbox.window.SECRETBASE_DESKTOP_LOCK_READY !== true) {
         throw new Error('桌面锁定监听器未就绪');
     }
     if (sandbox.window.SECRETBASE_DESKTOP_CLOSE_READY !== true) {
         throw new Error('桌面关闭确认监听器未就绪');
+    }
+    if (typeof fallbackTimeout !== 'function') {
+        throw new Error('初始化完成后没有安排保护层兜底释放');
+    }
+    fallbackTimeout();
+    if (attributes.has('data-secretbase-desktop-locking')) {
+        throw new Error('初始化完成后残留的桌面保护层没有释放');
+    }
+
+    const passwordChangeFirst = controller.changePassword();
+    const passwordChangeSecond = controller.changePassword();
+    await Promise.resolve();
+    if (passwordChangeCalls !== 1 || !state.passwordChanging.value) {
+        throw new Error('修改主密码没有阻止重复提交');
+    }
+    finishPasswordChange();
+    await Promise.all([passwordChangeFirst, passwordChangeSecond]);
+    if (state.passwordChanging.value) {
+        throw new Error('修改主密码完成后没有恢复交互状态');
     }
 
     windowListeners.get('secretbase:desktop-close-request')();
@@ -183,6 +229,7 @@ controller.registerLifecycle({
     }
 
     attributes.add('data-secretbase-desktop-locking');
+    state.passwordChanging.value = true;
     windowListeners.get('secretbase:desktop-lock')();
 
     if (api.token !== null || !store.lockedState || !state.locked.value) {
@@ -199,16 +246,23 @@ controller.registerLifecycle({
     if (state.desktopCloseSettingsSaving.value) {
         throw new Error('桌面锁定没有清理关闭设置保存状态');
     }
+    if (state.entrySaving.value || state.groupSaving.value || state.tagSaving.value
+        || state.tagMerging.value || state.groupPickerSaving.value
+        || state.passwordChanging.value) {
+        throw new Error('桌面锁定没有清理弹窗写入状态');
+    }
     if (state.revealedFields.value.length || state.selectedEntry.value !== null) {
         throw new Error('桌面锁定没有清除已显示字段或选中条目');
     }
-    if (!attributes.has('data-secretbase-desktop-locking') || typeof animationFrame !== 'function') {
-        throw new Error('锁定页面切换期间缺少敏感画面遮罩');
+    if (!attributes.has('data-secretbase-desktop-locking')
+        || typeof animationFrame !== 'function'
+        || typeof fallbackTimeout !== 'function') {
+        throw new Error('锁定页面切换期间缺少敏感画面遮罩或兜底释放');
     }
 
-    animationFrame();
+    fallbackTimeout();
     if (attributes.has('data-secretbase-desktop-locking')) {
-        throw new Error('锁定状态应用后遮罩没有释放');
+        throw new Error('隐藏窗口暂停动画帧时，锁定遮罩没有通过兜底计时器释放');
     }
 
     unmounted();

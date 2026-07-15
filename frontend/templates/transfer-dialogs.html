@@ -156,8 +156,10 @@
                     <h3>{{ confirmTitle }}</h3>
                     <p>{{ confirmMessage }}</p>
                     <div class="confirm-actions">
-                        <button class="btn-secondary" @click="showConfirm = false">取消</button>
-                        <button class="btn-danger" @click="confirmAction">确认</button>
+                        <button class="btn-secondary" @click="cancelConfirmAction" :disabled="confirmSubmitting">取消</button>
+                        <button class="btn-danger" @click="confirmAction" :disabled="confirmSubmitting">
+                            {{ confirmSubmitting ? '处理中...' : '确认' }}
+                        </button>
                     </div>
                 </div>
             </div>

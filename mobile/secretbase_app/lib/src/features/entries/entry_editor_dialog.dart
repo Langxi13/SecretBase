@@ -97,6 +97,7 @@ class _EntryEditorDialogState extends State<EntryEditorDialog> {
   }
 
   Future<void> _save() async {
+    if (_saving) return;
     if (!(_formKey.currentState?.validate() ?? false)) return;
     setState(() {
       _saving = true;
@@ -144,7 +145,7 @@ class _EntryEditorDialogState extends State<EntryEditorDialog> {
   Widget build(BuildContext context) {
     return DialogFrame(
       title: _isNew ? '新建条目' : '编辑条目',
-      onClose: _saving ? () {} : null,
+      canClose: !_saving,
       child: Form(
         key: _formKey,
         child: Column(

@@ -435,7 +435,7 @@
     background: var(--surface-2);
 }
 
-.modal-close:hover {
+.modal-close:hover:not(:disabled) {
     background: var(--surface-3);
 }
 

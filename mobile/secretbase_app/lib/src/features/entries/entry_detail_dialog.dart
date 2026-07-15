@@ -85,6 +85,7 @@ class _EntryDetailDialogState extends State<EntryDetailDialog> {
   Widget _buildEntry(EntryRecord entry) {
     return DialogFrame(
       title: entry.title,
+      canClose: !_mutating,
       actions: [
         if (!entry.deleted) ...[
           IconButton(
@@ -97,6 +98,7 @@ class _EntryDetailDialogState extends State<EntryDetailDialog> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          if (_mutating) const LinearProgressIndicator(minHeight: 2),
           Expanded(
             child: SingleChildScrollView(
               padding: const EdgeInsets.fromLTRB(14, 14, 14, 22),
@@ -333,6 +335,7 @@ class _EntryDetailDialogState extends State<EntryDetailDialog> {
   Future<void> _runMutation(
     Future<OperationResult> Function() operation,
   ) async {
+    if (_mutating) return;
     setState(() => _mutating = true);
     try {
       final result = await operation();

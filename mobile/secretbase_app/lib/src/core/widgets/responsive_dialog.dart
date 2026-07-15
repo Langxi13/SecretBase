@@ -40,6 +40,7 @@ class DialogFrame extends StatelessWidget {
     required this.child,
     this.leading,
     this.actions = const [],
+    this.canClose = true,
     this.onClose,
     super.key,
   });
@@ -48,43 +49,49 @@ class DialogFrame extends StatelessWidget {
   final Widget child;
   final Widget? leading;
   final List<Widget> actions;
+  final bool canClose;
   final VoidCallback? onClose;
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Material(
-          color: Theme.of(context).colorScheme.surface,
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 10, 8, 10),
-            child: Row(
-              children: [
-                if (leading != null) ...[leading!, const SizedBox(width: 10)],
-                Expanded(
-                  child: Text(
-                    title,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.w700,
+    return PopScope(
+      canPop: canClose,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Material(
+            color: Theme.of(context).colorScheme.surface,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 10, 8, 10),
+              child: Row(
+                children: [
+                  if (leading != null) ...[leading!, const SizedBox(width: 10)],
+                  Expanded(
+                    child: Text(
+                      title,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
                   ),
-                ),
-                ...actions,
-                IconButton(
-                  tooltip: '关闭',
-                  onPressed: onClose ?? () => Navigator.of(context).pop(),
-                  icon: const Icon(Icons.close),
-                ),
-              ],
+                  ...actions,
+                  IconButton(
+                    tooltip: '关闭',
+                    onPressed: canClose
+                        ? onClose ?? () => Navigator.of(context).pop()
+                        : null,
+                    icon: const Icon(Icons.close),
+                  ),
+                ],
+              ),
             ),
           ),
-        ),
-        const Divider(height: 1),
-        Expanded(child: child),
-      ],
+          const Divider(height: 1),
+          Expanded(child: child),
+        ],
+      ),
     );
   }
 }

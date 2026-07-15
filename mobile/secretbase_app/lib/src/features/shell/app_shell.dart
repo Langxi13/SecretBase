@@ -53,6 +53,9 @@ class _AppShellState extends ConsumerState<AppShell> {
 
   @override
   Widget build(BuildContext context) {
+    final vaultPhase = ref.watch(
+      vaultControllerProvider.select((state) => state.phase),
+    );
     ref.listen(vaultControllerProvider, (previous, next) {
       if (previous?.phase == VaultPhase.unlocked &&
           next.phase != VaultPhase.unlocked &&
@@ -60,6 +63,12 @@ class _AppShellState extends ConsumerState<AppShell> {
         context.go('/');
       }
     });
+    if (vaultPhase != VaultPhase.unlocked && !_exiting) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) context.go('/');
+      });
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
 
     final width = MediaQuery.sizeOf(context).width;
     final wide = width >= 840;

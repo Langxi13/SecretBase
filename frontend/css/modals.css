@@ -86,11 +86,16 @@
     transition: all var(--transition-fast);
 }
 
-.modal-close:hover {
+.modal-close:hover:not(:disabled) {
     background: var(--status-error-bg);
     color: var(--color-error);
     border-color: var(--color-error);
     transform: rotate(90deg);
+}
+
+.modal-close:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
 }
 
 .modal-body {

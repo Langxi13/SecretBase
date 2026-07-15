@@ -28,19 +28,29 @@
         function showConfirmDialog(title, message, callback) {
             state.confirmTitle.value = title;
             state.confirmMessage.value = message;
+            state.confirmSubmitting.value = false;
             confirmCallback = callback;
             state.showConfirm.value = true;
         }
 
         async function confirmAction() {
+            if (state.confirmSubmitting.value) return;
+            state.confirmSubmitting.value = true;
             try {
                 if (confirmCallback) {
                     await confirmCallback();
                 }
             } finally {
+                state.confirmSubmitting.value = false;
                 state.showConfirm.value = false;
                 confirmCallback = null;
             }
+        }
+
+        function cancelConfirmAction() {
+            if (state.confirmSubmitting.value) return;
+            state.showConfirm.value = false;
+            confirmCallback = null;
         }
 
         return {
@@ -48,6 +58,7 @@
             resetEntryForm,
             showConfirmDialog,
             confirmAction,
+            cancelConfirmAction,
             getEntryIconText: viewHelpers.getEntryIconText,
             getTagColor: viewHelpers.getTagColor,
             groupCardStyle: viewHelpers.groupCardStyle,

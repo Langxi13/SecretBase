@@ -246,8 +246,16 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   }
 
   Future<void> _lock() async {
-    await ref.read(vaultControllerProvider.notifier).lock();
-    if (mounted) context.go('/');
+    if (_working) return;
+    setState(() => _working = true);
+    try {
+      await ref.read(vaultControllerProvider.notifier).lock();
+      if (mounted) context.go('/');
+    } catch (error) {
+      if (mounted) _showMessage(mobileErrorMessage(error));
+    } finally {
+      if (mounted) setState(() => _working = false);
+    }
   }
 
   Future<void> _export() => _run(() => exportVaultBackup());
@@ -261,6 +269,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     Future<String?> Function() operation, {
     bool transferErrors = false,
   }) async {
+    if (_working) return;
     setState(() => _working = true);
     try {
       final message = await operation();
@@ -361,6 +370,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   }
 
   Future<void> _enableBiometric() async {
+    if (_working) return;
     final password = await _requestCurrentMasterPassword();
     if (password == null || password.isEmpty || !mounted) return;
     setState(() => _working = true);
@@ -388,6 +398,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   }
 
   Future<void> _disableBiometric() async {
+    if (_working) return;
     setState(() => _working = true);
     try {
       await ref.read(biometricPlatformProvider).deleteCredential();
@@ -456,7 +467,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     await showResponsiveDialog<void>(
       context: context,
       maxWidth: 680,
-      builder: (_) => _RecoveryDialog(ref: ref, onRestored: _showMessage),
+      builder: (_) => _RecoveryDialog(onRestored: _showMessage),
     );
   }
 
@@ -561,22 +572,29 @@ class _SettingsSection extends StatelessWidget {
   }
 }
 
-class _RecoveryDialog extends ConsumerWidget {
-  const _RecoveryDialog({required this.ref, required this.onRestored});
+class _RecoveryDialog extends ConsumerStatefulWidget {
+  const _RecoveryDialog({required this.onRestored});
 
-  final WidgetRef ref;
   final ValueChanged<String> onRestored;
 
   @override
-  Widget build(BuildContext context, WidgetRef widgetRef) {
-    final snapshots = widgetRef.watch(recoverySnapshotsProvider);
+  ConsumerState<_RecoveryDialog> createState() => _RecoveryDialogState();
+}
+
+class _RecoveryDialogState extends ConsumerState<_RecoveryDialog> {
+  String? _restoringId;
+
+  @override
+  Widget build(BuildContext context) {
+    final snapshots = ref.watch(recoverySnapshotsProvider);
     return DialogFrame(
       title: '本机恢复记录',
+      canClose: _restoringId == null,
       child: snapshots.when(
         loading: () => const LoadingView(label: '正在加载恢复记录'),
         error: (error, stackTrace) => ErrorView(
           message: mobileErrorMessage(error),
-          onRetry: () => widgetRef.invalidate(recoverySnapshotsProvider),
+          onRetry: () => ref.invalidate(recoverySnapshotsProvider),
         ),
         data: (items) {
           if (items.isEmpty) {
@@ -591,31 +609,20 @@ class _RecoveryDialog extends ConsumerWidget {
             separatorBuilder: (context, index) => const SizedBox(height: 8),
             itemBuilder: (context, index) {
               final item = items[index];
+              final restoring = _restoringId == item.id;
               return Card(
                 child: ListTile(
                   leading: const Icon(Icons.restore_page_outlined),
                   title: Text(_formatSnapshotTime(item.createdAt)),
                   subtitle: Text(_formatSize(item.sizeBytes.toInt())),
-                  trailing: const Icon(Icons.chevron_right),
-                  onTap: () async {
-                    try {
-                      final message = await restoreRecoverySnapshot(
-                        context: context,
-                        ref: ref,
-                        snapshot: item,
-                      );
-                      if (message != null && context.mounted) {
-                        Navigator.of(context).pop();
-                        onRestored(message);
-                      }
-                    } catch (error) {
-                      if (context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text(transferErrorMessage(error))),
-                        );
-                      }
-                    }
-                  },
+                  trailing: restoring
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.chevron_right),
+                  onTap: _restoringId == null ? () => _restore(item) : null,
                 ),
               );
             },
@@ -623,6 +630,30 @@ class _RecoveryDialog extends ConsumerWidget {
         },
       ),
     );
+  }
+
+  Future<void> _restore(RecoverySnapshot snapshot) async {
+    if (_restoringId != null) return;
+    setState(() => _restoringId = snapshot.id);
+    try {
+      final message = await restoreRecoverySnapshot(
+        context: context,
+        ref: ref,
+        snapshot: snapshot,
+      );
+      if (message != null && mounted) {
+        Navigator.of(context).pop();
+        widget.onRestored(message);
+      }
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(transferErrorMessage(error))));
+      }
+    } finally {
+      if (mounted) setState(() => _restoringId = null);
+    }
   }
 
   static String _formatSnapshotTime(String millis) {

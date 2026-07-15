@@ -208,6 +208,7 @@ class _GroupsScreenState extends ConsumerState<GroupsScreen> {
   }
 
   Future<void> _saveOrder() async {
+    if (_savingOrder) return;
     setState(() => _savingOrder = true);
     try {
       final result = await rust_api.saveGroupOrder(
@@ -233,6 +234,8 @@ class _GroupsScreenState extends ConsumerState<GroupsScreen> {
   }
 
   Future<void> _restoreDefault() async {
+    if (_savingOrder) return;
+    setState(() => _savingOrder = true);
     try {
       final result = await rust_api.saveGroupOrder(
         names: const [],
@@ -243,6 +246,8 @@ class _GroupsScreenState extends ConsumerState<GroupsScreen> {
       if (mounted) _showMessage(result.message);
     } catch (error) {
       if (mounted) _showMessage(mobileErrorMessage(error));
+    } finally {
+      if (mounted) setState(() => _savingOrder = false);
     }
   }
 
@@ -335,28 +340,38 @@ class _GroupsHeader extends StatelessWidget {
               if (hasGroups)
                 IconButton(
                   tooltip: '调整顺序',
-                  onPressed: onToggleOrder,
+                  onPressed: saving ? null : onToggleOrder,
                   icon: const Icon(Icons.swap_vert),
                 ),
-              PopupMenuButton<String>(
-                tooltip: '更多操作',
-                onSelected: (value) {
-                  if (value == 'restore') onRestoreDefault();
-                },
-                itemBuilder: (context) => const [
-                  PopupMenuItem(
-                    value: 'restore',
-                    child: ListTile(
-                      contentPadding: EdgeInsets.zero,
-                      leading: Icon(Icons.restart_alt),
-                      title: Text('恢复默认排序'),
-                    ),
+              if (saving)
+                const Padding(
+                  padding: EdgeInsets.all(12),
+                  child: SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
                   ),
-                ],
-              ),
+                )
+              else
+                PopupMenuButton<String>(
+                  tooltip: '更多操作',
+                  onSelected: (value) {
+                    if (value == 'restore') onRestoreDefault();
+                  },
+                  itemBuilder: (context) => const [
+                    PopupMenuItem(
+                      value: 'restore',
+                      child: ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        leading: Icon(Icons.restart_alt),
+                        title: Text('恢复默认排序'),
+                      ),
+                    ),
+                  ],
+                ),
               IconButton.filled(
                 tooltip: '新建密码组',
-                onPressed: onCreate,
+                onPressed: saving ? null : onCreate,
                 icon: const Icon(Icons.create_new_folder_outlined),
               ),
             ],

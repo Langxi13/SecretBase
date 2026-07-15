@@ -14,6 +14,7 @@ const inspectorControllerJs = read('frontend/js/controllers/ai-assistant-inspect
 const featureCompositionJs = read('frontend/js/app-feature-composition.js');
 const aiFeatureCompositionJs = read('frontend/js/ai-feature-composition.js');
 const sessionControllerJs = read('frontend/js/app-session-controller.js');
+const desktopLockCoverJs = read('frontend/js/desktop-lock-cover.js');
 const dataControllerJs = read('frontend/js/app-data-controller.js');
 const templateContextJs = read('frontend/js/app-template-context.js');
 
@@ -58,9 +59,9 @@ localAssetPaths.forEach(asset => {
     'js/backup-view.js?v=20260715-sync-v1',
     'js/ai-view.js?v=20260715-sync-v1',
     'js/download-helper.js?v=20260715-sync-v1',
-    'js/controllers/entry-controller.js?v=20260715-sync-v1',
-    'js/controllers/group-controller.js?v=20260715-sync-v1',
-    'js/controllers/tag-controller.js?v=20260715-sync-v1',
+    'js/controllers/entry-controller.js?v=20260716-interaction-v1',
+    'js/controllers/group-controller.js?v=20260716-interaction-v1',
+    'js/controllers/tag-controller.js?v=20260716-interaction-v1',
     'js/controllers/ai-settings-controller.js?v=20260715-sync-v1',
     'js/controllers/ai-controller.js?v=20260715-sync-v1',
     'js/controllers/ai-scope-controller.js?v=20260715-sync-v1',
@@ -73,12 +74,13 @@ localAssetPaths.forEach(asset => {
     'js/controllers/list-controller.js?v=20260715-sync-v1',
     'js/ai-assistant-inspector-state.js?v=20260715-sync-v1',
     'js/ai-state.js?v=20260715-sync-v1',
-    'js/app-state.js?v=20260715-sync-v1',
-    'js/app-ui-controller.js?v=20260715-sync-v1',
+    'js/app-state.js?v=20260716-interaction-v1',
+    'js/app-ui-controller.js?v=20260716-interaction-v1',
     'js/app-data-controller.js?v=20260715-sync-v1',
     'js/ai-feature-composition.js?v=20260715-sync-v1',
-    'js/app-feature-composition.js?v=20260715-sync-v1',
-    'js/app-session-controller.js?v=20260715-sync-v1',
+    'js/app-feature-composition.js?v=20260716-interaction-v1',
+    'js/desktop-lock-cover.js?v=20260716-interaction-v1',
+    'js/app-session-controller.js?v=20260716-interaction-v1',
     'js/app-watchers.js?v=20260715-sync-v1',
     'js/app-template-context.js?v=20260715-sync-v1',
     'js/app.js?v=20260715-sync-v1'
@@ -110,6 +112,7 @@ assertIncludes(inspectorControllerJs, 'function createAiAssistantInspectorContro
 assertNotIncludes(stateJs, 'async function', '状态模块不应承载异步领域行为');
 assertIncludes(dataControllerJs, 'function createAppDataController', '跨领域加载行为必须从根入口拆出');
 assertIncludes(sessionControllerJs, 'function createAppSessionController', '认证与生命周期必须从根入口拆出');
+assertIncludes(desktopLockCoverJs, 'scheduleRelease', '桌面保护层必须提供隐藏窗口可恢复的释放调度');
 
 assertIncludes(appJs, 'const viewHelpers = window.SecretBaseViewHelpers', '根入口必须装配视图辅助模块');
 assertIncludes(featureCompositionJs, 'viewHelpers,', '领域装配层必须接收视图辅助模块依赖');

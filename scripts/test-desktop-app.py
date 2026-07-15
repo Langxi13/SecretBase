@@ -512,9 +512,11 @@ def test_desktop_lifecycle_locks_before_hiding() -> None:
         def show(self) -> None:
             self.shown += 1
             self.hidden = False
+            events.append("show")
 
         def restore(self) -> None:
             self.restored += 1
+            events.append("restore")
 
         def destroy(self) -> None:
             self.destroyed = True
@@ -579,10 +581,12 @@ def test_desktop_lifecycle_locks_before_hiding() -> None:
         assert saved["close_to_tray"] is True
         assert saved["confirm_close"] is False
 
+        restore_event_start = len(events)
         lifecycle.restore()
         assert window.hidden is False
         assert window.shown == 1
         assert window.restored == 1
+        assert events[restore_event_start:] == ["frontend-lock", "show", "restore"]
 
         evaluated_before_close = len(window.evaluated_scripts)
         assert lifecycle.on_closing() is False

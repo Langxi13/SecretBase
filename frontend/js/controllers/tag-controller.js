@@ -29,6 +29,8 @@
             allManagedPageTagsSelected,
             tagMergeForm,
             tagMergeSourceList,
+            tagSaving,
+            tagMerging,
             currentPage,
             loadTags
         } = options;
@@ -110,23 +112,30 @@
         }
 
         async function createTagFromManager() {
+            if (tagSaving.value) return;
             const name = tagEditorForm.name.trim();
             if (!name) {
                 showToast('请输入标签名称', 'warning');
                 return;
             }
-            const created = await store.createTag({
-                name,
-                description: tagEditorForm.description.trim(),
-                color: tagEditorForm.color
-            });
-            if (created) {
-                closeTagEditorModal();
-                await loadTags();
+            tagSaving.value = true;
+            try {
+                const created = await store.createTag({
+                    name,
+                    description: tagEditorForm.description.trim(),
+                    color: tagEditorForm.color
+                });
+                if (created) {
+                    closeTagEditorModal();
+                    await loadTags();
+                }
+            } finally {
+                tagSaving.value = false;
             }
         }
 
         async function saveManagedTag() {
+            if (tagSaving.value) return;
             if (tagEditorForm.mode !== 'edit') {
                 await createTagFromManager();
                 return;
@@ -136,14 +145,19 @@
                 showToast('请输入标签名称', 'warning');
                 return;
             }
-            const updated = await store.updateTag(tagEditorForm.originalName, {
-                name,
-                description: tagEditorForm.description.trim(),
-                color: tagEditorForm.color
-            });
-            if (updated) {
-                closeTagEditorModal();
-                await Promise.all([loadTags(), loadEntries(currentPage.value)]);
+            tagSaving.value = true;
+            try {
+                const updated = await store.updateTag(tagEditorForm.originalName, {
+                    name,
+                    description: tagEditorForm.description.trim(),
+                    color: tagEditorForm.color
+                });
+                if (updated) {
+                    closeTagEditorModal();
+                    await Promise.all([loadTags(), loadEntries(currentPage.value)]);
+                }
+            } finally {
+                tagSaving.value = false;
             }
         }
 
@@ -229,6 +243,7 @@
         }
 
         async function mergeTags() {
+            if (tagMerging.value) return;
             commitTagMergeSourceTags();
             const sourceTags = [...tagMergeSourceList.value];
             const targetTag = tagMergeForm.targetTag.trim();
@@ -237,6 +252,7 @@
                 return;
             }
 
+            tagMerging.value = true;
             try {
                 const result = await api.post('/tags/merge', {
                     source_tags: sourceTags,
@@ -250,6 +266,8 @@
                 await loadEntries(currentPage.value);
             } catch (error) {
                 showToast(error.message || '标签合并失败', 'error');
+            } finally {
+                tagMerging.value = false;
             }
         }
 

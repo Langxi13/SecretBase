@@ -114,6 +114,7 @@ context.scrollTo = () => {};
         sortOrder: ref('desc'),
         editingGroupName: ref(''),
         groupForm: { name: '', description: '' },
+        groupSaving: ref(false),
         showGroupModal: ref(false),
         loadGroups: async () => { loadGroupsCount += 1; },
         loadEntries: async () => { groupLoadEntriesCount += 1; },
@@ -128,6 +129,7 @@ context.scrollTo = () => {};
         groupPickerGroupFilter: ref(''),
         groupPickerPage: ref(1),
         groupPickerLoading: ref(false),
+        groupPickerSaving: ref(false),
         groupPickerTotalPages: ref(1),
         paginatedGroupPickerEntries: ref([]),
         allGroupPickerEntriesSelected: ref(false)

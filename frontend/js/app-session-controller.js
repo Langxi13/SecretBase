@@ -16,15 +16,13 @@
         handleDocumentClick
     }) {
         let aiNowTimer = null;
-
-        function clearDesktopLockCover() {
-            document.documentElement.removeAttribute('data-secretbase-desktop-locking');
-        }
-
+        const desktopLockCover = window.SecretBaseDesktopLockCover;
         function applyLockedState() {
             api.setToken(null);
             store.setState({ locked: true });
             state.locked.value = true;
+            state.submitting.value = false;
+            state.passwordChanging.value = false;
             state.password.value = '';
             state.entries.value = [];
             state.tags.value = [];
@@ -51,9 +49,12 @@
             state.showGroupModal.value = false;
             state.showTagBrowser.value = false;
             state.showGroupEntryPicker.value = false;
+            [state.entrySaving, state.groupSaving, state.tagSaving, state.tagMerging, state.groupPickerSaving]
+                .forEach(flag => { flag.value = false; });
             state.showChangePassword.value = false;
             state.showBackupCenter.value = false;
             state.showConfirm.value = false;
+            state.confirmSubmitting.value = false;
             state.showTools.value = false;
             state.showImportPreview.value = false;
             state.showImportConflicts.value = false;
@@ -67,11 +68,7 @@
 
         function handleDesktopLockRequest() {
             applyLockedState();
-            if (typeof window.requestAnimationFrame === 'function') {
-                window.requestAnimationFrame(clearDesktopLockCover);
-            } else {
-                Promise.resolve().then(clearDesktopLockCover);
-            }
+            desktopLockCover.scheduleRelease();
         }
 
         function handleDesktopCloseRequest() {
@@ -105,7 +102,7 @@
                 await store.initPassword(state.password.value);
                 state.initialized.value = true;
                 state.locked.value = false;
-                clearDesktopLockCover();
+                desktopLockCover.clear();
                 state.password.value = '';
                 state.confirmPassword.value = '';
                 await data.applySettings(await store.loadSettings(), theme);
@@ -131,7 +128,7 @@
             try {
                 await store.unlock(state.password.value);
                 state.locked.value = false;
-                clearDesktopLockCover();
+                desktopLockCover.clear();
                 state.password.value = '';
                 await data.applySettings(await store.loadSettings(), theme);
                 await data.loadAllData();
@@ -188,6 +185,7 @@
         }
 
         async function changePassword() {
+            if (state.passwordChanging.value) return;
             state.passwordForm.error = '';
             if (!state.passwordForm.oldPassword) {
                 state.passwordForm.error = '请输入旧密码';
@@ -202,6 +200,7 @@
                 return;
             }
 
+            state.passwordChanging.value = true;
             try {
                 await api.post('/auth/change-password', {
                     old_password: state.passwordForm.oldPassword,
@@ -214,7 +213,7 @@
                 state.passwordForm.confirmPassword = '';
             } catch (error) {
                 state.passwordForm.error = error.message || '修改失败';
-            }
+            } finally { state.passwordChanging.value = false; }
         }
 
         function registerLifecycle({ onMounted, onUnmounted }) {
@@ -258,6 +257,7 @@
                     console.error('初始化失败:', error);
                 } finally {
                     state.loading.value = false;
+                    desktopLockCover.scheduleRelease();
                 }
             });
 

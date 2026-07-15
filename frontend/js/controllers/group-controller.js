@@ -26,6 +26,7 @@
             sortOrder,
             editingGroupName,
             groupForm,
+            groupSaving,
             showGroupModal,
             loadGroups,
             loadEntries,
@@ -40,6 +41,7 @@
             groupPickerGroupFilter,
             groupPickerPage,
             groupPickerLoading,
+            groupPickerSaving,
             groupPickerTotalPages,
             paginatedGroupPickerEntries,
             allGroupPickerEntriesSelected
@@ -119,27 +121,33 @@
         }
 
         async function saveGroup() {
+            if (groupSaving.value) return;
             const name = groupForm.name.trim();
             if (!name) {
                 showToast('请输入密码组名称', 'error');
                 return;
             }
-            const oldName = editingGroupName.value;
-            const payload = {
-                name,
-                description: groupForm.description.trim()
-            };
-            const result = oldName
-                ? await store.updateGroup(oldName, payload)
-                : await store.createGroup(payload);
-            if (result) {
-                closeGroupModal();
-                await loadGroups();
-                if (oldName && activeGroupName.value === oldName) {
-                    await filterByGroup(result.new_name || name);
-                } else if (oldName) {
-                    await loadEntries(currentPage.value);
+            groupSaving.value = true;
+            try {
+                const oldName = editingGroupName.value;
+                const payload = {
+                    name,
+                    description: groupForm.description.trim()
+                };
+                const result = oldName
+                    ? await store.updateGroup(oldName, payload)
+                    : await store.createGroup(payload);
+                if (result) {
+                    closeGroupModal();
+                    await loadGroups();
+                    if (oldName && activeGroupName.value === oldName) {
+                        await filterByGroup(result.new_name || name);
+                    } else if (oldName) {
+                        await loadEntries(currentPage.value);
+                    }
                 }
+            } finally {
+                groupSaving.value = false;
             }
         }
 
@@ -191,7 +199,7 @@
         }
 
         async function openGroupEntryPicker() {
-            if (!activeGroupName.value) return;
+            if (!activeGroupName.value || groupPickerLoading.value || groupPickerSaving.value) return;
             showGroupEntryPicker.value = true;
             groupPickerTagFilter.value = '';
             groupPickerGroupFilter.value = '';
@@ -248,11 +256,16 @@
         }
 
         async function assignSelectedEntriesToActiveGroup() {
-            if (!activeGroupName.value || groupPickerSelectedIds.value.length === 0) return;
-            const result = await store.assignEntriesToGroup(activeGroupName.value, groupPickerSelectedIds.value);
-            if (result) {
-                closeGroupEntryPicker();
-                await Promise.all([loadEntries(currentPage.value), loadGroups()]);
+            if (groupPickerSaving.value || !activeGroupName.value || groupPickerSelectedIds.value.length === 0) return;
+            groupPickerSaving.value = true;
+            try {
+                const result = await store.assignEntriesToGroup(activeGroupName.value, groupPickerSelectedIds.value);
+                if (result) {
+                    closeGroupEntryPicker();
+                    await Promise.all([loadEntries(currentPage.value), loadGroups()]);
+                }
+            } finally {
+                groupPickerSaving.value = false;
             }
         }
 

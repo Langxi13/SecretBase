@@ -76,6 +76,8 @@ vm.runInContext(read('frontend/js/controllers/tag-controller.js'), context, {
         allManagedPageTagsSelected: ref(false),
         tagMergeForm: { sourceTags: '', targetTag: '' },
         tagMergeSourceList: ref([]),
+        tagSaving: ref(false),
+        tagMerging: ref(false),
         currentPage: ref(2),
         loadTags: async () => { loadTagsCount += 1; }
     });
