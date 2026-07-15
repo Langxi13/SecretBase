@@ -137,6 +137,8 @@
                 await loadGroups();
                 if (oldName && activeGroupName.value === oldName) {
                     await filterByGroup(result.new_name || name);
+                } else if (oldName) {
+                    await loadEntries(currentPage.value);
                 }
             }
         }
@@ -156,7 +158,9 @@
                 if (!result) return;
                 if (filter.value === 'group' && activeGroupName.value === name) {
                     await showGroupMode();
+                    return;
                 }
+                await Promise.all([loadGroups(), loadEntries(currentPage.value)]);
             });
         }
 

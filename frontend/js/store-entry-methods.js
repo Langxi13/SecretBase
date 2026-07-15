@@ -1,5 +1,6 @@
 /**
  * Store 的条目读写与批量操作方法。
+ * 写操作只提交并返回结果，页面状态刷新由调用方统一负责。
  */
 (function () {
     function createEntryMethods({ api, showToast, normalizePagination, buildEntrySearchParams }) {
@@ -44,7 +45,6 @@
                 try {
                     const result = await api.post('/entries', entryData);
                     showToast('条目创建成功', 'success');
-                    await this.loadEntries(this.state.pagination.page);
                     return result.data;
                 } catch (error) {
                     console.error('创建条目失败:', error);
@@ -57,7 +57,6 @@
                 try {
                     const result = await api.put(`/entries/${id}`, updates);
                     showToast('条目更新成功', 'success');
-                    await this.loadEntries(this.state.pagination.page);
                     return result.data;
                 } catch (error) {
                     console.error('更新条目失败:', error);
@@ -70,7 +69,6 @@
                 try {
                     await api.delete(`/entries/${id}`);
                     showToast('条目已移至回收站', 'success');
-                    await this.loadEntries(this.state.pagination.page);
                     return true;
                 } catch (error) {
                     console.error('删除条目失败:', error);
@@ -83,7 +81,6 @@
                 try {
                     const result = await api.post('/entries/batch-delete', { ids });
                     showToast(result.message || '批量删除成功', 'success');
-                    await this.loadEntries(1);
                     return result.data;
                 } catch (error) {
                     console.error('批量删除失败:', error);
@@ -96,7 +93,6 @@
                 try {
                     const result = await api.post('/entries/batch-star', { ids, starred });
                     showToast(result.message || '批量更新成功', 'success');
-                    await this.loadEntries(this.state.pagination.page);
                     return result.data;
                 } catch (error) {
                     console.error('批量星标失败:', error);
@@ -113,8 +109,6 @@
                         remove_tags: removeTags
                     });
                     showToast(result.message || '批量标签更新成功', 'success');
-                    await this.loadEntries(this.state.pagination.page);
-                    await this.loadTags();
                     return result.data;
                 } catch (error) {
                     console.error('批量更新标签失败:', error);

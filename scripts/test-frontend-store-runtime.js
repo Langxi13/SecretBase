@@ -72,6 +72,11 @@ function assert(condition, message) {
 }
 
 (async () => {
+    const entryMethodsSource = read('frontend/js/store-entry-methods.js');
+    const taxonomyMethodsSource = read('frontend/js/store-taxonomy-methods.js');
+    assert(!entryMethodsSource.includes('await this.loadEntries'), '条目 Store 写操作不得隐式刷新页面数据');
+    assert(!taxonomyMethodsSource.includes('await this.load'), '分类 Store 写操作不得隐式刷新页面数据');
+
     [
         'checkAuth', 'initPassword', 'unlock', 'lock', 'loadSettings', 'updateSettings',
         'loadEntries', 'getEntry', 'createEntry', 'updateEntry', 'deleteEntry', 'batchDelete',
@@ -121,8 +126,12 @@ function assert(condition, message) {
     assert(settingsCall[2].auto_lock_minutes === 10, '设置更新必须转换 autoLockMinutes');
     assert(store.state.settings.pageSize === 30, '设置响应必须映射回 pageSize');
 
+    await store.loadGroups();
+    const groupMutationStart = calls.length;
     await store.assignEntriesToGroup('工作', ['entry-1']);
-    assert(calls.some(call => call[0] === 'post' && call[1] === '/groups/%E5%B7%A5%E4%BD%9C/entries'), '批量加入密码组必须调用正确接口');
+    const groupMutationCalls = calls.slice(groupMutationStart);
+    assert(groupMutationCalls.some(call => call[0] === 'post' && call[1] === '/groups/%E5%B7%A5%E4%BD%9C/entries'), '批量加入密码组必须调用正确接口');
+    assert(!groupMutationCalls.some(call => call[0] === 'get'), 'Store 写操作不应隐式重复加载页面数据');
     assert(store.state.groups[0].name === '工作', '加载密码组必须同步 Store 状态');
 
     store.clearFilters();

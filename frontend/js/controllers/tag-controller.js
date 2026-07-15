@@ -68,6 +68,7 @@
                 const deleted = await store.deleteTag(tag.name);
                 if (deleted) {
                     selectedManagedTagNames.value = selectedManagedTagNames.value.filter(name => name !== tag.name);
+                    await Promise.all([loadTags(), loadEntries(currentPage.value)]);
                 }
             });
         }
@@ -121,6 +122,7 @@
             });
             if (created) {
                 closeTagEditorModal();
+                await loadTags();
             }
         }
 
@@ -141,6 +143,7 @@
             });
             if (updated) {
                 closeTagEditorModal();
+                await Promise.all([loadTags(), loadEntries(currentPage.value)]);
             }
         }
 
@@ -182,6 +185,7 @@
                 const result = await store.batchDeleteTags(names);
                 if (result) {
                     selectedManagedTagNames.value = [];
+                    await Promise.all([loadTags(), loadEntries(currentPage.value)]);
                     goToTagManagerPage(tagManagerPage.value);
                 }
             });

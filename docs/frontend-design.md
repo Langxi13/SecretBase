@@ -119,6 +119,7 @@ frontend/
 - `app-feature-composition.js` 只负责显式注入依赖并组合既有控制器和 computed 工厂，不实现领域业务分支。
 - `store.js` 保持现有 `store.*` 公共调用面；具体 API 方法按资源域拆到 `store-*.js`，避免 UI 控制器感知拆分细节。
 - 控制器仅接收显式注入的 ref、reactive 状态、帮助函数和回调。跨领域刷新通过 `loadEntries`、`loadTags`、`loadGroups`、`loadAllData` 等公开回调完成，避免模块直接依赖其他控制器的内部实现。
+- Store 写操作只提交请求并返回结果，不得在内部隐式调用 `loadEntries`、`loadTags` 或 `loadGroups`。控制器必须根据操作影响范围刷新 Vue 实际绑定的数据，避免 Store 与页面双份状态不同步及重复请求。
 - `scripts/test-frontend-template-loader-runtime.js` 验证片段请求顺序与挂载目标；`scripts/test-frontend-runtime-setup.js` 在模拟浏览器环境中验证脚本实际加载顺序与 Vue `setup()` 装配，防止遗漏依赖导致登录页白屏；`scripts/test-frontend-store-runtime.js` 通过模拟 API 验证 Store 组合后的方法、筛选参数和字段映射。
 
 ### 2.2 V2 目标组件结构
