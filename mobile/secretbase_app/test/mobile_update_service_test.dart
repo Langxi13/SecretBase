@@ -101,6 +101,39 @@ Future<_SignedFixture> _fixture({
 }
 
 void main() {
+  test('尚无正式更新清单时返回中性状态而不是网络失败', () async {
+    final current = MobileApplicationInfo(
+      packageId: 'io.github.langxi13.secretbase',
+      versionName: '5.0.0',
+      versionCode: 5000000,
+      signerSha256: List.filled(64, 'a').join(),
+      cacheRoot: Directory.systemTemp.path,
+    );
+    final service = MobileUpdateService(
+      platform: _FakePlatform(
+        current: current,
+        package: MobilePackageInfo(
+          packageId: current.packageId,
+          versionName: current.versionName,
+          versionCode: current.versionCode,
+          signerSha256: current.signerSha256,
+        ),
+      ),
+      client: MockClient((request) async => http.Response('not found', 404)),
+    );
+
+    expect(
+      () => service.checkForUpdate(current),
+      throwsA(
+        isA<MobileUpdateUnavailable>().having(
+          (error) => error.message,
+          'message',
+          contains('正式 Release'),
+        ),
+      ),
+    );
+  });
+
   test('签名清单通过后可以下载并复核 Android 包身份', () async {
     final fixture = await _fixture();
     final root = await Directory.systemTemp.createTemp('secretbase-update-');

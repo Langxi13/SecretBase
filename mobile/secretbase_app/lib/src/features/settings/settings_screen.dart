@@ -613,6 +613,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       MobileUpdatePhase.ready => '${update.asset?.version ?? '新版本'} 已准备安装',
       MobileUpdatePhase.installing => '正在打开 Android 系统安装界面',
       MobileUpdatePhase.upToDate => '当前已是最新正式版本',
+      MobileUpdatePhase.unavailable => '暂无可用的正式更新清单',
       MobileUpdatePhase.reinstallRequired => '需要迁移到正式签名版本',
       MobileUpdatePhase.error => '更新检查或下载失败',
       MobileUpdatePhase.idle => '每天自动检查稳定版本',

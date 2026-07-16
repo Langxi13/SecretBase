@@ -15,6 +15,7 @@ enum MobileUpdatePhase {
   ready,
   installing,
   upToDate,
+  unavailable,
   reinstallRequired,
   error,
 }
@@ -155,6 +156,14 @@ class MobileUpdateController extends Notifier<MobileUpdateState> {
       } else if (network == MobileNetworkType.metered) {
         state = state.copyWith(message: '已发现新版本，当前设置为仅在 Wi-Fi 下自动下载');
       }
+    } on MobileUpdateUnavailable catch (error) {
+      await ref
+          .read(preferencesProvider.notifier)
+          .setLastUpdateCheckAt(DateTime.now());
+      state = state.copyWith(
+        phase: MobileUpdatePhase.unavailable,
+        message: error.message,
+      );
     } on MobileUpdateReinstallRequired catch (error) {
       await ref
           .read(preferencesProvider.notifier)

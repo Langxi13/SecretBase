@@ -14,10 +14,10 @@ from typing import Any, Callable
 
 try:
     from .preferences import load_preferences, update_preferences
-    from .update import check_for_updates
+    from .update import build_update_opener, check_for_updates
 except ImportError:
     from preferences import load_preferences, update_preferences
-    from update import check_for_updates
+    from update import build_update_opener, check_for_updates
 
 
 logger = logging.getLogger(__name__)
@@ -69,7 +69,7 @@ class DesktopUpdateManager:
         self.updates_dir = updates_dir.expanduser().resolve()
         self.settings_path = settings_path
         self.exit_callback = exit_callback
-        self.opener = opener or urllib.request.build_opener()
+        self.opener = opener or build_update_opener()
         self.process_launcher = process_launcher
         self.clock = clock
         self._lock = threading.RLock()

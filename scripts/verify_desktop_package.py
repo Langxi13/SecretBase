@@ -11,6 +11,7 @@ REQUIRED_FILES = {
     "LICENSE.txt",
     "SecretBase.exe",
     "SecretBase.exe.config",
+    "_internal/certifi/cacert.pem",
     "_internal/frontend/index.html",
 }
 ALLOWED_ROOT_ITEMS = {"LICENSE.txt", "SecretBase.exe", "SecretBase.exe.config", "_internal"}

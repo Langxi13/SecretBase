@@ -5,7 +5,7 @@ import sys
 from importlib import metadata
 from pathlib import Path
 
-from PyInstaller.utils.hooks import collect_submodules
+from PyInstaller.utils.hooks import collect_data_files, collect_submodules
 
 
 ROOT = Path(SPECPATH).resolve().parent
@@ -14,6 +14,17 @@ BACKEND_DIR = ROOT / "backend"
 
 IS_WINDOWS = sys.platform.startswith("win")
 IS_MACOS = sys.platform == "darwin"
+
+expected_common_dependencies = {
+    "certifi": "2026.4.22",
+}
+for package, expected_version in expected_common_dependencies.items():
+    installed_version = metadata.version(package)
+    if installed_version != expected_version:
+        raise SystemExit(
+            f"SecretBase.spec: {package} {installed_version} is not supported; "
+            f"install the pinned {expected_version} release from desktop/requirements.txt."
+        )
 
 if IS_WINDOWS:
     expected_desktop_dependencies = {
@@ -85,15 +96,17 @@ windows_icon = DESKTOP_DIR / "assets" / "secretbase.ico"
 macos_icon = Path(os.getenv("SECRETBASE_MACOS_ICON", DESKTOP_DIR / "assets" / "secretbase.icns"))
 executable_icon = macos_icon if IS_MACOS else windows_icon
 target_arch = os.getenv("SECRETBASE_TARGET_ARCH") if IS_MACOS else None
+runtime_data = [
+    (str(ROOT / "frontend"), "frontend"),
+    (str(DESKTOP_DIR / "assets" / "secretbase.ico"), "desktop/assets"),
+]
+runtime_data.extend(collect_data_files("certifi"))
 
 a = Analysis(
     [str(DESKTOP_DIR / "app.py")],
     pathex=[str(DESKTOP_DIR), str(BACKEND_DIR), str(ROOT)],
     binaries=[],
-    datas=[
-        (str(ROOT / "frontend"), "frontend"),
-        (str(DESKTOP_DIR / "assets" / "secretbase.ico"), "desktop/assets"),
-    ],
+    datas=runtime_data,
     hiddenimports=hidden_imports,
     hookspath=[],
     hooksconfig={},

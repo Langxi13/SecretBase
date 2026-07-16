@@ -110,6 +110,14 @@ def run_self_test(data_root_value: str | None, report_path: str | None) -> int:
 def run_desktop_runtime_self_test(report_path: str | None) -> int:
     result = {"success": False, "mode": "desktop-runtime"}
     try:
+        try:
+            from .update import build_update_opener, update_ca_bundle_path
+        except ImportError:
+            from update import build_update_opener, update_ca_bundle_path
+
+        ca_bundle = update_ca_bundle_path()
+        build_update_opener()
+        ca_ready = ca_bundle.is_file() and ca_bundle.stat().st_size > 0
         profile = current_platform_profile()
         if profile.key == "windows":
             import clr
@@ -125,13 +133,17 @@ def run_desktop_runtime_self_test(report_path: str | None) -> int:
             with Image.open(icon_path) as icon:
                 tray_icon_size = list(icon.size)
             result.update({
-                "success": renderer == profile.renderer and bool(pystray.Icon) and tray_icon_size[0] > 0,
+                "success": renderer == profile.renderer
+                and bool(pystray.Icon)
+                and tray_icon_size[0] > 0
+                and ca_ready,
                 "platform": profile.key,
                 "architecture": normalized_architecture(),
                 "renderer": renderer,
                 "dotnet_version": str(System.Environment.Version),
                 "tray_available": True,
                 "tray_icon_size": tray_icon_size,
+                "update_ca_bundle": ca_ready,
             })
         elif profile.key == "macos":
             import WebKit
@@ -139,11 +151,13 @@ def run_desktop_runtime_self_test(report_path: str | None) -> int:
 
             result.update({
                 "success": bool(getattr(cocoa, "BrowserView", None))
-                and callable(getattr(WebKit.WKWebView, "setPageZoom_", None)),
+                and callable(getattr(WebKit.WKWebView, "setPageZoom_", None))
+                and ca_ready,
                 "platform": profile.key,
                 "architecture": normalized_architecture(),
                 "renderer": profile.renderer,
                 "tray_available": False,
+                "update_ca_bundle": ca_ready,
             })
         else:
             raise RuntimeError("当前系统不支持打包桌面运行时自检")

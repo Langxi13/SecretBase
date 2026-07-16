@@ -20,10 +20,12 @@ from verify_macos_package import MacPackageValidationError, verify_macos_package
 def create_valid_package(root: Path) -> Path:
     package = root / "SecretBase"
     (package / "_internal" / "frontend").mkdir(parents=True)
+    (package / "_internal" / "certifi").mkdir(parents=True)
     (package / "LICENSE.txt").write_text("test license", encoding="ascii")
     (package / "SecretBase.exe").write_bytes(b"desktop-test")
     (package / "SecretBase.exe.config").write_text("<configuration />", encoding="ascii")
     (package / "_internal" / "frontend" / "index.html").write_text("<div id=\"app\"></div>", encoding="utf-8")
+    (package / "_internal" / "certifi" / "cacert.pem").write_text("test ca", encoding="ascii")
     return package
 
 
@@ -31,6 +33,7 @@ def create_valid_macos_app(root: Path) -> Path:
     app = root / "SecretBase.app"
     (app / "Contents" / "MacOS").mkdir(parents=True)
     (app / "Contents" / "Frameworks" / "frontend").mkdir(parents=True)
+    (app / "Contents" / "Frameworks" / "certifi").mkdir(parents=True)
     (app / "Contents" / "Resources").mkdir(parents=True)
     executable = app / "Contents" / "MacOS" / "SecretBase"
     if sys.platform == "darwin":
@@ -42,6 +45,9 @@ def create_valid_macos_app(root: Path) -> Path:
         executable.write_bytes(b"macos-test")
     (app / "Contents" / "Frameworks" / "frontend" / "index.html").write_text(
         '<div id="app"></div>', encoding="utf-8"
+    )
+    (app / "Contents" / "Frameworks" / "certifi" / "cacert.pem").write_text(
+        "test ca", encoding="ascii"
     )
     (app / "Contents" / "Resources" / "LICENSE.txt").write_text("test license", encoding="ascii")
     with (app / "Contents" / "Info.plist").open("wb") as file:
@@ -66,6 +72,7 @@ def test_desktop_dependency_pins() -> None:
     assert "-r ../backend/requirements.txt" in requirements
     assert "pywebview==6.2.1" in requirements
     assert "pyinstaller==6.21.0" in requirements
+    assert "certifi==2026.4.22" in requirements
     assert 'pystray==0.19.5; sys_platform == "win32"' in requirements
     assert "Pillow==12.3.0" in requirements
     assert "six==1.17.0" in requirements
@@ -83,6 +90,8 @@ def test_spec_only_collects_public_runtime_assets() -> None:
     assert "backend/.env" not in spec
     assert "backend/data" not in spec
     assert 'console=False' in spec
+    assert '"certifi": "2026.4.22"' in spec
+    assert 'collect_data_files("certifi")' in spec
     assert '"webview.platforms.mshtml"' in spec
     assert "icon=str(executable_icon)" in spec
     assert '"pythonnet": "3.0.5"' in spec
@@ -233,14 +242,14 @@ def test_macos_package_validator_accepts_public_app_and_rejects_private_data() -
     with tempfile.TemporaryDirectory() as raw:
         root = Path(raw)
         app = create_valid_macos_app(root)
-        assert len(verify_macos_package(app).files) == 4
+        assert len(verify_macos_package(app).files) == 5
 
         archive = root / "SecretBase.zip"
         with zipfile.ZipFile(archive, "w") as bundle:
             for path in app.rglob("*"):
                 if path.is_file():
                     bundle.write(path, Path("SecretBase.app") / path.relative_to(app))
-        assert len(verify_macos_package(archive).files) == 4
+        assert len(verify_macos_package(archive).files) == 5
 
         private_file = app / "Contents" / "Frameworks" / "data" / "secretbase.enc"
         private_file.parent.mkdir(parents=True)
@@ -303,7 +312,7 @@ def test_package_validator_accepts_clean_directory_and_archive() -> None:
     with tempfile.TemporaryDirectory() as raw:
         root = Path(raw)
         package = create_valid_package(root)
-        assert len(verify_package(package).files) == 4
+        assert len(verify_package(package).files) == 5
 
         archive = root / "SecretBase.zip"
         with zipfile.ZipFile(archive, "w") as bundle:

@@ -95,6 +95,8 @@ def _validate_inventory(inventory: MacPackageInventory) -> None:
         raise MacPackageValidationError(f"Missing required app files: {', '.join(missing)}")
     if not any(path.as_posix().endswith("frontend/index.html") for path in inventory.files):
         raise MacPackageValidationError("Bundled frontend/index.html is missing")
+    if not any(path.as_posix().endswith("certifi/cacert.pem") for path in inventory.files):
+        raise MacPackageValidationError("Bundled certifi/cacert.pem is missing")
     if not any(path.name == "LICENSE.txt" for path in inventory.files):
         raise MacPackageValidationError("Bundled LICENSE.txt is missing")
 

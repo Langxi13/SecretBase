@@ -215,8 +215,11 @@
                                 :key="field.name"
                                 class="field-row"
                             >
-                                <span class="field-name">{{ field.name }}</span>
-                                <span class="field-value">{{ field.masked ? '••••••' : field.value }}</span>
+                                <span class="field-name" :title="field.name">{{ field.name }}</span>
+                                <span
+                                    class="field-value"
+                                    :title="field.masked ? '隐藏字段' : field.value"
+                                >{{ field.masked ? '••••••' : field.value }}</span>
                             </div>
                             <div v-if="entry.fields.length > 2" class="field-overflow-hint">
                                 还有 {{ entry.fields.length - 2 }} 个字段，点击查看详情

@@ -9,8 +9,9 @@ import sys
 import tempfile
 import threading
 import time
+import urllib.error
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
@@ -23,6 +24,7 @@ from desktop.update import (  # noqa: E402
     LATEST_MANIFEST_URL,
     LATEST_SIGNATURE_URL,
     UPDATE_PUBLIC_KEYS,
+    build_update_opener,
     check_for_updates,
     verify_signed_manifest,
 )
@@ -46,6 +48,11 @@ class RoutingOpener:
         if url not in self.routes:
             raise OSError(f"unexpected URL: {url}")
         return BytesResponse(self.routes[url])
+
+
+class MissingManifestOpener:
+    def open(self, request, timeout: float):
+        raise urllib.error.HTTPError(request.full_url, 404, "Not Found", {}, None)
 
 
 def signed_manifest(
@@ -132,6 +139,25 @@ def test_signed_manifest_and_platform_selection() -> None:
             assert "签名校验失败" in str(error)
         else:
             raise AssertionError("tampered update manifest must be rejected")
+
+
+def test_missing_formal_manifest_is_a_neutral_state() -> None:
+    result = check_for_updates("5.0.0", opener=MissingManifestOpener())
+    assert result["status"] == "unavailable"
+    assert result["available"] is False
+    assert "正式 Release" in result["message"]
+
+
+def test_update_opener_loads_system_and_certifi_roots() -> None:
+    context = Mock()
+    with (
+        patch("desktop.update.ssl.create_default_context", return_value=context),
+        patch("desktop.update.update_ca_bundle_path", return_value=ROOT / "LICENSE"),
+        patch("desktop.update.urllib.request.build_opener") as build_opener,
+    ):
+        build_update_opener()
+    context.load_verify_locations.assert_called_once_with(cafile=str((ROOT / "LICENSE").resolve()))
+    assert build_opener.call_count == 1
 
 
 def test_desktop_update_download_and_install_handoff() -> None:
@@ -271,6 +297,8 @@ def test_release_manifest_generator() -> None:
 def main() -> int:
     for test in (
         test_signed_manifest_and_platform_selection,
+        test_missing_formal_manifest_is_a_neutral_state,
+        test_update_opener_loads_system_and_certifi_roots,
         test_desktop_update_download_and_install_handoff,
         test_disabling_auto_check_cancels_scheduled_check,
         test_release_manifest_generator,

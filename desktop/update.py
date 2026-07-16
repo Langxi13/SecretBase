@@ -3,12 +3,15 @@ from __future__ import annotations
 import base64
 import json
 import re
+import ssl
 import urllib.error
 import urllib.request
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
 
+import certifi
 from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
 
@@ -42,6 +45,22 @@ class UpdateTarget:
 
 class UpdateManifestError(ValueError):
     pass
+
+
+class UpdateManifestUnavailable(UpdateManifestError):
+    pass
+
+
+def update_ca_bundle_path() -> Path:
+    return Path(certifi.where()).expanduser().resolve()
+
+
+def build_update_opener():
+    context = ssl.create_default_context()
+    ca_bundle = update_ca_bundle_path()
+    if ca_bundle.is_file():
+        context.load_verify_locations(cafile=str(ca_bundle))
+    return urllib.request.build_opener(urllib.request.HTTPSHandler(context=context))
 
 
 def parse_version(value: str) -> tuple[int, int, int]:
@@ -163,10 +182,29 @@ def _read_url(client, url: str, *, timeout: float, limit: int) -> bytes:
 
 
 def fetch_signed_manifest(*, opener=None, timeout: float = 8.0) -> dict[str, Any]:
-    client = opener or urllib.request.build_opener()
-    manifest = _read_url(client, LATEST_MANIFEST_URL, timeout=timeout, limit=MAX_MANIFEST_BYTES)
-    signature = _read_url(client, LATEST_SIGNATURE_URL, timeout=timeout, limit=MAX_SIGNATURE_BYTES)
+    client = opener or build_update_opener()
+    try:
+        manifest = _read_url(client, LATEST_MANIFEST_URL, timeout=timeout, limit=MAX_MANIFEST_BYTES)
+    except urllib.error.HTTPError as error:
+        if error.code == 404:
+            raise UpdateManifestUnavailable(
+                "当前暂无支持自动更新的正式版本；正式 Release 发布后即可检查更新"
+            ) from error
+        raise
+    try:
+        signature = _read_url(client, LATEST_SIGNATURE_URL, timeout=timeout, limit=MAX_SIGNATURE_BYTES)
+    except urllib.error.HTTPError as error:
+        if error.code == 404:
+            raise UpdateManifestError("正式更新清单缺少签名文件") from error
+        raise
     return verify_signed_manifest(manifest, signature)
+
+
+def _network_error_message(error: BaseException) -> str:
+    reason = error.reason if isinstance(error, urllib.error.URLError) else error
+    if isinstance(reason, ssl.SSLCertVerificationError) or "CERTIFICATE_VERIFY_FAILED" in str(error):
+        return "无法验证 GitHub HTTPS 证书，请检查系统时间、代理证书或安装最新桌面版本"
+    return f"无法检查更新：{error}"
 
 
 def check_for_updates(
@@ -204,6 +242,20 @@ def check_for_updates(
             "manual_download_url": asset["url"] if available and asset is not None else None,
             "asset": asset if install_supported else None,
         }
+    except UpdateManifestUnavailable as error:
+        return {
+            "status": "unavailable",
+            "available": False,
+            "current_version": current_version,
+            "latest_version": None,
+            "release_url": None,
+            "published_at": None,
+            "notes": "",
+            "install_supported": False,
+            "manual_download_url": None,
+            "asset": None,
+            "message": str(error),
+        }
     except (
         OSError,
         UpdateManifestError,
@@ -220,5 +272,5 @@ def check_for_updates(
             "install_supported": False,
             "manual_download_url": None,
             "asset": None,
-            "message": f"无法检查更新：{error}",
+            "message": _network_error_message(error),
         }

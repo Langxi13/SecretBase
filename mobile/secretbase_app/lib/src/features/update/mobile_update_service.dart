@@ -32,6 +32,10 @@ class MobileUpdateReinstallRequired extends MobileUpdateException {
   const MobileUpdateReinstallRequired(super.message);
 }
 
+class MobileUpdateUnavailable extends MobileUpdateException {
+  const MobileUpdateUnavailable(super.message);
+}
+
 class MobileUpdateAsset {
   const MobileUpdateAsset({
     required this.version,
@@ -97,8 +101,19 @@ class MobileUpdateService {
     } on TimeoutException {
       throw const MobileUpdateException('获取正式版本信息超时，请稍后重试');
     }
-    if (responses.any((response) => response.statusCode != 200)) {
+    if (responses[0].statusCode == 404) {
+      throw const MobileUpdateUnavailable(
+        '当前暂无支持自动更新的正式版本；正式 Release 发布后即可检查更新',
+      );
+    }
+    if (responses[0].statusCode != 200) {
       throw const MobileUpdateException('无法获取正式版本信息');
+    }
+    if (responses[1].statusCode == 404) {
+      throw const MobileUpdateException('正式更新清单缺少签名文件');
+    }
+    if (responses[1].statusCode != 200) {
+      throw const MobileUpdateException('无法获取正式版本签名');
     }
     final manifestBytes = responses[0].bodyBytes;
     if (manifestBytes.isEmpty || manifestBytes.length > 512 * 1024) {
