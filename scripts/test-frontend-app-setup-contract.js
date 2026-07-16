@@ -52,6 +52,18 @@ assertMatches(
 );
 assertIncludes(indexHtml, 'updateEntryPageSize(settingsForm.pageSize)', '全部条目分页控件必须继续支持自定义每页数量');
 assertIncludes(indexHtml, 'entryPageSizeOptions', '全部条目分页控件必须继续支持常用每页数量下拉');
+assertMatches(
+    indexHtml,
+    /name="init_password"[\s\S]*?minlength="8"[\s\S]*?maxlength="128"/,
+    '首次主密码表单必须与移动端保持 8 至 128 个字符边界'
+);
+assertMatches(
+    indexHtml,
+    /v-model="passwordForm\.newPassword"[^>]*minlength="8"[^>]*maxlength="128"/,
+    '修改主密码表单必须限制为 8 至 128 个字符'
+);
+assertIncludes(sessionControllerJs, 'state.password.value.length > 128', '初始化逻辑必须提前拦截超长主密码');
+assertIncludes(sessionControllerJs, 'state.passwordForm.newPassword.length > 128', '改密逻辑必须提前拦截超长主密码');
 if (/<div class="setting-item">\s*<label>每页条目数<\/label>/.test(indexHtml)) {
     throw new Error('系统设置通用页不应再保留“每页条目数”，分页数量应在各分页区自定义');
 }

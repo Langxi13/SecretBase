@@ -1,6 +1,13 @@
 """工具函数"""
 
 
+def request_log_path(request) -> str:
+    """优先记录路由模板，避免路径参数中的业务名称进入日志。"""
+    route = request.scope.get("route")
+    route_path = getattr(route, "path", "")
+    return route_path or "<unmatched>"
+
+
 def djb2_hash(text: str) -> int:
     """
     DJB2 哈希算法

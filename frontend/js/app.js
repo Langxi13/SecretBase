@@ -13,7 +13,8 @@ const app = createApp({
             ref,
             reactive,
             computed,
-            loadPageSizePreference: pagination.loadPageSizePreference
+            loadPageSizePreference: pagination.loadPageSizePreference,
+            defaultSearchScopes: window.SecretBaseStoreState.DEFAULT_SEARCH_SCOPES
         });
         const ui = window.SecretBaseAppUiController.createAppUiController({
             state,

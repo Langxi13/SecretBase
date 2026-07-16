@@ -5,7 +5,9 @@
  * 但入口页不再承担全部页面和弹窗的标记。
  */
 (function () {
-    const TEMPLATE_VERSION = '20260716-update-v2';
+    const templateVersion = String(
+        window.SECRETBASE_RUNTIME_CONFIG?.version || 'development'
+    );
     const templatePaths = [
         'templates/app-layout.html',
         'templates/workspace-list.html',
@@ -23,7 +25,7 @@
     ];
 
     async function loadTemplate(path) {
-        const response = await fetch(`${path}?v=${TEMPLATE_VERSION}`, {
+        const response = await fetch(`${path}?v=${encodeURIComponent(templateVersion)}`, {
             credentials: 'same-origin'
         });
         if (!response.ok) {

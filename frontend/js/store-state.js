@@ -2,13 +2,21 @@
  * Store 的初始状态、字段映射和条目查询参数构建。
  */
 (function () {
+    const DEFAULT_SEARCH_SCOPES = Object.freeze([
+        'title',
+        'url',
+        'tags',
+        'field_names',
+        'remarks'
+    ]);
+
     function createDefaultFilters() {
         return {
             search: '',
             entryIds: [],
             tag: null,
             group: null,
-            searchScopes: [],
+            searchScopes: [...DEFAULT_SEARCH_SCOPES],
             tags: [],
             untagged: false,
             createdFrom: '',
@@ -141,6 +149,7 @@
     }
 
     window.SecretBaseStoreState = {
+        DEFAULT_SEARCH_SCOPES,
         createDefaultFilters,
         createInitialStoreState,
         normalizeSettings,

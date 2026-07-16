@@ -12,11 +12,11 @@
                     </div>
                     <div class="form-group">
                         <label>新密码</label>
-                        <input type="password" v-model="passwordForm.newPassword" placeholder="请输入新密码（至少 8 位）">
+                        <input type="password" v-model="passwordForm.newPassword" placeholder="请输入新密码（8 至 128 个字符）" minlength="8" maxlength="128">
                     </div>
                     <div class="form-group">
                         <label>确认新密码</label>
-                        <input type="password" v-model="passwordForm.confirmPassword" placeholder="请再次输入新密码">
+                        <input type="password" v-model="passwordForm.confirmPassword" placeholder="请再次输入新密码" maxlength="128">
                     </div>
                     <p v-if="passwordForm.error" class="error-message">{{ passwordForm.error }}</p>
                 </div>
@@ -200,11 +200,11 @@
                     <div class="tag-edit-grid">
                         <label>
                             <span>标签名称</span>
-                            <input type="text" v-model="tagEditorForm.name" placeholder="例如：云服务" @keydown.enter.prevent="saveManagedTag">
+                            <input type="text" v-model="tagEditorForm.name" placeholder="例如：云服务" maxlength="50" @keydown.enter.prevent="saveManagedTag">
                         </label>
                         <label>
                             <span>标签简介</span>
-                            <input type="text" v-model="tagEditorForm.description" placeholder="简要说明适用范围" @keydown.enter.prevent="saveManagedTag">
+                            <input type="text" v-model="tagEditorForm.description" placeholder="简要说明适用范围" maxlength="300" @keydown.enter.prevent="saveManagedTag">
                         </label>
                         <label>
                             <span>标签颜色</span>

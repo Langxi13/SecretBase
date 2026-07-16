@@ -17,6 +17,8 @@ router = APIRouter()
 _unlock_attempts: list[float] = []
 MAX_ATTEMPTS = 5
 WINDOW_SECONDS = 300
+MIN_MASTER_PASSWORD_LENGTH = 8
+MAX_MASTER_PASSWORD_LENGTH = 128
 
 
 def _load_auto_lock_minutes() -> int:
@@ -61,8 +63,12 @@ async def init_password(request: AuthRequest):
     if is_initialized():
         raise HTTPException(status_code=409, detail="主密码已设置")
     
-    if len(request.password) < 8:
-        raise HTTPException(status_code=422, detail="密码至少 8 位")
+    if not (
+        MIN_MASTER_PASSWORD_LENGTH
+        <= len(request.password)
+        <= MAX_MASTER_PASSWORD_LENGTH
+    ):
+        raise HTTPException(status_code=422, detail="主密码必须为 8 到 128 个字符")
     
     success = init_vault(request.password)
     if not success:

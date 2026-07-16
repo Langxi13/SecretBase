@@ -216,15 +216,17 @@ http://127.0.0.1:8001
 V5.0 是当前稳定版本，已建立 Windows、macOS 和 Android 的统一签名更新基线。GitHub Release 包含：
 
 ```text
-SecretBase-v5.0.1-windows-x64-setup.exe
-SecretBase-v5.0.1-windows-x64.zip
-SecretBase-v5.0.1-macos-arm64.dmg
-SecretBase-v5.0.1-macos-arm64.zip
-SecretBase-v5.0.1-android-universal.apk
+SecretBase-v5.0.2-windows-x64-setup.exe
+SecretBase-v5.0.2-windows-x64.zip
+SecretBase-v5.0.2-macos-arm64.dmg
+SecretBase-v5.0.2-macos-arm64.zip
+SecretBase-v5.0.2-android-universal.apk
 secretbase-update-v1.json
 secretbase-update-v1.json.sig
 SHA256SUMS.txt
 ```
+
+V5.0.2 的完整审计范围、自动化门禁和真机回归项见 [发布评估](docs/release-assessment-v5.0.2.md)。
 
 Windows 独立版默认将 vault、备份、日志、设置和 WebView 数据保存在 `%LOCALAPPDATA%\SecretBase\`。发布包只包含程序资源，构建时会扫描并拒绝 `.env`、vault、备份、日志和本地设置文件。桌面导出使用 Windows 原生“另存为”，外部网址交给系统默认浏览器打开；重复启动会恢复并聚焦已有窗口。
 

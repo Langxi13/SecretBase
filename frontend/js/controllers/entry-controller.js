@@ -214,7 +214,8 @@
 
         async function saveEntry() {
             if (entrySaving.value) return;
-            if (!entryForm.title) {
+            const title = entryForm.title.trim();
+            if (!title) {
                 showToast('请输入标题', 'error');
                 return;
             }
@@ -228,8 +229,8 @@
                 }
 
                 const data = {
-                    title: entryForm.title,
-                    url: entryForm.url || '',
+                    title,
+                    url: (entryForm.url || '').trim(),
                     starred: entryForm.starred,
                     tags: Array.from(new Set(entryForm.tags.map(tag => String(tag).trim()).filter(Boolean))),
                     groups: Array.from(new Set(entryForm.groups.map(group => String(group).trim()).filter(Boolean))),

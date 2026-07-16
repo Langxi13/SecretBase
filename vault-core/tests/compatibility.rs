@@ -1,8 +1,10 @@
 use std::{fs, path::PathBuf};
 
+#[cfg(feature = "test-vectors")]
+use secretbase_vault_core::encrypt_v1_with_parameters;
 use secretbase_vault_core::{
-    decrypt_v1, encrypt_v1, encrypt_v1_with_parameters, inspect_header, validate_document,
-    VaultDocument, VaultError, VaultSession,
+    decrypt_v1, encrypt_v1, inspect_header, validate_document, VaultDocument, VaultError,
+    VaultSession,
 };
 use serde::Deserialize;
 use serde_json::Value;
@@ -38,6 +40,7 @@ fn read_manifest() -> Result<Manifest, Box<dyn std::error::Error>> {
     Ok(serde_json::from_slice(&content)?)
 }
 
+#[cfg(feature = "test-vectors")]
 fn fixed_array<const N: usize>(value: &str) -> Result<[u8; N], Box<dyn std::error::Error>> {
     let bytes = hex::decode(value)?;
     Ok(bytes
@@ -74,13 +77,16 @@ fn python_vectors_decrypt_and_reencrypt_exactly() -> Result<(), Box<dyn std::err
             "{} payload",
             vector.name
         );
-        let regenerated = encrypt_v1_with_parameters(
-            &manifest.test_password,
-            &document,
-            fixed_array(&vector.salt_hex)?,
-            fixed_array(&vector.nonce_hex)?,
-        )?;
-        assert_eq!(regenerated, encrypted, "{} encrypted bytes", vector.name);
+        #[cfg(feature = "test-vectors")]
+        {
+            let regenerated = encrypt_v1_with_parameters(
+                &manifest.test_password,
+                &document,
+                fixed_array(&vector.salt_hex)?,
+                fixed_array(&vector.nonce_hex)?,
+            )?;
+            assert_eq!(regenerated, encrypted, "{} encrypted bytes", vector.name);
+        }
     }
     Ok(())
 }

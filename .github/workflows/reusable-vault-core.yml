@@ -21,6 +21,9 @@ jobs:
       - name: Run Clippy
         working-directory: vault-core
         run: cargo clippy --locked --all-targets --all-features -- -D warnings
+      - name: Verify default developer test command
+        working-directory: vault-core
+        run: cargo test --locked
       - name: Verify Python-compatible golden vectors
         working-directory: vault-core
         run: cargo test --locked --release --all-features

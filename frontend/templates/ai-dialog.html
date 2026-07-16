@@ -28,6 +28,7 @@
                                 v-model="aiText"
                                 placeholder="例如：示例云 账号:xxx 密码:yyy。也可以一次粘贴多个系统/账号，AI 会尝试拆成多条。"
                                 rows="5"
+                                maxlength="6000"
                             ></textarea>
                             <div class="ai-input-meta">
                                 <span :class="{ 'warning-message': aiTextLength > aiSoftInputChars, 'error-message': aiTextLength > aiMaxInputChars }">

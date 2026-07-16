@@ -135,7 +135,7 @@ async def create_group(request: GroupRequest):
     if group_order_enabled(vault):
         vault.groups_meta[name]["order_index"] = next_group_order_index(vault)
     save_vault_data(vault)
-    logger.info(f"创建密码组: {name}")
+    logger.info("创建密码组成功")
     return {"success": True, "data": {"name": name}, "message": "密码组已创建"}
 
 
@@ -200,7 +200,12 @@ async def assign_entries_to_group(group_name: str, request: BatchRequest):
     if updated_count > 0 or meta_changed:
         save_vault_data(vault)
 
-    logger.info(f"批量加入密码组 {name}: updated={updated_count}, skipped={skipped_count}, missing={missing_count}")
+    logger.info(
+        "批量加入密码组: updated=%s, skipped=%s, missing=%s",
+        updated_count,
+        skipped_count,
+        missing_count,
+    )
     return {
         "success": True,
         "data": {
@@ -298,9 +303,9 @@ async def update_group(group_name: str, request: GroupRequest):
             if not entry.deleted and old_name in (getattr(entry, "groups", []) or []):
                 entry.groups = [new_name if item == old_name else item for item in entry.groups]
                 entry.updated_at = now
-        logger.info(f"重命名密码组: {old_name} -> {new_name}")
+        logger.info("重命名密码组成功")
     else:
-        logger.info(f"更新密码组: {old_name}")
+        logger.info("更新密码组成功")
 
     vault.groups_meta[new_name] = meta
     save_vault_data(vault)
@@ -333,7 +338,7 @@ async def delete_group(group_name: str):
         raise HTTPException(status_code=404, detail="密码组不存在")
 
     save_vault_data(vault)
-    logger.info(f"删除密码组: {name}")
+    logger.info("删除密码组成功")
     return {
         "success": True,
         "data": {"affected_count": affected_count},
@@ -355,5 +360,5 @@ async def delete_empty_group(group_name: str):
         raise HTTPException(status_code=404, detail="密码组不存在")
     vault.groups_meta.pop(name, None)
     save_vault_data(vault)
-    logger.info("删除空密码组: %s", name)
+    logger.info("删除空密码组成功")
     return {"success": True, "data": {"name": name}, "message": "空密码组已删除"}

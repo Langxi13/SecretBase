@@ -55,11 +55,19 @@ function readFrontendCss() {
     return cssPaths.map(readProjectFile).join('\n');
 }
 
+function readAppVersion() {
+    const source = readProjectFile('backend/version.py');
+    const match = source.match(/APP_VERSION\s*=\s*"([0-9]+\.[0-9]+\.[0-9]+)"/);
+    if (!match) throw new Error('无法读取 backend/version.py 中的 APP_VERSION');
+    return match[1];
+}
+
 module.exports = {
     root,
     templatePaths,
     cssPaths,
     readProjectFile,
     readFrontendMarkup,
-    readFrontendCss
+    readFrontendCss,
+    readAppVersion
 };

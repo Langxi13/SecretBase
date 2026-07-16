@@ -138,15 +138,15 @@ server {
     }
 
     # API 代理
-    location ~ ^/api/ai/(parse|organize/preview|tags/preview)$ {
+    location /api/ai/ {
         rewrite ^/api/(.*) /\$1 break;
         proxy_pass http://127.0.0.1:10004;
         proxy_set_header Host \$host;
         proxy_set_header X-Real-IP \$remote_addr;
         proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto \$scheme;
-        proxy_read_timeout 120s;
-        proxy_send_timeout 120s;
+        proxy_read_timeout 180s;
+        proxy_send_timeout 180s;
         client_max_body_size 10m;
     }
 

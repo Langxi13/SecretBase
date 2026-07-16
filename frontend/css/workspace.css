@@ -68,12 +68,6 @@
     box-shadow: 0 0 0 3px var(--color-primary-light);
 }
 
-.search-scope-hint {
-    color: var(--text-tertiary);
-    font-size: var(--font-size-xs);
-    margin: -4px 0 12px;
-}
-
 .search-scope-selector {
     display: flex;
     flex-wrap: wrap;

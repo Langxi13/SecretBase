@@ -6,20 +6,30 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
-RELEASE_VERSION = "5.0.1"
 
 
 def read(relative_path: str) -> str:
     return (ROOT / relative_path).read_text(encoding="utf-8")
 
 
+def release_version() -> str:
+    match = re.search(
+        r'APP_VERSION\s*=\s*"([0-9]+\.[0-9]+\.[0-9]+)"',
+        read("backend/version.py"),
+    )
+    if not match:
+        raise AssertionError("backend/version.py 缺少有效 APP_VERSION")
+    return match.group(1)
+
+
 def test_version_is_centralized() -> None:
+    release = release_version()
     version_source = read("backend/version.py")
-    assert f'APP_VERSION = "{RELEASE_VERSION}"' in version_source
+    assert f'APP_VERSION = "{release}"' in version_source
     assert "version=APP_VERSION" in read("backend/main.py")
     assert '"version": APP_VERSION' in read("backend/routes/health.py")
-    assert f"version: '{RELEASE_VERSION}'" in read("frontend/secretbase-runtime-config.js")
-    assert f"## {RELEASE_VERSION} -" in read("CHANGELOG.md")
+    assert f"version: '{release}'" in read("frontend/secretbase-runtime-config.js")
+    assert f"## {release} -" in read("CHANGELOG.md")
 
 
 def test_runtime_dependencies_are_pinned() -> None:
@@ -33,6 +43,7 @@ def test_runtime_dependencies_are_pinned() -> None:
 
 
 def test_local_and_remote_release_entrypoints_exist() -> None:
+    release_assessment = f"docs/release-assessment-v{release_version()}.md"
     required_paths = (
         "start-secretbase.cmd",
         "scripts/start-local.ps1",
@@ -47,6 +58,7 @@ def test_local_and_remote_release_entrypoints_exist() -> None:
         "docs/vault-format-v1.md",
         "docs/update-system.md",
         "docs/manual-qa-checklist-v5-updates.md",
+        release_assessment,
         "tests/fixtures/vault-v1/manifest.json",
         "vault-core/Cargo.toml",
         "vault-core/Cargo.lock",

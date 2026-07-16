@@ -136,6 +136,7 @@
                                         v-model="aiAssistantInput"
                                         :placeholder="aiAssistantMode === 'sensitive_create' ? '描述要新建的条目，可包含字段值；发送前会再次确认' : '告诉 AI 管家你想查找、整理或调整什么'"
                                         rows="2"
+                                        maxlength="6000"
                                         :disabled="aiAssistantBusy"
                                         @keydown.ctrl.enter.prevent="sendAssistantMessage"
                                         @keydown.meta.enter.prevent="sendAssistantMessage"

@@ -11,19 +11,11 @@
     }
 
     function loadPageSizePreference(key, fallback = 12) {
-        try {
-            return normalizeUniversalPageSize(localStorage.getItem(key), fallback);
-        } catch (error) {
-            return fallback;
-        }
+        return normalizeUniversalPageSize(window.SecretBaseStorage.getLocal(key), fallback);
     }
 
     function savePageSizePreference(key, value) {
-        try {
-            localStorage.setItem(key, String(normalizeUniversalPageSize(value)));
-        } catch (error) {
-            // 本地偏好保存失败不影响分页功能
-        }
+        window.SecretBaseStorage.setLocal(key, normalizeUniversalPageSize(value));
     }
 
     function createVisiblePages(current, total) {

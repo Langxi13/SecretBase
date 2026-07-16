@@ -30,6 +30,7 @@ from config import (
 from models import Settings
 from storage import ConflictError, VaultLockTimeoutError, enforce_auto_lock, is_unlocked, touch_activity, validate_session_token
 from routes import auth, entries, trash, tags, groups, ai, settings, health, transfer, tools
+from utils import request_log_path
 from version import APP_VERSION
 
 
@@ -69,6 +70,17 @@ def apply_security_headers(response):
     return response
 
 
+def apply_cache_headers(request: Request, response):
+    """入口页和运行时配置必须在桌面升级后重新读取。"""
+    if request.method == "GET" and request.url.path in {
+        "/",
+        "/index.html",
+        "/secretbase-runtime-config.js",
+    }:
+        response.headers["Cache-Control"] = "no-store"
+    return response
+
+
 class RedactingFormatter(logging.Formatter):
     def format(self, record):
         return SENSITIVE_LOG_PATTERN.sub(r"\1=***REDACTED***", super().format(record))
@@ -105,6 +117,8 @@ def setup_logging():
         console_handler = logging.StreamHandler()
         console_handler.setFormatter(formatter)
         root_logger.addHandler(console_handler)
+    logging.getLogger("httpx").setLevel(logging.WARNING)
+    logging.getLogger("httpcore").setLevel(logging.WARNING)
     root_logger._secretbase_logging_configured = True
 
 ensure_runtime_dirs()
@@ -238,12 +252,12 @@ async def log_requests(request: Request, call_next):
     
     process_time = time.time() - start_time
     logger.info(
-        f"{request.method} {request.url.path} "
+        f"{request.method} {request_log_path(request)} "
         f"status={response.status_code} "
         f"duration={process_time:.3f}s"
     )
     
-    return apply_security_headers(response)
+    return apply_cache_headers(request, apply_security_headers(response))
 
 
 # 配置 CORS。保持在自定义中间件之后注册，确保提前返回的 401/413 也带 CORS 响应头。

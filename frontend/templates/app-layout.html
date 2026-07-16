@@ -20,8 +20,9 @@
                             id="init_password"
                             autocomplete="new-password"
                             v-model="password"
-                            placeholder="请输入主密码（至少 8 位）"
+                            placeholder="请输入主密码（8 至 128 个字符）"
                             minlength="8"
+                            maxlength="128"
                             required
                         >
                     </div>
@@ -34,6 +35,7 @@
                             autocomplete="new-password"
                             v-model="confirmPassword"
                             placeholder="请再次输入密码"
+                            maxlength="128"
                             required
                         >
                     </div>
@@ -192,7 +194,6 @@
                         {{ scope.label }}
                     </button>
                 </div>
-                <p class="search-scope-hint">只在已选范围内搜索；全部取消时，输入搜索词不会返回结果。</p>
                 <div class="sort-controls">
                     <label>
                         排序

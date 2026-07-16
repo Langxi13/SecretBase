@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
+const { readAppVersion } = require('./frontend-source');
 
 const root = path.resolve(__dirname, '..');
 const read = file => fs.readFileSync(path.join(root, file), 'utf8');
@@ -13,13 +14,14 @@ const settingsTemplate = read('frontend/templates/settings-dialog.html');
 const desktopTemplate = read('frontend/templates/desktop-dialog.html');
 const appLayout = read('frontend/templates/app-layout.html');
 const indexHtml = read('frontend/index.html');
+const appVersion = readAppVersion();
 
 function assertIncludes(content, needle, message) {
     if (!content.includes(needle)) throw new Error(message);
 }
 
-assertIncludes(indexHtml, 'js/controllers/desktop-controller.js?v=20260716-update-v1', '入口页必须加载桌面控制器');
-assertIncludes(indexHtml, 'css/desktop-components.css?v=20260716-update-v1', '入口页必须加载桌面样式');
+assertIncludes(indexHtml, `js/controllers/desktop-controller.js?v=${appVersion}`, '入口页必须加载桌面控制器');
+assertIncludes(indexHtml, `css/desktop-components.css?v=${appVersion}`, '入口页必须加载桌面样式');
 assertIncludes(stateSource, "runtimeConfig.mode === 'desktop'", '桌面入口必须由运行模式控制');
 assertIncludes(stateSource, 'desktopRuntimeCapabilities', '桌面运行时必须提供平台能力');
 assertIncludes(controllerSource, 'desktopSupportsTray', '桌面控制器必须按能力决定托盘 UI');

@@ -254,7 +254,7 @@ def migrate_legacy_backups_to_auto(strict: bool = False) -> list[Path]:
             target = _dedupe_backup_path(auto_dir, path.name)
             shutil.move(str(path), str(target))
             moved.append(target)
-            logger.info(f"迁移旧备份到自动备份目录: {target}")
+            logger.info("迁移旧备份到自动备份目录成功")
     except Exception as e:
         logger.error(f"迁移旧备份失败: {e}")
         if strict:
@@ -398,7 +398,7 @@ def _create_backup_unlocked(strict: bool = False, backup_type: str = AUTO_BACKUP
             _cleanup_backups()
         elif backup_type == AI_BACKUP_TYPE:
             _cleanup_ai_backups()
-        logger.info(f"创建备份: {backup_path}")
+        logger.info("创建备份成功: type=%s", backup_type)
         return backup_path
     except Exception as e:
         logger.error(f"创建备份失败: {e}")
@@ -449,7 +449,7 @@ def _cleanup_backups():
         while len(backups) > retention:
             oldest = backups.pop(0)
             oldest.unlink()
-            logger.info(f"删除旧备份: {oldest}")
+            logger.info("删除旧自动备份成功")
     except Exception as e:
         logger.error(f"清理备份失败: {e}")
 

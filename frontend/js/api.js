@@ -45,11 +45,11 @@ class ApiClient {
     setToken(token) {
         this.token = token;
         if (token) {
-            sessionStorage.setItem('token', token);
+            window.SecretBaseStorage.setSession('token', token);
         } else {
-            sessionStorage.removeItem('token');
+            window.SecretBaseStorage.removeSession('token');
         }
-        localStorage.removeItem('token');
+        window.SecretBaseStorage.removeLocal('token');
     }
 
     /**
@@ -57,10 +57,46 @@ class ApiClient {
      */
     getToken() {
         if (!this.token) {
-            this.token = sessionStorage.getItem('token');
-            localStorage.removeItem('token');
+            this.token = window.SecretBaseStorage.getSession('token');
+            window.SecretBaseStorage.removeLocal('token');
         }
         return this.token;
+    }
+
+    async parseResponse(response) {
+        let text;
+        try {
+            text = await response.text();
+        } catch (error) {
+            return { valid: false, data: null };
+        }
+        if (!text.trim()) {
+            return { valid: response.status === 204, data: {} };
+        }
+        try {
+            const data = JSON.parse(text);
+            return {
+                valid: data !== null && typeof data === 'object' && !Array.isArray(data),
+                data
+            };
+        } catch (error) {
+            return { valid: false, data: null };
+        }
+    }
+
+    responseError(response, parsed) {
+        if (parsed.valid && response.ok) return parsed.data;
+        if (parsed.valid) {
+            return {
+                ...parsed.data,
+                error: parsed.data.error || 'HTTP_ERROR',
+                message: parsed.data.message || `请求失败（HTTP ${response.status}）`
+            };
+        }
+        return {
+            error: 'HTTP_ERROR',
+            message: `请求失败（HTTP ${response.status}）`
+        };
     }
 
     /**
@@ -96,10 +132,10 @@ class ApiClient {
         }
 
         let response;
-        let result;
+        let parsed;
         try {
             response = await fetch(`${this.baseUrl}${path}`, options);
-            result = await response.json();
+            parsed = await this.parseResponse(response);
         } catch (error) {
             if (error?.name === 'AbortError') {
                 throw new ApiError('REQUEST_TIMEOUT', '请求处理超时，请稍后重试', 408);
@@ -109,9 +145,13 @@ class ApiClient {
             if (timeoutId !== null) window.clearTimeout(timeoutId);
         }
 
+        const result = this.responseError(response, parsed);
         if (!response.ok) {
             this.notifyUnauthorized(response.status, result.message);
             throw new ApiError(result.error, result.message, response.status, result.data || result.details);
+        }
+        if (!parsed.valid) {
+            throw new ApiError('INVALID_RESPONSE', '服务器返回了无法识别的响应', response.status);
         }
 
         return result;
@@ -162,17 +202,27 @@ class ApiClient {
             headers['X-SecretBase-Token'] = token;
         }
 
-        const response = await fetch(`${this.baseUrl}${path}`, {
-            method: 'POST',
-            headers,
-            credentials: 'same-origin',
-            body: formData
-        });
+        let response;
+        let parsed;
+        try {
+            response = await fetch(`${this.baseUrl}${path}`, {
+                method: 'POST',
+                headers,
+                credentials: 'same-origin',
+                body: formData
+            });
+            parsed = await this.parseResponse(response);
+        } catch (error) {
+            throw new ApiError('NETWORK_ERROR', '网络连接失败，请检查连接后重试', 0);
+        }
 
-        const result = await response.json();
+        const result = this.responseError(response, parsed);
         if (!response.ok) {
             this.notifyUnauthorized(response.status, result.message);
             throw new ApiError(result.error, result.message, response.status, result.data || result.details);
+        }
+        if (!parsed.valid) {
+            throw new ApiError('INVALID_RESPONSE', '服务器返回了无法识别的响应', response.status);
         }
 
         return result;

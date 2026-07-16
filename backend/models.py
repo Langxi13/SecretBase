@@ -6,13 +6,15 @@ import uuid
 
 def _normalize_entity_names(values: List[str], label: str) -> List[str]:
     cleaned = []
+    seen = set()
     for item in values:
         name = str(item or "").strip()
         if not name:
             raise ValueError(f"{label}不能为空")
         if len(name) > 50:
             raise ValueError(f"{label}名称不能超过 50 个字符")
-        if name not in cleaned:
+        if name not in seen:
+            seen.add(name)
             cleaned.append(name)
     return cleaned
 
@@ -26,19 +28,36 @@ class FieldItem(BaseModel):
     copyable: bool = False
     hidden: Optional[bool] = None
 
+    @field_validator("name")
+    @classmethod
+    def normalize_name(cls, value: str) -> str:
+        normalized = str(value or "").strip()
+        if not normalized:
+            raise ValueError("字段名不能为空")
+        return normalized
+
 
 class EntryBase(BaseModel):
     """条目基础模型"""
     title: str = Field(..., min_length=1, max_length=200)
     url: Optional[str] = Field(default="", max_length=2000)
     starred: bool = False
-    tags: List[str] = Field(default_factory=list)
-    groups: List[str] = Field(default_factory=list)
-    fields: List[FieldItem] = Field(default_factory=list)
+    tags: List[str] = Field(default_factory=list, max_length=100)
+    groups: List[str] = Field(default_factory=list, max_length=100)
+    fields: List[FieldItem] = Field(default_factory=list, max_length=200)
     remarks: Optional[str] = Field(default="", max_length=2000)
+
+    @field_validator('title')
+    @classmethod
+    def normalize_title(cls, value: str) -> str:
+        normalized = str(value or "").strip()
+        if not normalized:
+            raise ValueError('条目标题不能为空')
+        return normalized
 
     @validator('url')
     def validate_url(cls, v):
+        v = v.strip() if isinstance(v, str) else v
         if v and not v.startswith(('http://', 'https://')):
             raise ValueError('URL 必须以 http:// 或 https:// 开头')
         return v
@@ -73,13 +92,24 @@ class EntryUpdate(BaseModel):
     title: Optional[str] = Field(None, min_length=1, max_length=200)
     url: Optional[str] = Field(None, max_length=2000)
     starred: Optional[bool] = None
-    tags: Optional[List[str]] = None
-    groups: Optional[List[str]] = None
-    fields: Optional[List[FieldItem]] = None
+    tags: Optional[List[str]] = Field(default=None, max_length=100)
+    groups: Optional[List[str]] = Field(default=None, max_length=100)
+    fields: Optional[List[FieldItem]] = Field(default=None, max_length=200)
     remarks: Optional[str] = Field(None, max_length=2000)
+
+    @field_validator('title')
+    @classmethod
+    def normalize_title(cls, value: Optional[str]) -> Optional[str]:
+        if value is None:
+            return None
+        normalized = str(value).strip()
+        if not normalized:
+            raise ValueError('条目标题不能为空')
+        return normalized
 
     @validator('url')
     def validate_url(cls, v):
+        v = v.strip() if isinstance(v, str) else v
         if v and not v.startswith(('http://', 'https://')):
             raise ValueError('URL 必须以 http:// 或 https:// 开头')
         return v
@@ -127,9 +157,9 @@ class EntryResponse(BaseModel):
     title: str
     url: str = ""
     starred: bool = False
-    tags: List[str] = []
-    groups: List[str] = []
-    fields: List[dict] = []
+    tags: List[str] = Field(default_factory=list)
+    groups: List[str] = Field(default_factory=list)
+    fields: List[dict] = Field(default_factory=list)
     remarks: str = ""
     created_at: str
     updated_at: str
@@ -137,14 +167,14 @@ class EntryResponse(BaseModel):
 
 class BatchRequest(BaseModel):
     """批量操作请求"""
-    ids: List[str] = Field(..., min_items=1)
+    ids: List[str] = Field(..., min_length=1, max_length=1000)
 
 
 class BatchTagRequest(BaseModel):
     """批量标签操作请求"""
-    ids: List[str] = Field(..., min_items=1)
-    add_tags: List[str] = Field(default_factory=list)
-    remove_tags: List[str] = Field(default_factory=list)
+    ids: List[str] = Field(..., min_length=1, max_length=1000)
+    add_tags: List[str] = Field(default_factory=list, max_length=100)
+    remove_tags: List[str] = Field(default_factory=list, max_length=100)
 
     @validator('add_tags', 'remove_tags')
     def validate_tags(cls, v):
@@ -158,7 +188,7 @@ class BatchTagRequest(BaseModel):
 
 class TagBatchDeleteRequest(BaseModel):
     """批量删除标签请求"""
-    names: List[str] = Field(..., min_items=1)
+    names: List[str] = Field(..., min_length=1, max_length=500)
 
     @validator('names')
     def validate_names(cls, v):
@@ -176,7 +206,7 @@ class TagBatchDeleteRequest(BaseModel):
 
 class BatchStarRequest(BaseModel):
     """批量星标请求"""
-    ids: List[str] = Field(..., min_items=1)
+    ids: List[str] = Field(..., min_length=1, max_length=1000)
     starred: bool
 
 
@@ -209,10 +239,14 @@ class TagRequest(BaseModel):
 
 class TagMergeRequest(BaseModel):
     """标签合并请求"""
-    source_tags: List[str] = Field(..., min_items=1)
+    source_tags: List[str] = Field(..., min_length=1, max_length=500)
     target_tag: str = Field(..., min_length=1, max_length=50)
     description: str = Field(default="", max_length=300)
     color: Optional[str] = Field(default=None, pattern=r"^#[0-9a-fA-F]{6}$")
+
+    @validator('source_tags')
+    def validate_source_tags(cls, value):
+        return _normalize_entity_names(value, "标签")
 
 
 class GroupRequest(BaseModel):
@@ -223,12 +257,16 @@ class GroupRequest(BaseModel):
 
 class GroupOrderRequest(BaseModel):
     """密码组自定义排序请求"""
-    names: List[str] = Field(default_factory=list)
+    names: List[str] = Field(default_factory=list, max_length=500)
+
+    @validator('names')
+    def validate_names(cls, value):
+        return _normalize_entity_names(value, "密码组")
 
 
 class AiParseRequest(BaseModel):
     """AI 解析请求"""
-    text: str = Field(..., min_length=1)
+    text: str = Field(..., min_length=1, max_length=6000)
 
 
 class AiOrganizePreviewRequest(BaseModel):
@@ -241,13 +279,13 @@ class AiOrganizePreviewRequest(BaseModel):
 
 class AiOrganizeSuggestion(BaseModel):
     """AI 整理建议"""
-    entry_id: str = Field(..., min_length=1)
+    entry_id: str = Field(..., min_length=1, max_length=100)
     selected: bool = True
-    add_tags: List[str] = Field(default_factory=list)
-    remove_tags: List[str] = Field(default_factory=list)
-    add_groups: List[str] = Field(default_factory=list)
-    remove_groups: List[str] = Field(default_factory=list)
-    group_descriptions: dict = Field(default_factory=dict)
+    add_tags: List[str] = Field(default_factory=list, max_length=100)
+    remove_tags: List[str] = Field(default_factory=list, max_length=100)
+    add_groups: List[str] = Field(default_factory=list, max_length=100)
+    remove_groups: List[str] = Field(default_factory=list, max_length=100)
+    group_descriptions: dict = Field(default_factory=dict, max_length=100)
     reason: str = Field(default="", max_length=500)
 
     @validator('add_tags', 'remove_tags', 'add_groups', 'remove_groups')
@@ -267,7 +305,7 @@ class AiOrganizeSuggestion(BaseModel):
 
 class AiOrganizeApplyRequest(BaseModel):
     """应用 AI 整理建议请求"""
-    suggestions: List[AiOrganizeSuggestion] = Field(..., min_items=1)
+    suggestions: List[AiOrganizeSuggestion] = Field(..., min_length=1, max_length=100)
 
 
 class AiTagGovernancePreviewRequest(BaseModel):
@@ -282,9 +320,9 @@ class AiTagGovernanceSuggestion(BaseModel):
     selected: bool = True
     tag: Optional[str] = Field(default=None, max_length=50)
     new_tag: Optional[str] = Field(default=None, max_length=50)
-    source_tags: List[str] = Field(default_factory=list)
+    source_tags: List[str] = Field(default_factory=list, max_length=500)
     target_tag: Optional[str] = Field(default=None, max_length=50)
-    entry_ids: List[str] = Field(default_factory=list)
+    entry_ids: List[str] = Field(default_factory=list, max_length=1000)
     description: str = Field(default="", max_length=300)
     color: Optional[str] = Field(default=None, pattern=r"^#[0-9a-fA-F]{6}$")
     reason: str = Field(default="", max_length=500)
@@ -296,21 +334,27 @@ class AiTagGovernanceSuggestion(BaseModel):
         cleaned = str(v).strip()
         return cleaned or None
 
-    @validator('source_tags', 'entry_ids')
-    def validate_name_lists(cls, v):
+    @validator('source_tags')
+    def validate_source_tags(cls, v):
+        return _normalize_entity_names(v, "标签")
+
+    @validator('entry_ids')
+    def validate_entry_ids(cls, v):
         cleaned = []
         seen = set()
         for item in v:
-            name = str(item or "").strip()
-            if name and name not in seen:
-                seen.add(name)
-                cleaned.append(name)
+            entry_id = str(item or "").strip()
+            if not entry_id or len(entry_id) > 100:
+                raise ValueError('条目 ID 无效')
+            if entry_id not in seen:
+                seen.add(entry_id)
+                cleaned.append(entry_id)
         return cleaned
 
 
 class AiTagGovernanceApplyRequest(BaseModel):
     """应用 AI 标签系统管理建议请求"""
-    suggestions: List[AiTagGovernanceSuggestion] = Field(..., min_items=1)
+    suggestions: List[AiTagGovernanceSuggestion] = Field(..., min_length=1, max_length=100)
 
 
 class AiActionPreviewRequest(BaseModel):
@@ -328,10 +372,10 @@ class AiActionPlanItem(BaseModel):
     description: str = Field(default="", max_length=300)
     title: Optional[str] = Field(default=None, max_length=200)
     url: Optional[str] = Field(default=None, max_length=2000)
-    tags: List[str] = Field(default_factory=list)
-    groups: List[str] = Field(default_factory=list)
+    tags: List[str] = Field(default_factory=list, max_length=100)
+    groups: List[str] = Field(default_factory=list, max_length=100)
     remarks: str = Field(default="", max_length=2000)
-    fields: List[FieldItem] = Field(default_factory=list)
+    fields: List[FieldItem] = Field(default_factory=list, max_length=200)
     entry_id: Optional[str] = Field(default=None, max_length=100)
     entry_title: Optional[str] = Field(default=None, max_length=200)
     source_entry_id: Optional[str] = Field(default=None, max_length=100)
@@ -339,10 +383,10 @@ class AiActionPlanItem(BaseModel):
     field_index: Optional[int] = Field(default=None, ge=0)
     field_name: Optional[str] = Field(default=None, max_length=100)
     field_name_new: Optional[str] = Field(default=None, max_length=100)
-    add_tags: List[str] = Field(default_factory=list)
-    remove_tags: List[str] = Field(default_factory=list)
-    add_groups: List[str] = Field(default_factory=list)
-    remove_groups: List[str] = Field(default_factory=list)
+    add_tags: List[str] = Field(default_factory=list, max_length=100)
+    remove_tags: List[str] = Field(default_factory=list, max_length=100)
+    add_groups: List[str] = Field(default_factory=list, max_length=100)
+    remove_groups: List[str] = Field(default_factory=list, max_length=100)
     reason: str = Field(default="", max_length=500)
 
     @validator('group', 'group_new', 'title', 'entry_id', 'source_entry_id', 'field_name', 'field_name_new')
@@ -374,7 +418,7 @@ class AiActionPlanItem(BaseModel):
 
 class AiActionApplyRequest(BaseModel):
     """应用 AI 自然语言操作计划请求"""
-    actions: List[AiActionPlanItem] = Field(..., min_items=1)
+    actions: List[AiActionPlanItem] = Field(..., min_length=1, max_length=100)
 
 
 class AiPendingPlanApplyRequest(BaseModel):

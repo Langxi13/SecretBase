@@ -48,7 +48,7 @@ async def create_tag(request: TagRequest):
 
     ensure_tag_meta(vault, name, request.description, request.color)
     save_vault_data(vault)
-    logger.info(f"创建标签: {name}")
+    logger.info("创建标签成功")
     return {
         "success": True,
         "data": {"name": name},
@@ -85,7 +85,7 @@ async def rename_tag(tag_name: str, request: TagRenameRequest):
     ensure_tag_meta(vault, new_name, meta.get("description", ""), meta.get("color"))
     save_vault_data(vault)
 
-    logger.info(f"更新标签: {old_name} -> {new_name}")
+    logger.info("更新标签成功")
     return {
         "success": True,
         "data": {
@@ -135,7 +135,7 @@ async def batch_delete_tags(request: TagBatchDeleteRequest):
     save_vault_data(vault)
     affected_count = len(affected_entry_ids)
 
-    logger.info(f"批量删除标签: {deleted_tags}")
+    logger.info("批量删除标签: %s 个", len(deleted_tags))
     return {
         "success": True,
         "data": {
@@ -166,7 +166,7 @@ async def delete_tag(tag_name: str):
         raise HTTPException(status_code=404, detail="标签不存在")
 
     save_vault_data(vault)
-    logger.info(f"删除标签: {name}")
+    logger.info("删除标签成功")
     return {
         "success": True,
         "data": {"affected_count": affected_count},
@@ -204,7 +204,7 @@ async def merge_tags(request: TagMergeRequest):
     ensure_tag_meta(vault, target_tag, request.description, request.color)
     save_vault_data(vault)
 
-    logger.info(f"合并标签: {source_tags} -> {target_tag}")
+    logger.info("合并标签: %s 个源标签", len(source_tags))
     return {
         "success": True,
         "data": {

@@ -188,6 +188,11 @@ def run():
 
     expect_json(client.get("/settings"), 401, "settings while locked")
 
+    expect_json(
+        client.post("/auth/init", json={"password": "x" * 129}),
+        422,
+        "init password maximum",
+    )
     init = expect_success(client.post("/auth/init", json={"password": PASSWORD}), "init")
     init_token = use_token(client, init, "init token")
     client.headers.pop("Authorization", None)

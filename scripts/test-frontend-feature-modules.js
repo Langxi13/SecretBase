@@ -4,6 +4,8 @@ const path = require('path');
 const root = path.resolve(__dirname, '..');
 const read = file => fs.readFileSync(path.join(root, file), 'utf8');
 const lineCount = file => read(file).split('\n').length;
+const { readAppVersion } = require('./frontend-source');
+const appVersion = readAppVersion();
 
 const indexHtml = read('frontend/index.html');
 const appJs = read('frontend/js/app.js');
@@ -42,52 +44,65 @@ function assertBefore(content, earlier, later, message) {
     }
 }
 
-const localAssetPaths = [
+const localAssetReferences = [
     ...[...indexHtml.matchAll(/<(?:script|link)\b[^>]+(?:src|href)="([^"]+)"/g)]
-        .map(match => match[1].split('?')[0])
+        .map(match => match[1])
         .filter(asset => asset.startsWith('js/') || asset.startsWith('css/'))
 ];
+const localAssetPaths = localAssetReferences.map(asset => asset.split('?')[0]);
 localAssetPaths.forEach(asset => {
     if (!fs.existsSync(path.join(root, 'frontend', asset))) {
         throw new Error(`入口页引用了不存在的本地资源：${asset}`);
     }
 });
+localAssetReferences.forEach(asset => {
+    if (!asset.endsWith(`?v=${appVersion}`)) {
+        throw new Error(`前端资源缓存版本必须统一为 ${appVersion}：${asset}`);
+    }
+});
+assertIncludes(
+    indexHtml,
+    `/secretbase-runtime-config.js?v=${appVersion}`,
+    '运行时配置也必须使用统一应用版本避免缓存旧模式'
+);
 
 [
-    'js/view-helpers.js?v=20260715-sync-v1',
-    'js/tag-view.js?v=20260715-sync-v1',
-    'js/backup-view.js?v=20260715-sync-v1',
-    'js/ai-view.js?v=20260715-sync-v1',
-    'js/download-helper.js?v=20260715-sync-v1',
-    'js/controllers/entry-controller.js?v=20260716-interaction-v1',
-    'js/controllers/group-controller.js?v=20260716-interaction-v1',
-    'js/controllers/tag-controller.js?v=20260716-interaction-v1',
-    'js/controllers/ai-settings-controller.js?v=20260715-sync-v1',
-    'js/controllers/ai-controller.js?v=20260715-sync-v1',
-    'js/controllers/ai-scope-controller.js?v=20260715-sync-v1',
-    'js/controllers/ai-assistant-inspector-controller.js?v=20260715-sync-v1',
-    'js/controllers/ai-assistant-controller.js?v=20260715-sync-v1',
-    'js/controllers/backup-controller.js?v=20260715-sync-v1',
-    'js/controllers/trash-controller.js?v=20260715-sync-v1',
-    'js/controllers/transfer-controller.js?v=20260715-sync-v1',
-    'js/controllers/maintenance-controller.js?v=20260715-sync-v1',
-    'js/controllers/list-controller.js?v=20260715-sync-v1',
-    'js/ai-assistant-inspector-state.js?v=20260715-sync-v1',
-    'js/ai-state.js?v=20260715-sync-v1',
-    'js/app-state.js?v=20260716-update-v1',
-    'js/app-ui-controller.js?v=20260716-interaction-v1',
-    'js/app-data-controller.js?v=20260715-sync-v1',
-    'js/ai-feature-composition.js?v=20260715-sync-v1',
-    'js/app-feature-composition.js?v=20260716-update-v1',
-    'js/desktop-lock-cover.js?v=20260716-interaction-v1',
-    'js/app-session-controller.js?v=20260716-update-v1',
-    'js/app-watchers.js?v=20260715-sync-v1',
-    'js/app-template-context.js?v=20260715-sync-v1',
-    'js/app.js?v=20260716-update-v1'
+    'js/storage.js',
+    'js/view-helpers.js',
+    'js/tag-view.js',
+    'js/backup-view.js',
+    'js/ai-view.js',
+    'js/download-helper.js',
+    'js/controllers/entry-controller.js',
+    'js/controllers/group-controller.js',
+    'js/controllers/tag-controller.js',
+    'js/controllers/ai-settings-controller.js',
+    'js/controllers/ai-controller.js',
+    'js/controllers/ai-scope-controller.js',
+    'js/controllers/ai-assistant-inspector-controller.js',
+    'js/controllers/ai-assistant-controller.js',
+    'js/controllers/backup-controller.js',
+    'js/controllers/trash-controller.js',
+    'js/controllers/transfer-controller.js',
+    'js/controllers/maintenance-controller.js',
+    'js/controllers/list-controller.js',
+    'js/ai-assistant-inspector-state.js',
+    'js/ai-state.js',
+    'js/app-state.js',
+    'js/app-ui-controller.js',
+    'js/app-data-controller.js',
+    'js/ai-feature-composition.js',
+    'js/app-feature-composition.js',
+    'js/desktop-lock-cover.js',
+    'js/app-session-controller.js',
+    'js/app-watchers.js',
+    'js/app-template-context.js',
+    'js/app.js'
 ].forEach(asset => {
-    assertIncludes(indexHtml, asset, `index.html 必须加载 ${asset}`);
+    assertIncludes(indexHtml, `${asset}?v=${appVersion}`, `index.html 必须加载 ${asset}`);
 });
 
+assertBefore(indexHtml, 'js/storage.js', 'js/api.js', '安全存储适配必须先于 API 客户端加载');
 assertBefore(indexHtml, 'js/store-state.js', 'js/store.js', 'Store 状态和领域方法必须先于 store.js 加载');
 assertBefore(indexHtml, 'js/store-taxonomy-methods.js', 'js/store.js', '密码组和标签 Store 方法必须先于 store.js 加载');
 assertBefore(indexHtml, 'js/ai-assistant-inspector-state.js', 'js/ai-state.js', '建议详情状态必须先于 AI 聚合状态加载');

@@ -2,6 +2,6 @@ fastapi==0.136.1
 uvicorn[standard]==0.46.0
 pydantic==2.13.3
 python-dotenv==1.2.2
-cryptography==47.0.0
+cryptography==48.0.1
 httpx==0.28.1
-python-multipart==0.0.27
+python-multipart==0.0.31

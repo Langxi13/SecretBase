@@ -9,8 +9,9 @@ SecretBase is intentionally scoped as a single-user encrypted vault. The priorit
 - Maintain a simple FastAPI backend and vendored Vue frontend with no runtime CDN dependency.
 - Keep production deployment practical behind nginx or another reverse proxy.
 - Maintain the stable Windows and macOS desktop packaging, diagnostics, lifecycle, and data-safety behavior described in [App Roadmap](app-roadmap.md).
-- Finish hardware, migration, and persistent signing acceptance for the implemented Android-first Flutter/Rust client; three-ABI CI and API 29/36 emulator gates are complete.
-- Complete the V5 signed-update baseline: Windows in-place updates, Android system-confirmed replacement, and macOS signed-manifest notifications are implemented and awaiting release acceptance.
+- Maintain the released Android-first Flutter/Rust client across hardware, encrypted migration, biometric unlock, AI safety, and three-ABI/API 29/36 gates.
+- Maintain the released V5 signed-update baseline: Windows in-place updates, Android system-confirmed replacement, and macOS signed-manifest notifications.
+- Keep Web, desktop, and Android AI plans behaviorally aligned while preserving the no-existing-field-values network boundary.
 
 ## Implemented
 
@@ -18,7 +19,7 @@ SecretBase is intentionally scoped as a single-user encrypted vault. The priorit
 - Entry CRUD with tags, custom fields, search, filters, sorting, pagination, and trash.
 - Encrypted backups and plain JSON export/import.
 - Optional conversational AI manager with multiple editable OpenAI-compatible provider presets, encrypted history, metadata-only requests, and review-before-apply plans.
-- Random session tokens and frontend `sessionStorage` token handling.
+- Random session tokens and safe frontend `sessionStorage` handling with an in-memory fallback when site storage is unavailable.
 - File locking, optimistic write conflict detection, and atomic vault writes.
 - Legacy encrypted backup compatibility with explicit backup password input.
 - Security self-check endpoint for deployment configuration.
@@ -33,7 +34,7 @@ SecretBase is intentionally scoped as a single-user encrypted vault. The priorit
 
 ## Later, If Needed
 
-- Android hardware acceptance and later iOS adaptation after the V5 release gates pass.
+- iOS feasibility and adaptation after the stable V5.0.x maintenance line, with App Store signing and distribution requirements planned separately.
 - Better large-vault performance if real usage outgrows pagination.
 - More compact and modular frontend organization.
 - Additional production health check automation.

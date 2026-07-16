@@ -4,7 +4,13 @@
  * 这里仅创建状态和不含副作用的派生值；领域行为仍由各控制器负责。
  */
 (function () {
-    function createAppState({ ref, reactive, computed, loadPageSizePreference }) {
+    function createAppState({
+        ref,
+        reactive,
+        computed,
+        loadPageSizePreference,
+        defaultSearchScopes
+    }) {
         const loading = ref(true);
         const initialized = ref(false);
         const locked = ref(true);
@@ -14,7 +20,7 @@
         const unlockError = ref('');
         const submitting = ref(false);
         const passwordChanging = ref(false);
-        const isSidebarCollapsed = ref(localStorage.getItem('secretbase.sidebarCollapsed') === 'true');
+        const isSidebarCollapsed = ref(window.SecretBaseStorage.getLocal('secretbase.sidebarCollapsed') === 'true');
         const runtimeConfig = window.SECRETBASE_RUNTIME_CONFIG || {};
         const isDesktopMode = runtimeConfig.mode === 'desktop';
         const desktopVersion = runtimeConfig.version || '未知';
@@ -50,7 +56,6 @@
             { key: 'field_values', label: '非隐藏字段值' },
             { key: 'remarks', label: '备注' }
         ];
-        const defaultSearchScopes = [];
         const selectedSearchScopes = ref([...defaultSearchScopes]);
         const sortBy = ref('updated_at');
         const sortOrder = ref('desc');

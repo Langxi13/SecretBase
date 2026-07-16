@@ -207,7 +207,7 @@ async def create_entry(entry_data: EntryCreate):
     
     entry = add_entry(entry_data)
     
-    logger.info(f"创建条目: {entry.title}")
+    logger.info("创建条目成功")
     
     return {
         "success": True,
@@ -230,7 +230,7 @@ async def update_entry_api(entry_id: str, entry_data: EntryUpdate):
     if not entry:
         raise HTTPException(status_code=404, detail="条目不存在")
     
-    logger.info(f"更新条目: {entry_id}")
+    logger.info("更新条目成功")
     
     return {
         "success": True,
@@ -248,7 +248,7 @@ async def delete_entry_api(entry_id: str):
     if not success:
         raise HTTPException(status_code=404, detail="条目不存在")
     
-    logger.info(f"删除条目: {entry_id}")
+    logger.info("条目已移至回收站")
     
     return {
         "success": True,
@@ -278,11 +278,12 @@ async def batch_update_tags(request: BatchTagRequest):
     check_unlocked()
     
     vault = get_vault_data()
+    requested_ids = set(request.ids)
     updated_count = 0
     now = datetime.now().isoformat()
     
     for entry in vault.entries:
-        if entry.id in request.ids and not entry.deleted:
+        if entry.id in requested_ids and not entry.deleted:
             tags = [tag for tag in entry.tags if tag not in request.remove_tags]
             for tag in request.add_tags:
                 if tag not in tags:
@@ -311,11 +312,12 @@ async def batch_star(request: BatchStarRequest):
     check_unlocked()
     
     vault = get_vault_data()
+    requested_ids = set(request.ids)
     updated_count = 0
     now = datetime.now().isoformat()
     
     for entry in vault.entries:
-        if entry.id in request.ids and not entry.deleted:
+        if entry.id in requested_ids and not entry.deleted:
             if entry.starred != request.starred:
                 entry.starred = request.starred
                 entry.updated_at = now

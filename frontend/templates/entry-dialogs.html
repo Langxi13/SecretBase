@@ -95,11 +95,11 @@
                     </div>
                     <div class="form-group">
                         <label>标题 *</label>
-                        <input type="text" v-model="entryForm.title" placeholder="请输入标题" required>
+                        <input type="text" v-model="entryForm.title" placeholder="请输入标题" maxlength="200" required>
                     </div>
                     <div class="form-group">
                         <label>网址</label>
-                        <input type="url" v-model="entryForm.url" placeholder="https://example.com">
+                        <input type="url" v-model="entryForm.url" placeholder="https://example.com" maxlength="2000">
                     </div>
                     <div class="form-group">
                         <label>标签</label>
@@ -113,6 +113,7 @@
                                 type="text"
                                 v-model="newTag"
                                 placeholder="输入标签后按回车"
+                                maxlength="50"
                                 @keydown.enter.prevent="addTag"
                                 @keydown.tab.prevent="addTag"
                             >
@@ -142,6 +143,7 @@
                                 type="text"
                                 v-model="newGroup"
                                 placeholder="输入密码组后按回车"
+                                maxlength="50"
                                 @keydown.enter.prevent="addGroup"
                                 @keydown.tab.prevent="addGroup"
                             >
@@ -151,6 +153,7 @@
                             class="group-description-input"
                             type="text"
                             placeholder="新密码组简介，可选"
+                            maxlength="300"
                             @keydown.enter.prevent="addGroup"
                         >
                         <div v-if="groups.length > 0" class="existing-choice-row">
@@ -171,8 +174,8 @@
                         <label>自定义字段</label>
                         <div class="fields-editor">
                             <div v-for="(field, index) in entryForm.fields" :key="index" class="field-item">
-                                <input type="text" v-model="field.name" placeholder="字段名">
-                                <input type="text" v-model="field.value" placeholder="字段值">
+                                <input type="text" v-model="field.name" placeholder="字段名" maxlength="100">
+                                <input type="text" v-model="field.value" placeholder="字段值" maxlength="10000">
                                 <label class="checkbox-label compact-check-option">
                                     <input type="checkbox" v-model="field.copyable">
                                     可复制
@@ -190,7 +193,7 @@
                     </div>
                     <div class="form-group">
                         <label>备注</label>
-                        <textarea v-model="entryForm.remarks" placeholder="添加备注..." rows="3"></textarea>
+                        <textarea v-model="entryForm.remarks" placeholder="添加备注..." rows="3" maxlength="2000"></textarea>
                     </div>
                 </div>
                 <div class="modal-footer">
@@ -198,7 +201,7 @@
                     <button v-if="showEditModal" class="btn-secondary" @click="createEntryFromCurrentEdit" :disabled="entrySaving">
                         在此基础上新建
                     </button>
-                    <button class="btn-primary" @click="saveEntry" :disabled="entrySaving || !entryForm.title">
+                    <button class="btn-primary" @click="saveEntry" :disabled="entrySaving || !entryForm.title.trim()">
                         {{ entrySaving ? '保存中...' : (showEditModal ? '保存' : '创建') }}
                     </button>
                 </div>
@@ -215,11 +218,11 @@
                 <div class="modal-body" :inert="groupSaving ? '' : null">
                     <div class="form-group">
                         <label>名称 *</label>
-                        <input type="text" v-model="groupForm.name" placeholder="例如：工作账号" @keydown.enter.prevent="saveGroup">
+                        <input type="text" v-model="groupForm.name" placeholder="例如：工作账号" maxlength="50" @keydown.enter.prevent="saveGroup">
                     </div>
                     <div class="form-group">
                         <label>简介</label>
-                        <textarea v-model="groupForm.description" placeholder="简单描述这个密码组" rows="3"></textarea>
+                        <textarea v-model="groupForm.description" placeholder="简单描述这个密码组" rows="3" maxlength="300"></textarea>
                     </div>
                 </div>
                 <div class="modal-footer">

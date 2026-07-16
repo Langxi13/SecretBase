@@ -94,7 +94,7 @@ async def restore_entry(entry_id: str):
     
     save_vault_data(vault)
     
-    logger.info(f"恢复条目: {entry_id}")
+    logger.info("恢复回收站条目成功")
     
     return {
         "success": True,
@@ -124,7 +124,7 @@ async def permanently_delete(entry_id: str):
     vault.deleted_entries.remove(entry)
     save_vault_data(vault)
     
-    logger.info(f"彻底删除: {entry_id}")
+    logger.info("彻底删除回收站条目成功")
     
     return {
         "success": True,

@@ -1,11 +1,13 @@
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
+const { readAppVersion } = require('./frontend-source');
 
 const root = path.resolve(__dirname, '..');
 const source = fs.readFileSync(path.join(root, 'frontend/js/desktop-zoom-indicator.js'), 'utf8');
 const styles = fs.readFileSync(path.join(root, 'frontend/css/desktop-components.css'), 'utf8');
 const indexHtml = fs.readFileSync(path.join(root, 'frontend/index.html'), 'utf8');
+const appVersion = readAppVersion();
 
 function createRuntime(mode, platform = 'windows') {
     const listeners = new Map();
@@ -150,7 +152,7 @@ if (server.listeners.has('secretbase:desktop-zoom-changed')) {
 if (server.listeners.has('keydown')) throw new Error('服务端模式不应拦截浏览器缩放快捷键');
 
 if (!styles.includes('.desktop-zoom-indicator.is-visible')) throw new Error('缩放提示可见样式缺失');
-if (!indexHtml.includes('js/desktop-zoom-indicator.js?v=20260715-sync-v1')) {
+if (!indexHtml.includes(`js/desktop-zoom-indicator.js?v=${appVersion}`)) {
     throw new Error('入口页没有加载桌面缩放提示脚本');
 }
 

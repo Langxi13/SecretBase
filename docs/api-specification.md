@@ -103,7 +103,7 @@ POST /auth/init
 
 **错误情况：**
 
-- 422: 密码为空或太短（最少 8 位）
+- 422: 新主密码长度不在 8 至 128 个字符范围内
 - 409: 主密码已设置
 
 ### 3.2 解锁
@@ -1161,7 +1161,7 @@ DELETE /ai/settings
 
 **使用 AI 解析自然语言文本为条目结构。**
 
-AI 解析要求用户已解锁并完成 AI 设置。前端调用前必须先查询 `GET /ai/status`，未配置时提示用户进入设置页配置 AI。AI 会尝试自主判断输入中是否包含多个独立条目。后端请求模型时使用严格 JSON object 输出约束，要求顶层返回 `entries` 数组。为兼容旧前端，响应仍保留 `parsed` 表示第一条解析结果；V1.2 新增 `parsed_entries` 和 `entry_count` 用于多条目录入。后端会归一化常见 AI 格式偏差，如 `items`、`accounts`、`records`、字段字典、标签字符串、`copyable`/`hidden` 字符串等。
+AI 解析要求用户已解锁并完成 AI 设置。前端调用前必须先查询 `GET /ai/status`，未配置时提示用户进入设置页配置 AI。单次输入最多 6000 个字符。AI 会尝试自主判断输入中是否包含多个独立条目。后端请求模型时使用严格 JSON object 输出约束，要求顶层返回 `entries` 数组。为兼容旧前端，响应仍保留 `parsed` 表示第一条解析结果；V1.2 新增 `parsed_entries` 和 `entry_count` 用于多条目录入。后端会归一化常见 AI 格式偏差，如 `items`、`accounts`、`records`、字段字典、标签字符串、`copyable`/`hidden` 字符串等。
 
 ```
 POST /ai/parse
@@ -2069,7 +2069,7 @@ GET /health
   "success": true,
   "data": {
     "status": "healthy",
-    "version": "5.0.1",
+    "version": "5.0.2",
     "uptime": 3600
   }
 }

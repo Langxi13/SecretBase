@@ -93,8 +93,8 @@
                 state.passwordError.value = '两次输入的密码不一致';
                 return;
             }
-            if (state.password.value.length < 8) {
-                state.passwordError.value = '密码至少 8 位';
+            if (state.password.value.length < 8 || state.password.value.length > 128) {
+                state.passwordError.value = '主密码必须为 8 至 128 个字符';
                 return;
             }
 
@@ -193,8 +193,8 @@
                 state.passwordForm.error = '请输入旧密码';
                 return;
             }
-            if (state.passwordForm.newPassword.length < 8) {
-                state.passwordForm.error = '新密码至少 8 位';
+            if (state.passwordForm.newPassword.length < 8 || state.passwordForm.newPassword.length > 128) {
+                state.passwordForm.error = '新密码必须为 8 至 128 个字符';
                 return;
             }
             if (state.passwordForm.newPassword !== state.passwordForm.confirmPassword) {

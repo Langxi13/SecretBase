@@ -136,7 +136,9 @@ function assert(condition, message) {
 
     store.clearFilters();
     assert(store.state.filters.group === null, '清除筛选必须恢复密码组筛选默认值');
-    assert(Array.isArray(store.state.filters.searchScopes), '清除筛选必须恢复搜索范围默认值');
+    assert(store.state.filters.searchScopes.includes('title'), '默认搜索范围必须支持直接搜索标题');
+    assert(store.state.filters.searchScopes.includes('field_names'), '默认搜索范围必须包含字段名');
+    assert(!store.state.filters.searchScopes.includes('field_values'), '字段值搜索必须由用户主动选择');
 
     console.log('PASS frontend store runtime');
 })().catch(error => {

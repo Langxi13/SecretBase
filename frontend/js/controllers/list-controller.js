@@ -74,11 +74,7 @@
 
         function toggleSidebar() {
             isSidebarCollapsed.value = !isSidebarCollapsed.value;
-            try {
-                localStorage.setItem('secretbase.sidebarCollapsed', String(isSidebarCollapsed.value));
-            } catch (error) {
-                // 本地存储不可用时仍保留本次会话内的状态切换。
-            }
+            window.SecretBaseStorage.setLocal('secretbase.sidebarCollapsed', isSidebarCollapsed.value);
         }
 
         async function applySort() {

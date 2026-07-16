@@ -228,13 +228,14 @@ assert "javascript" in response.headers["content-type"]
 assert "window.SECRETBASE_RUNTIME_CONFIG" in response.text
 assert '"apiBaseUrl": ""' in response.text
 assert '"mode": "desktop"' in response.text
-assert '"version": "5.0.1"' in response.text
+assert '"version": "5.0.2"' in response.text
 assert '"desktopShell": true' in response.text
 assert '"desktopPlatform": "macos"' in response.text
 assert '"desktopArchitecture": "arm64"' in response.text
 assert '"tray": false' in response.text
 assert response.headers["x-frame-options"] == "DENY"
 assert response.headers["referrer-policy"] == "no-referrer"
+assert response.headers["cache-control"] == "no-store"
 """,
             {
                 "SECRETBASE_MODE": "desktop",
@@ -262,6 +263,7 @@ client = TestClient(main.app, base_url="http://127.0.0.1")
 index_response = client.get("/")
 assert index_response.status_code == 200
 assert "text/html" in index_response.headers["content-type"]
+assert index_response.headers["cache-control"] == "no-store"
 assert '<div id="app"' in index_response.text
 assert 'js/template-loader.js' in index_response.text
 assert 'js/app.js' in index_response.text

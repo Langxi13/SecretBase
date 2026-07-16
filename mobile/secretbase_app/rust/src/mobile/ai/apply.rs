@@ -8,6 +8,7 @@ use crate::mobile::{
     models::{EntryDraft, EntryRecord, FieldRecord},
 };
 
+use super::assistant::ordered_selected_actions;
 use super::types::{
     ActionPlan, AssistantAction, OrganizeSuggestion, PendingAiPreview, PreviewData,
     TagGovernanceSuggestion,
@@ -76,7 +77,7 @@ fn apply_assistant(
     now: &str,
 ) -> Result<String, MobileError> {
     let mut applied = 0;
-    for action in actions.iter().filter(|item| selected.contains(&item.id)) {
+    for action in ordered_selected_actions(actions, selected)? {
         match action.action_type.as_str() {
             "create_group" => {
                 let name = required_name(action.name.as_deref(), "创建密码组操作缺少名称")?;

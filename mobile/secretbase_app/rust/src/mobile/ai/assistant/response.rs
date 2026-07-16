@@ -90,7 +90,6 @@ pub(crate) fn normalize_response(
                 format!("AI 返回了不允许的操作：{action_type}"),
             )
         })?;
-        domains.insert(domain);
         let mut action = parse_action(index, &action_type, object, pending)?;
         if action_type == "open_entry" {
             if navigation_entry_id.is_none() {
@@ -103,33 +102,33 @@ pub(crate) fn normalize_response(
             }
             continue;
         }
+        domains.insert(domain);
         let item = preview_item(&action, &entries);
         action.id = item.id.clone();
         items.push(item);
         actions.push(action);
     }
-    if domains.len() > 1 {
-        return Err(MobileError::new(
-            "AI_DOMAIN_CONFLICT",
-            "AI 将不同类型的管理任务混在同一计划中，已拒绝",
-        ));
+    let actual_domain = match domains.len() {
+        0 if navigation_entry_id.is_some() => "navigation",
+        0 => "none",
+        1 => domains.iter().next().copied().unwrap_or("none"),
+        _ => "composite",
+    };
+    let mut warnings = clean_string_list(payload.get("warnings"), 300);
+    if !declared_domain.is_empty() && declared_domain != actual_domain {
+        warnings.push("AI 声明的计划类型与实际操作不一致，已按实际操作归类。".to_string());
     }
-    let actual_domain = domains.iter().next().copied().unwrap_or("none");
-    if !declared_domain.is_empty() && declared_domain != "none" && declared_domain != actual_domain
-    {
-        return Err(MobileError::new(
-            "AI_DOMAIN_CONFLICT",
-            "AI 返回的计划类型与操作不一致",
-        ));
-    }
-    let warnings = clean_string_list(payload.get("warnings"), 300);
     let preview = if actions.is_empty() {
         None
     } else {
         let public = AiPreview {
             token: Uuid::new_v4().to_string(),
             kind: "assistant".to_string(),
-            title: "AI 管家操作计划".to_string(),
+            title: if actual_domain == "composite" {
+                "AI 管家复合操作计划".to_string()
+            } else {
+                "AI 管家操作计划".to_string()
+            },
             source_revision: pending.source_revision,
             items,
             warnings: warnings.clone(),
@@ -203,8 +202,8 @@ mod tests {
     }
 
     #[test]
-    fn mixed_management_domains_are_rejected() {
-        let document = sample_document();
+    fn mixed_management_domains_are_kept_as_a_reviewable_composite_plan() {
+        let mut document = sample_document();
         let real_id = document["entries"][0]["id"].as_str().unwrap().to_string();
         let pending = PendingAssistantRequest {
             token: "token".to_string(),
@@ -222,19 +221,69 @@ mod tests {
                 "message": "建议",
                 "domain": "tags",
                 "actions": [
-                    {"type": "create_tag", "name": "开发"},
+                    {"type": "create_tag", "name": "待整理"},
                     {"type": "create_group", "name": "工作"}
                 ],
                 "warnings": []
             }).to_string()}}]
         })
         .to_string();
-        let error = normalize_response(&document, &pending, &content)
-            .err()
-            .unwrap();
-        assert!(matches!(
-            error,
-            MobileError::Failure { ref code, .. } if code == "AI_DOMAIN_CONFLICT"
-        ));
+        let normalized = normalize_response(&document, &pending, &content).unwrap();
+        assert!(normalized
+            .warnings
+            .iter()
+            .any(|item| item.contains("已按实际操作归类")));
+        let pending_preview = normalized.preview.unwrap();
+        assert_eq!(pending_preview.preview.title, "AI 管家复合操作计划");
+        assert_eq!(pending_preview.preview.items.len(), 2);
+        let selected = pending_preview
+            .preview
+            .items
+            .iter()
+            .map(|item| item.id.clone())
+            .collect::<Vec<_>>();
+        crate::mobile::ai::apply_preview(
+            &mut document,
+            &pending_preview,
+            &selected,
+            "2026-07-16T00:00:00.000000Z",
+        )
+        .unwrap();
+        assert!(document["tags_meta"].get("待整理").is_some());
+        assert!(document["groups_meta"].get("工作").is_some());
+    }
+
+    #[test]
+    fn navigation_only_response_keeps_its_declared_domain() {
+        let document = sample_document();
+        let real_id = document["entries"][0]["id"].as_str().unwrap().to_string();
+        let pending = PendingAssistantRequest {
+            token: "token".to_string(),
+            source_revision: 1,
+            conversation_id: "conversation".to_string(),
+            user_message: "打开生产控制台".to_string(),
+            mode: "assistant".to_string(),
+            input_chars: 7,
+            input_lines: 1,
+            entry_aliases: HashMap::from([("E001".to_string(), real_id.clone())]),
+            field_aliases: HashMap::new(),
+        };
+        let content = json!({
+            "choices": [{"message": {"content": json!({
+                "message": "已定位条目",
+                "domain": "navigation",
+                "actions": [{"type": "open_entry", "entry_ref": "E001"}],
+                "warnings": []
+            }).to_string()}}]
+        })
+        .to_string();
+
+        let normalized = normalize_response(&document, &pending, &content).unwrap();
+        assert!(normalized.preview.is_none());
+        assert_eq!(
+            normalized.navigation_entry_id.as_deref(),
+            Some(real_id.as_str())
+        );
+        assert!(normalized.warnings.is_empty());
     }
 }

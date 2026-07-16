@@ -93,7 +93,7 @@
 
         function loadSavedAdvancedFilters() {
             try {
-                const raw = localStorage.getItem('secretbase.savedAdvancedFilters');
+                const raw = window.SecretBaseStorage.getLocal('secretbase.savedAdvancedFilters');
                 const parsed = raw ? JSON.parse(raw) : [];
                 savedAdvancedFilters.value = Array.isArray(parsed) ? parsed : [];
             } catch (error) {
@@ -102,7 +102,10 @@
         }
 
         function persistSavedAdvancedFilters() {
-            localStorage.setItem('secretbase.savedAdvancedFilters', JSON.stringify(savedAdvancedFilters.value));
+            window.SecretBaseStorage.setLocal(
+                'secretbase.savedAdvancedFilters',
+                JSON.stringify(savedAdvancedFilters.value)
+            );
         }
 
         function getAdvancedFilterSnapshot(name) {
