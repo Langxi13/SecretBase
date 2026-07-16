@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
+import 'package:secretbase/src/core/autofill_service.dart';
 import 'package:secretbase/src/core/biometric_unlock.dart';
 import 'package:secretbase/src/core/mobile_error_presenter.dart';
 import 'package:secretbase/src/core/theme/app_theme.dart';
@@ -12,6 +13,7 @@ import 'package:secretbase/src/core/widgets/mobile_chrome.dart';
 import 'package:secretbase/src/core/widgets/responsive_dialog.dart';
 import 'package:secretbase/src/data/vault_providers.dart';
 import 'package:secretbase/src/features/settings/transfer_service.dart';
+import 'package:secretbase/src/features/settings/autofill_settings_dialog.dart';
 import 'package:secretbase/src/features/update/mobile_update_controller.dart';
 import 'package:secretbase/src/rust/api/mobile.dart' as rust_api;
 import 'package:secretbase/src/rust/mobile/error.dart';
@@ -34,6 +36,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final preferences = ref.watch(preferencesProvider);
     final vault = ref.watch(vaultControllerProvider);
     final biometric = ref.watch(biometricStatusProvider);
+    final autofill = ref.watch(autofillStatusProvider);
     final update = ref.watch(mobileUpdateControllerProvider);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -175,6 +178,29 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                           const Divider(height: 1, indent: 56),
                           ListTile(
                             leading: const Icon(Icons.password_outlined),
+                            title: const Text('系统自动填充'),
+                            subtitle: Text(
+                              autofill.when(
+                                loading: () => '正在读取系统状态',
+                                error: (error, stackTrace) => '无法读取系统状态',
+                                data: (status) => status.supported
+                                    ? status.enabled
+                                          ? '已启用 · 本机验证后填充'
+                                          : '尚未设为系统自动填充服务'
+                                    : '当前系统不支持',
+                              ),
+                            ),
+                            trailing: const Icon(Icons.chevron_right),
+                            onTap: () async {
+                              await showAutofillSettingsDialog(
+                                context: context,
+                              );
+                              ref.invalidate(autofillStatusProvider);
+                            },
+                          ),
+                          const Divider(height: 1, indent: 56),
+                          ListTile(
+                            leading: const Icon(Icons.password),
                             title: const Text('修改主密码'),
                             trailing: const Icon(Icons.chevron_right),
                             onTap: _working ? null : _changePassword,

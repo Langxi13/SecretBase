@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:secretbase/src/core/security_lifecycle_guard.dart';
+import 'package:secretbase/src/core/autofill_vault_change_coordinator.dart';
 import 'package:secretbase/src/core/theme/app_theme.dart';
 import 'package:secretbase/src/features/update/mobile_update_widgets.dart';
 import 'package:secretbase/src/routing/app_router.dart';
@@ -30,7 +31,11 @@ class SecretBaseApp extends ConsumerWidget {
       ],
       routerConfig: router,
       builder: (context, child) => MobileUpdateCoordinator(
-        child: SecurityLifecycleGuard(child: child ?? const SizedBox.shrink()),
+        child: AutofillVaultChangeCoordinator(
+          child: SecurityLifecycleGuard(
+            child: child ?? const SizedBox.shrink(),
+          ),
+        ),
       ),
     );
   }

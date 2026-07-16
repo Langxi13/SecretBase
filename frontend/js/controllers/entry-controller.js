@@ -10,6 +10,9 @@
             copyToClipboard,
             normalizeFieldForEdit,
             entries,
+            filter,
+            activeTagName,
+            activeGroupName,
             currentPage,
             totalPages,
             selectedEntry,
@@ -56,6 +59,12 @@
 
         function openCreateModal() {
             resetEntryForm();
+            if (filter.value === 'tag' && activeTagName.value) {
+                entryForm.tags = [activeTagName.value];
+            }
+            if (filter.value === 'group' && activeGroupName.value) {
+                entryForm.groups = [activeGroupName.value];
+            }
             showCreateModal.value = true;
         }
 

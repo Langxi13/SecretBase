@@ -54,6 +54,10 @@ for expected in \
   'android:networkSecurityConfig=' \
   'android.permission.USE_BIOMETRIC' \
   'android.permission.REQUEST_INSTALL_PACKAGES' \
+  'android.permission.BIND_AUTOFILL_SERVICE' \
+  'android.service.autofill.AutofillService' \
+  'io.github.langxi13.secretbase.autofill.SecretBaseAutofillActivity' \
+  'io.github.langxi13.secretbase.autofill.SecretBaseAutofillService' \
   'androidx.core.content.FileProvider' \
   'android:grantUriPermissions="true"' \
   'android:enableOnBackInvokedCallback="true"'; do
@@ -80,6 +84,12 @@ for abi in "${abi_list[@]}"; do
   output_path="$temporary_dir/${abi//\//_}.so"
   unzip -p "$apk_path" "$library_path" >"$output_path"
   strings "$output_path" >"$output_path.strings"
+  if ! grep -Fq \
+    'Java_io_github_langxi13_secretbase_autofill_AutofillNativeBridge_openWithCredential' \
+    "$output_path.strings"; then
+    echo "Rust library is missing the Android Autofill JNI bridge: $library_path" >&2
+    exit 1
+  fi
   if grep -Eq "$forbidden_build_pattern" "$output_path.strings"; then
     echo "Rust library contains a private or machine-specific build path: $library_path" >&2
     exit 1

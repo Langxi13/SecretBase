@@ -12,7 +12,7 @@ use zeroize::Zeroizing;
 
 use super::{
     ai::{self, PendingAiPreview, PendingAiRequest, PendingAssistantRequest},
-    document,
+    autofill, document,
     error::MobileError,
     models::{
         AiApplyResult, AiAssistantRequestPlan, AiAssistantTurnResult, AiConversation,
@@ -206,6 +206,7 @@ pub fn create_vault(password: String) -> Result<VaultStatus, MobileError> {
         }
         storage::delete_secure_settings(&root)?;
         storage::delete_ai_history(&root)?;
+        storage::delete_autofill_settings(&root)?;
         let document = VaultDocument::from_value(document::new_document(&now()))?;
         let session = VaultSession::create(&password, document)?;
         storage::persist_vault(&root, &session.encrypted_bytes()?, false)?;
@@ -319,6 +320,92 @@ pub fn save_entry(
             } else {
                 "条目已更新".to_string()
             })
+        })
+    })
+}
+
+#[cfg(target_os = "android")]
+pub fn save_autofill_entry_with_device_credential(
+    data_root: String,
+    credential: Vec<u8>,
+    draft: EntryDraft,
+) -> Result<OperationResult, MobileError> {
+    let credential = Zeroizing::new(credential);
+    save_autofill_entry(data_root, draft, |content| {
+        VaultSession::unlock_with_device_credential(&credential, content).map_err(|_| {
+            MobileError::new(
+                "BIOMETRIC_CREDENTIAL_INVALID",
+                "指纹解锁凭据已失效，请使用主密码并重新开启指纹解锁",
+            )
+        })
+    })
+}
+
+#[cfg(target_os = "android")]
+pub fn save_autofill_entry_with_password(
+    data_root: String,
+    password: String,
+    draft: EntryDraft,
+) -> Result<OperationResult, MobileError> {
+    if password.is_empty() {
+        return Err(MobileError::new("VALIDATION_FAILED", "请输入主密码"));
+    }
+    let password = Zeroizing::new(password);
+    save_autofill_entry(data_root, draft, |content| {
+        Ok(VaultSession::unlock(password.as_str(), content)?)
+    })
+}
+
+#[cfg(target_os = "android")]
+fn save_autofill_entry(
+    data_root: String,
+    draft: EntryDraft,
+    authenticate: impl FnOnce(&[u8]) -> Result<VaultSession, MobileError>,
+) -> Result<OperationResult, MobileError> {
+    let root = PathBuf::from(data_root);
+    if !root.is_absolute() {
+        return Err(MobileError::new(
+            "INVALID_PATH",
+            "自动填充数据目录必须是绝对路径",
+        ));
+    }
+    with_runtime(|runtime| {
+        let content = storage::read_vault(&root)?;
+        let mut authenticated = authenticate(&content)?;
+        let mut authenticated_value = authenticated.document().as_value().clone();
+        if document::prepare_for_mobile(&mut authenticated_value, &now())? {
+            authenticated.replace_document(authenticated_value)?;
+        }
+
+        if runtime.session.is_some() {
+            if runtime.root.as_ref() != Some(&root) {
+                return Err(MobileError::new(
+                    "RUNTIME_ACTIVE",
+                    "当前解锁会话与自动填充密码库不一致",
+                ));
+            }
+            let revision = runtime.revision;
+            return runtime.transaction(revision, |value| {
+                document::save_entry(value, None, &draft, &now())?;
+                Ok("登录信息已保存为新条目".to_string())
+            });
+        }
+
+        let mut candidate = authenticated.document().as_value().clone();
+        document::save_entry(&mut candidate, None, &draft, &now())?;
+        let document = VaultDocument::from_value(candidate)?;
+        let encrypted = authenticated.encrypted_document_bytes(&document)?;
+        storage::persist_vault(&root, &encrypted, true)?;
+        runtime.root = Some(root);
+        runtime.revision = runtime.revision.saturating_add(1).max(1);
+        runtime.pending_import = None;
+        runtime.pending_ai_request = None;
+        runtime.pending_ai_assistant = None;
+        runtime.pending_ai_preview = None;
+        runtime.pending_ai_undo = None;
+        Ok(OperationResult {
+            revision: runtime.revision,
+            message: "登录信息已保存为新条目".to_string(),
         })
     })
 }
@@ -509,6 +596,7 @@ pub fn apply_import(token: String) -> Result<OperationResult, MobileError> {
         runtime.pending_ai_preview = None;
         runtime.pending_ai_undo = None;
         storage::delete_ai_history(&root)?;
+        autofill::clear_settings(&root)?;
         Ok(OperationResult {
             revision: runtime.revision,
             message: "加密密码库已导入".to_string(),
@@ -542,6 +630,13 @@ pub fn change_password(
         let root = runtime.root()?.to_path_buf();
         let document = VaultDocument::from_value(runtime.session()?.document().as_value().clone())?;
         let replacement = VaultSession::create(&new_password, document)?;
+        let autofill_settings_rekeyed =
+            autofill::rekey_settings(&root, runtime.session()?, &replacement).unwrap_or_else(
+                |_| {
+                    let _ = autofill::clear_settings(&root);
+                    false
+                },
+            );
         storage::persist_vault(&root, &replacement.encrypted_bytes()?, true)?;
         let settings_path = storage::secure_settings_path(&root);
         if settings_path.exists() {
@@ -557,7 +652,11 @@ pub fn change_password(
         runtime.revision = runtime.revision.saturating_add(1);
         Ok(OperationResult {
             revision: runtime.revision,
-            message: "主密码已更新；本机 AI 设置和对话历史已清除".to_string(),
+            message: if autofill_settings_rekeyed {
+                "主密码已更新；自动填充绑定已重新加密，本机 AI 设置和对话历史已清除".to_string()
+            } else {
+                "主密码已更新；本机 AI 设置、对话历史和无效自动填充绑定已清除".to_string()
+            },
         })
     })
 }

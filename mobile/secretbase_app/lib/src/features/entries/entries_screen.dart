@@ -318,7 +318,12 @@ class _EntriesScreenState extends ConsumerState<EntriesScreen> {
 
   Future<void> _createEntry() async {
     try {
-      final message = await showEntryEditorDialog(context: context, ref: ref);
+      final message = await showEntryEditorDialog(
+        context: context,
+        ref: ref,
+        initialTags: _tag == null ? const {} : {_tag!},
+        initialGroups: _group == null ? const {} : {_group!},
+      );
       if (message != null && mounted) {
         ScaffoldMessenger.of(
           context,

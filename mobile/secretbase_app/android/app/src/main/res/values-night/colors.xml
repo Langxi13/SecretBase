@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="autofill_surface">#18211F</color>
+    <color name="autofill_outline">#44514F</color>
+    <color name="autofill_text_primary">#E4ECEA</color>
+    <color name="autofill_text_secondary">#B5C5C2</color>
+</resources>

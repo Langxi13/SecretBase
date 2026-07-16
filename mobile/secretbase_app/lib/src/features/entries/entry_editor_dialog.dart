@@ -12,6 +12,8 @@ Future<String?> showEntryEditorDialog({
   required WidgetRef ref,
   EntryRecord? source,
   bool duplicate = false,
+  Set<String> initialTags = const {},
+  Set<String> initialGroups = const {},
 }) async {
   final taxonomy = await Future.wait([
     rust_api.listTaxonomy(kind: 'tags'),
@@ -25,6 +27,8 @@ Future<String?> showEntryEditorDialog({
     builder: (_) => EntryEditorDialog(
       source: source,
       duplicate: duplicate,
+      initialTags: initialTags,
+      initialGroups: initialGroups,
       availableTags: taxonomy[0],
       availableGroups: taxonomy[1],
       ref: ref,
@@ -39,11 +43,15 @@ class EntryEditorDialog extends StatefulWidget {
     required this.ref,
     this.source,
     this.duplicate = false,
+    this.initialTags = const {},
+    this.initialGroups = const {},
     super.key,
   });
 
   final EntryRecord? source;
   final bool duplicate;
+  final Set<String> initialTags;
+  final Set<String> initialGroups;
   final List<TaxonomyRecord> availableTags;
   final List<TaxonomyRecord> availableGroups;
   final WidgetRef ref;
@@ -80,8 +88,8 @@ class _EntryEditorDialogState extends State<EntryEditorDialog> {
     _fields =
         source?.fields.map(_EditableField.fromRecord).toList() ??
         [_EditableField.empty()];
-    _tags = {...?source?.tags};
-    _groups = {...?source?.groups};
+    _tags = source == null ? {...widget.initialTags} : {...source.tags};
+    _groups = source == null ? {...widget.initialGroups} : {...source.groups};
     _starred = source?.starred ?? false;
   }
 

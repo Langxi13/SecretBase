@@ -77,6 +77,10 @@ android {
             isMinifyEnabled = true
             isShrinkResources = true
             signingConfig = signingConfigs.findByName("release")
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro",
+            )
         }
     }
 }
@@ -92,5 +96,8 @@ flutter {
 }
 
 dependencies {
+    implementation("androidx.autofill:autofill:1.3.0")
     implementation("androidx.biometric:biometric:1.1.0")
+    implementation("com.google.android.material:material:1.14.0")
+    testImplementation("junit:junit:4.13.2")
 }

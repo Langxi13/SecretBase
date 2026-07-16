@@ -213,20 +213,20 @@ http://127.0.0.1:8001
 
 `v3.0.0` 已完成由浏览器承载界面的桌面基础模式。`v3.1.0` 在此基础上增加 Windows 独立桌面窗口：使用 PyInstaller one-folder、pywebview 和 Edge WebView2，用户双击 `SecretBase.exe` 即可使用，不需要单独打开浏览器或安装 Python 依赖。
 
-V5.0 是当前稳定版本，已建立 Windows、macOS 和 Android 的统一签名更新基线。GitHub Release 包含：
+V5.1 是当前稳定版本，延续 Windows、macOS 和 Android 的统一签名更新基线，并为 Android 10+ 增加系统级自动填充。GitHub Release 包含：
 
 ```text
-SecretBase-v5.0.2-windows-x64-setup.exe
-SecretBase-v5.0.2-windows-x64.zip
-SecretBase-v5.0.2-macos-arm64.dmg
-SecretBase-v5.0.2-macos-arm64.zip
-SecretBase-v5.0.2-android-universal.apk
+SecretBase-v5.1.0-windows-x64-setup.exe
+SecretBase-v5.1.0-windows-x64.zip
+SecretBase-v5.1.0-macos-arm64.dmg
+SecretBase-v5.1.0-macos-arm64.zip
+SecretBase-v5.1.0-android-universal.apk
 secretbase-update-v1.json
 secretbase-update-v1.json.sig
 SHA256SUMS.txt
 ```
 
-V5.0.2 的完整审计范围、自动化门禁和真机回归项见 [发布评估](docs/release-assessment-v5.0.2.md)。
+V5.1.0 的完整审计范围、自动化门禁和真机回归项见 [发布评估](docs/release-assessment-v5.1.0.md)。
 
 Windows 独立版默认将 vault、备份、日志、设置和 WebView 数据保存在 `%LOCALAPPDATA%\SecretBase\`。发布包只包含程序资源，构建时会扫描并拒绝 `.env`、vault、备份、日志和本地设置文件。桌面导出使用 Windows 原生“另存为”，外部网址交给系统默认浏览器打开；重复启动会恢复并聚焦已有窗口。
 
@@ -243,7 +243,7 @@ cargo clippy --locked --all-targets --all-features -- -D warnings
 cargo test --locked --release --all-features
 ```
 
-V5.0 Android 客户端已经正式发布。它使用 Flutter + Rust，完全脱离浏览器和 FastAPI，覆盖创建与解锁、Android Keystore 指纹解锁、条目、标签、密码组、回收站、加密迁移、生命周期锁定和五项需用户确认的 AI 辅助能力。移动界面使用适配手机与平板的 Material 3 导航、紧凑卡片、来源感知返回、双击返回退出和分组式 AI 计划审核；AI 输入器通过圆形 `+` 收纳快捷整理、模式和范围，应用后的计划可在 revision 未变化时撤回。Vault 与恢复副本保存在 Android 应用私有目录，正式签名 APK 后续可直接覆盖升级。
+V5 Android 客户端已经正式发布。它使用 Flutter + Rust，完全脱离浏览器和 FastAPI，覆盖创建与解锁、Android Keystore 指纹解锁、系统自动填充、条目、标签、密码组、回收站、加密迁移、生命周期锁定和五项需用户确认的 AI 辅助能力。自动填充只在用户通过本机验证并选择条目后返回密码，绑定与字段映射使用独立加密文件保存。移动界面使用适配手机与平板的 Material 3 导航、紧凑卡片、来源感知返回、双击返回退出和分组式 AI 计划审核；AI 输入器通过圆形 `+` 收纳快捷整理、模式和范围，应用后的计划可在 revision 未变化时撤回。Vault 与恢复副本保存在 Android 应用私有目录，正式签名 APK 可直接覆盖升级。
 
 低内存 Linux 开发机只构建 arm64：
 
@@ -673,7 +673,7 @@ http://127.0.0.1:8001
 
 `v3.0.0` completes the browser-hosted desktop foundation. `v3.1.0` adds an independent Windows window built with PyInstaller one-folder, pywebview, and Edge WebView2. Users launch `SecretBase.exe` directly without opening a separate browser or installing Python dependencies.
 
-V5.0 is the current stable release and establishes one signed update baseline for Windows, macOS, and Android. GitHub Release provides the Windows installer and portable ZIP, the macOS DMG and ZIP, the Android APK, the signed update manifest, and `SHA256SUMS.txt`.
+V5.1 is the current stable release. It keeps the signed Windows, macOS, and Android update baseline and adds Android 10+ system Autofill with local authentication and explicit credential selection. GitHub Release provides the Windows installer and portable ZIP, the macOS DMG and ZIP, the Android APK, the signed update manifest, and `SHA256SUMS.txt`.
 
 Desktop data is stored under `%LOCALAPPDATA%\SecretBase\`. Build validation rejects `.env`, vault, backup, log, and local settings files. Native exports use the Windows Save As dialog, external URLs open in the system browser, and a second launch activates the existing window.
 

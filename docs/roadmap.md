@@ -9,7 +9,7 @@ SecretBase is intentionally scoped as a single-user encrypted vault. The priorit
 - Maintain a simple FastAPI backend and vendored Vue frontend with no runtime CDN dependency.
 - Keep production deployment practical behind nginx or another reverse proxy.
 - Maintain the stable Windows and macOS desktop packaging, diagnostics, lifecycle, and data-safety behavior described in [App Roadmap](app-roadmap.md).
-- Maintain the released Android-first Flutter/Rust client across hardware, encrypted migration, biometric unlock, AI safety, and three-ABI/API 29/36 gates.
+- Maintain the released Android-first Flutter/Rust client across hardware, encrypted migration, biometric unlock, system Autofill, AI safety, and three-ABI/API 29/36 gates.
 - Maintain the released V5 signed-update baseline: Windows in-place updates, Android system-confirmed replacement, and macOS signed-manifest notifications.
 - Keep Web, desktop, and Android AI plans behaviorally aligned while preserving the no-existing-field-values network boundary.
 
@@ -30,11 +30,12 @@ SecretBase is intentionally scoped as a single-user encrypted vault. The priorit
 - macOS V3.3 arm64 DMG/ZIP packaging, WKWebView lifecycle, native zoom controls, CI, and Apple Silicon hardware acceptance.
 - Normative Vault V1 format documentation, public Python-compatible golden vectors, and an isolated Rust reference core.
 - Android 10+ Flutter/Rust client with private storage, lifecycle locking, Keystore-backed biometric unlock, entries, tags, groups, trash, encrypted transfer, a conversational AI manager, and revision-bound AI undo.
+- Android system Autofill with local authentication, explicit candidate selection, encrypted target bindings, inline suggestions, and save confirmation.
 - Signed stable update manifests, Windows installer handoff, Android package identity verification, and protected release-key environments.
 
 ## Later, If Needed
 
-- iOS feasibility and adaptation after the stable V5.0.x maintenance line, with App Store signing and distribution requirements planned separately.
+- iOS adaptation remains postponed; revisit only when App Store signing and distribution constraints are worth the maintenance cost.
 - Better large-vault performance if real usage outgrows pagination.
 - More compact and modular frontend organization.
 - Additional production health check automation.

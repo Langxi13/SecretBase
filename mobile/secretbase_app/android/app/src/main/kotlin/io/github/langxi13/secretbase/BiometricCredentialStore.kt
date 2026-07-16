@@ -10,6 +10,7 @@ import android.util.AtomicFile
 import androidx.biometric.BiometricManager
 import androidx.biometric.BiometricPrompt
 import androidx.core.content.ContextCompat
+import androidx.fragment.app.FragmentActivity
 import io.flutter.plugin.common.MethodChannel
 import java.io.File
 import java.security.KeyStore
@@ -21,7 +22,7 @@ import javax.crypto.SecretKeyFactory
 import javax.crypto.spec.GCMParameterSpec
 
 internal class BiometricCredentialStore(
-    private val activity: MainActivity,
+    private val activity: FragmentActivity,
 ) {
     companion object {
         private const val KEY_ALIAS = "secretbase_device_unlock_v1"
@@ -37,24 +38,31 @@ internal class BiometricCredentialStore(
         File(activity.filesDir, "biometric/device-unlock.v1"),
     )
     private var prompt: BiometricPrompt? = null
-    private var activeResult: MethodChannel.Result? = null
+    private data class ActiveResult(
+        val success: (Any?) -> Unit,
+        val error: (String, String) -> Unit,
+    )
+
+    private var activeResult: ActiveResult? = null
     private var pendingCredential: ByteArray? = null
 
     fun status(result: MethodChannel.Result) {
+        result.success(status())
+    }
+
+    fun status(): Map<String, Any> {
         val authentication = biometricManager.canAuthenticate(
             BiometricManager.Authenticators.BIOMETRIC_STRONG,
         )
         if (credentialFile.baseFile.exists() && !keyExists()) {
             clearCredential()
         }
-        result.success(
-            mapOf(
-                "supported" to (authentication != BiometricManager.BIOMETRIC_ERROR_NO_HARDWARE),
-                "enrolled" to (authentication == BiometricManager.BIOMETRIC_SUCCESS),
-                "credentialStored" to (credentialFile.baseFile.exists() && keyExists()),
-                "hardwareBacked" to keyIsHardwareBacked(),
-                "code" to authentication,
-            ),
+        return mapOf(
+            "supported" to (authentication != BiometricManager.BIOMETRIC_ERROR_NO_HARDWARE),
+            "enrolled" to (authentication == BiometricManager.BIOMETRIC_SUCCESS),
+            "credentialStored" to (credentialFile.baseFile.exists() && keyExists()),
+            "hardwareBacked" to keyIsHardwareBacked(),
+            "code" to authentication,
         )
     }
 
@@ -95,7 +103,27 @@ internal class BiometricCredentialStore(
     }
 
     fun read(result: MethodChannel.Result) {
-        if (!begin(result)) return
+        read(
+            onSuccess = result::success,
+            onError = { code, message -> result.error(code, message, null) },
+        )
+    }
+
+    fun read(
+        onSuccess: (ByteArray) -> Unit,
+        onError: (String, String) -> Unit,
+    ) {
+        if (!begin(
+                onSuccess = { value ->
+                    if (value is ByteArray) {
+                        onSuccess(value)
+                    } else {
+                        onError("BIOMETRIC_STORAGE_FAILED", "生物识别未返回安全凭据")
+                    }
+                },
+                onError = onError,
+            )
+        ) return
         if (!credentialFile.baseFile.exists()) {
             fail("BIOMETRIC_NOT_ENABLED", "尚未开启指纹解锁")
             return
@@ -141,9 +169,14 @@ internal class BiometricCredentialStore(
             result.error("BIOMETRIC_BUSY", "生物识别操作正在进行", null)
             return
         }
+        result.success(delete())
+    }
+
+    fun delete(): Boolean {
+        if (activeResult != null) return false
         val existed = credentialFile.baseFile.exists() || keyExists()
         clearCredential()
-        result.success(existed)
+        return existed
     }
 
     fun dispose() {
@@ -151,17 +184,29 @@ internal class BiometricCredentialStore(
         prompt = null
         pendingCredential?.fill(0)
         pendingCredential = null
-        activeResult?.error("BIOMETRIC_CANCELED", "生物识别操作已取消", null)
+        activeResult?.error("BIOMETRIC_CANCELED", "生物识别操作已取消")
         activeResult = null
     }
 
     private fun begin(result: MethodChannel.Result, credential: ByteArray? = null): Boolean {
+        return begin(
+            credential = credential,
+            onSuccess = result::success,
+            onError = { code, message -> result.error(code, message, null) },
+        )
+    }
+
+    private fun begin(
+        credential: ByteArray? = null,
+        onSuccess: (Any?) -> Unit,
+        onError: (String, String) -> Unit,
+    ): Boolean {
         if (activeResult != null) {
             credential?.fill(0)
-            result.error("BIOMETRIC_BUSY", "生物识别操作正在进行", null)
+            onError("BIOMETRIC_BUSY", "生物识别操作正在进行")
             return false
         }
-        activeResult = result
+        activeResult = ActiveResult(success = onSuccess, error = onError)
         pendingCredential = credential
         return true
     }
@@ -255,11 +300,9 @@ internal class BiometricCredentialStore(
             @Suppress("DEPRECATION")
             builder.setUserAuthenticationValidityDurationSeconds(-1)
         }
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-            builder.setUnlockedDeviceRequired(true)
-            if (useStrongBox && activity.packageManager.hasSystemFeature("android.hardware.strongbox_keystore")) {
-                builder.setIsStrongBoxBacked(true)
-            }
+        builder.setUnlockedDeviceRequired(true)
+        if (useStrongBox && activity.packageManager.hasSystemFeature("android.hardware.strongbox_keystore")) {
+            builder.setIsStrongBoxBacked(true)
         }
         return try {
             KeyGenerator.getInstance(KeyProperties.KEY_ALGORITHM_AES, KEYSTORE).run {
@@ -359,6 +402,6 @@ internal class BiometricCredentialStore(
         prompt = null
         pendingCredential?.fill(0)
         pendingCredential = null
-        result.error(code, message, null)
+        result.error(code, message)
     }
 }

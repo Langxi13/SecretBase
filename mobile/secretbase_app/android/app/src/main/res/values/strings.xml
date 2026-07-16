@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="autofill_title">SecretBase 自动填充</string>
+    <string name="autofill_unlock_subtitle">验证后选择要填充的条目</string>
+    <string name="master_password">主密码</string>
+    <string name="biometric">指纹</string>
+    <string name="unlock">解锁</string>
+    <string name="autofill_filter_entries">筛选条目</string>
+    <string name="autofill_remember_binding">记住此网站或应用与所选条目的绑定</string>
+    <string name="entry_title">条目名称</string>
+    <string name="url">网址</string>
+    <string name="autofill_masked_password">密码  ••••••••</string>
+    <string name="confirm_save">确认保存</string>
+    <string name="autofill_block_target">不再为此网站或应用显示</string>
+    <string name="select">选择</string>
+    <string name="autofill_candidate_count">%1$d 个候选条目</string>
+    <string name="autofill_username_value">账号  %1$s</string>
+    <string name="autofill_username_missing">账号  未识别</string>
+</resources>

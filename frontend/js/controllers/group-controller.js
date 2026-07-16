@@ -31,9 +31,6 @@
             loadGroups,
             loadEntries,
             currentPage,
-            entryForm,
-            resetEntryForm,
-            showCreateModal,
             showGroupEntryPicker,
             groupPickerEntries,
             groupPickerSelectedIds,
@@ -191,13 +188,6 @@
             await loadEntries(1);
         }
 
-        function openCreateEntryForActiveGroup() {
-            if (!activeGroupName.value) return;
-            resetEntryForm();
-            entryForm.groups = [activeGroupName.value];
-            showCreateModal.value = true;
-        }
-
         async function openGroupEntryPicker() {
             if (!activeGroupName.value || groupPickerLoading.value || groupPickerSaving.value) return;
             showGroupEntryPicker.value = true;
@@ -280,7 +270,6 @@
             saveGroup,
             confirmDeleteGroup,
             filterByGroup,
-            openCreateEntryForActiveGroup,
             openGroupEntryPicker,
             closeGroupEntryPicker,
             goToGroupPickerPage,

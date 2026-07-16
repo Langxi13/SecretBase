@@ -12,13 +12,14 @@ import android.content.pm.PackageInfo
 import android.content.pm.PackageManager
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
-import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.os.PersistableBundle
 import android.view.WindowManager
 import android.provider.Settings
 import androidx.core.content.FileProvider
+import androidx.core.net.toUri
+import io.github.langxi13.secretbase.autofill.AutofillPlatform
 import io.flutter.embedding.android.FlutterFragmentActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
@@ -34,6 +35,7 @@ class MainActivity : FlutterFragmentActivity() {
 
     private var securityChannel: MethodChannel? = null
     private var biometricCredentialStore: BiometricCredentialStore? = null
+    private var autofillPlatform: AutofillPlatform? = null
     private var receiverRegistered = false
     private var pendingExportResult: MethodChannel.Result? = null
     private var pendingExportBytes: ByteArray? = null
@@ -53,10 +55,14 @@ class MainActivity : FlutterFragmentActivity() {
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
         biometricCredentialStore = BiometricCredentialStore(this)
+        autofillPlatform = AutofillPlatform(this)
         MethodChannel(
             flutterEngine.dartExecutor.binaryMessenger,
             PLATFORM_CHANNEL,
         ).setMethodCallHandler { call, result ->
+            if (autofillPlatform?.handle(call, result) == true) {
+                return@setMethodCallHandler
+            }
             when (call.method) {
                 "getApplicationDataRoot" -> result.success(filesDir.absolutePath)
                 "getApplicationInfo" -> result.success(currentApplicationInfo())
@@ -151,6 +157,7 @@ class MainActivity : FlutterFragmentActivity() {
         pendingExportBytes = null
         biometricCredentialStore?.dispose()
         biometricCredentialStore = null
+        autofillPlatform = null
         securityChannel = null
         super.onDestroy()
     }
@@ -251,7 +258,7 @@ class MainActivity : FlutterFragmentActivity() {
     private fun openInstallPermission() {
         val intent = Intent(
             Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
-            Uri.parse("package:$packageName"),
+            "package:$packageName".toUri(),
         )
         startActivity(intent)
     }
@@ -302,35 +309,22 @@ class MainActivity : FlutterFragmentActivity() {
         }
     }
 
-    @Suppress("DEPRECATION")
     private fun packageInfo(packageId: String): PackageInfo? = try {
-        val flags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-            PackageManager.GET_SIGNING_CERTIFICATES
-        } else {
-            PackageManager.GET_SIGNATURES
-        }
-        packageManager.getPackageInfo(packageId, flags)
+        packageManager.getPackageInfo(packageId, PackageManager.GET_SIGNING_CERTIFICATES)
     } catch (_: PackageManager.NameNotFoundException) {
         null
     }
 
-    @Suppress("DEPRECATION")
     private fun archivePackageInfo(file: File): PackageInfo? {
-        val flags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-            PackageManager.GET_SIGNING_CERTIFICATES
-        } else {
-            PackageManager.GET_SIGNATURES
-        }
-        return packageManager.getPackageArchiveInfo(file.absolutePath, flags)
+        return packageManager.getPackageArchiveInfo(
+            file.absolutePath,
+            PackageManager.GET_SIGNING_CERTIFICATES,
+        )
     }
 
-    @Suppress("DEPRECATION")
     private fun signerSha256(info: PackageInfo): String {
-        val signature = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-            info.signingInfo?.apkContentsSigners?.firstOrNull()
-        } else {
-            info.signatures?.firstOrNull()
-        } ?: throw IllegalStateException("应用签名不存在")
+        val signature = info.signingInfo?.apkContentsSigners?.firstOrNull()
+            ?: throw IllegalStateException("应用签名不存在")
         return MessageDigest.getInstance("SHA-256")
             .digest(signature.toByteArray())
             .joinToString("") { byte -> "%02x".format(byte) }

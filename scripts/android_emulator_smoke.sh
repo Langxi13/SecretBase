@@ -55,6 +55,19 @@ trap capture_evidence EXIT
 wait_for_package_manager
 adb logcat -c
 install_apk
+package_dump="${output_prefix}-package.txt"
+adb shell dumpsys package "$package_name" >"$package_dump"
+if ! grep -Fq 'SecretBaseAutofillService' "$package_dump"; then
+  echo "SecretBase AutofillService is not registered in the installed APK." >&2
+  exit 1
+fi
+adb shell settings put secure autofill_service \
+  "${package_name}/.autofill.SecretBaseAutofillService"
+enabled_autofill=$(adb shell settings get secure autofill_service | tr -d '\r')
+if [[ "$enabled_autofill" != *"SecretBaseAutofillService"* ]]; then
+  echo "SecretBase AutofillService could not be enabled on the emulator." >&2
+  exit 1
+fi
 adb shell am start -W -n "$activity_name" | tee "${output_prefix}-launch.txt"
 sleep 8
 

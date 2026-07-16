@@ -1,6 +1,6 @@
 # SecretBase V5 Android 实施计划
 
-本文档定义 V5.0 Android 首版的架构、阶段、功能边界和验收标准。状态：`v5.0.0` 正式基线、GitHub 三 ABI 构建、API 29/36 模拟器和永久签名发布已完成，继续进行 arm64 真机覆盖升级和跨桌面迁移验收。
+本文档定义 V5 Android 的架构、阶段、功能边界和验收标准。状态：`v5.0.0` 正式基线和 V5.1 Android 系统自动填充已完成，继续使用三 ABI、API 29/36 模拟器、永久签名和 arm64 真机回归门禁。
 
 ## 1. 产品目标
 
@@ -39,8 +39,9 @@ tests/fixtures/vault-v1/   Python、Rust、Flutter 共用黄金向量
 - 普通 AI 只发送 hostname 和结构元数据，并使用临时条目/字段别名；AI 新建是唯一允许用户主动发送新字段值的模式，且必须二次确认。
 - AI 配置和对话历史分别使用用途隔离密钥加密，默认只允许 HTTPS；敏感新建原文不写入历史或后续普通上下文。
 - Storage Access Framework 导入导出、敏感剪贴板标记与自动清理、明暗主题和中文响应式界面。
+- Android 10+ 原生系统自动填充：本机身份验证、明确候选选择、加密目标绑定和字段映射、Android 11+ 行内建议、新登录信息保存确认及目标停用管理。
 
-本机已通过 Flutter 分析、29 项 Dart/Widget 测试、Vault Core 8 项测试和移动端 Rust 23 项测试。当前生物识别候选版已于 2026-07-16 通过 Android CI 的三 ABI Release APK、隐私扫描及 API 29/36 模拟器；仍需真机指纹验收。本机仅构建 arm64，避免在低内存服务器上并行编译。
+V5.1 候选已通过 Flutter 分析、37 项 Dart/Widget 测试、Vault Core 8 项测试、移动端 Rust 30 项测试、Android 原生单元测试和 Release Lint 零错误。本机保持串行构建；三 ABI Release APK、隐私扫描及 API 29/36 模拟器由 GitHub CI 执行，系统自动填充仍需 Chrome、原生登录页和新密码页的 arm64 真机回归。
 
 ## 3. 分阶段实施
 
@@ -91,8 +92,8 @@ tests/fixtures/vault-v1/   Python、Rust、Flutter 共用黄金向量
 
 首版包含：本地 Vault、主密码与指纹解锁、条目、搜索、自定义字段、标签、密码组、回收站、加密导入导出、主题、生命周期锁定、默认对话式 AI 管家、一次性 AI 撤回和五项需用户确认的专业 AI 工具。
 
-首版不包含：云同步、账号系统、团队共享、浏览器自动填充、系统 PIN/图案代替指纹、Wear OS、平板专属双栏、Play 商店发布和 iOS 包。
+当前不包含：云同步、账号系统、团队共享、浏览器扩展、系统 PIN/图案代替指纹、Wear OS、平板专属双栏、Play 商店发布和 iOS 包。
 
 ## 5. 后续顺序
 
-下一步依次完成 Android 10+ arm64 指纹真机、桌面与手机加密备份双向迁移、安装升级和卸载数据语义验收；Android MVP 稳定后再启动 iOS 适配。iOS 应复用同一 Flutter 页面、设备解锁抽象和 Rust API，只新增 Keychain、Touch ID/Face ID、文件选择和生命周期实现，不分叉 Vault 数据模型或业务规则。
+下一步依次完成 Android 10+ arm64 指纹与系统自动填充真机回归、桌面与手机加密备份双向迁移、安装升级和卸载数据语义验收。iOS 因签名和分发限制继续搁置，不进入当前实施顺序。

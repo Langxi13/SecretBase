@@ -204,6 +204,14 @@ fn entry_record(value: &Value) -> Option<EntryRecord> {
     })
 }
 
+#[cfg_attr(not(target_os = "android"), allow(dead_code))]
+pub(crate) fn active_entry_records(value: &Value) -> Result<Vec<EntryRecord>, MobileError> {
+    Ok(array(root(value)?, "entries")?
+        .iter()
+        .filter_map(entry_record)
+        .collect())
+}
+
 fn normalize_names(values: &[String], label: &str) -> Result<Vec<String>, MobileError> {
     let mut result = Vec::new();
     for raw in values {
