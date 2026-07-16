@@ -29,7 +29,7 @@
 
 ## 发布门禁
 
-- [ ] 普通 CI APK 文件名带 `-ci`，正式 Release 拒绝临时签名产物。
-- [ ] `release` 环境审批前，Android 构建和清单签名任务不能读取永久密钥。
-- [ ] Release 同时包含三端产物、`SHA256SUMS.txt`、签名清单及签名文件。
-- [ ] 修改清单任意字节后，桌面和 Android 客户端都拒绝更新。
+- [x] 普通 CI APK 文件名带 `-ci`，正式 Release 拒绝临时签名产物。
+- [x] `release` 环境审批前，Android 构建和清单签名任务不能读取永久密钥。
+- [x] Release 同时包含三端产物、`SHA256SUMS.txt`、签名清单及签名文件。
+- [x] 修改清单任意字节后，桌面和 Android 客户端都拒绝更新。

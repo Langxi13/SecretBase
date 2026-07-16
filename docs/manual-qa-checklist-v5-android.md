@@ -87,5 +87,5 @@
 - [x] `scripts/verify_android_apk.sh` 通过，APK 不含真实构建机路径或私人域名。
 - [x] 正式 APK 发布密钥和更新清单密钥已生成、写入受保护的 GitHub `release` 环境，并在仓库外建立恢复备份。
 - [ ] 正式签名 APK 已完成真机安装和从后续高 `versionCode` 覆盖升级，签名证书指纹与客户端内置值一致。
-- [ ] `SHA256SUMS.txt` 与实际 APK 一致，GitHub Release 不包含一次性 CI 签名产物。
-- [ ] 完成以上验收前不创建 `v5.0.0` 标签。
+- [x] `SHA256SUMS.txt` 与实际 APK 一致，GitHub Release 不包含一次性 CI 签名产物。
+- [x] `v5.0.0` 已按用户授权建立自用正式发布基线，后续验收问题通过补丁版本修复。

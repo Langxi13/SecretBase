@@ -213,13 +213,16 @@ http://127.0.0.1:8001
 
 `v3.0.0` 已完成由浏览器承载界面的桌面基础模式。`v3.1.0` 在此基础上增加 Windows 独立桌面窗口：使用 PyInstaller one-folder、pywebview 和 Edge WebView2，用户双击 `SecretBase.exe` 即可使用，不需要单独打开浏览器或安装 Python 依赖。
 
-V3.3 是当前稳定版本，已通过 Windows Server 2022/2025、macOS arm64 CI 以及 Windows 10/11 和 Apple Silicon 真机验收。GitHub Release 包含：
+V5.0 是当前稳定版本，已建立 Windows、macOS 和 Android 的统一签名更新基线。GitHub Release 包含：
 
 ```text
-SecretBase-v3.3.0-windows-x64-setup.exe
-SecretBase-v3.3.0-windows-x64.zip
-SecretBase-v3.3.0-macos-arm64.dmg
-SecretBase-v3.3.0-macos-arm64.zip
+SecretBase-v5.0.1-windows-x64-setup.exe
+SecretBase-v5.0.1-windows-x64.zip
+SecretBase-v5.0.1-macos-arm64.dmg
+SecretBase-v5.0.1-macos-arm64.zip
+SecretBase-v5.0.1-android-universal.apk
+secretbase-update-v1.json
+secretbase-update-v1.json.sig
 SHA256SUMS.txt
 ```
 
@@ -238,7 +241,7 @@ cargo clippy --locked --all-targets --all-features -- -D warnings
 cargo test --locked --release --all-features
 ```
 
-V5.0 Android 客户端的核心实现已经完成，当前尚未正式发布。它使用 Flutter + Rust，完全脱离浏览器和 FastAPI，覆盖创建与解锁、Android Keystore 指纹解锁、条目、标签、密码组、回收站、加密迁移、生命周期锁定和五项需用户确认的 AI 辅助能力。移动界面使用适配手机与平板的 Material 3 导航、紧凑卡片、来源感知返回、双击返回退出和分组式 AI 计划审核；AI 输入器通过圆形 `+` 收纳快捷整理、模式和范围，应用后的计划可在 revision 未变化时撤回。Vault 与恢复副本保存在 Android 应用私有目录，首次从临时签名测试包迁移前必须导出加密备份。
+V5.0 Android 客户端已经正式发布。它使用 Flutter + Rust，完全脱离浏览器和 FastAPI，覆盖创建与解锁、Android Keystore 指纹解锁、条目、标签、密码组、回收站、加密迁移、生命周期锁定和五项需用户确认的 AI 辅助能力。移动界面使用适配手机与平板的 Material 3 导航、紧凑卡片、来源感知返回、双击返回退出和分组式 AI 计划审核；AI 输入器通过圆形 `+` 收纳快捷整理、模式和范围，应用后的计划可在 revision 未变化时撤回。Vault 与恢复副本保存在 Android 应用私有目录，正式签名 APK 后续可直接覆盖升级。
 
 低内存 Linux 开发机只构建 arm64：
 
@@ -668,7 +671,7 @@ http://127.0.0.1:8001
 
 `v3.0.0` completes the browser-hosted desktop foundation. `v3.1.0` adds an independent Windows window built with PyInstaller one-folder, pywebview, and Edge WebView2. Users launch `SecretBase.exe` directly without opening a separate browser or installing Python dependencies.
 
-V3.3 is the current stable release. It has passed Windows Server 2022/2025 and macOS arm64 CI, plus Windows 10/11 and Apple Silicon hardware acceptance. GitHub Release provides the Windows installer and portable ZIP, the macOS DMG and ZIP, and `SHA256SUMS.txt`.
+V5.0 is the current stable release and establishes one signed update baseline for Windows, macOS, and Android. GitHub Release provides the Windows installer and portable ZIP, the macOS DMG and ZIP, the Android APK, the signed update manifest, and `SHA256SUMS.txt`.
 
 Desktop data is stored under `%LOCALAPPDATA%\SecretBase\`. Build validation rejects `.env`, vault, backup, log, and local settings files. Native exports use the Windows Save As dialog, external URLs open in the system browser, and a second launch activates the existing window.
 
@@ -678,7 +681,7 @@ V3.3 adds a macOS 13+ Apple Silicon arm64 desktop app while preserving the same 
 
 V4.0 shared Vault preparation is complete. Existing Web, Windows, and macOS builds continue to use the Python production core. The normative Vault V1 contract, public golden vectors, and isolated Rust reference implementation now provide the compatibility boundary for future Flutter Android and iOS clients without migrating existing vaults or bundling Rust into current desktop packages. See `docs/v4-vault-core.md` for acceptance and `docs/v5-android-plan.md` for the next implementation phase.
 
-The V5 Android client is implemented but not released. It is a browser-free Flutter/Rust app for Android 10+ with private Vault storage, Android Keystore biometric unlock, lifecycle locking, entries, tags, groups, trash, encrypted transfer, an adaptive Material 3 interface, double-back exit handling, a conversational AI manager, and five focused review-before-apply AI tools. V5 also adds signed stable manifests, Windows installer handoff, Android certificate-aware replacement installation, and macOS DMG notifications. The current CI-signed Android test package requires one encrypted-backup migration to the permanent-signed baseline; later formal APKs update in place. Hardware, cross-desktop migration, and update acceptance remain release gates.
+The V5 Android client is released as a browser-free Flutter/Rust app for Android 10+ with private Vault storage, Android Keystore biometric unlock, lifecycle locking, entries, tags, groups, trash, encrypted transfer, an adaptive Material 3 interface, double-back exit handling, a conversational AI manager, and five focused review-before-apply AI tools. V5 also adds signed stable manifests, Windows installer handoff, Android certificate-aware replacement installation, and macOS DMG notifications. Permanently signed APKs update in place; remaining hardware and cross-desktop checks continue as post-release acceptance work.
 
 Build the macOS test package on Apple Silicon with Python 3.11:
 

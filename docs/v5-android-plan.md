@@ -1,6 +1,6 @@
 # SecretBase V5 Android 实施计划
 
-本文档定义 V5.0 Android 首版的架构、阶段、功能边界和验收标准。状态：核心实现、本机 arm64 APK、GitHub 三 ABI 构建及 API 29/36 模拟器已通过，等待 arm64 真机、跨桌面迁移和持久签名验收；尚未创建 `v5.0.0` 标签。
+本文档定义 V5.0 Android 首版的架构、阶段、功能边界和验收标准。状态：`v5.0.0` 正式基线、GitHub 三 ABI 构建、API 29/36 模拟器和永久签名发布已完成，继续进行 arm64 真机覆盖升级和跨桌面迁移验收。
 
 ## 1. 产品目标
 
@@ -85,7 +85,7 @@ tests/fixtures/vault-v1/   Python、Rust、Flutter 共用黄金向量
 - 覆盖至少两个 Android API 级别、arm64 真机、安装升级、卸载保留/删除数据和低存储空间场景。
 - 建立由项目密钥签名的 APK/AAB 流程；签名密钥不得提交到仓库。
 
-退出条件：自动化门禁全部通过，完成真机清单和跨桌面备份迁移验收后，才允许创建 `v5.0.0` 发布标签。
+退出条件：自动化门禁全部通过并建立正式发布基线；真机与跨桌面备份迁移结果持续记录在人工验收清单中。
 
 ## 4. Android MVP 范围
 
@@ -95,4 +95,4 @@ tests/fixtures/vault-v1/   Python、Rust、Flutter 共用黄金向量
 
 ## 5. 后续顺序
 
-下一步依次完成 Android 10+ arm64 指纹真机、桌面与手机加密备份双向迁移、安装升级、卸载数据语义和持久签名验收。上述门禁全部通过后再创建 `v5.0.0` 标签；Android MVP 稳定后才启动 iOS 适配。iOS 应复用同一 Flutter 页面、设备解锁抽象和 Rust API，只新增 Keychain、Touch ID/Face ID、文件选择和生命周期实现，不分叉 Vault 数据模型或业务规则。
+下一步依次完成 Android 10+ arm64 指纹真机、桌面与手机加密备份双向迁移、安装升级和卸载数据语义验收；Android MVP 稳定后再启动 iOS 适配。iOS 应复用同一 Flutter 页面、设备解锁抽象和 Rust API，只新增 Keychain、Touch ID/Face ID、文件选择和生命周期实现，不分叉 Vault 数据模型或业务规则。
