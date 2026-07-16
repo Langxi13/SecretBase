@@ -69,7 +69,8 @@ def app_version() -> str:
 
 def test_desktop_dependency_pins() -> None:
     requirements = (ROOT / "desktop" / "requirements.txt").read_text(encoding="ascii")
-    assert "-r ../backend/requirements.txt" in requirements
+    assert "-r ../backend/requirements.txt" not in requirements
+    assert "backend/requirements.txt" in requirements
     assert "pywebview==6.2.1" in requirements
     assert "pyinstaller==6.21.0" in requirements
     assert "certifi==2026.4.22" in requirements
@@ -81,6 +82,14 @@ def test_desktop_dependency_pins() -> None:
     assert 'pyobjc-core==12.2.1; sys_platform == "darwin"' in requirements
     assert 'pyobjc-framework-Cocoa==12.2.1; sys_platform == "darwin"' in requirements
     assert 'pyobjc-framework-WebKit==12.2.1; sys_platform == "darwin"' in requirements
+
+    windows_build = (ROOT / "scripts" / "build-desktop-windows.ps1").read_text(encoding="utf-8")
+    macos_build = (ROOT / "scripts" / "build-desktop-macos.sh").read_text(encoding="utf-8")
+    windows_workflow = (ROOT / ".github" / "workflows" / "reusable-windows-desktop.yml").read_text(encoding="utf-8")
+    macos_workflow = (ROOT / ".github" / "workflows" / "reusable-macos-desktop.yml").read_text(encoding="utf-8")
+    for source in (windows_build, macos_build, windows_workflow, macos_workflow):
+        assert "backend/requirements.txt" in source or "backend\\requirements.txt" in source
+        assert "desktop/requirements.txt" in source or "desktop\\requirements.txt" in source
 
 
 def test_spec_only_collects_public_runtime_assets() -> None:

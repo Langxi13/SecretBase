@@ -26,7 +26,8 @@ if ($LASTEXITCODE -ne 0) {
 
 $BuildEnvironment = Join-Path $ProjectRoot ".desktop-build\venv"
 $BuildPython = Join-Path $BuildEnvironment "Scripts\python.exe"
-$Requirements = Join-Path $ProjectRoot "desktop\requirements.txt"
+$BackendRequirements = Join-Path $ProjectRoot "backend\requirements.txt"
+$DesktopRequirements = Join-Path $ProjectRoot "desktop\requirements.txt"
 
 if ($SkipDependencyInstall) {
     $BuildPython = $BootstrapCommand.Source
@@ -41,7 +42,7 @@ if ($SkipDependencyInstall) {
     }
     & $BuildPython -m pip install --disable-pip-version-check --progress-bar off --upgrade pip
     if ($LASTEXITCODE -ne 0) { throw "Failed to update pip." }
-    & $BuildPython -m pip install --disable-pip-version-check --progress-bar off -r $Requirements
+    & $BuildPython -m pip install --disable-pip-version-check --progress-bar off -r $BackendRequirements -r $DesktopRequirements
     if ($LASTEXITCODE -ne 0) { throw "Failed to install desktop build dependencies." }
 }
 

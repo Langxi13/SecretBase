@@ -1,5 +1,4 @@
-# Desktop packaging inherits the audited backend dependency pins from this manifest.
--r ../backend/requirements.txt
+# Install backend/requirements.txt together with this desktop-only manifest.
 
 pywebview==6.2.1
 pyinstaller==6.21.0

@@ -29,7 +29,7 @@ jobs:
       - name: Verify Apple Silicon runner
         run: test "$(uname -m)" = "arm64"
       - name: Install desktop build dependencies
-        run: python -m pip install --disable-pip-version-check --progress-bar off -r desktop/requirements.txt
+        run: python -m pip install --disable-pip-version-check --progress-bar off -r backend/requirements.txt -r desktop/requirements.txt
       - name: Run desktop packaging checks
         run: python scripts/test-desktop-packaging.py
       - name: Build macOS desktop package

@@ -28,7 +28,8 @@ PYTHON_BIN="${PYTHON_BIN:-python3}"
 }
 
 if [[ "$SKIP_DEPENDENCY_INSTALL" != true ]]; then
-    "$PYTHON_BIN" -m pip install --disable-pip-version-check --progress-bar off -r desktop/requirements.txt
+    "$PYTHON_BIN" -m pip install --disable-pip-version-check --progress-bar off \
+        -r backend/requirements.txt -r desktop/requirements.txt
 fi
 
 VERSION="$($PYTHON_BIN -c 'import ast, pathlib; tree=ast.parse(pathlib.Path("backend/version.py").read_text()); print(ast.literal_eval(next(node for node in tree.body if isinstance(node, ast.Assign)).value))')"
