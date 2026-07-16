@@ -16,6 +16,10 @@ class AppPreferences {
     required this.groupPageSize,
     required this.clipboardClearSeconds,
     required this.aiPrivacyAccepted,
+    required this.updateAutoCheck,
+    required this.updateAutoDownload,
+    required this.updateAllowMeteredDownload,
+    required this.lastUpdateCheckAt,
   });
 
   final ThemeMode themeMode;
@@ -25,6 +29,10 @@ class AppPreferences {
   final int groupPageSize;
   final int clipboardClearSeconds;
   final bool aiPrivacyAccepted;
+  final bool updateAutoCheck;
+  final bool updateAutoDownload;
+  final bool updateAllowMeteredDownload;
+  final DateTime? lastUpdateCheckAt;
 
   AppPreferences copyWith({
     ThemeMode? themeMode,
@@ -34,6 +42,11 @@ class AppPreferences {
     int? groupPageSize,
     int? clipboardClearSeconds,
     bool? aiPrivacyAccepted,
+    bool? updateAutoCheck,
+    bool? updateAutoDownload,
+    bool? updateAllowMeteredDownload,
+    DateTime? lastUpdateCheckAt,
+    bool clearLastUpdateCheckAt = false,
   }) {
     return AppPreferences(
       themeMode: themeMode ?? this.themeMode,
@@ -44,6 +57,13 @@ class AppPreferences {
       clipboardClearSeconds:
           clipboardClearSeconds ?? this.clipboardClearSeconds,
       aiPrivacyAccepted: aiPrivacyAccepted ?? this.aiPrivacyAccepted,
+      updateAutoCheck: updateAutoCheck ?? this.updateAutoCheck,
+      updateAutoDownload: updateAutoDownload ?? this.updateAutoDownload,
+      updateAllowMeteredDownload:
+          updateAllowMeteredDownload ?? this.updateAllowMeteredDownload,
+      lastUpdateCheckAt: clearLastUpdateCheckAt
+          ? null
+          : lastUpdateCheckAt ?? this.lastUpdateCheckAt,
     );
   }
 }
@@ -78,6 +98,13 @@ class PreferencesController extends Notifier<AppPreferences> {
         _preferences.getInt('clipboard_clear_seconds'),
       ),
       aiPrivacyAccepted: _preferences.getBool('ai_privacy_accepted') ?? false,
+      updateAutoCheck: _preferences.getBool('update_auto_check') ?? true,
+      updateAutoDownload: _preferences.getBool('update_auto_download') ?? true,
+      updateAllowMeteredDownload:
+          _preferences.getBool('update_allow_metered_download') ?? false,
+      lastUpdateCheckAt: _dateTimeFromMillis(
+        _preferences.getInt('last_update_check_at'),
+      ),
     );
   }
 
@@ -120,6 +147,29 @@ class PreferencesController extends Notifier<AppPreferences> {
     await _preferences.setBool('ai_privacy_accepted', true);
   }
 
+  Future<void> setUpdateAutoCheck(bool value) async {
+    state = state.copyWith(updateAutoCheck: value);
+    await _preferences.setBool('update_auto_check', value);
+  }
+
+  Future<void> setUpdateAutoDownload(bool value) async {
+    state = state.copyWith(updateAutoDownload: value);
+    await _preferences.setBool('update_auto_download', value);
+  }
+
+  Future<void> setUpdateAllowMeteredDownload(bool value) async {
+    state = state.copyWith(updateAllowMeteredDownload: value);
+    await _preferences.setBool('update_allow_metered_download', value);
+  }
+
+  Future<void> setLastUpdateCheckAt(DateTime value) async {
+    state = state.copyWith(lastUpdateCheckAt: value);
+    await _preferences.setInt(
+      'last_update_check_at',
+      value.millisecondsSinceEpoch,
+    );
+  }
+
   static ThemeMode _themeFromName(String? value) {
     return ThemeMode.values.where((mode) => mode.name == value).firstOrNull ??
         ThemeMode.system;
@@ -136,5 +186,10 @@ class PreferencesController extends Notifier<AppPreferences> {
 
   static int _validClipboardSeconds(int? value) {
     return const [15, 30, 60, 120].contains(value) ? value! : 30;
+  }
+
+  static DateTime? _dateTimeFromMillis(int? value) {
+    if (value == null || value <= 0) return null;
+    return DateTime.fromMillisecondsSinceEpoch(value);
   }
 }

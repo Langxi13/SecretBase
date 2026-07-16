@@ -184,12 +184,14 @@ def test_windows_workflows_build_once_and_retest_downloaded_artifact() -> None:
     assert "secretbase-installer*-self-test.json" in reusable
     assert "retention-days: 14" in desktop
     assert "uses: ./.github/workflows/reusable-windows-desktop.yml" in desktop
-    assert "needs: [vault-core, verify, windows-desktop, macos-desktop]" in release
+    assert "needs: [vault-core, verify, windows-desktop, macos-desktop, android]" in release
     assert "uses: ./.github/workflows/reusable-vault-core.yml" in release
     assert "path: release-input/windows" in release
     assert "path: release-input/macos" in release
+    assert "path: release-input/android" in release
     assert "Prepare unified release assets" in release
-    assert "sha256sum -- *.dmg *.exe *.zip" in release
+    assert "generate-update-manifest.py" in release
+    assert "sha256sum -- *.apk *.dmg *.exe *.json *.sig *.zip" in release
     assert 'gh release create "$GITHUB_REF_NAME" release-assets/*' in release
     assert "gh release upload" in release
 
@@ -264,6 +266,8 @@ def test_installer_preserves_data_unless_delete_is_confirmed() -> None:
     assert "Check: IsSecretBaseRunning" in installer
     assert "CheckForMutexes('Local\\SecretBase.Desktop.Mutex')" in installer
     assert "function PrepareToInstall" in installer
+    assert "function IsAutoUpdate" in installer
+    assert "{param:AUTOUPDATE|0}" in installer
     assert "PurgeCheckBox.Checked := False" in installer
     assert "CompareText(Trim(ConfirmationEdit.Text), 'DELETE') = 0" in installer
     assert "{param:PURGEDATA|0}" in installer

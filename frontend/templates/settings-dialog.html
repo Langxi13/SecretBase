@@ -283,19 +283,58 @@
                                 >
                             </div>
 
+                            <div class="setting-item desktop-tray-setting">
+                                <div>
+                                    <label for="desktop_update_auto_check">自动检查更新</label>
+                                    <p>每天后台检查一次稳定版本；断网不会影响密码库使用。</p>
+                                </div>
+                                <input
+                                    id="desktop_update_auto_check"
+                                    type="checkbox"
+                                    v-model="settingsForm.desktopUpdateAutoCheck"
+                                    @change="saveDesktopUpdatePreferences"
+                                >
+                            </div>
+
+                            <div v-if="desktopPlatformLabel === 'Windows' && desktopPackageLabel === '安装版'" class="setting-item desktop-tray-setting">
+                                <div>
+                                    <label for="desktop_update_auto_download">自动下载更新</label>
+                                    <p>发现稳定版本后预下载，安装和重启仍需确认。</p>
+                                </div>
+                                <input
+                                    id="desktop_update_auto_download"
+                                    type="checkbox"
+                                    v-model="settingsForm.desktopUpdateAutoDownload"
+                                    @change="saveDesktopUpdatePreferences"
+                                >
+                            </div>
+
                             <div class="setting-actions desktop-settings-actions">
                                 <button class="btn-secondary" @click="openDesktopStatus">查看状态与诊断</button>
-                                <button class="btn-secondary" @click="checkDesktopUpdates" :disabled="desktopUpdateChecking">
+                                <button class="btn-secondary" @click="checkDesktopUpdates" :disabled="desktopUpdateChecking || desktopUpdateBusy">
                                     {{ desktopUpdateChecking ? '检查中...' : '检查更新' }}
                                 </button>
                             </div>
                             <p v-if="desktopUpdateResult && desktopUpdateResult.status === 'up_to_date'" class="info-message">
                                 当前已是最新正式版本。
                             </p>
-                            <div v-if="desktopUpdateResult && desktopUpdateResult.status === 'available'" class="info-panel desktop-update-result">
-                                <span>发现新版本 {{ desktopUpdateResult.latest_version }}</span>
-                                <button class="btn-small" @click="openDesktopRelease">打开下载页面</button>
+                            <div v-if="desktopUpdateResult && ['available', 'downloading', 'ready', 'installing'].includes(desktopUpdateResult.status)" class="info-panel desktop-update-result">
+                                <div class="desktop-update-copy">
+                                    <strong>发现新版本 {{ desktopUpdateResult.latest_version }}</strong>
+                                    <span v-if="desktopUpdateResult.notes">{{ desktopUpdateResult.notes }}</span>
+                                    <progress v-if="desktopUpdateResult.status === 'downloading'" class="desktop-update-progress" max="100" :value="desktopUpdateProgress"></progress>
+                                </div>
+                                <div class="desktop-update-actions">
+                                    <button
+                                        v-if="desktopUpdateActionLabel"
+                                        class="btn-small"
+                                        @click="handleDesktopUpdateAction"
+                                        :disabled="desktopUpdateResult.status === 'downloading' || desktopUpdateResult.status === 'installing'"
+                                    >{{ desktopUpdateActionLabel }}</button>
+                                    <button v-if="desktopUpdateResult.status === 'downloading'" class="btn-small danger-quiet" @click="cancelDesktopUpdateDownload">取消</button>
+                                </div>
                             </div>
+                            <p v-if="desktopUpdateResult && desktopUpdateResult.message && desktopUpdateResult.status !== 'error'" class="info-message">{{ desktopUpdateResult.message }}</p>
                             <p v-if="desktopUpdateError" class="error-message">{{ desktopUpdateError }}</p>
                         </div>
                     </div>

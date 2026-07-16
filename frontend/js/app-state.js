@@ -189,7 +189,9 @@
             autoBackupRetention: 30,
             closeToTray: false,
             confirmClose: true,
-            desktopZoomPercent: 100
+            desktopZoomPercent: 100,
+            desktopUpdateAutoCheck: true,
+            desktopUpdateAutoDownload: true
         });
         const activeSettingsTab = ref('general');
         const settingsTabs = [

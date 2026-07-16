@@ -47,4 +47,5 @@ jobs:
       retention-days: 14
       run-emulators: ${{ github.event_name != 'workflow_dispatch' || inputs.run-emulators }}
       require-release-signing: ${{ github.event_name == 'workflow_dispatch' && inputs.require-release-signing }}
+      environment-name: ${{ github.event_name == 'workflow_dispatch' && inputs.require-release-signing && 'release' || 'ci' }}
     secrets: inherit

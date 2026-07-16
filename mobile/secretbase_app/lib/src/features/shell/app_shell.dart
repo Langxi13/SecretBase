@@ -8,6 +8,7 @@ import 'package:secretbase/src/features/entries/entries_screen.dart';
 import 'package:secretbase/src/features/groups/groups_screen.dart';
 import 'package:secretbase/src/features/settings/settings_screen.dart';
 import 'package:secretbase/src/features/tags/tags_screen.dart';
+import 'package:secretbase/src/features/update/mobile_update_widgets.dart';
 import 'package:secretbase/src/state/vault_controller.dart';
 
 class AppShell extends ConsumerStatefulWidget {
@@ -73,7 +74,7 @@ class _AppShellState extends ConsumerState<AppShell> {
     final width = MediaQuery.sizeOf(context).width;
     final wide = width >= 840;
     final extendedRail = width >= 1120;
-    final body = IndexedStack(
+    final pages = IndexedStack(
       index: _index,
       children: [
         EntriesScreen(
@@ -84,6 +85,12 @@ class _AppShellState extends ConsumerState<AppShell> {
         TagsScreen(onOpenTag: _openTag),
         const AiManagerScreen(),
         const SettingsScreen(),
+      ],
+    );
+    final body = Column(
+      children: [
+        MobileUpdateBanner(onOpenSettings: () => _selectDestination(4)),
+        Expanded(child: pages),
       ],
     );
 

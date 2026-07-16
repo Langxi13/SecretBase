@@ -331,6 +331,7 @@
             openExternalUrl,
             store,
             showToast,
+            showConfirmDialog: ui.showConfirmDialog,
             state
         });
 

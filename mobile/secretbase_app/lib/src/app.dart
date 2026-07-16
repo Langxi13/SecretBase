@@ -3,6 +3,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:secretbase/src/core/security_lifecycle_guard.dart';
 import 'package:secretbase/src/core/theme/app_theme.dart';
+import 'package:secretbase/src/features/update/mobile_update_widgets.dart';
 import 'package:secretbase/src/routing/app_router.dart';
 import 'package:secretbase/src/state/preferences_controller.dart';
 
@@ -28,8 +29,9 @@ class SecretBaseApp extends ConsumerWidget {
         GlobalCupertinoLocalizations.delegate,
       ],
       routerConfig: router,
-      builder: (context, child) =>
-          SecurityLifecycleGuard(child: child ?? const SizedBox.shrink()),
+      builder: (context, child) => MobileUpdateCoordinator(
+        child: SecurityLifecycleGuard(child: child ?? const SizedBox.shrink()),
+      ),
     );
   }
 }

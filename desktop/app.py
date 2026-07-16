@@ -12,21 +12,21 @@ from pathlib import Path
 
 try:
     from .bridge import DesktopApi
-    from .diagnostics import DesktopDiagnostics
+    from .diagnostics import DesktopDiagnostics, detect_package_type
     from .instance import SingleInstanceCoordinator, request_existing_process_exit
     from .platform_support import current_platform_profile, normalized_architecture, show_native_message
     from .runtime import InProcessDesktopServer, application_root, desktop_paths, resolve_data_root
     from .tray import DesktopLifecycle, load_close_preferences
-    from .update import check_for_updates
+    from .updater import DesktopUpdateManager
     from .zoom import DesktopZoomController
 except ImportError:
     from bridge import DesktopApi
-    from diagnostics import DesktopDiagnostics
+    from diagnostics import DesktopDiagnostics, detect_package_type
     from instance import SingleInstanceCoordinator, request_existing_process_exit
     from platform_support import current_platform_profile, normalized_architecture, show_native_message
     from runtime import InProcessDesktopServer, application_root, desktop_paths, resolve_data_root
     from tray import DesktopLifecycle, load_close_preferences
-    from update import check_for_updates
+    from updater import DesktopUpdateManager
     from zoom import DesktopZoomController
 
 
@@ -223,6 +223,7 @@ def run_window(data_root_value: str | None) -> int:
     server = InProcessDesktopServer(data_root, desktop_shell=True)
     lifecycle = None
     zoom_controller = None
+    update_manager = None
     try:
         url = server.start()
     except Exception as error:
@@ -272,12 +273,21 @@ def run_window(data_root_value: str | None) -> int:
         if not profile.tray:
             close_to_tray = False
         lifecycle.set_close_preferences(close_to_tray, confirm_close)
+        update_manager = DesktopUpdateManager(
+            current_version=APP_VERSION,
+            platform=profile.key,
+            architecture=normalized_architecture(),
+            package_type=detect_package_type(),
+            updates_dir=paths.updates,
+            settings_path=paths.settings,
+            exit_callback=lifecycle.exit,
+        )
         bridge = DesktopApi(
             url,
             save_dialog,
             diagnostics_provider=diagnostics.collect,
             directory_opener=diagnostics.open_directory,
-            update_checker=lambda: check_for_updates(APP_VERSION),
+            update_manager=update_manager,
             close_preferences_setter=lifecycle.set_close_preferences,
             close_request_resolver=lifecycle.resolve_close_request,
         )
@@ -306,6 +316,7 @@ def run_window(data_root_value: str | None) -> int:
             bridge.zoom_changer = zoom_controller.change
             window.events.loaded += zoom_controller.attach
         window.events.closing += lifecycle.on_closing
+        update_manager.start_background_check()
         coordinator.start_listener(lifecycle.restore, lifecycle.exit)
         webview.start(
             gui=profile.gui,
@@ -328,6 +339,8 @@ def run_window(data_root_value: str | None) -> int:
     finally:
         if zoom_controller is not None:
             zoom_controller.detach()
+        if update_manager is not None:
+            update_manager.shutdown()
         if lifecycle is not None:
             lifecycle.shutdown()
         coordinator.close()

@@ -50,9 +50,19 @@ jobs:
     with:
       retention-days: 30
 
+  android:
+    uses: ./.github/workflows/reusable-android.yml
+    with:
+      retention-days: 30
+      run-emulators: false
+      require-release-signing: true
+      environment-name: release
+    secrets: inherit
+
   release:
-    needs: [vault-core, verify, windows-desktop, macos-desktop]
+    needs: [vault-core, verify, windows-desktop, macos-desktop, android]
     runs-on: ubuntu-latest
+    environment: release
     steps:
       - uses: actions/checkout@v7
         with:
@@ -67,21 +77,41 @@ jobs:
         with:
           name: secretbase-macos-arm64
           path: release-input/macos
+      - name: Download Android release assets
+        uses: actions/download-artifact@v8
+        with:
+          name: secretbase-android-universal
+          path: release-input/android
       - name: Prepare unified release assets
         run: |
           (cd release-input/windows && sha256sum -c SHA256SUMS.txt)
           (cd release-input/macos && sha256sum -c SHA256SUMS.txt)
+          (cd release-input/android && sha256sum -c SHA256SUMS.txt)
           mkdir -p release-assets
           cp release-input/windows/SecretBase-v*-windows-x64.zip release-assets/
           cp release-input/windows/SecretBase-v*-windows-x64-setup.exe release-assets/
           cp release-input/macos/SecretBase-v*-macos-arm64.dmg release-assets/
           cp release-input/macos/SecretBase-v*-macos-arm64.zip release-assets/
-          (cd release-assets && sha256sum -- *.dmg *.exe *.zip > SHA256SUMS.txt)
+          cp release-input/android/SecretBase-v*-android-universal.apk release-assets/
+          cp release-input/android/ANDROID-METADATA.json release-assets/
       - name: Validate release tag
         run: |
           version=$(sed -n 's/^APP_VERSION = "\([0-9][0-9.]*\)"/\1/p' backend/version.py)
+          android_version=$(sed -n 's/^version: \([^+]*\).*/\1/p' mobile/secretbase_app/pubspec.yaml)
           test -n "$version"
+          test "$android_version" = "$version"
           test "$GITHUB_REF_NAME" = "v$version"
+      - name: Generate signed update manifest
+        env:
+          UPDATE_SIGNING_PRIVATE_KEY_PEM_BASE64: ${{ secrets.UPDATE_SIGNING_PRIVATE_KEY_PEM_BASE64 }}
+        run: |
+          version=${GITHUB_REF_NAME#v}
+          python scripts/generate-update-manifest.py \
+            --version "$version" \
+            --assets-dir release-assets \
+            --output-dir release-assets
+          rm release-assets/ANDROID-METADATA.json
+          (cd release-assets && sha256sum -- *.apk *.dmg *.exe *.json *.sig *.zip > SHA256SUMS.txt)
       - name: Create GitHub release
         env:
           GH_TOKEN: ${{ github.token }}

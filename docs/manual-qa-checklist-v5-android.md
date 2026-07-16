@@ -82,9 +82,10 @@
 
 - [x] GitHub Android workflow 的 Flutter、Rust、Clippy 和三 ABI Release 构建全部通过。
 - [x] API 29/36 模拟器启动截图与日志无崩溃。
-- [x] 本机 `flutter analyze`、29 项 Dart/Widget 测试、Vault Core 8 项测试和 23 项移动端 Rust 测试通过。
+- [x] 本机 `flutter analyze`、33 项 Dart/Widget 测试、Vault Core 8 项测试和 23 项移动端 Rust 测试通过。
 - [x] 当前生物识别候选版重新通过三 ABI 构建及 API 29/36 模拟器启动验证。
 - [x] `scripts/verify_android_apk.sh` 通过，APK 不含真实构建机路径或私人域名。
-- [ ] 正式 APK 使用持久发布密钥签名，签名证书指纹已离线记录并备份。
+- [x] 正式 APK 发布密钥和更新清单密钥已生成、写入受保护的 GitHub `release` 环境，并在仓库外建立恢复备份。
+- [ ] 正式签名 APK 已完成真机安装和从后续高 `versionCode` 覆盖升级，签名证书指纹与客户端内置值一致。
 - [ ] `SHA256SUMS.txt` 与实际 APK 一致，GitHub Release 不包含一次性 CI 签名产物。
 - [ ] 完成以上验收前不创建 `v5.0.0` 标签。

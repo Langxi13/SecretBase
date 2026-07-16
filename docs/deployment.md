@@ -37,6 +37,8 @@ Default uninstall never deletes the runtime data directory. Interactive data rem
 
 Windows signing is optional. Set `WINDOWS_SIGNING_CERT_BASE64`, `WINDOWS_SIGNING_CERT_PASSWORD`, and optionally `WINDOWS_SIGNING_TIMESTAMP_URL` in the trusted release environment. Missing certificate and password means an unsigned build; a partial signing configuration fails the build. Never store a PFX or certificate password in the repository.
 
+V5 installed builds use the signed update manifest from the latest formal GitHub Release. They check at most once every 24 hours, may pre-download the verified installer, and only install after explicit confirmation. The updater locks the vault, starts the existing Inno Setup installer with `/AUTOUPDATE=1`, exits, and lets the installer restart the new version. Portable ZIP builds remain manual-update builds. Runtime data remains under `%LOCALAPPDATA%\SecretBase` throughout the upgrade.
+
 ## macOS arm64 Desktop Build
 
 V3.3 uses Apple Silicon Python 3.11, PyInstaller and pywebview Cocoa/WKWebView. Build on macOS 13 or later:
@@ -48,6 +50,8 @@ scripts/build-desktop-macos.sh
 The script produces `SecretBase-v<version>-macos-arm64.dmg`, `SecretBase-v<version>-macos-arm64.zip`, and `SHA256SUMS.txt`. Runtime data stays under `~/Library/Application Support/SecretBase`. macOS does not use a separate uninstaller: quit the app and move `SecretBase.app` to Trash. Deleting the app does not delete the vault, backups, settings, or logs; remove the application-support directory manually only after verifying an encrypted backup.
 
 Unsigned test builds may require approval through System Settings -> Privacy & Security -> Open Anyway. Do not disable Gatekeeper as part of the normal installation flow. Developer ID signing and notarization remain deferred until an Apple Developer account is available.
+
+Without Developer ID signing, V5 only verifies the signed release manifest and opens the formal DMG URL. Users replace `SecretBase.app` manually; the application must not attempt to rewrite `/Applications` with an unsigned helper. A future Sparkle integration can reuse the same update UI after signing and notarization are available.
 
 ## Android Build And Signing
 
@@ -65,6 +69,10 @@ ANDROID_KEY_PASSWORD
 ```
 
 The four values must be configured together. Ordinary CI creates a short-lived test key and labels its APK with `-ci`; never publish that artifact as a formal release. For a publishable candidate, manually run `.github/workflows/android.yml` with `require-release-signing` enabled. The workflow fails if persistent signing is unavailable, verifies all ABI libraries and Manifest security attributes, scans native libraries for machine-specific paths, and produces `SHA256SUMS.txt`.
+
+Formal Android updates additionally require `UPDATE_SIGNING_PRIVATE_KEY_PEM_BASE64`. Store all five secrets in the protected GitHub `release` environment; the `ci` environment intentionally contains no signing secrets. The client embeds only the Ed25519 public key and the Android release-certificate fingerprint. Losing the Android JKS prevents future in-place APK upgrades, so keep a protected offline recovery copy outside the repository and outside GitHub.
+
+The current CI test APK uses a one-time temporary signer and cannot be upgraded in place. Before installing the first formal V5 APK, export an encrypted backup, uninstall the CI package, install the permanent-signed baseline, and restore the backup. Future formal APKs preserve app-private data during replacement installation.
 
 ## Recommended Layout
 

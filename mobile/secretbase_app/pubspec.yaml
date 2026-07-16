@@ -1,12 +1,14 @@
 name: secretbase
 description: "SecretBase 离线加密密码库 Android 客户端。"
 publish_to: 'none'
-version: 5.0.0+50002
+version: 5.0.0+5000000
 
 environment:
   sdk: ^3.12.2
 
 dependencies:
+  crypto: ^3.0.7
+  cryptography: ^2.7.0
   file_selector: ^1.1.0
   flutter:
     sdk: flutter

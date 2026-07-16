@@ -281,29 +281,16 @@ def test_desktop_diagnostics_and_directory_allowlist() -> None:
 
 
 def test_desktop_update_check_validation() -> None:
-    assert parse_version("v3.2.0") == (3, 2, 0)
+    assert parse_version("3.2.0") == (3, 2, 0)
     release_url = "https://github.com/Langxi13/SecretBase/releases/tag/v3.2.0"
     assert validate_release_url(release_url) == release_url
-    opener = StaticOpener({
-        "tag_name": "v3.2.0",
-        "html_url": release_url,
-        "draft": False,
-        "prerelease": False,
-        "published_at": "2026-07-11T00:00:00Z",
-    })
-    available = check_for_updates("3.1.0", opener=opener)
-    assert available["status"] == "available"
-    assert available["latest_version"] == "3.2.0"
-    current = check_for_updates("3.2.0", opener=opener)
-    assert current["status"] == "up_to_date"
-
-    unsafe = StaticOpener({
-        "tag_name": "v9.0.0",
-        "html_url": "https://example.com/download",
-        "draft": False,
-        "prerelease": False,
-    })
-    assert check_for_updates("3.2.0", opener=unsafe)["status"] == "error"
+    for invalid in ("v3.2.0", "3.2", "3.2.0-beta"):
+        try:
+            parse_version(invalid)
+        except ValueError:
+            pass
+        else:
+            raise AssertionError(invalid)
 
 
 def test_desktop_bridge_productization_methods() -> None:

@@ -135,6 +135,30 @@ html[data-secretbase-desktop-locking="true"] body::after {
     gap: 12px;
 }
 
+.desktop-update-copy {
+    display: grid;
+    gap: 4px;
+    min-width: 0;
+}
+
+.desktop-update-copy span {
+    color: var(--text-muted);
+    font-size: 0.84rem;
+}
+
+.desktop-update-progress {
+    width: min(320px, 100%);
+    height: 8px;
+    accent-color: var(--primary-color);
+}
+
+.desktop-update-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: 0 0 auto;
+}
+
 .desktop-status-modal {
     width: min(960px, calc(100vw - 40px));
     max-width: 960px;

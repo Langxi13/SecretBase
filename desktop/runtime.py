@@ -37,6 +37,7 @@ class DesktopPaths:
     settings: Path
     secure_settings: Path
     webview: Path
+    updates: Path
 
 
 def application_root() -> Path:
@@ -94,12 +95,13 @@ def desktop_paths(data_root: Path) -> DesktopPaths:
         settings=root / "settings.json",
         secure_settings=data / "secure-settings.enc",
         webview=root / "webview",
+        updates=root / "updates",
     )
 
 
 def prepare_data_root(data_root: Path, *, include_webview: bool = False) -> DesktopPaths:
     paths = desktop_paths(data_root)
-    directories = [paths.root, paths.data, paths.backups, paths.logs]
+    directories = [paths.root, paths.data, paths.backups, paths.logs, paths.updates]
     if include_webview:
         directories.append(paths.webview)
     for directory in directories:

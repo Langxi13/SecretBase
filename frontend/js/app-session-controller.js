@@ -13,6 +13,8 @@
         loadSavedAdvancedFilters,
         loadAiSettingsStatus,
         loadDesktopDiagnostics,
+        initializeDesktopUpdates = () => null,
+        disposeDesktopUpdates = () => {},
         handleDocumentClick
     }) {
         let aiNowTimer = null;
@@ -222,6 +224,7 @@
                 window.SECRETBASE_DESKTOP_CLOSE_READY = true;
                 window.addEventListener('secretbase:desktop-lock', handleDesktopLockRequest);
                 window.addEventListener('secretbase:desktop-close-request', handleDesktopCloseRequest);
+                initializeDesktopUpdates();
                 try {
                     const authStatus = await store.checkAuth();
                     state.initialized.value = authStatus.initialized;
@@ -260,7 +263,6 @@
                     desktopLockCover.scheduleRelease();
                 }
             });
-
             onUnmounted(() => {
                 window.SECRETBASE_DESKTOP_LOCK_READY = false;
                 window.SECRETBASE_DESKTOP_CLOSE_READY = false;
@@ -275,9 +277,9 @@
                     window.clearInterval(aiNowTimer);
                     aiNowTimer = null;
                 }
+                disposeDesktopUpdates();
             });
         }
-
         return {
             ...autoLock,
             applyLockedState,
@@ -291,8 +293,5 @@
             registerLifecycle
         };
     }
-
-    window.SecretBaseAppSessionController = {
-        createAppSessionController
-    };
+    window.SecretBaseAppSessionController = { createAppSessionController };
 })();

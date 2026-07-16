@@ -16,6 +16,10 @@ void main() {
       'taxonomy_page_size': 10,
       'group_page_size': 20,
       'clipboard_clear_seconds': 60,
+      'update_auto_check': false,
+      'update_auto_download': false,
+      'update_allow_metered_download': true,
+      'last_update_check_at': 1234567890000,
     });
     final preferences = await SharedPreferences.getInstance();
     final container = ProviderContainer(
@@ -30,6 +34,10 @@ void main() {
     expect(initial.taxonomyPageSize, 10);
     expect(initial.groupPageSize, 20);
     expect(initial.clipboardClearSeconds, 60);
+    expect(initial.updateAutoCheck, isFalse);
+    expect(initial.updateAutoDownload, isFalse);
+    expect(initial.updateAllowMeteredDownload, isTrue);
+    expect(initial.lastUpdateCheckAt?.millisecondsSinceEpoch, 1234567890000);
 
     await container.read(preferencesProvider.notifier).setTaxonomyPageSize(20);
     expect(container.read(preferencesProvider).taxonomyPageSize, 20);
@@ -40,6 +48,15 @@ void main() {
         .setTextSize(AppTextSize.standard);
     expect(container.read(preferencesProvider).textSize, AppTextSize.standard);
     expect(preferences.getString('text_size'), 'standard');
+
+    await container
+        .read(preferencesProvider.notifier)
+        .setUpdateAllowMeteredDownload(false);
+    expect(
+      container.read(preferencesProvider).updateAllowMeteredDownload,
+      isFalse,
+    );
+    expect(preferences.getBool('update_allow_metered_download'), isFalse);
   });
 
   test('非法分页数量不会进入应用状态', () async {

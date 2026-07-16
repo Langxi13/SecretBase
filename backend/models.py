@@ -466,6 +466,9 @@ class Settings(BaseModel):
     close_to_tray: bool = False
     confirm_close: bool = True
     desktop_zoom_percent: int = Field(default=100, ge=25, le=500)
+    desktop_update_auto_check: bool = True
+    desktop_update_auto_download: bool = True
+    desktop_update_last_check_at: float = Field(default=0, ge=0)
     language: str = Field(default="zh-CN")
 
 

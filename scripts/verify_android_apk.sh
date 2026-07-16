@@ -53,6 +53,9 @@ for expected in \
   'android:usesCleartextTraffic="false"' \
   'android:networkSecurityConfig=' \
   'android.permission.USE_BIOMETRIC' \
+  'android.permission.REQUEST_INSTALL_PACKAGES' \
+  'androidx.core.content.FileProvider' \
+  'android:grantUriPermissions="true"' \
   'android:enableOnBackInvokedCallback="true"'; do
   if ! grep -Fq "$expected" <<<"$manifest"; then
     echo "Manifest requirement is missing: $expected" >&2

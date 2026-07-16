@@ -18,6 +18,11 @@ on:
         required: false
         type: boolean
         default: false
+      environment-name:
+        description: GitHub environment used by the Android build job
+        required: false
+        type: string
+        default: ci
     secrets:
       ANDROID_KEYSTORE_BASE64:
         required: false
@@ -35,6 +40,7 @@ jobs:
   build:
     name: Verify and build Android universal APK
     runs-on: ubuntu-24.04
+    environment: ${{ inputs.environment-name }}
     timeout-minutes: 60
     env:
       CARGO_BUILD_JOBS: "2"
@@ -103,10 +109,10 @@ jobs:
           done
 
           keystore="$RUNNER_TEMP/secretbase-android-release.jks"
-          if [[ $configured -eq 4 ]]; then
+          if [[ "$REQUIRE_RELEASE_SIGNING" == "true" && $configured -eq 4 ]]; then
             printf '%s' "$KEYSTORE_BASE64" | base64 --decode >"$keystore"
             signing_mode=production
-          elif [[ $configured -ne 0 ]]; then
+          elif [[ "$REQUIRE_RELEASE_SIGNING" == "true" && $configured -ne 0 ]]; then
             echo "Android signing secrets must be configured together." >&2
             exit 1
           elif [[ "$REQUIRE_RELEASE_SIGNING" == "true" ]]; then
@@ -159,6 +165,33 @@ jobs:
           scripts/verify_android_apk.sh "$artifact" armeabi-v7a,arm64-v8a,x86_64
           "$ANDROID_SDK_ROOT/build-tools/36.0.0/apksigner" \
             verify --verbose --print-certs "$artifact"
+          signer_sha256=$("$ANDROID_SDK_ROOT/build-tools/36.0.0/apksigner" \
+            verify --print-certs "$artifact" \
+            | sed -n 's/^Signer #1 certificate SHA-256 digest: //p' \
+            | head -n 1)
+          version_code=$(sed -n 's/^version: [^+]*+\([0-9][0-9]*\)$/\1/p' mobile/secretbase_app/pubspec.yaml)
+          test -n "$signer_sha256"
+          test -n "$version_code"
+          python - "$version" "$version_code" "$signer_sha256" <<'PY'
+          import json
+          import sys
+          from pathlib import Path
+
+          version_name, version_code, signer_sha256 = sys.argv[1:]
+          Path("artifacts/android/ANDROID-METADATA.json").write_text(
+              json.dumps(
+                  {
+                      "package_id": "io.github.langxi13.secretbase",
+                      "version_name": version_name,
+                      "version_code": int(version_code),
+                      "signer_sha256": signer_sha256.lower(),
+                  },
+                  sort_keys=True,
+              )
+              + "\n",
+              encoding="utf-8",
+          )
+          PY
           printf 'signing_mode=%s\n' "$SECRETBASE_ANDROID_SIGNING_MODE" \
             >artifacts/android/ANDROID-BUILD.txt
           (cd artifacts/android && sha256sum -- "$filename" >SHA256SUMS.txt)

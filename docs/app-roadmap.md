@@ -134,6 +134,8 @@ V5.0 的目标是实现完全离线的手机 App。UI 采用 Flutter，vault 能
 
 状态：核心实现完成，尚未发布。Flutter/Rust、私有数据目录、生命周期安全、Android Keystore 指纹解锁、条目、标签、密码组、回收站、加密迁移、对话式 AI 管家、一次性 AI 撤回和五项专业 AI 工具均已落地；当前生物识别候选版的三 ABI CI、APK 隐私扫描与 API 29/36 模拟器已经通过，仍需完成 Android 10+ arm64 指纹真机、跨桌面迁移和持久签名验收。详细边界见 [V5 Android 实施计划](v5-android-plan.md)，真机步骤见 [V5 Android 真机验收清单](manual-qa-checklist-v5-android.md)。
 
+V5.0 同时建立统一更新基线：Windows 安装版可在应用内预下载并覆盖升级；GitHub 分发的 Android APK 在核对永久签名后交给系统安装；未做 Developer ID 签名的 macOS 只自动检查并引导用户下载 DMG。详细协议和迁移要求见 [跨端更新系统](update-system.md)。
+
 初版手机 App 只关注核心密码库能力：
 
 - 本地创建和解锁 vault。
@@ -186,4 +188,4 @@ App 化不能降低当前安全模型：
 
 V3.2 桌面产品化已经完成安装、升级、卸载数据安全、窗口缩放、关闭确认、托盘锁定、单实例、隐私扫描和双版本 Windows CI 验收。
 
-V5.0 已完成 Flutter Android 工程、Rust FFI、私有存储、生命周期锁定、指纹解锁、主要业务功能、对话式 AI 管家、AI 撤回和自动化 CI。本阶段只继续处理指纹与 AI 黑名单真机验收、持久签名密钥、跨桌面备份迁移和发布文档，不创建未经验收的标签。Android MVP 稳定后再适配 iOS，移动端始终不内嵌 FastAPI。
+V5.0 已完成 Flutter Android 工程、Rust FFI、私有存储、生命周期锁定、指纹解锁、主要业务功能、对话式 AI 管家、AI 撤回和自动化 CI。本阶段只继续处理指纹与 AI 黑名单真机验收、永久签名基线、跨桌面备份迁移和更新覆盖验收，不创建未经验收的标签。Android MVP 稳定后再适配 iOS，移动端始终不内嵌 FastAPI。

@@ -34,6 +34,9 @@ SecretBase 已进入真实生产使用阶段。后续任何迭代默认不得破
 - [ ] 关闭确认是否支持隐藏、退出、取消和“不再提醒”，设置切换是否不会立即启动托盘或锁死界面。
 - [ ] Windows 窗口缩小到 `360 × 320` 时，关键操作是否仍可通过响应式布局和滚动访问。
 - [ ] `SHA256SUMS.txt` 是否同时对应本次实际发布的 ZIP 和安装器。
+- [ ] 签名更新清单和 `.sig` 是否通过内置公钥验证，三端文件大小与 SHA-256 是否一致。
+- [ ] Windows 安装版更新是否先锁定 Vault，再通过相同 `AppId` 覆盖安装并只启动一个新实例。
+- [ ] Windows 便携版和未签名 macOS 是否只提供正式下载链接，不尝试替换自身。
 - [ ] macOS DMG 和 ZIP 是否只包含 arm64 `SecretBase.app`、公开运行资源和许可证。
 - [ ] macOS 应用 Bundle ID、最低系统版本、WKWebView 自检和 Gatekeeper 真机流程是否已验证。
 - [ ] Windows/macOS 键盘缩放、100% 重置、比例提示和重启恢复是否已真机验证。
@@ -49,8 +52,10 @@ SecretBase 已进入真实生产使用阶段。后续任何迭代默认不得破
 - [ ] Android 根页面双击返回退出是否不会截获弹窗、子页面和来源筛选的正常返回。
 - [x] Android APK 是否通过 `scripts/verify_android_apk.sh`，且不含真实工作区、用户目录、私人域名、Vault 或签名密钥。
 - [ ] 正式 Android APK 是否使用持久发布密钥；一次性 CI 密钥产物是否明确带 `-ci` 且未上传正式 Release。
+- [ ] Android 更新是否拒绝错误包名、低 `versionCode`、错误哈希和非正式证书，并只允许缓存 `updates` 下的 APK。
+- [ ] Android 的移动网络自动下载是否默认关闭，安装前是否锁定 Vault 并经过系统确认。
 - [ ] Android 真机是否完成锁屏、后台超时、条目/标签/密码组、AI 确认、跨桌面备份和卸载删除私有数据验收。
-- [ ] 统一 Release 是否同时包含当前版本的 Windows 与 macOS 资产，避免更新入口缺少对应平台下载。
+- [ ] 统一 Release 是否同时包含当前版本的 Windows、macOS 与 Android 资产以及签名清单，避免更新入口缺少对应平台下载。
 - [ ] 是否在 Windows 10/11 x64 真机完成独立窗口、原生导出和单实例验收。
 - [ ] 是否在 Apple Silicon macOS 13+ 真机完成安装、导入导出、单实例、退出和数据保留验收。
 - [ ] 正式标签是否与 `backend/version.py` 完全一致。

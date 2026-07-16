@@ -47,6 +47,7 @@ class DesktopApi:
         diagnostics_provider: Callable[[], dict] | None = None,
         directory_opener: Callable[[str], dict] | None = None,
         update_checker: Callable[[], dict] | None = None,
+        update_manager=None,
         close_preferences_setter: Callable[[bool, bool], bool] | None = None,
         close_request_resolver: Callable[[str, bool], dict] | None = None,
         zoom_changer: Callable[[str], int] | None = None,
@@ -57,6 +58,7 @@ class DesktopApi:
         self.diagnostics_provider = diagnostics_provider
         self.directory_opener = directory_opener
         self.update_checker = update_checker
+        self.update_manager = update_manager
         self.close_preferences_setter = close_preferences_setter
         self.close_request_resolver = close_request_resolver
         self.zoom_changer = zoom_changer
@@ -131,9 +133,42 @@ class DesktopApi:
         return self.directory_opener(kind)
 
     def check_for_updates(self) -> dict:
+        if self.update_manager is not None:
+            return self.update_manager.check(force=True)
         if self.update_checker is None:
             raise RuntimeError("当前运行环境不支持更新检查")
         return self.update_checker()
+
+    def get_update_state(self) -> dict:
+        if self.update_manager is None:
+            raise RuntimeError("当前运行环境不支持更新状态")
+        return self.update_manager.get_state()
+
+    def start_background_update_check(self) -> dict:
+        if self.update_manager is None:
+            raise RuntimeError("当前运行环境不支持后台更新检查")
+        started = self.update_manager.start_background_check(delay=0)
+        return {**self.update_manager.get_state(), "background_check_started": started}
+
+    def set_update_preferences(self, auto_check: bool, auto_download: bool) -> dict:
+        if self.update_manager is None:
+            raise RuntimeError("当前运行环境不支持更新设置")
+        return self.update_manager.set_preferences(auto_check, auto_download)
+
+    def start_update_download(self) -> dict:
+        if self.update_manager is None:
+            raise RuntimeError("当前运行环境不支持应用内下载更新")
+        return self.update_manager.start_download()
+
+    def cancel_update_download(self) -> dict:
+        if self.update_manager is None:
+            raise RuntimeError("当前运行环境不支持取消更新下载")
+        return self.update_manager.cancel_download()
+
+    def install_downloaded_update(self) -> dict:
+        if self.update_manager is None:
+            raise RuntimeError("当前运行环境不支持应用内安装更新")
+        return self.update_manager.install()
 
     def set_close_preferences(self, close_to_tray: bool, confirm_close: bool) -> dict[str, str | bool]:
         if type(close_to_tray) is not bool or type(confirm_close) is not bool:

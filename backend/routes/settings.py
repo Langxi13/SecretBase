@@ -36,7 +36,7 @@ def save_settings(settings: Settings):
     try:
         path.parent.mkdir(parents=True, exist_ok=True)
         with open(temporary_path, 'w', encoding='utf-8') as f:
-            json.dump(settings.dict(), f, ensure_ascii=False, indent=2)
+            json.dump(settings.model_dump(), f, ensure_ascii=False, indent=2)
             f.flush()
             os.fsync(f.fileno())
         os.replace(temporary_path, path)
@@ -54,7 +54,7 @@ async def get_settings():
     
     return {
         "success": True,
-        "data": settings.dict()
+        "data": settings.model_dump()
     }
 
 
@@ -80,13 +80,13 @@ async def update_settings(updates: dict):
     updated_keys = []
     for key, value in updates.items():
         backend_key = field_mapping.get(key, key)
-        if backend_key in Settings.__fields__:
+        if backend_key in Settings.model_fields:
             setattr(settings, backend_key, value)
             updated_keys.append(backend_key)
     
     # 验证设置
     try:
-        settings = Settings(**settings.dict())
+        settings = Settings(**settings.model_dump())
     except Exception as e:
         raise HTTPException(status_code=422, detail=f"设置值无效: {e}")
     
@@ -96,6 +96,6 @@ async def update_settings(updates: dict):
     
     return {
         "success": True,
-        "data": settings.dict(),
+        "data": settings.model_dump(),
         "message": "设置已更新"
     }

@@ -238,7 +238,7 @@ cargo clippy --locked --all-targets --all-features -- -D warnings
 cargo test --locked --release --all-features
 ```
 
-V5.0 Android 客户端的核心实现已经完成，当前尚未正式发布。它使用 Flutter + Rust，完全脱离浏览器和 FastAPI，覆盖创建与解锁、Android Keystore 指纹解锁、条目、标签、密码组、回收站、加密迁移、生命周期锁定和五项需用户确认的 AI 辅助能力。移动界面使用适配手机与平板的 Material 3 导航、紧凑卡片、来源感知返回、双击返回退出和分组式 AI 计划审核；AI 输入器通过圆形 `+` 收纳快捷整理、模式和范围，应用后的计划可在 revision 未变化时撤回。Vault 与恢复副本保存在 Android 应用私有目录，卸载应用会删除该目录，因此卸载前必须导出加密备份。
+V5.0 Android 客户端的核心实现已经完成，当前尚未正式发布。它使用 Flutter + Rust，完全脱离浏览器和 FastAPI，覆盖创建与解锁、Android Keystore 指纹解锁、条目、标签、密码组、回收站、加密迁移、生命周期锁定和五项需用户确认的 AI 辅助能力。移动界面使用适配手机与平板的 Material 3 导航、紧凑卡片、来源感知返回、双击返回退出和分组式 AI 计划审核；AI 输入器通过圆形 `+` 收纳快捷整理、模式和范围，应用后的计划可在 revision 未变化时撤回。Vault 与恢复副本保存在 Android 应用私有目录，首次从临时签名测试包迁移前必须导出加密备份。
 
 低内存 Linux 开发机只构建 arm64：
 
@@ -253,7 +253,7 @@ CARGO_BUILD_JOBS=1 CARGOKIT_RUST_TOOLCHAIN=1.88.0 \
   build/app/outputs/flutter-apk/app-debug.apk arm64-v8a
 ```
 
-三 ABI Release APK、API 29/36 模拟器和可选持久签名由 `.github/workflows/android.yml` 执行。当前生物识别候选版的三 ABI 构建、APK 隐私扫描和两级模拟器已于 2026-07-16 通过；功能与剩余门禁见 `docs/v5-android-plan.md` 和 `docs/manual-qa-checklist-v5-android.md`。完成 arm64 真机、跨桌面迁移和持久签名验收前不创建 `v5.0.0` 标签。
+三 ABI Release APK、API 29/36 模拟器和永久签名由 `.github/workflows/android.yml` 执行。V5 已实现统一签名更新清单：Windows 安装版可预下载并原地覆盖，Android 在核对包名、版本、哈希和正式证书后交给系统安装，未签名 macOS 自动提醒并提供 DMG。当前仍需完成 arm64 真机、跨桌面迁移和覆盖更新验收，详见 `docs/update-system.md`、`docs/manual-qa-checklist-v5-updates.md` 和 Android 真机清单。
 
 Apple Silicon Mac 使用 Python 3.11 构建测试包：
 
@@ -506,6 +506,8 @@ scripts/
 - `docs/release-assessment-v3.0.0.md`：V3.0.0 完备性、风险和发布结论。
 - `docs/release-safety-checklist.md`：发布前安全检查清单。
 - `docs/roadmap.md`：路线图。
+- `docs/update-system.md`：V5 Windows、Android 与 macOS 更新协议、安全边界和首次迁移。
+- `docs/manual-qa-checklist-v5-updates.md`：V5 跨端覆盖更新人工验收清单。
 
 ### License
 
@@ -676,7 +678,7 @@ V3.3 adds a macOS 13+ Apple Silicon arm64 desktop app while preserving the same 
 
 V4.0 shared Vault preparation is complete. Existing Web, Windows, and macOS builds continue to use the Python production core. The normative Vault V1 contract, public golden vectors, and isolated Rust reference implementation now provide the compatibility boundary for future Flutter Android and iOS clients without migrating existing vaults or bundling Rust into current desktop packages. See `docs/v4-vault-core.md` for acceptance and `docs/v5-android-plan.md` for the next implementation phase.
 
-The V5 Android client is implemented but not released. It is a browser-free Flutter/Rust app for Android 10+ with private Vault storage, Android Keystore biometric unlock, lifecycle locking, entries, tags, groups, trash, encrypted transfer, an adaptive Material 3 interface, double-back exit handling, a conversational AI manager, and five focused review-before-apply AI tools. Mobile AI actions have a revision-bound one-step undo, and the compact composer moves quick tasks, mode, scope, and professional tools behind a `+` action surface. Android uninstall removes the private app directory, so users must export an encrypted backup first. The biometric candidate's three-ABI build, APK privacy scan, and API 29/36 emulator smoke tests passed on 2026-07-16; `v5.0.0` remains blocked on arm64 biometric hardware, cross-desktop migration, and persistent signing acceptance.
+The V5 Android client is implemented but not released. It is a browser-free Flutter/Rust app for Android 10+ with private Vault storage, Android Keystore biometric unlock, lifecycle locking, entries, tags, groups, trash, encrypted transfer, an adaptive Material 3 interface, double-back exit handling, a conversational AI manager, and five focused review-before-apply AI tools. V5 also adds signed stable manifests, Windows installer handoff, Android certificate-aware replacement installation, and macOS DMG notifications. The current CI-signed Android test package requires one encrypted-backup migration to the permanent-signed baseline; later formal APKs update in place. Hardware, cross-desktop migration, and update acceptance remain release gates.
 
 Build the macOS test package on Apple Silicon with Python 3.11:
 
@@ -926,6 +928,8 @@ scripts/
 - `docs/v4-vault-core.md`: V4 Vault V1 contract and Rust compatibility-core acceptance.
 - `docs/v5-android-plan.md`: V5 Android architecture, implemented scope, and remaining release gates.
 - `docs/manual-qa-checklist-v5-android.md`: V5 Android emulator, hardware, migration, and signing acceptance checklist.
+- `docs/update-system.md`: signed Windows, Android, and macOS update behavior and migration rules.
+- `docs/manual-qa-checklist-v5-updates.md`: V5 cross-platform update acceptance checklist.
 - `docs/manual-qa-checklist.md`: V3.1 Windows hardware acceptance checklist.
 - `docs/release-assessment-v3.0.0.md`: V3.0.0 completeness, risk, and release assessment.
 - `docs/release-safety-checklist.md`: release safety checklist.

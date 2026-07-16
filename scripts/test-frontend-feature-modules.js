@@ -74,16 +74,16 @@ localAssetPaths.forEach(asset => {
     'js/controllers/list-controller.js?v=20260715-sync-v1',
     'js/ai-assistant-inspector-state.js?v=20260715-sync-v1',
     'js/ai-state.js?v=20260715-sync-v1',
-    'js/app-state.js?v=20260716-interaction-v1',
+    'js/app-state.js?v=20260716-update-v1',
     'js/app-ui-controller.js?v=20260716-interaction-v1',
     'js/app-data-controller.js?v=20260715-sync-v1',
     'js/ai-feature-composition.js?v=20260715-sync-v1',
-    'js/app-feature-composition.js?v=20260716-interaction-v1',
+    'js/app-feature-composition.js?v=20260716-update-v1',
     'js/desktop-lock-cover.js?v=20260716-interaction-v1',
-    'js/app-session-controller.js?v=20260716-interaction-v1',
+    'js/app-session-controller.js?v=20260716-update-v1',
     'js/app-watchers.js?v=20260715-sync-v1',
     'js/app-template-context.js?v=20260715-sync-v1',
-    'js/app.js?v=20260715-sync-v1'
+    'js/app.js?v=20260716-update-v1'
 ].forEach(asset => {
     assertIncludes(indexHtml, asset, `index.html 必须加载 ${asset}`);
 });

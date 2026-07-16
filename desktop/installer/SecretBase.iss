@@ -64,7 +64,8 @@ Name: "{group}\SecretBase"; Filename: "{app}\{#MyAppExeName}"; WorkingDir: "{app
 Name: "{autodesktop}\SecretBase"; Filename: "{app}\{#MyAppExeName}"; WorkingDir: "{app}"; Tasks: desktopicon
 
 [Run]
-Filename: "{app}\{#MyAppExeName}"; Description: "启动 SecretBase"; Flags: nowait postinstall skipifsilent
+Filename: "{app}\{#MyAppExeName}"; Description: "启动 SecretBase"; Flags: nowait postinstall skipifsilent; Check: not IsAutoUpdate
+Filename: "{app}\{#MyAppExeName}"; Flags: nowait; Check: IsAutoUpdate
 
 [Registry]
 Root: HKCU; Subkey: "Software\SecretBase"; ValueType: string; ValueName: "InstallPath"; ValueData: "{app}"; Flags: uninsdeletekey
@@ -81,6 +82,11 @@ var
 function IsSecretBaseRunning: Boolean;
 begin
   Result := CheckForMutexes('Local\SecretBase.Desktop.Mutex');
+end;
+
+function IsAutoUpdate: Boolean;
+begin
+  Result := CompareText(ExpandConstant('{param:AUTOUPDATE|0}'), '1') = 0;
 end;
 
 function ConfirmUninstallOptions: Boolean;

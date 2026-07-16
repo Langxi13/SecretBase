@@ -6,7 +6,16 @@
         return window.pywebview && window.pywebview.api;
     }
 
-    function createDesktopController({ computed, copyToClipboard, openExternalUrl, store, showToast, state }) {
+    function createDesktopController({
+        computed,
+        copyToClipboard,
+        openExternalUrl,
+        store,
+        showToast,
+        showConfirmDialog,
+        state
+    }) {
+        let updatePollTimer = null;
         const desktopPackageLabel = computed(() => {
             const packageType = state.desktopDiagnostics.value?.package_type;
             if (packageType === 'installed') return '安装版';
@@ -27,6 +36,24 @@
             if (platform === 'windows') return 'Windows';
             if (platform === 'macos') return 'macOS';
             return '桌面';
+        });
+        const desktopUpdateBusy = computed(() => {
+            return ['scheduled', 'checking', 'downloading', 'installing'].includes(
+                state.desktopUpdateResult.value?.status
+            );
+        });
+        const desktopUpdateProgress = computed(() => {
+            return Math.max(0, Math.min(100, Number(state.desktopUpdateResult.value?.progress || 0)));
+        });
+        const desktopUpdateActionLabel = computed(() => {
+            const result = state.desktopUpdateResult.value;
+            if (!result) return '';
+            if (result.status === 'downloading') return `正在下载 ${desktopUpdateProgress.value}%`;
+            if (result.status === 'ready') return '立即更新';
+            if (result.status === 'available' && result.install_supported) return '下载更新';
+            if (result.status === 'available') return '打开下载链接';
+            if (result.status === 'installing') return '正在启动安装';
+            return '';
         });
 
         function requireDesktopApi(method) {
@@ -79,17 +106,68 @@
             showToast(copied ? '诊断信息已复制' : '复制诊断信息失败', copied ? 'success' : 'error');
         }
 
+        function applyDesktopUpdateState(result) {
+            if (!result) return null;
+            state.desktopUpdateResult.value = result;
+            state.desktopUpdateError.value = result.status === 'error' ? (result.message || '无法检查更新') : '';
+            if (result.preferences) {
+                state.settingsForm.desktopUpdateAutoCheck = result.preferences.auto_check !== false;
+                state.settingsForm.desktopUpdateAutoDownload = result.preferences.auto_download !== false;
+            }
+            if (['scheduled', 'checking', 'downloading'].includes(result.status)) {
+                startUpdatePolling();
+            } else {
+                stopUpdatePolling();
+            }
+            return result;
+        }
+
+        function stopUpdatePolling() {
+            if (updatePollTimer !== null) {
+                window.clearInterval(updatePollTimer);
+                updatePollTimer = null;
+            }
+        }
+
+        function startUpdatePolling() {
+            if (updatePollTimer !== null) return;
+            updatePollTimer = window.setInterval(refreshDesktopUpdateState, 700);
+        }
+
+        async function refreshDesktopUpdateState() {
+            if (!state.isDesktopMode) return null;
+            try {
+                const api = requireDesktopApi('get_update_state');
+                return applyDesktopUpdateState(await api.get_update_state());
+            } catch (error) {
+                state.desktopUpdateError.value = error.message || '无法读取更新状态';
+                stopUpdatePolling();
+                return null;
+            }
+        }
+
+        async function initializeDesktopUpdates() {
+            if (!state.isDesktopMode) return null;
+            try {
+                const api = requireDesktopApi('start_background_update_check');
+                return applyDesktopUpdateState(await api.start_background_update_check());
+            } catch (error) {
+                state.desktopUpdateError.value = error.message || '无法初始化更新检查';
+                return null;
+            }
+        }
+
+        function disposeDesktopUpdates() {
+            stopUpdatePolling();
+        }
+
         async function checkDesktopUpdates() {
             state.desktopUpdateChecking.value = true;
             state.desktopUpdateError.value = '';
             try {
                 const api = requireDesktopApi('check_for_updates');
                 const result = await api.check_for_updates();
-                state.desktopUpdateResult.value = result;
-                if (result.status === 'error') {
-                    state.desktopUpdateError.value = result.message || '无法检查更新';
-                }
-                return result;
+                return applyDesktopUpdateState(result);
             } catch (error) {
                 state.desktopUpdateResult.value = null;
                 state.desktopUpdateError.value = error.message || '无法检查更新';
@@ -100,12 +178,75 @@
         }
 
         async function openDesktopRelease() {
-            const url = state.desktopUpdateResult.value?.release_url;
+            const result = state.desktopUpdateResult.value;
+            const url = result?.manual_download_url || result?.release_url;
             if (!url) return;
             try {
                 await openExternalUrl(url);
             } catch (error) {
                 showToast(error.message || '无法打开下载页面', 'error');
+            }
+        }
+
+        async function saveDesktopUpdatePreferences() {
+            try {
+                const api = requireDesktopApi('set_update_preferences');
+                const result = await api.set_update_preferences(
+                    Boolean(state.settingsForm.desktopUpdateAutoCheck),
+                    Boolean(state.settingsForm.desktopUpdateAutoDownload)
+                );
+                applyDesktopUpdateState(result);
+                showToast('更新偏好已保存', 'success');
+            } catch (error) {
+                showToast(error.message || '保存更新偏好失败', 'error');
+                await refreshDesktopUpdateState();
+            }
+        }
+
+        async function startDesktopUpdateDownload() {
+            try {
+                const api = requireDesktopApi('start_update_download');
+                applyDesktopUpdateState(await api.start_update_download());
+                startUpdatePolling();
+            } catch (error) {
+                showToast(error.message || '无法下载更新', 'error');
+            }
+        }
+
+        async function cancelDesktopUpdateDownload() {
+            try {
+                const api = requireDesktopApi('cancel_update_download');
+                applyDesktopUpdateState(await api.cancel_update_download());
+            } catch (error) {
+                showToast(error.message || '无法取消更新下载', 'error');
+            }
+        }
+
+        function installDesktopUpdate() {
+            showConfirmDialog(
+                '安装更新',
+                '应用将立即锁定密码库、退出并安装更新，完成后自动重新打开。确认继续？',
+                async () => {
+                    try {
+                        const api = requireDesktopApi('install_downloaded_update');
+                        applyDesktopUpdateState(await api.install_downloaded_update());
+                    } catch (error) {
+                        showToast(error.message || '无法启动更新安装程序', 'error');
+                        await refreshDesktopUpdateState();
+                    }
+                }
+            );
+        }
+
+        function handleDesktopUpdateAction() {
+            const result = state.desktopUpdateResult.value;
+            if (!result) return;
+            if (result.status === 'ready') {
+                installDesktopUpdate();
+            } else if (result.status === 'available' && result.install_supported) {
+                startDesktopUpdateDownload();
+            } else if (result.status === 'available') {
+                openDesktopRelease();
             }
         }
 
@@ -178,7 +319,10 @@
                 desktopStatusLabel,
                 desktopCapabilities,
                 desktopSupportsTray,
-                desktopPlatformLabel
+                desktopPlatformLabel,
+                desktopUpdateBusy,
+                desktopUpdateProgress,
+                desktopUpdateActionLabel
             },
             actions: {
                 loadDesktopDiagnostics,
@@ -186,7 +330,15 @@
                 openDesktopDirectory,
                 copyDesktopDiagnostics,
                 checkDesktopUpdates,
+                refreshDesktopUpdateState,
+                initializeDesktopUpdates,
+                disposeDesktopUpdates,
                 openDesktopRelease,
+                saveDesktopUpdatePreferences,
+                startDesktopUpdateDownload,
+                cancelDesktopUpdateDownload,
+                installDesktopUpdate,
+                handleDesktopUpdateAction,
                 saveCloseToTraySetting,
                 cancelDesktopClose,
                 resolveDesktopClose,

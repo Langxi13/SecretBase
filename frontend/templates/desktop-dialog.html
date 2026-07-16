@@ -66,15 +66,28 @@
                         <section class="desktop-status-section desktop-update-section">
                             <div class="desktop-section-heading">
                                 <h3>版本更新</h3>
-                                <button class="btn-small" @click="checkDesktopUpdates" :disabled="desktopUpdateChecking">
+                                <button class="btn-small" @click="checkDesktopUpdates" :disabled="desktopUpdateChecking || desktopUpdateBusy">
                                     {{ desktopUpdateChecking ? '检查中...' : '手动检查' }}
                                 </button>
                             </div>
                             <p v-if="desktopUpdateResult && desktopUpdateResult.status === 'up_to_date'" class="info-message">当前已是最新正式版本。</p>
-                            <div v-if="desktopUpdateResult && desktopUpdateResult.status === 'available'" class="desktop-update-available">
-                                <span>可更新到 {{ desktopUpdateResult.latest_version }}</span>
-                                <button class="btn-secondary" @click="openDesktopRelease">打开下载页面</button>
+                            <div v-if="desktopUpdateResult && ['available', 'downloading', 'ready', 'installing'].includes(desktopUpdateResult.status)" class="desktop-update-available">
+                                <div class="desktop-update-copy">
+                                    <strong>可更新到 {{ desktopUpdateResult.latest_version }}</strong>
+                                    <span v-if="desktopUpdateResult.notes">{{ desktopUpdateResult.notes }}</span>
+                                    <progress v-if="desktopUpdateResult.status === 'downloading'" class="desktop-update-progress" max="100" :value="desktopUpdateProgress"></progress>
+                                </div>
+                                <div class="desktop-update-actions">
+                                    <button
+                                        v-if="desktopUpdateActionLabel"
+                                        class="btn-secondary"
+                                        @click="handleDesktopUpdateAction"
+                                        :disabled="desktopUpdateResult.status === 'downloading' || desktopUpdateResult.status === 'installing'"
+                                    >{{ desktopUpdateActionLabel }}</button>
+                                    <button v-if="desktopUpdateResult.status === 'downloading'" class="btn-small danger-quiet" @click="cancelDesktopUpdateDownload">取消</button>
+                                </div>
                             </div>
+                            <p v-if="desktopUpdateResult && desktopUpdateResult.message && desktopUpdateResult.status !== 'error'" class="info-message">{{ desktopUpdateResult.message }}</p>
                             <p v-if="desktopUpdateError" class="error-message">{{ desktopUpdateError }}</p>
                         </section>
                     </template>

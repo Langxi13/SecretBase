@@ -8,13 +8,22 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.content.pm.PackageInfo
+import android.content.pm.PackageManager
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.os.PersistableBundle
 import android.view.WindowManager
+import android.provider.Settings
+import androidx.core.content.FileProvider
 import io.flutter.embedding.android.FlutterFragmentActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
+import java.io.File
+import java.security.MessageDigest
 
 class MainActivity : FlutterFragmentActivity() {
     companion object {
@@ -50,6 +59,21 @@ class MainActivity : FlutterFragmentActivity() {
         ).setMethodCallHandler { call, result ->
             when (call.method) {
                 "getApplicationDataRoot" -> result.success(filesDir.absolutePath)
+                "getApplicationInfo" -> result.success(currentApplicationInfo())
+                "getNetworkType" -> result.success(currentNetworkType())
+                "inspectUpdatePackage" -> inspectUpdatePackage(
+                    call.argument<String>("path"),
+                    result,
+                )
+                "canInstallPackages" -> result.success(packageManager.canRequestPackageInstalls())
+                "openInstallPermission" -> {
+                    openInstallPermission()
+                    result.success(null)
+                }
+                "installUpdatePackage" -> installUpdatePackage(
+                    call.argument<String>("path"),
+                    result,
+                )
                 else -> result.notImplemented()
             }
         }
@@ -179,6 +203,137 @@ class MainActivity : FlutterFragmentActivity() {
         if (current == expected) {
             clipboard.clearPrimaryClip()
         }
+    }
+
+    private fun currentApplicationInfo(): Map<String, Any> {
+        val info = packageInfo(packageName)
+            ?: throw IllegalStateException("无法读取当前应用信息")
+        return mapOf(
+            "packageId" to packageName,
+            "versionName" to info.versionName.orEmpty(),
+            "versionCode" to info.longVersionCode,
+            "signerSha256" to signerSha256(info),
+            "cacheRoot" to cacheDir.absolutePath,
+        )
+    }
+
+    private fun currentNetworkType(): String {
+        val manager = getSystemService(CONNECTIVITY_SERVICE) as ConnectivityManager
+        val network = manager.activeNetwork ?: return "offline"
+        val capabilities = manager.getNetworkCapabilities(network) ?: return "offline"
+        if (!capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)) {
+            return "offline"
+        }
+        return if (manager.isActiveNetworkMetered) "metered" else "unmetered"
+    }
+
+    private fun inspectUpdatePackage(path: String?, result: MethodChannel.Result) {
+        val file = trustedUpdateFile(path)
+        if (file == null || !file.isFile) {
+            result.error("UPDATE_FILE_INVALID", "更新文件不存在或路径无效", null)
+            return
+        }
+        val info = archivePackageInfo(file)
+        if (info == null) {
+            result.error("UPDATE_PACKAGE_INVALID", "无法读取更新包信息", null)
+            return
+        }
+        result.success(
+            mapOf(
+                "packageId" to info.packageName,
+                "versionName" to info.versionName.orEmpty(),
+                "versionCode" to info.longVersionCode,
+                "signerSha256" to signerSha256(info),
+            ),
+        )
+    }
+
+    private fun openInstallPermission() {
+        val intent = Intent(
+            Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
+            Uri.parse("package:$packageName"),
+        )
+        startActivity(intent)
+    }
+
+    private fun installUpdatePackage(path: String?, result: MethodChannel.Result) {
+        val file = trustedUpdateFile(path)
+        if (file == null || !file.isFile) {
+            result.error("UPDATE_FILE_INVALID", "更新文件不存在或路径无效", null)
+            return
+        }
+        if (!packageManager.canRequestPackageInstalls()) {
+            result.error("UPDATE_PERMISSION_REQUIRED", "请先允许安装未知应用", null)
+            return
+        }
+        try {
+            val uri = FileProvider.getUriForFile(
+                this,
+                "$packageName.fileprovider",
+                file,
+            )
+            val intent = Intent(Intent.ACTION_VIEW).apply {
+                setDataAndType(uri, "application/vnd.android.package-archive")
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            startActivity(intent)
+            result.success(null)
+        } catch (_: Exception) {
+            result.error("UPDATE_INSTALL_FAILED", "无法打开 Android 系统安装界面", null)
+        }
+    }
+
+    private fun trustedUpdateFile(path: String?): File? {
+        if (path.isNullOrBlank()) return null
+        return try {
+            val updatesRoot = File(cacheDir, "updates").canonicalFile
+            val candidate = File(path).canonicalFile
+            if (
+                candidate.extension.equals("apk", ignoreCase = true) &&
+                candidate.path.startsWith(updatesRoot.path + File.separator)
+            ) {
+                candidate
+            } else {
+                null
+            }
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    @Suppress("DEPRECATION")
+    private fun packageInfo(packageId: String): PackageInfo? = try {
+        val flags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            PackageManager.GET_SIGNING_CERTIFICATES
+        } else {
+            PackageManager.GET_SIGNATURES
+        }
+        packageManager.getPackageInfo(packageId, flags)
+    } catch (_: PackageManager.NameNotFoundException) {
+        null
+    }
+
+    @Suppress("DEPRECATION")
+    private fun archivePackageInfo(file: File): PackageInfo? {
+        val flags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            PackageManager.GET_SIGNING_CERTIFICATES
+        } else {
+            PackageManager.GET_SIGNATURES
+        }
+        return packageManager.getPackageArchiveInfo(file.absolutePath, flags)
+    }
+
+    @Suppress("DEPRECATION")
+    private fun signerSha256(info: PackageInfo): String {
+        val signature = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            info.signingInfo?.apkContentsSigners?.firstOrNull()
+        } else {
+            info.signatures?.firstOrNull()
+        } ?: throw IllegalStateException("应用签名不存在")
+        return MessageDigest.getInstance("SHA-256")
+            .digest(signature.toByteArray())
+            .joinToString("") { byte -> "%02x".format(byte) }
     }
 
     @Suppress("DEPRECATION")

@@ -24,6 +24,7 @@ PYTHON_TESTS = [
     "scripts/test-backend-module-split.py",
     "scripts/test-release-readiness.py",
     "scripts/test-script-compatibility.py",
+    "scripts/test-update-manifest.py",
 ]
 
 

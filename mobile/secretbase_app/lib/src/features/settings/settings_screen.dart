@@ -12,6 +12,7 @@ import 'package:secretbase/src/core/widgets/mobile_chrome.dart';
 import 'package:secretbase/src/core/widgets/responsive_dialog.dart';
 import 'package:secretbase/src/data/vault_providers.dart';
 import 'package:secretbase/src/features/settings/transfer_service.dart';
+import 'package:secretbase/src/features/update/mobile_update_controller.dart';
 import 'package:secretbase/src/rust/api/mobile.dart' as rust_api;
 import 'package:secretbase/src/rust/mobile/error.dart';
 import 'package:secretbase/src/rust/mobile/models.dart';
@@ -33,6 +34,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final preferences = ref.watch(preferencesProvider);
     final vault = ref.watch(vaultControllerProvider);
     final biometric = ref.watch(biometricStatusProvider);
+    final update = ref.watch(mobileUpdateControllerProvider);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -216,17 +218,149 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         ],
                       ),
                       const SizedBox(height: 10),
-                      const _SettingsSection(
+                      _SettingsSection(
+                        title: '版本更新',
+                        icon: Icons.system_update_outlined,
+                        children: [
+                          ListTile(
+                            leading: const Icon(Icons.info_outline),
+                            title: Text('当前版本 ${_currentVersion(update)}'),
+                            subtitle: Text(_updateStatusText(update)),
+                            trailing: update.phase == MobileUpdatePhase.checking
+                                ? const SizedBox(
+                                    width: 20,
+                                    height: 20,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                    ),
+                                  )
+                                : null,
+                          ),
+                          const Divider(height: 1, indent: 56),
+                          SwitchListTile(
+                            secondary: const Icon(Icons.sync_outlined),
+                            title: const Text('自动检查更新'),
+                            subtitle: const Text('每天检查一次稳定版本'),
+                            value: preferences.updateAutoCheck,
+                            onChanged: (value) => ref
+                                .read(preferencesProvider.notifier)
+                                .setUpdateAutoCheck(value),
+                          ),
+                          const Divider(height: 1, indent: 56),
+                          SwitchListTile(
+                            secondary: const Icon(Icons.download_outlined),
+                            title: const Text('自动预下载'),
+                            subtitle: const Text('默认仅在 Wi-Fi 下自动下载'),
+                            value: preferences.updateAutoDownload,
+                            onChanged: (value) => ref
+                                .read(preferencesProvider.notifier)
+                                .setUpdateAutoDownload(value),
+                          ),
+                          const Divider(height: 1, indent: 56),
+                          SwitchListTile(
+                            secondary: const Icon(Icons.network_cell_outlined),
+                            title: const Text('允许移动网络自动下载'),
+                            subtitle: const Text('可能产生数据流量'),
+                            value: preferences.updateAllowMeteredDownload,
+                            onChanged: preferences.updateAutoDownload
+                                ? (value) => ref
+                                      .read(preferencesProvider.notifier)
+                                      .setUpdateAllowMeteredDownload(value)
+                                : null,
+                          ),
+                          if (update.phase == MobileUpdatePhase.downloading)
+                            Padding(
+                              padding: const EdgeInsets.fromLTRB(16, 10, 16, 2),
+                              child: LinearProgressIndicator(
+                                value: update.progress / 100,
+                              ),
+                            ),
+                          if (update.message.isNotEmpty)
+                            Padding(
+                              padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
+                              child: Text(
+                                update.message,
+                                style: Theme.of(context).textTheme.bodySmall
+                                    ?.copyWith(
+                                      color: Theme.of(
+                                        context,
+                                      ).colorScheme.onSurfaceVariant,
+                                    ),
+                              ),
+                            ),
+                          Padding(
+                            padding: const EdgeInsets.fromLTRB(16, 12, 16, 14),
+                            child: Wrap(
+                              spacing: 8,
+                              runSpacing: 8,
+                              alignment: WrapAlignment.end,
+                              children: [
+                                OutlinedButton.icon(
+                                  onPressed: update.busy
+                                      ? null
+                                      : () => ref
+                                            .read(
+                                              mobileUpdateControllerProvider
+                                                  .notifier,
+                                            )
+                                            .check(),
+                                  icon: const Icon(Icons.refresh, size: 18),
+                                  label: const Text('检查更新'),
+                                ),
+                                if (update.phase == MobileUpdatePhase.available)
+                                  FilledButton.icon(
+                                    onPressed: ref
+                                        .read(
+                                          mobileUpdateControllerProvider
+                                              .notifier,
+                                        )
+                                        .download,
+                                    icon: const Icon(
+                                      Icons.download_outlined,
+                                      size: 18,
+                                    ),
+                                    label: const Text('下载更新'),
+                                  ),
+                                if (update.phase ==
+                                    MobileUpdatePhase.downloading)
+                                  OutlinedButton.icon(
+                                    onPressed: ref
+                                        .read(
+                                          mobileUpdateControllerProvider
+                                              .notifier,
+                                        )
+                                        .cancelDownload,
+                                    icon: const Icon(Icons.close, size: 18),
+                                    label: const Text('取消下载'),
+                                  ),
+                                if (update.phase == MobileUpdatePhase.ready)
+                                  FilledButton.icon(
+                                    onPressed: _confirmInstallUpdate,
+                                    icon: const Icon(
+                                      Icons.system_update_alt,
+                                      size: 18,
+                                    ),
+                                    label: const Text('安装更新'),
+                                  ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 10),
+                      _SettingsSection(
                         title: '关于',
                         icon: Icons.info_outline,
                         children: [
                           ListTile(
-                            leading: Icon(Icons.shield_outlined),
-                            title: Text('SecretBase Android'),
-                            subtitle: Text('版本 5.0.0 · Vault V1'),
+                            leading: const Icon(Icons.shield_outlined),
+                            title: const Text('SecretBase Android'),
+                            subtitle: Text(
+                              '版本 ${_currentVersion(update)} · Vault V1',
+                            ),
                           ),
-                          Divider(height: 1, indent: 56),
-                          ListTile(
+                          const Divider(height: 1, indent: 56),
+                          const ListTile(
                             leading: Icon(Icons.phonelink_lock_outlined),
                             title: Text('本机私有存储'),
                             subtitle: Text('系统备份已关闭'),
@@ -469,6 +603,48 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       maxWidth: 680,
       builder: (_) => _RecoveryDialog(onRestored: _showMessage),
     );
+  }
+
+  String _updateStatusText(MobileUpdateState update) {
+    return switch (update.phase) {
+      MobileUpdatePhase.checking => '正在检查正式版本',
+      MobileUpdatePhase.available => '可更新到 ${update.asset?.version ?? ''}',
+      MobileUpdatePhase.downloading => '正在下载 ${update.progress}%',
+      MobileUpdatePhase.ready => '${update.asset?.version ?? '新版本'} 已准备安装',
+      MobileUpdatePhase.installing => '正在打开 Android 系统安装界面',
+      MobileUpdatePhase.upToDate => '当前已是最新正式版本',
+      MobileUpdatePhase.reinstallRequired => '需要迁移到正式签名版本',
+      MobileUpdatePhase.error => '更新检查或下载失败',
+      MobileUpdatePhase.idle => '每天自动检查稳定版本',
+    };
+  }
+
+  String _currentVersion(MobileUpdateState update) {
+    final version = update.application?.versionName.trim() ?? '';
+    return version.isEmpty ? '读取中' : version;
+  }
+
+  Future<void> _confirmInstallUpdate() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('安装更新'),
+        content: const Text('SecretBase 将先锁定密码库，再打开 Android 系统安装界面。确认继续？'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('稍后'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('继续安装'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true) {
+      await ref.read(mobileUpdateControllerProvider.notifier).install();
+    }
   }
 
   void _showMessage(String message) {

@@ -10,6 +10,7 @@ SecretBase is intentionally scoped as a single-user encrypted vault. The priorit
 - Keep production deployment practical behind nginx or another reverse proxy.
 - Maintain the stable Windows and macOS desktop packaging, diagnostics, lifecycle, and data-safety behavior described in [App Roadmap](app-roadmap.md).
 - Finish hardware, migration, and persistent signing acceptance for the implemented Android-first Flutter/Rust client; three-ABI CI and API 29/36 emulator gates are complete.
+- Complete the V5 signed-update baseline: Windows in-place updates, Android system-confirmed replacement, and macOS signed-manifest notifications are implemented and awaiting release acceptance.
 
 ## Implemented
 
@@ -28,6 +29,7 @@ SecretBase is intentionally scoped as a single-user encrypted vault. The priorit
 - macOS V3.3 arm64 DMG/ZIP packaging, WKWebView lifecycle, native zoom controls, CI, and Apple Silicon hardware acceptance.
 - Normative Vault V1 format documentation, public Python-compatible golden vectors, and an isolated Rust reference core.
 - Android 10+ Flutter/Rust client with private storage, lifecycle locking, Keystore-backed biometric unlock, entries, tags, groups, trash, encrypted transfer, a conversational AI manager, and revision-bound AI undo.
+- Signed stable update manifests, Windows installer handoff, Android package identity verification, and protected release-key environments.
 
 ## Later, If Needed
 
