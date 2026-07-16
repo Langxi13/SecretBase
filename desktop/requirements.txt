@@ -1,3 +1,4 @@
+# Desktop packaging inherits the audited backend dependency pins from this manifest.
 -r ../backend/requirements.txt
 
 pywebview==6.2.1
