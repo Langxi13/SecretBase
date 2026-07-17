@@ -1,0 +1,256 @@
+        <!-- 创建或加入同步空间 -->
+        <div v-if="showSyncSetup" class="modal-overlay">
+            <div class="modal-content sync-setup-modal">
+                <div class="modal-header">
+                    <h2>{{ syncSetupMode === 'create' ? '创建同步空间' : '加入同步空间' }}</h2>
+                    <button class="modal-close" @click="closeSyncSetup" :disabled="syncBusy || syncSetupTesting">✕</button>
+                </div>
+                <form @submit.prevent="submitSyncSetup">
+                    <div class="modal-body">
+                        <div class="sync-mode-switch" role="tablist" aria-label="同步配置方式">
+                            <button type="button" :class="{ active: syncSetupMode === 'create' }" @click="syncSetupMode = 'create'">创建新空间</button>
+                            <button type="button" :class="{ active: syncSetupMode === 'join' }" @click="syncSetupMode = 'join'">使用恢复码加入</button>
+                        </div>
+                        <p class="sync-security-note">仅支持 HTTPS WebDAV。SecretBase 不提供忽略证书错误的选项。</p>
+                        <div class="form-group">
+                            <label for="sync_base_url">WebDAV 地址</label>
+                            <input id="sync_base_url" type="url" v-model.trim="syncSetupForm.baseUrl" placeholder="https://dav.example.invalid/secretbase" required>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="sync_username">用户名</label>
+                                <input id="sync_username" type="text" v-model.trim="syncSetupForm.username" autocomplete="username" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="sync_password">WebDAV 应用密码</label>
+                                <input id="sync_password" type="password" v-model="syncSetupForm.password" autocomplete="new-password" required>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label for="sync_device_name">设备名称</label>
+                            <input id="sync_device_name" type="text" v-model.trim="syncSetupForm.deviceName" maxlength="100" placeholder="留空时使用当前设备名称">
+                        </div>
+                        <div v-if="syncSetupMode === 'join'" class="form-group">
+                            <label for="sync_recovery_code">同步恢复码</label>
+                            <textarea id="sync_recovery_code" class="sync-recovery-input" v-model.trim="syncSetupForm.recoveryCode" rows="4" spellcheck="false" required></textarea>
+                            <label class="compact-check-option sync-merge-option">
+                                <input type="checkbox" v-model="syncSetupForm.mergeExisting">
+                                当前 Vault 已有数据时进行三方合并
+                            </label>
+                        </div>
+                        <label class="sync-auto-option">
+                            <input type="checkbox" v-model="syncSetupForm.autoSync">
+                            <span><strong>启用自动同步</strong><small>写入后防抖同步，并在解锁和回到前台时检查。</small></span>
+                        </label>
+                        <p v-if="syncSetupMessage" class="info-message">{{ syncSetupMessage }}</p>
+                        <p v-if="syncError" class="error-message">{{ syncError }}</p>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn-secondary" @click="testSyncConnection" :disabled="syncBusy || syncSetupTesting">
+                            {{ syncSetupTesting ? '测试中...' : '测试连接' }}
+                        </button>
+                        <button type="button" class="btn-secondary" @click="closeSyncSetup" :disabled="syncBusy">取消</button>
+                        <button
+                            type="submit"
+                            class="btn-primary inline"
+                            :disabled="syncBusy || !syncSetupForm.baseUrl || !syncSetupForm.username || !syncSetupForm.password || (syncSetupMode === 'join' && !syncSetupForm.recoveryCode)"
+                        >{{ syncBusy ? '处理中...' : (syncSetupMode === 'create' ? '创建并上传' : '加入并同步') }}</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- 同步冲突 -->
+        <div v-if="showSyncConflicts" class="modal-overlay">
+            <div class="modal-content sync-conflict-modal">
+                <div class="modal-header">
+                    <h2>处理同步冲突</h2>
+                    <button class="modal-close" @click="showSyncConflicts = false" :disabled="syncBusy">✕</button>
+                </div>
+                <div class="modal-body">
+                    <p class="sync-security-note">这里不会展示任何字段值。请逐项选择本机、远端，或为条目保留两个版本。</p>
+                    <div class="sync-conflict-list">
+                        <article v-for="item in syncConflicts" :key="item.conflict_id" class="sync-conflict-item">
+                            <header>
+                                <div>
+                                    <strong>{{ item.label }}</strong>
+                                    <span>{{ item.changed_sections.join('、') }}</span>
+                                </div>
+                                <span class="sync-conflict-kind">{{ item.kind === 'entry' ? '条目' : item.kind === 'tags_meta' ? '标签' : item.kind === 'groups_meta' ? '密码组' : '扩展数据' }}</span>
+                            </header>
+                            <div class="sync-conflict-compare">
+                                <div>
+                                    <b>本机</b>
+                                    <span>{{ syncConflictStateLabel(item.local) }}</span>
+                                    <small v-if="item.local?.updated_at">{{ formatSyncTime(item.local.updated_at) }}</small>
+                                    <small v-if="item.local?.field_count !== undefined">{{ item.local.field_count }} 个字段</small>
+                                </div>
+                                <div>
+                                    <b>远端</b>
+                                    <span>{{ syncConflictStateLabel(item.remote) }}</span>
+                                    <small v-if="item.remote?.updated_at">{{ formatSyncTime(item.remote.updated_at) }}</small>
+                                    <small v-if="item.remote?.field_count !== undefined">{{ item.remote.field_count }} 个字段</small>
+                                </div>
+                            </div>
+                            <div class="sync-resolution-options">
+                                <label :class="{ selected: syncConflictResolutions[item.conflict_id] === 'local' }">
+                                    <input type="radio" :name="item.conflict_id" value="local" v-model="syncConflictResolutions[item.conflict_id]">保留本机
+                                </label>
+                                <label :class="{ selected: syncConflictResolutions[item.conflict_id] === 'remote' }">
+                                    <input type="radio" :name="item.conflict_id" value="remote" v-model="syncConflictResolutions[item.conflict_id]">保留远端
+                                </label>
+                                <label v-if="item.allow_both" :class="{ selected: syncConflictResolutions[item.conflict_id] === 'both' }">
+                                    <input type="radio" :name="item.conflict_id" value="both" v-model="syncConflictResolutions[item.conflict_id]">保留两份
+                                </label>
+                            </div>
+                        </article>
+                    </div>
+                    <p v-if="syncError" class="error-message">{{ syncError }}</p>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn-secondary" @click="showSyncConflicts = false" :disabled="syncBusy">稍后处理</button>
+                    <button class="btn-primary inline" @click="resolveSyncConflicts" :disabled="syncBusy || !allSyncConflictsResolved">
+                        {{ syncBusy ? '应用中...' : '应用全部选择' }}
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 同步历史 -->
+        <div v-if="showSyncHistory" class="modal-overlay">
+            <div class="modal-content sync-history-modal">
+                <div class="modal-header">
+                    <h2>同步历史</h2>
+                    <button class="modal-close" @click="showSyncHistory = false" :disabled="syncBusy">✕</button>
+                </div>
+                <div class="modal-body">
+                    <p class="sync-security-note">远端保留最近 10 个端到端加密版本。恢复会生成新的最新版本，不会改写旧快照。</p>
+                    <div v-if="syncHistoryLoading" class="sync-inline-loading">正在读取历史版本...</div>
+                    <div v-else-if="syncHistory.length === 0" class="sync-inline-loading">暂无历史版本</div>
+                    <div v-else class="sync-history-list">
+                        <div v-for="item in syncHistory" :key="item.snapshot_id" class="sync-history-row">
+                            <div>
+                                <strong>{{ formatSyncTime(item.created_at) }}</strong>
+                                <span>{{ item.device_name || '未知设备' }}</span>
+                            </div>
+                            <span v-if="item.snapshot_id === syncCurrentSnapshotId" class="sync-current-badge">当前</span>
+                            <button v-else class="btn-small" @click="restoreSyncHistory(item)" :disabled="syncBusy">恢复</button>
+                        </div>
+                    </div>
+                    <p v-if="syncError" class="error-message">{{ syncError }}</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- 恢复码与密钥轮换 -->
+        <div v-if="showSyncRecovery" class="modal-overlay">
+            <div class="modal-content sync-recovery-modal">
+                <div class="modal-header">
+                    <h2>{{ syncRecoveryMode === 'rotate' ? '轮换同步密钥' : '加入新设备' }}</h2>
+                    <button class="modal-close" @click="closeSyncRecovery" :disabled="syncRecoveryBusy">✕</button>
+                </div>
+                <div class="modal-body">
+                    <template v-if="!syncRecoveryMaterial">
+                        <p v-if="syncRecoveryMode === 'rotate'" class="warning-panel">轮换后旧设备和旧恢复码立即失效，远端历史会从当前版本重新开始。</p>
+                        <p v-else class="sync-security-note">二维码和恢复码等同于同步密钥。显示前必须再次验证当前 Vault 的主密码。</p>
+                        <form @submit.prevent="submitSyncRecovery">
+                            <div class="form-group">
+                                <label for="sync_master_password">当前主密码</label>
+                                <input id="sync_master_password" type="password" v-model="syncMasterPassword" autocomplete="current-password" required autofocus>
+                            </div>
+                            <button class="btn-primary inline" type="submit" :disabled="syncRecoveryBusy || !syncMasterPassword">
+                                {{ syncRecoveryBusy ? '验证中...' : (syncRecoveryMode === 'rotate' ? '验证并轮换' : '验证并显示') }}
+                            </button>
+                        </form>
+                    </template>
+                    <template v-else>
+                        <div class="sync-pairing-layout">
+                            <img v-if="syncRecoveryMaterial.qr_data_uri" :src="syncRecoveryMaterial.qr_data_uri" alt="SecretBase 同步配对二维码">
+                            <div v-else class="sync-qr-unavailable">配对信息较长，请复制配对链接或使用恢复码加入。</div>
+                            <div>
+                                <strong>{{ syncRecoveryMode === 'rotate' ? '新同步密钥已生效' : '在新设备上加入同步空间' }}</strong>
+                                <p>请在可信设备上使用。完成配对后关闭此窗口。</p>
+                                <button class="btn-secondary" @click="copySyncSecret(syncRecoveryMaterial.pairing_uri, '配对链接')">复制配对链接</button>
+                            </div>
+                        </div>
+                        <div class="sync-recovery-code">
+                            <span>分段恢复码</span>
+                            <code>{{ syncRecoveryMaterial.recovery_code }}</code>
+                            <button class="btn-secondary" @click="copySyncSecret(syncRecoveryMaterial.recovery_code, '恢复码')">复制恢复码</button>
+                        </div>
+                    </template>
+                    <p v-if="syncError" class="error-message">{{ syncError }}</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- 连接设置 -->
+        <div v-if="showSyncConfig" class="modal-overlay">
+            <div class="modal-content sync-config-modal">
+                <div class="modal-header">
+                    <h2>WebDAV 连接设置</h2>
+                    <button class="modal-close" @click="showSyncConfig = false" :disabled="syncBusy">✕</button>
+                </div>
+                <form @submit.prevent="saveSyncConfig">
+                    <div class="modal-body">
+                        <div class="form-group">
+                            <label for="sync_config_url">WebDAV 地址</label>
+                            <input id="sync_config_url" type="url" v-model.trim="syncConfigForm.baseUrl" required>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="sync_config_username">用户名</label>
+                                <input id="sync_config_username" type="text" v-model.trim="syncConfigForm.username" :placeholder="syncStatus.username_mask + '（留空保持不变）'" autocomplete="username">
+                            </div>
+                            <div class="form-group">
+                                <label for="sync_config_password">WebDAV 应用密码</label>
+                                <input id="sync_config_password" type="password" v-model="syncConfigForm.password" placeholder="留空保持不变" autocomplete="new-password">
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label for="sync_config_device">设备名称</label>
+                            <input id="sync_config_device" type="text" v-model.trim="syncConfigForm.deviceName" maxlength="100">
+                        </div>
+                        <label class="sync-auto-option">
+                            <input type="checkbox" v-model="syncConfigForm.autoSync">
+                            <span><strong>启用自动同步</strong><small>连接信息变化时会先验证远端同步空间。</small></span>
+                        </label>
+                        <p v-if="syncError" class="error-message">{{ syncError }}</p>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn-secondary" @click="showSyncConfig = false" :disabled="syncBusy">取消</button>
+                        <button type="submit" class="btn-primary inline" :disabled="syncBusy || !syncConfigForm.baseUrl">{{ syncBusy ? '保存中...' : '保存设置' }}</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- 删除远端同步数据 -->
+        <div v-if="showSyncDeleteRemote" class="modal-overlay">
+            <div class="modal-content sync-delete-modal">
+                <div class="modal-header">
+                    <h2>删除远端同步数据</h2>
+                    <button class="modal-close" @click="showSyncDeleteRemote = false" :disabled="syncBusy">✕</button>
+                </div>
+                <form @submit.prevent="deleteRemoteSync">
+                    <div class="modal-body">
+                        <p class="warning-panel">此操作会删除 WebDAV 上当前 Vault 的索引和 10 个加密历史版本，并断开本机同步。本机 Vault 不会被删除。</p>
+                        <div class="form-group">
+                            <label for="sync_delete_password">当前主密码</label>
+                            <input id="sync_delete_password" type="password" v-model="syncDeleteForm.password" autocomplete="current-password" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="sync_delete_confirmation">输入 DELETE 确认</label>
+                            <input id="sync_delete_confirmation" type="text" v-model.trim="syncDeleteForm.confirmation" autocomplete="off" required>
+                        </div>
+                        <p v-if="syncError" class="error-message">{{ syncError }}</p>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn-secondary" @click="showSyncDeleteRemote = false" :disabled="syncBusy">取消</button>
+                        <button type="submit" class="btn-danger" :disabled="syncBusy || !syncDeleteForm.password || syncDeleteForm.confirmation !== 'DELETE'">
+                            {{ syncBusy ? '删除中...' : '永久删除远端数据' }}
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>

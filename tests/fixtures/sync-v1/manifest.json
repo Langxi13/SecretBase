@@ -1,0 +1,65 @@
+{
+  "schema_version": 1,
+  "vectors": [
+    {
+      "name": "python-snapshot-v1",
+      "kind": 2,
+      "key_hex": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+      "nonce_hex": "0a0b0c0d0e0f101112131415",
+      "vault_id": "11111111-1111-4111-8111-111111111111",
+      "object_id": "22222222-2222-4222-8222-222222222222",
+      "bundle_sha256": "f712fed4a089e1e049ad219923e507d1095439720dab49ef610a9327fda8eaa2",
+      "bundle_hex": "5342533101020a0b0c0d0e0f101112131415703632c86bddd775b6fb455f13c23608ed6048cea5ddb0ae31910c2853c19cb69dd0f77c29317f8d0759e2b9a81bf9df637106a2dd0763cfcc560881a11291cadd922af31ea220a4cfc44303124eb2e4d4443ed93e5aabeeff7d5d447068d82d8273958e3d79a6ad3f383a3e46d12f03fe45a92070798cddd13ffebee7230ab9302fbeebab5e5906569bb48c42d76d3bc52382dda7ff248109190df02704ee91dee9632c63edc02709713f58b4d39406f3105f42423f4b5e36da95a6d4def5abbbdf19062930e0cdc902f4864e6d667a22357897f475ce54681fe8d9d90e2759d07b7ba594d57d0cc3cbbe4876625596f93b4815dfc03edeae7bb104a1d519e7c2c81059f398a7c29979072fbe4356262a63afb1c88b60c14716bc045a5158b4388a1d4348d11184dca33023be827015695e47e932f751bd81cdbff0c3adea0173a5e32f34c80618c4534392dfae08214ee2e8229f2e80827cf870850022d56c57f965b087786a66e0425871fb4ae154870e52dad65c3aac46ff90811a00c1300ee55c3d6f061677393ab0dc18fed2b2d3479bb38f3dc61de2ee8979afbc9cfcceb2d4c1253543c5627fed92eccac0d9980ce86677d54d0d04a652bbac1d43da3745c082d6ec1c54c306cb849e398e5c2b6aaaaed8b1c159088ffb6f7ce21991aabcdc4c8314e96ecc61",
+      "payload": {
+        "schema_version": 1,
+        "vault_id": "11111111-1111-4111-8111-111111111111",
+        "snapshot_id": "22222222-2222-4222-8222-222222222222",
+        "parents": [],
+        "created_at": "2026-07-17T00:00:00Z",
+        "device_id": "33333333-3333-4333-8333-333333333333",
+        "device_name": "公开测试设备",
+        "document": {
+          "version": "1.0",
+          "created_at": "2026-07-17T00:00:00Z",
+          "app_name": "SecretBase",
+          "vault_id": "11111111-1111-4111-8111-111111111111",
+          "entries": [
+            {
+              "id": "44444444-4444-4444-8444-444444444444",
+              "title": "同步向量条目",
+              "url": "https://example.invalid",
+              "starred": false,
+              "tags": ["测试"],
+              "groups": ["向量"],
+              "fields": [
+                {
+                  "name": "密码",
+                  "value": "public-test-secret",
+                  "copyable": true,
+                  "hidden": true
+                }
+              ],
+              "remarks": "公开测试数据",
+              "created_at": "2026-07-17T00:00:00Z",
+              "updated_at": "2026-07-17T00:00:00Z",
+              "deleted": false,
+              "deleted_at": null
+            }
+          ],
+          "deleted_entries": [],
+          "tags_meta": {
+            "测试": {
+              "description": "向量标签",
+              "color": "#2563eb"
+            }
+          },
+          "groups_meta": {
+            "向量": {
+              "description": "同步协议测试"
+            }
+          }
+        }
+      }
+    }
+  ]
+}

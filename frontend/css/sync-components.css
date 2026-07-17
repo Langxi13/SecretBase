@@ -1,0 +1,576 @@
+.sync-status-button {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    min-width: 36px;
+    height: 36px;
+    padding: 0 10px;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    background: var(--surface-2);
+    color: var(--text-secondary);
+    font-size: var(--font-size-xs);
+    font-weight: 700;
+    white-space: nowrap;
+    transition: border-color var(--transition-fast), background var(--transition-fast), color var(--transition-fast);
+}
+
+.sync-status-button:hover {
+    border-color: var(--color-primary);
+    color: var(--text-primary);
+}
+
+.sync-status-button.is-success {
+    border-color: color-mix(in srgb, var(--color-success) 38%, var(--border-color));
+    background: var(--status-success-bg);
+    color: var(--color-success);
+}
+
+.sync-status-button.is-warning {
+    border-color: color-mix(in srgb, var(--color-warning) 45%, var(--border-color));
+    background: var(--status-warning-bg);
+    color: var(--color-warning);
+}
+
+.sync-status-button.is-error {
+    border-color: color-mix(in srgb, var(--color-error) 42%, var(--border-color));
+    background: var(--status-error-bg);
+    color: var(--color-error);
+}
+
+.sync-status-button.is-working {
+    border-color: color-mix(in srgb, var(--color-info) 42%, var(--border-color));
+    background: var(--status-info-bg);
+    color: var(--color-info);
+}
+
+.sync-status-icon {
+    display: inline-grid;
+    place-items: center;
+    width: 16px;
+    height: 16px;
+    font-size: 14px;
+    line-height: 1;
+}
+
+.sync-status-icon.spinning {
+    animation: sync-spin 0.9s linear infinite;
+}
+
+@keyframes sync-spin {
+    to { transform: rotate(360deg); }
+}
+
+.sync-section-heading {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+    padding-bottom: 14px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.sync-section-heading h3 {
+    margin: 0 0 5px;
+}
+
+.sync-section-heading p,
+.sync-empty-state p,
+.sync-auto-row span,
+.sync-status-message {
+    margin: 0;
+    color: var(--text-secondary);
+    font-size: var(--font-size-sm);
+}
+
+.sync-phase-badge,
+.sync-current-badge,
+.sync-conflict-kind {
+    display: inline-flex;
+    align-items: center;
+    min-height: 25px;
+    padding: 3px 8px;
+    border: 1px solid var(--border-color);
+    border-radius: 999px;
+    background: var(--surface-2);
+    color: var(--text-secondary);
+    font-size: var(--font-size-xs);
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+.sync-phase-badge.is-success,
+.sync-current-badge {
+    border-color: color-mix(in srgb, var(--color-success) 35%, var(--border-color));
+    background: var(--status-success-bg);
+    color: var(--color-success);
+}
+
+.sync-phase-badge.is-warning {
+    background: var(--status-warning-bg);
+    color: var(--color-warning);
+}
+
+.sync-phase-badge.is-error {
+    background: var(--status-error-bg);
+    color: var(--color-error);
+}
+
+.sync-phase-badge.is-working {
+    background: var(--status-info-bg);
+    color: var(--color-info);
+}
+
+.sync-inline-loading,
+.sync-empty-state {
+    margin: 16px 0;
+    padding: 16px 0;
+    color: var(--text-secondary);
+}
+
+.sync-empty-state {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+}
+
+.sync-empty-icon {
+    display: grid;
+    place-items: center;
+    flex: 0 0 42px;
+    width: 42px;
+    height: 42px;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    background: var(--surface-2);
+    font-size: 21px;
+}
+
+.sync-empty-state strong {
+    display: block;
+    margin-bottom: 4px;
+    color: var(--text-primary);
+}
+
+.sync-primary-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 14px;
+}
+
+.sync-summary-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    margin: 16px 0 0;
+    border-top: 1px solid var(--border-color);
+    border-left: 1px solid var(--border-color);
+}
+
+.sync-summary-grid div {
+    min-width: 0;
+    padding: 12px 14px;
+    border-right: 1px solid var(--border-color);
+    border-bottom: 1px solid var(--border-color);
+}
+
+.sync-summary-grid dt {
+    margin-bottom: 4px;
+    color: var(--text-tertiary);
+    font-size: var(--font-size-xs);
+}
+
+.sync-summary-grid dd {
+    margin: 0;
+    overflow: hidden;
+    color: var(--text-primary);
+    font-size: var(--font-size-sm);
+    font-weight: 650;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.sync-auto-row,
+.sync-auto-option {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 14px 0;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.sync-auto-row > div,
+.sync-auto-option > span {
+    display: grid;
+    gap: 3px;
+}
+
+.sync-auto-row input,
+.sync-auto-option input {
+    flex: 0 0 auto;
+    width: 17px;
+    height: 17px;
+    accent-color: var(--color-primary);
+}
+
+.sync-auto-option small {
+    color: var(--text-secondary);
+    font-size: var(--font-size-xs);
+}
+
+.sync-status-message {
+    padding-top: 12px;
+}
+
+.sync-conflict-action {
+    border-color: color-mix(in srgb, var(--color-warning) 48%, var(--border-color));
+    color: var(--color-warning);
+}
+
+.sync-danger-zone {
+    margin-top: 20px;
+    padding-top: 15px;
+    border-top: 1px dashed var(--border-strong);
+}
+
+.sync-danger-zone > strong {
+    display: block;
+    margin-bottom: 9px;
+    color: var(--text-secondary);
+    font-size: var(--font-size-sm);
+}
+
+.sync-setup-modal,
+.sync-config-modal,
+.sync-recovery-modal,
+.sync-delete-modal {
+    max-width: min(760px, calc(100vw - 32px));
+}
+
+.sync-conflict-modal {
+    max-width: min(980px, calc(100vw - 32px));
+}
+
+.sync-history-modal {
+    max-width: min(780px, calc(100vw - 32px));
+}
+
+.sync-mode-switch {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 4px;
+    margin-bottom: 16px;
+    padding: 4px;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    background: var(--surface-3);
+}
+
+.sync-mode-switch button {
+    min-height: 34px;
+    border-radius: 6px;
+    color: var(--text-secondary);
+    font-size: var(--font-size-sm);
+    font-weight: 650;
+}
+
+.sync-mode-switch button.active {
+    background: var(--surface-1);
+    color: var(--color-primary);
+    box-shadow: var(--shadow-sm);
+}
+
+.sync-security-note {
+    margin: 0 0 16px;
+    padding: 10px 12px;
+    border-left: 3px solid var(--color-info);
+    background: var(--status-info-bg);
+    color: var(--text-secondary);
+    font-size: var(--font-size-sm);
+    line-height: 1.55;
+}
+
+.sync-recovery-input {
+    min-height: 88px !important;
+    font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+    overflow-wrap: anywhere;
+}
+
+.sync-merge-option {
+    margin-top: 10px;
+}
+
+.sync-conflict-list {
+    display: grid;
+    gap: 12px;
+}
+
+.sync-conflict-item {
+    padding: 14px;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    background: var(--surface-2);
+}
+
+.sync-conflict-item > header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 14px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.sync-conflict-item > header div {
+    display: grid;
+    min-width: 0;
+    gap: 4px;
+}
+
+.sync-conflict-item > header strong {
+    overflow: hidden;
+    color: var(--text-primary);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.sync-conflict-item > header span:not(.sync-conflict-kind) {
+    color: var(--text-secondary);
+    font-size: var(--font-size-xs);
+}
+
+.sync-conflict-compare {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1px;
+    margin: 12px 0;
+    background: var(--border-color);
+}
+
+.sync-conflict-compare > div {
+    display: grid;
+    gap: 3px;
+    min-width: 0;
+    padding: 10px 12px;
+    background: var(--surface-1);
+}
+
+.sync-conflict-compare b {
+    color: var(--text-tertiary);
+    font-size: var(--font-size-xs);
+}
+
+.sync-conflict-compare span {
+    color: var(--text-primary);
+    font-size: var(--font-size-sm);
+    font-weight: 650;
+}
+
+.sync-conflict-compare small {
+    color: var(--text-secondary);
+}
+
+.sync-resolution-options {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 7px;
+}
+
+.sync-resolution-options label {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 31px;
+    padding: 5px 9px;
+    border: 1px solid var(--border-color);
+    border-radius: 7px;
+    background: var(--surface-1);
+    color: var(--text-secondary);
+    font-size: var(--font-size-xs);
+    cursor: pointer;
+}
+
+.sync-resolution-options label.selected {
+    border-color: var(--color-primary);
+    background: var(--color-primary-light);
+    color: var(--color-primary);
+}
+
+.sync-resolution-options input {
+    width: 14px;
+    height: 14px;
+    margin: 0;
+    accent-color: var(--color-primary);
+}
+
+.sync-history-list {
+    border-top: 1px solid var(--border-color);
+}
+
+.sync-history-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 12px;
+    min-height: 58px;
+    padding: 9px 2px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.sync-history-row > div {
+    display: grid;
+    gap: 3px;
+    min-width: 0;
+}
+
+.sync-history-row strong {
+    color: var(--text-primary);
+    font-size: var(--font-size-sm);
+}
+
+.sync-history-row span:not(.sync-current-badge) {
+    overflow: hidden;
+    color: var(--text-secondary);
+    font-size: var(--font-size-xs);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.sync-pairing-layout {
+    display: grid;
+    grid-template-columns: 210px minmax(0, 1fr);
+    align-items: center;
+    gap: 22px;
+}
+
+.sync-pairing-layout img {
+    display: block;
+    width: 210px;
+    height: 210px;
+    padding: 8px;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    background: #ffffff;
+}
+
+.sync-qr-unavailable {
+    display: grid;
+    place-items: center;
+    width: 210px;
+    min-height: 150px;
+    padding: 18px;
+    border: 1px dashed var(--border-strong);
+    border-radius: 8px;
+    color: var(--text-secondary);
+    font-size: var(--font-size-sm);
+    line-height: 1.6;
+    text-align: center;
+}
+
+.sync-pairing-layout strong {
+    display: block;
+    margin-bottom: 6px;
+    color: var(--text-primary);
+}
+
+.sync-pairing-layout p {
+    margin: 0 0 14px;
+    color: var(--text-secondary);
+    font-size: var(--font-size-sm);
+}
+
+.sync-recovery-code {
+    display: grid;
+    gap: 8px;
+    margin-top: 18px;
+    padding-top: 16px;
+    border-top: 1px solid var(--border-color);
+}
+
+.sync-recovery-code > span {
+    color: var(--text-secondary);
+    font-size: var(--font-size-xs);
+    font-weight: 700;
+}
+
+.sync-recovery-code code {
+    padding: 11px 12px;
+    border: 1px solid var(--border-color);
+    border-radius: 7px;
+    background: var(--surface-3);
+    color: var(--text-primary);
+    font-size: var(--font-size-xs);
+    line-height: 1.7;
+    overflow-wrap: anywhere;
+    user-select: all;
+}
+
+.sync-recovery-code .btn-secondary {
+    justify-self: start;
+}
+
+@media (max-width: 760px) {
+    .sync-status-button {
+        width: 36px;
+        padding: 0;
+        justify-content: center;
+    }
+
+    .sync-status-text {
+        display: none;
+    }
+
+    .sync-section-heading,
+    .sync-empty-state,
+    .sync-auto-row,
+    .sync-auto-option {
+        align-items: flex-start;
+    }
+
+    .sync-summary-grid,
+    .sync-conflict-compare,
+    .sync-pairing-layout {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .sync-pairing-layout img,
+    .sync-qr-unavailable {
+        width: min(210px, 100%);
+        height: auto;
+        justify-self: center;
+    }
+
+    .sync-pairing-layout img {
+        aspect-ratio: 1;
+    }
+
+    .sync-conflict-item > header {
+        align-items: flex-start;
+    }
+
+    .sync-resolution-options label {
+        flex: 1 1 110px;
+        justify-content: center;
+    }
+}
+
+@media (max-width: 480px) {
+    .sync-section-heading {
+        display: grid;
+    }
+
+    .sync-phase-badge {
+        justify-self: start;
+    }
+
+    .sync-mode-switch,
+    .sync-summary-grid {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .sync-primary-actions > button,
+    .sync-danger-zone .setting-actions > button {
+        flex: 1 1 140px;
+    }
+}

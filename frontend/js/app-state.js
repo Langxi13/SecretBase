@@ -198,11 +198,13 @@
             desktopUpdateAutoCheck: true,
             desktopUpdateAutoDownload: true
         });
+        const syncState = window.SecretBaseSyncState.createSyncState({ ref, reactive });
         const activeSettingsTab = ref('general');
         const settingsTabs = [
             { key: 'general', label: '通用' },
             { key: 'security', label: '安全' },
             { key: 'ai', label: 'AI' },
+            { key: 'sync', label: '同步' },
             { key: 'data', label: '数据' },
             ...(isDesktopMode ? [{ key: 'desktop', label: '桌面' }] : [])
         ];
@@ -388,6 +390,7 @@
             selectedTemplate,
             entryTemplates,
             ...aiState,
+            ...syncState,
             settingsForm,
             activeSettingsTab,
             settingsTabs,

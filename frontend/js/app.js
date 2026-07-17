@@ -68,6 +68,9 @@ const app = createApp({
             loadDesktopDiagnostics: features.actions.loadDesktopDiagnostics,
             initializeDesktopUpdates: features.actions.initializeDesktopUpdates,
             disposeDesktopUpdates: features.actions.disposeDesktopUpdates,
+            initializeSync: features.actions.initializeSync,
+            pauseSync: features.actions.pauseSync,
+            disposeSync: features.actions.disposeSync,
             handleDocumentClick: features.actions.handleDocumentClick
         });
         Object.assign(settingsActions, session);

@@ -153,6 +153,15 @@
                     <h1 class="logo">🔐 SecretBase</h1>
                 </div>
                 <div class="header-right">
+                    <button
+                        class="sync-status-button"
+                        :class="'is-' + syncStatusTone"
+                        @click="openSyncCenter"
+                        :title="syncStatusLabel"
+                    >
+                        <span class="sync-status-icon" :class="{ spinning: syncStatus.phase === 'syncing' }">{{ syncStatusIcon }}</span>
+                        <span class="sync-status-text">{{ syncStatusLabel }}</span>
+                    </button>
                     <button class="btn-icon" @click="openAiAssistant" title="AI 管家">
                         ✦
                     </button>

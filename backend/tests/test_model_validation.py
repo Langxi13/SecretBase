@@ -1,4 +1,5 @@
 import unittest
+from pathlib import Path
 from types import SimpleNamespace
 
 from pydantic import ValidationError
@@ -68,6 +69,11 @@ class ModelValidationTests(unittest.TestCase):
 
         unmatched = SimpleNamespace(scope={}, url=SimpleNamespace(path="/private-value"))
         self.assertEqual(request_log_path(unmatched), "<unmatched>")
+
+    def test_cors_exposes_vault_mutation_headers_for_split_frontend_dev(self):
+        source = (Path(__file__).resolve().parents[1] / "main.py").read_text(encoding="utf-8")
+        expected = 'expose_headers=["X-SecretBase-Vault-Changed", "X-SecretBase-Vault-Revision"]'
+        self.assertIn(expected, source)
 
 
 if __name__ == "__main__":

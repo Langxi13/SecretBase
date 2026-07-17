@@ -31,4 +31,5 @@ def encode_vault_document(vault: VaultData) -> bytes:
             vault = VaultData.model_validate(vault)
         except (ValidationError, TypeError, ValueError) as error:
             raise VaultDocumentError("Vault payload 无效") from error
-    return vault.model_dump_json().encode("utf-8")
+    exclude = {"vault_id"} if vault.vault_id is None else None
+    return vault.model_dump_json(exclude=exclude).encode("utf-8")

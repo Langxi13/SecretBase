@@ -15,6 +15,7 @@
 | V2.7 | 前端深度模块化：入口页只保留资源与加载壳；同源模板片段由加载器按顺序组合；条目、密码组、标签、AI、备份、导入导出、回收站、维护工具和列表交互由独立控制器承载。 |
 | V2.8 | 组合根与资源域拆分：根入口仅连接依赖；响应式状态、会话生命周期、数据加载、监听和模板上下文独立；Store 按认证、条目、标签/密码组、回收站拆分；CSS 按基础、工作台、弹窗、表单、AI、管理与响应式拆分。 |
 | V2.9 | 侧边栏折叠态改用导航栏式分组图标：视图、标签、管理保留固定图标容器、语义色和悬停名称提示，移除难以辨识的小圆点。 |
+| V3.0 | WebDAV 加密同步：独立状态与控制器、顶部紧凑状态入口、设置页同步标签、宽版冲突/历史/配对弹窗，以及解锁、写入防抖和前台恢复触发。 |
 
 V2.0 只调整认证 token 存储：前端优先使用 `sessionStorage`，不再使用 `localStorage` 长期保存 token；浏览器禁止站点存储时只保留当前内存会话，刷新后要求重新解锁。V2.3 前的页面重构采用“布局分层、逻辑复用”的低风险方案：PC 端增加桌面侧边栏和卡片工作台，移动端继续使用现有单列卡片流；不引入 npm 构建链，不拆 Vue SFC。V2.7 保持这一部署边界，使用同源静态模板片段和浏览器脚本模块进行拆分，不引入运行时路由或服务端模板引擎。
 
@@ -54,6 +55,7 @@ frontend/
 │   ├── app-layout.html     # 认证、侧边栏、顶部与搜索筛选区
 │   ├── workspace-list.html # 密码组、条目列表、分页与批量操作
 │   ├── entry-dialogs.html  # 引导、条目和密码组编辑相关弹窗
+│   ├── sync-dialogs.html   # WebDAV 配置、冲突、历史、恢复码和远端删除
 │   └── ...                 # AI、设置、备份、标签、导入等领域弹窗
 ├── css/
 │   ├── base.css            # 重置、认证、基础按钮和通用状态
@@ -62,6 +64,7 @@ frontend/
 │   ├── form-controls.css   # 表单、字段、标签和复制控件
 │   ├── ai-components.css   # Toast 与 AI 交互组件
 │   ├── management-components.css # 设置、工具、备份、标签和回收站组件
+│   ├── sync-components.css # 同步状态、设置、冲突、历史和配对响应式样式
 │   ├── component-responsive.css # 弹窗与管理组件的移动端规则
 │   ├── visual-polish.css   # 后段整体视觉覆盖层，必须在主题样式之后加载
 │   ├── component-polish.css # 后段组件覆盖层，必须在领域组件样式之后加载
@@ -78,6 +81,8 @@ frontend/
     ├── app-feature-composition.js # 视图工厂和领域控制器装配
     ├── app-watchers.js     # 跨模块响应式监听
     ├── app-template-context.js # 向 Vue 模板平铺状态、视图和操作
+    ├── sync-state.js       # 同步表单、状态、冲突、历史和恢复材料的短生命周期状态
+    ├── sync-lifecycle.js   # 自动同步计时、前后台监听和解锁会话 epoch
     ├── template-loader.js  # 并行加载同源模板片段后挂载 Vue
     ├── api.js              # Fetch API 封装，Windows 开发直连后端，生产环境使用 /api 前缀
     ├── store.js            # Store 外观和领域方法组合
@@ -100,6 +105,7 @@ frontend/
     ├── controllers/        # 领域操作控制器，不直接读取其他控制器私有状态
     │   ├── entry-controller.js
     │   ├── group-controller.js
+    │   ├── sync-controller.js
     │   ├── tag-controller.js
     │   ├── ai-controller.js
     │   ├── backup-controller.js
@@ -120,6 +126,8 @@ frontend/
 - `store.js` 保持现有 `store.*` 公共调用面；具体 API 方法按资源域拆到 `store-*.js`，避免 UI 控制器感知拆分细节。
 - 控制器仅接收显式注入的 ref、reactive 状态、帮助函数和回调。跨领域刷新通过 `loadEntries`、`loadTags`、`loadGroups`、`loadAllData` 等公开回调完成，避免模块直接依赖其他控制器的内部实现。
 - Store 写操作只提交请求并返回结果，不得在内部隐式调用 `loadEntries`、`loadTags` 或 `loadGroups`。控制器必须根据操作影响范围刷新 Vue 实际绑定的数据，避免 Store 与页面双份状态不同步及重复请求。
+- `api.js` 只在非 `/sync` 写接口成功返回 `X-SecretBase-Vault-Changed: 1` 时派发 `secretbase:vault-mutated`。同步控制器使用该事件安排 5 秒防抖，必须排除同步接口自身以避免递归请求。
+- 锁定或切换会话时，`pauseSync()` 必须关闭同步弹窗并清除 WebDAV 密码、恢复码、主密码和二维码材料；这些值不得写入 `localStorage`、`sessionStorage` 或 Store 持久状态。
 - `scripts/test-frontend-template-loader-runtime.js` 验证片段请求顺序与挂载目标；`scripts/test-frontend-runtime-setup.js` 在模拟浏览器环境中验证脚本实际加载顺序与 Vue `setup()` 装配，防止遗漏依赖导致登录页白屏；`scripts/test-frontend-store-runtime.js` 通过模拟 API 验证 Store 组合后的方法、筛选参数和字段映射。
 
 ### 2.2 V2 目标组件结构

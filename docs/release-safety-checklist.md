@@ -44,6 +44,15 @@ SecretBase 已进入真实生产使用阶段。后续任何迭代默认不得破
 - [ ] Vault V1 Python 黄金向量和 Rust `fmt`、Clippy、release 测试是否全部通过。
 - [ ] Rust 参考核心是否仍与 FastAPI、桌面打包和用户数据目录隔离。
 - [ ] Vault envelope 是否保持 V1，未知根字段、条目字段和自定义字段是否能往返保留。
+- [ ] 旧 Vault 缺少 `vault_id` 时是否仍原样往返，不会被写入 `vault_id: null`；首次启用同步后是否生成稳定 UUID。
+- [ ] Sync Bundle V1 Python/Rust 黄金向量是否通过，错误密钥、篡改密文和错误 AAD 对象 ID 是否全部拒绝。
+- [ ] WebDAV 能力测试是否要求 HTTPS、强 ETag、`If-Match`、`If-None-Match` 和条件删除，并清理探测对象和目录。
+- [ ] WebDAV 错误密码是否返回受控同步错误而不是 401，避免前端误锁定 SecretBase 会话。
+- [ ] 同步冲突界面和 API 是否只展示标题、状态、时间、字段数量和变化区块，不包含字段值。
+- [ ] 二维码、恢复码、配对 URI、WebDAV 密码和同步密钥是否不会写入日志、浏览器存储、诊断、文档或构建产物。
+- [ ] 修改主密码后 `sync-settings.enc` 与 `sync-base.enc` 是否仍可读取；导入不同 `vault_id` 后是否自动停用旧同步。
+- [ ] 密钥轮换是否只保留一个新历史版本、旧恢复码失效，并在本机配置保存失败时恢复旧密钥、原历史链和本机基线。
+- [ ] 自动同步是否只在解锁、非同步写入后 5 秒、后台超过 60 秒返回和手动操作时触发，锁定后是否停止并清除敏感表单。
 - [x] Android Flutter 分析、Widget 测试、移动端 Rust 测试和 Clippy 是否全部通过。
 - [x] Android 三 ABI Release APK 是否包含对应的 `libsecretbase_mobile.so`，并通过 API 29/36 模拟器启动验证。
 - [x] Android Manifest 是否保持 `allowBackup=false`、`usesCleartextTraffic=false`、API 29 最低版本和 `FLAG_SECURE` 运行时保护。

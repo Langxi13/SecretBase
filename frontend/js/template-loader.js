@@ -18,6 +18,7 @@
         'templates/ai-dialog.html',
         'templates/tag-browser-dialog.html',
         'templates/settings-dialog.html',
+        'templates/sync-dialogs.html',
         'templates/desktop-dialog.html',
         'templates/backup-dialogs.html',
         'templates/management-dialogs.html',

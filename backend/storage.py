@@ -9,7 +9,15 @@ from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
-from config import AI_HISTORY_FILE, VAULT_PATH, BACKUP_DIR, SETTINGS_PATH, SECURE_SETTINGS_FILE
+from config import (
+    AI_HISTORY_FILE,
+    BACKUP_DIR,
+    SECURE_SETTINGS_FILE,
+    SETTINGS_PATH,
+    SYNC_BASE_FILE,
+    SYNC_SETTINGS_FILE,
+    VAULT_PATH,
+)
 from crypto import (
     SecureKey,
     decrypt_vault,
@@ -23,9 +31,11 @@ from models import VaultData, Settings
 from secure_settings import (
     AI_HISTORY_PURPOSE,
     AI_SETTINGS_PURPOSE,
+    SYNC_BASE_PURPOSE,
+    SYNC_SETTINGS_PURPOSE,
+    delete_files_transactionally,
     derive_purpose_key,
-    prepare_rekey,
-    replace_file_atomically,
+    rekey_secure_files_transactionally,
 )
 from vault_document import decode_vault_document, encode_vault_document
 
@@ -318,9 +328,10 @@ def import_encrypted_vault(content: bytes) -> int:
     if not is_unlocked():
         raise ValueError("Vault 未解锁")
 
+    previous_vault_id = getattr(_vault_data, "vault_id", None)
     plaintext = _decrypt_with_current_key(content)
     data = decode_vault_document(plaintext)
-    save_vault(content)
+    _save_imported_vault(content, previous_vault_id, data.vault_id)
     _vault_data = data
     _vault_revision += 1
     logger.info("导入加密 vault 成功")
@@ -334,13 +345,29 @@ def import_encrypted_vault_with_password(content: bytes, password: str) -> int:
     if not is_unlocked():
         raise ValueError("Vault 未解锁")
 
+    previous_vault_id = getattr(_vault_data, "vault_id", None)
     plaintext = decrypt_vault(password, content)
     data = decode_vault_document(plaintext)
-    save_vault(_encrypt_with_current_key(plaintext))
+    encrypted = _encrypt_with_current_key(plaintext)
+    _save_imported_vault(encrypted, previous_vault_id, data.vault_id)
     _vault_data = data
     _vault_revision += 1
     logger.info("导入旧加密 vault 成功")
     return len(data.entries)
+
+
+def _save_imported_vault(content: bytes, previous_vault_id: str | None, next_vault_id: str | None) -> None:
+    if previous_vault_id == next_vault_id:
+        save_vault(content)
+        return
+    delete_files_transactionally(
+        [
+            (Path(SYNC_SETTINGS_FILE), "同步设置"),
+            (Path(SYNC_BASE_FILE), "同步基线"),
+        ],
+        lambda: save_vault(content),
+    )
+    logger.info("Vault 身份变化，已停用原 WebDAV 同步配置")
 
 
 def read_encrypted_vault_with_current_key(content: bytes) -> VaultData:
@@ -512,6 +539,12 @@ def lock_vault():
     _vault_fingerprint = None
     _vault_revision = 0
     _vault_session_id = None
+    try:
+        from sync_runtime import clear_pending_plan, set_runtime
+        clear_pending_plan()
+        set_runtime("idle", "Vault 已锁定，等待重新同步")
+    except ImportError:
+        pass
     logger.info("Vault 已锁定")
 
 
@@ -559,6 +592,14 @@ def save_vault_data(vault: VaultData):
         _restore_cached_vault_from_disk()
         logger.error(f"保存 vault 失败: {e}")
         raise
+
+
+def replace_vault_data_if_revision(vault: VaultData, expected_revision: int) -> int:
+    """Replace the local document only when no local write occurred meanwhile."""
+    if vault_revision() != expected_revision:
+        raise ConflictError("同步期间 Vault 已发生本地修改")
+    save_vault_data(vault)
+    return vault_revision()
 
 
 def init_vault(password: str) -> bool:
@@ -617,33 +658,17 @@ def change_vault_password(old_password: str, new_password: str) -> bool:
         secure_files = [
             (Path(SECURE_SETTINGS_FILE), AI_SETTINGS_PURPOSE, "AI 安全设置"),
             (Path(AI_HISTORY_FILE), AI_HISTORY_PURPOSE, "AI 对话历史"),
+            (Path(SYNC_SETTINGS_FILE), SYNC_SETTINGS_PURPOSE, "同步设置"),
+            (Path(SYNC_BASE_FILE), SYNC_BASE_PURPOSE, "同步基线"),
         ]
-        rekey_states = []
-        for secure_path, purpose, label in secure_files:
-            state = prepare_rekey(
-                secure_path,
-                purpose,
-                old_key,
-                _vault_key.salt,
-                new_key,
-                new_salt,
-            )
-            rekey_states.append((secure_path, label, state))
-            if state:
-                if state[1] is None:
-                    logger.warning("%s无法随主密码迁移，将清除遗留文件", label)
-                replace_file_atomically(secure_path, state[1])
-        try:
-            save_vault(encrypted)
-        except Exception:
-            for secure_path, label, state in rekey_states:
-                if not state:
-                    continue
-                try:
-                    replace_file_atomically(secure_path, state[0])
-                except Exception as rollback_error:
-                    logger.critical("主密码变更回滚%s失败: %s", label, rollback_error)
-            raise
+        rekey_secure_files_transactionally(
+            secure_files,
+            old_key,
+            _vault_key.salt,
+            new_key,
+            new_salt,
+            lambda: save_vault(encrypted),
+        )
 
         if _vault_key is not None:
             _vault_key.lock()

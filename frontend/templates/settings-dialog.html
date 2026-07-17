@@ -19,7 +19,6 @@
                             {{ tab.label }}
                         </button>
                     </div>
-
                     <div class="settings-tab-panel">
                         <div v-if="activeSettingsTab === 'general'" class="settings-section">
                             <h3>通用</h3>
@@ -32,7 +31,6 @@
                                 </select>
                             </div>
                         </div>
-
                         <div v-if="activeSettingsTab === 'security'" class="settings-section">
                             <h3>安全</h3>
                             <div class="setting-item">
@@ -49,7 +47,6 @@
                                 <button class="btn-secondary" @click="showChangePassword = true">修改主密码</button>
                             </div>
                         </div>
-
                         <div v-if="activeSettingsTab === 'ai'" class="settings-section ai-settings-section">
                             <h3>AI 配置</h3>
                             <div v-if="aiSettingsStatus && aiSettingsStatus.configured && !aiSettingsEditing" class="info-panel ai-config-summary">
@@ -202,7 +199,80 @@
                                 </button>
                             </div>
                         </div>
-
+                        <div v-if="activeSettingsTab === 'sync'" class="settings-section sync-settings-section">
+                            <div class="sync-section-heading">
+                                <div>
+                                    <h3>端到端加密同步</h3>
+                                    <p>WebDAV 只保存由独立同步密钥加密的 Vault 快照。</p>
+                                </div>
+                                <span class="sync-phase-badge" :class="'is-' + syncStatusTone">{{ syncStatusLabel }}</span>
+                            </div>
+                            <div v-if="syncStatusLoading" class="sync-inline-loading">正在读取同步状态...</div>
+                            <template v-else-if="syncStatus.pending_join">
+                                <div class="sync-empty-state">
+                                    <span class="sync-empty-icon">!</span>
+                                    <div>
+                                        <strong>加入同步空间尚未完成</strong>
+                                        <p>当前 Vault 与远端存在冲突。完成逐项选择前，不会保存同步配置或覆盖远端。</p>
+                                    </div>
+                                </div>
+                                <div class="setting-actions sync-primary-actions">
+                                    <button class="btn-primary inline" @click="loadSyncConflicts(true)">继续处理冲突</button>
+                                    <button class="btn-secondary" @click="disconnectSync" :disabled="syncBusy">取消加入</button>
+                                </div>
+                            </template>
+                            <template v-else-if="!syncStatus.configured">
+                                <div class="sync-empty-state">
+                                    <span class="sync-empty-icon">☁</span>
+                                    <div>
+                                        <strong>{{ syncStatus.phase === 'error' ? '同步配置需要修复' : '在多台设备间同步加密密码库' }}</strong>
+                                        <p>{{ syncStatus.last_error || '需要支持 HTTPS、强 ETag 和条件写入的 WebDAV 服务。' }}</p>
+                                    </div>
+                                </div>
+                                <div class="setting-actions sync-primary-actions">
+                                    <button class="btn-primary inline" @click="openSyncSetup('create')">创建同步空间</button>
+                                    <button class="btn-secondary" @click="openSyncSetup('join')">加入现有空间</button>
+                                    <button v-if="syncStatus.phase === 'error'" class="btn-secondary" @click="disconnectSync">清除本机异常配置</button>
+                                </div>
+                            </template>
+                            <template v-else>
+                                <dl class="sync-summary-grid">
+                                    <div><dt>WebDAV</dt><dd>{{ syncStatus.host || '已配置' }}</dd></div>
+                                    <div><dt>设备</dt><dd>{{ syncStatus.device_name || '本机' }}</dd></div>
+                                    <div><dt>最近同步</dt><dd>{{ formatSyncTime(syncStatus.last_synced_at) }}</dd></div>
+                                    <div><dt>远端版本</dt><dd>第 {{ syncStatus.generation || 0 }} 代</dd></div>
+                                </dl>
+                                <div class="sync-auto-row">
+                                    <div>
+                                        <strong>自动同步</strong>
+                                        <span>解锁、写入后 5 秒以及从后台返回时检查。</span>
+                                    </div>
+                                    <input type="checkbox" v-model="syncStatus.auto_sync" @change="setAutoSync" :disabled="syncBusy">
+                                </div>
+                                <p v-if="syncStatus.message" class="sync-status-message">{{ syncStatus.message }}</p>
+                                <p v-if="syncStatus.last_error" class="error-message">{{ syncStatus.last_error }}</p>
+                                <div class="setting-actions sync-primary-actions">
+                                    <button class="btn-primary inline" @click="runSync" :disabled="syncBusy">
+                                        {{ syncBusy || syncStatus.phase === 'syncing' ? '同步中...' : '立即同步' }}
+                                    </button>
+                                    <button v-if="syncStatus.pending_conflicts > 0" class="btn-secondary sync-conflict-action" @click="loadSyncConflicts(true)">
+                                        处理 {{ syncStatus.pending_conflicts }} 项冲突
+                                    </button>
+                                    <button class="btn-secondary" @click="openSyncHistory" :disabled="syncBusy">历史版本</button>
+                                    <button class="btn-secondary" @click="openSyncRecovery('reveal')" :disabled="syncBusy">加入新设备</button>
+                                    <button class="btn-secondary" @click="openSyncConfig" :disabled="syncBusy">连接设置</button>
+                                </div>
+                                <div class="sync-danger-zone">
+                                    <strong>同步管理</strong>
+                                    <div class="setting-actions">
+                                        <button class="btn-secondary" @click="openSyncRecovery('rotate')" :disabled="syncBusy">轮换同步密钥</button>
+                                        <button class="btn-secondary" @click="disconnectSync" :disabled="syncBusy">断开本机</button>
+                                        <button class="btn-danger" @click="openDeleteRemoteSync" :disabled="syncBusy">删除远端数据</button>
+                                    </div>
+                                </div>
+                            </template>
+                            <p v-if="syncError && !syncStatus.last_error" class="error-message">{{ syncError }}</p>
+                        </div>
                         <div v-if="activeSettingsTab === 'data'" class="settings-section settings-backup-section">
                             <h3>数据迁移 / 导入导出</h3>
                             <div class="setting-item">
@@ -228,7 +298,6 @@
                             </div>
                             <button class="btn-secondary" @click="openBackupCenter">打开备份中心</button>
                         </div>
-
                         <div v-if="activeSettingsTab === 'desktop' && isDesktopMode" class="settings-section desktop-settings-section">
                             <h3>{{ desktopPlatformLabel }} 桌面</h3>
                             <dl class="desktop-settings-meta">
@@ -253,7 +322,6 @@
                                     <dd>默认保留本地数据</dd>
                                 </div>
                             </dl>
-
                             <div v-if="desktopSupportsTray" class="setting-item desktop-tray-setting">
                                 <div>
                                     <label for="close_to_tray">不询问时隐藏到托盘</label>
@@ -267,7 +335,6 @@
                                     @change="saveCloseToTraySetting"
                                 >
                             </div>
-
                             <div class="setting-item desktop-tray-setting">
                                 <div>
                                     <label for="confirm_close">关闭窗口时询问</label>
@@ -282,7 +349,6 @@
                                     @change="saveCloseToTraySetting"
                                 >
                             </div>
-
                             <div class="setting-item desktop-tray-setting">
                                 <div>
                                     <label for="desktop_update_auto_check">自动检查更新</label>
@@ -295,7 +361,6 @@
                                     @change="saveDesktopUpdatePreferences"
                                 >
                             </div>
-
                             <div v-if="desktopPlatformLabel === 'Windows' && desktopPackageLabel === '安装版'" class="setting-item desktop-tray-setting">
                                 <div>
                                     <label for="desktop_update_auto_download">自动下载更新</label>
@@ -308,7 +373,6 @@
                                     @change="saveDesktopUpdatePreferences"
                                 >
                             </div>
-
                             <div class="setting-actions desktop-settings-actions">
                                 <button class="btn-secondary" @click="openDesktopStatus">查看状态与诊断</button>
                                 <button class="btn-secondary" @click="checkDesktopUpdates" :disabled="desktopUpdateChecking || desktopUpdateBusy">

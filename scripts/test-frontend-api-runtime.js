@@ -110,6 +110,31 @@ async function expectApiError(promise, expectedCode, expectedStatus) {
     };
     await expectApiError(api.get('/offline'), 'NETWORK_ERROR', 0);
 
+    const mutationEventCount = events.filter(event => event.type === 'secretbase:vault-mutated').length;
+    context.fetch = async url => ({
+        ok: true,
+        status: 200,
+        headers: {
+            get(name) {
+                if (name === 'X-SecretBase-Vault-Changed') return '1';
+                if (name === 'X-SecretBase-Vault-Revision') return '7';
+                return null;
+            }
+        },
+        async text() {
+            return JSON.stringify({ success: true, data: { url } });
+        }
+    });
+    await api.post('/entries', { title: '测试' });
+    const mutationEvents = events.filter(event => event.type === 'secretbase:vault-mutated');
+    if (mutationEvents.length !== mutationEventCount + 1 || mutationEvents.at(-1).detail.revision !== '7') {
+        throw new Error('Vault 写入响应必须派发带 revision 的自动同步事件');
+    }
+    await api.post('/sync/run', {});
+    if (events.filter(event => event.type === 'secretbase:vault-mutated').length !== mutationEvents.length) {
+        throw new Error('同步接口自身不得再次触发自动同步事件');
+    }
+
     console.log('PASS frontend api runtime');
 })().catch(error => {
     console.error(error);

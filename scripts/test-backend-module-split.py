@@ -29,6 +29,7 @@ def main() -> None:
     actions = read("backend/ai_services/actions.py")
     tag_governance = read("backend/ai_services/tag_governance.py")
     entry_service = read("backend/entry_service.py")
+    sync_routes = read("backend/routes/sync.py")
 
     required_files = [
         "backend/ai_services/__init__.py",
@@ -53,6 +54,15 @@ def main() -> None:
         "backend/entry_service.py",
         "backend/import_service.py",
         "backend/secure_settings.py",
+        "backend/sync_crypto.py",
+        "backend/sync_webdav.py",
+        "backend/sync_remote.py",
+        "backend/sync_merge.py",
+        "backend/sync_state.py",
+        "backend/sync_runtime.py",
+        "backend/sync_service.py",
+        "backend/sync_management.py",
+        "backend/routes/sync.py",
     ]
     for relative_path in required_files:
         if not (ROOT / relative_path).is_file():
@@ -71,6 +81,15 @@ def main() -> None:
     assert_less_than(line_count("backend/ai_services/diagnostics.py"), 340, "AI 诊断运行器必须保持可审阅体量")
     assert_less_than(line_count("backend/ai_services/diagnostic_cases.py"), 260, "AI 诊断场景必须独立维护")
     assert_less_than(line_count("backend/storage.py"), 700, "加密存储核心不能继续无控制增长")
+    assert_less_than(line_count("backend/sync_crypto.py"), 200, "同步加密协议模块必须保持单一职责")
+    assert_less_than(line_count("backend/sync_webdav.py"), 260, "WebDAV 传输模块必须保持可审阅体量")
+    assert_less_than(line_count("backend/sync_remote.py"), 280, "同步远端仓库模块必须保持可审阅体量")
+    assert_less_than(line_count("backend/sync_merge.py"), 260, "同步合并模块必须保持可审阅体量")
+    assert_less_than(line_count("backend/sync_state.py"), 170, "本机同步状态模块必须保持轻量")
+    assert_less_than(line_count("backend/sync_runtime.py"), 330, "同步共享运行态必须保持可审阅体量")
+    assert_less_than(line_count("backend/sync_service.py"), 380, "同步核心服务必须保持单一职责")
+    assert_less_than(line_count("backend/sync_management.py"), 230, "同步管理服务必须保持单一职责")
+    assert_less_than(line_count("backend/routes/sync.py"), 170, "同步路由必须保持轻量")
 
     for module_name in ("ai_settings", "ai_organize", "ai_actions", "ai_tags", "ai_parse"):
         assert_contains(aggregator, f"router.include_router({module_name}.router)", f"AI 聚合路由必须挂载 {module_name}")
@@ -91,6 +110,8 @@ def main() -> None:
     assert_contains(tag_governance, "def apply_tag_governance", "AI 标签治理的应用逻辑必须独立于路由")
     assert_contains(tag_governance, "if not tag or not _tag_exists", "过期标签治理建议不得意外创建标签")
     assert_contains(entry_service, "def add_entry", "条目写入逻辑必须独立于加密存储核心")
+    assert_contains(sync_routes, "sync_management.update_config", "同步配置与历史操作必须由管理服务承载")
+    assert_contains(sync_routes, "sync_service.run", "同步执行与冲突处理必须由核心服务承载")
 
     print("PASS backend module split")
 

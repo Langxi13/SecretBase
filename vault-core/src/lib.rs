@@ -1,5 +1,7 @@
 //! SecretBase Vault V1 cross-language reference implementation.
 
+pub mod sync_bundle;
+
 use std::collections::HashSet;
 
 use aes_gcm::{
@@ -11,6 +13,7 @@ use rand_core::{OsRng, RngCore};
 use serde_json::{Map, Value};
 use sha2::Sha256;
 use thiserror::Error;
+use uuid::Uuid;
 use zeroize::Zeroizing;
 
 pub const MAGIC_BYTES: &[u8; 4] = b"SB01";
@@ -383,10 +386,28 @@ fn normalize_and_validate_document(value: &mut Value) -> Result<(), VaultError> 
     validate_payload_version(root)?;
     require_string(root, "created_at", "root")?;
     require_string(root, "app_name", "root")?;
+    normalize_optional_vault_id(root)?;
     validate_meta_object(root, "tags_meta")?;
     validate_meta_object(root, "groups_meta")?;
     validate_entries(root, "entries")?;
     validate_entries(root, "deleted_entries")?;
+    Ok(())
+}
+
+fn normalize_optional_vault_id(root: &mut Map<String, Value>) -> Result<(), VaultError> {
+    let Some(value) = root.get_mut("vault_id") else {
+        return Ok(());
+    };
+    if value.is_null() {
+        return Ok(());
+    }
+    let raw = value.as_str().ok_or_else(|| {
+        VaultError::InvalidPayload("root.vault_id must be a UUID string or null".to_string())
+    })?;
+    let normalized = Uuid::parse_str(raw)
+        .map_err(|_| VaultError::InvalidPayload("root.vault_id must be a valid UUID".to_string()))?
+        .to_string();
+    *value = Value::String(normalized);
     Ok(())
 }
 

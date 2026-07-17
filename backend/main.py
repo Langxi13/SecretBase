@@ -28,8 +28,16 @@ from config import (
     is_desktop_mode,
 )
 from models import Settings
-from storage import ConflictError, VaultLockTimeoutError, enforce_auto_lock, is_unlocked, touch_activity, validate_session_token
-from routes import auth, entries, trash, tags, groups, ai, settings, health, transfer, tools
+from storage import (
+    ConflictError,
+    VaultLockTimeoutError,
+    enforce_auto_lock,
+    is_unlocked,
+    touch_activity,
+    validate_session_token,
+    vault_revision,
+)
+from routes import auth, entries, trash, tags, groups, ai, settings, health, transfer, tools, sync
 from utils import request_log_path
 from version import APP_VERSION
 
@@ -245,7 +253,12 @@ async def log_requests(request: Request, call_next):
                 }
             ))
     
+    revision_before = vault_revision() if is_unlocked() else 0
     response = await call_next(request)
+    revision_after = vault_revision() if is_unlocked() else 0
+    if revision_after != revision_before:
+        response.headers["X-SecretBase-Vault-Changed"] = "1"
+        response.headers["X-SecretBase-Vault-Revision"] = str(revision_after)
 
     if request.url.path not in PUBLIC_PATHS and response.status_code < 400:
         touch_activity()
@@ -267,6 +280,7 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["X-SecretBase-Vault-Changed", "X-SecretBase-Vault-Revision"],
 )
 
 if is_desktop_mode():
@@ -416,6 +430,7 @@ app.include_router(ai.router, prefix="/ai", tags=["AI 智能录入"])
 app.include_router(settings.router, prefix="/settings", tags=["设置"])
 app.include_router(transfer.router, tags=["导入导出"])
 app.include_router(tools.router, prefix="/tools", tags=["管理工具"])
+app.include_router(sync.router, prefix="/sync", tags=["WebDAV 同步"])
 
 # 兼容前端以 /api 作为 API Base URL 的部署形态。生产 nginx 可继续 rewrite
 # /api/* 到顶层路径；后端别名让未 rewrite 的请求也不会落到 404。
@@ -429,6 +444,7 @@ app.include_router(ai.router, prefix="/api/ai", tags=["AI 智能录入"])
 app.include_router(settings.router, prefix="/api/settings", tags=["设置"])
 app.include_router(transfer.router, prefix="/api", tags=["导入导出"])
 app.include_router(tools.router, prefix="/api/tools", tags=["管理工具"])
+app.include_router(sync.router, prefix="/api/sync", tags=["WebDAV 同步"])
 
 if is_desktop_mode():
     app.mount("/", StaticFiles(directory=FRONTEND_DIR, html=True), name="desktop_frontend")

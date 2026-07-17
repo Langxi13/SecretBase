@@ -11,6 +11,8 @@ const indexHtml = read('frontend/index.html');
 const appJs = read('frontend/js/app.js');
 const stateJs = read('frontend/js/app-state.js');
 const aiStateJs = read('frontend/js/ai-state.js');
+const syncStateJs = read('frontend/js/sync-state.js');
+const syncLifecycleJs = read('frontend/js/sync-lifecycle.js');
 const inspectorStateJs = read('frontend/js/ai-assistant-inspector-state.js');
 const inspectorControllerJs = read('frontend/js/controllers/ai-assistant-inspector-controller.js');
 const featureCompositionJs = read('frontend/js/app-feature-composition.js');
@@ -75,6 +77,8 @@ assertIncludes(
     'js/download-helper.js',
     'js/controllers/entry-controller.js',
     'js/controllers/group-controller.js',
+    'js/sync-lifecycle.js',
+    'js/controllers/sync-controller.js',
     'js/controllers/tag-controller.js',
     'js/controllers/ai-settings-controller.js',
     'js/controllers/ai-controller.js',
@@ -88,6 +92,7 @@ assertIncludes(
     'js/controllers/list-controller.js',
     'js/ai-assistant-inspector-state.js',
     'js/ai-state.js',
+    'js/sync-state.js',
     'js/app-state.js',
     'js/app-ui-controller.js',
     'js/app-data-controller.js',
@@ -107,6 +112,8 @@ assertBefore(indexHtml, 'js/store-state.js', 'js/store.js', 'Store 状态和领�
 assertBefore(indexHtml, 'js/store-taxonomy-methods.js', 'js/store.js', '密码组和标签 Store 方法必须先于 store.js 加载');
 assertBefore(indexHtml, 'js/ai-assistant-inspector-state.js', 'js/ai-state.js', '建议详情状态必须先于 AI 聚合状态加载');
 assertBefore(indexHtml, 'js/ai-state.js', 'js/app-state.js', 'AI 状态模块必须先于根状态模块加载');
+assertBefore(indexHtml, 'js/sync-state.js', 'js/app-state.js', '同步状态模块必须先于根状态模块加载');
+assertBefore(indexHtml, 'js/sync-lifecycle.js', 'js/controllers/sync-controller.js', '同步生命周期必须先于控制器加载');
 assertBefore(indexHtml, 'js/controllers/ai-assistant-inspector-controller.js', 'js/controllers/ai-assistant-controller.js', 'AI 管家支持模块必须先于主控制器加载');
 assertBefore(indexHtml, 'js/app-state.js', 'js/app.js', '根状态模块必须先于 app.js 加载');
 assertBefore(indexHtml, 'js/ai-feature-composition.js', 'js/app-feature-composition.js', 'AI 领域装配必须先于根领域装配加载');
@@ -120,7 +127,10 @@ assertIncludes(appJs, 'window.SecretBaseTemplateContext.createTemplateContext', 
 assertIncludes(templateContextJs, 'Object.assign', '模板上下文必须将状态、视图和操作平铺给 Vue');
 assertIncludes(stateJs, 'function createAppState', '共享响应式状态必须在独立模块中创建');
 assertIncludes(stateJs, 'window.SecretBaseAiState.createAiState', '根状态模块必须装配独立 AI 状态');
+assertIncludes(stateJs, 'window.SecretBaseSyncState.createSyncState', '根状态模块必须装配独立同步状态');
 assertIncludes(aiStateJs, 'function createAiState', 'AI 状态必须由独立模块创建');
+assertIncludes(syncStateJs, 'function createSyncState', '同步状态必须由独立模块创建');
+assertIncludes(syncLifecycleJs, 'function createSyncLifecycle', '同步生命周期必须由独立模块创建');
 assertIncludes(inspectorStateJs, 'function createAiAssistantInspectorState', '建议详情状态必须由独立模块创建');
 assertIncludes(inspectorControllerJs, 'function normalizeAssistantPlan', 'AI 计划归一化必须由管家支持模块负责');
 assertIncludes(inspectorControllerJs, 'function createAiAssistantInspectorController', '建议详情加载必须由独立控制器负责');
@@ -144,6 +154,7 @@ assertIncludes(featureCompositionJs, 'openExternalUrl,', '领域装配不得隐�
 [
     'window.SecretBaseEntryController.createEntryController',
     'window.SecretBaseGroupController.createGroupController',
+    'window.SecretBaseSyncController.createSyncController',
     'window.SecretBaseTagController.createTagController',
     'window.SecretBaseBackupController.createBackupController',
     'window.SecretBaseTrashController.createTrashController',
@@ -163,6 +174,9 @@ assertNotIncludes(appJs, 'const aiOrganizeSummary = computed', 'AI 整理摘要�
 assertLessThan(lineCount('frontend/js/app.js'), 140, 'app.js 必须保持为轻量装配入口');
 assertLessThan(lineCount('frontend/js/app-state.js'), 500, '共享状态模块必须保持可审阅体量');
 assertLessThan(lineCount('frontend/js/ai-state.js'), 220, 'AI 状态模块必须保持可审阅体量');
+assertLessThan(lineCount('frontend/js/sync-state.js'), 120, '同步状态模块必须保持轻量');
+assertLessThan(lineCount('frontend/js/sync-lifecycle.js'), 140, '同步生命周期模块必须保持轻量');
+assertLessThan(lineCount('frontend/js/controllers/sync-controller.js'), 600, '同步控制器必须保持可审阅体量');
 assertLessThan(lineCount('frontend/js/ai-assistant-inspector-state.js'), 120, '建议详情状态模块必须保持轻量');
 assertLessThan(lineCount('frontend/js/ai-feature-composition.js'), 220, 'AI 领域装配模块必须保持单一职责体量');
 assertLessThan(lineCount('frontend/js/app-feature-composition.js'), 550, '领域装配模块必须只承担依赖连接');

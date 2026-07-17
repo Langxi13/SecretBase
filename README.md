@@ -98,7 +98,7 @@ SecretBase 是一个面向个人自托管和本机离线场景的单用户加密
 | 范围外能力 | 说明 |
 | --- | --- |
 | 多用户协作 | 当前版本不实现组织、团队、共享 vault 或多租户权限模型。 |
-| 云同步 | 项目不默认上传、同步或托管用户 vault。 |
+| 官方云与账号同步 | 项目不托管用户 vault，也不提供账号系统；V5.2 可选连接用户自己的 WebDAV，并只上传端到端加密快照。 |
 | 企业 KMS | 不替代 HSM、KMS、SSO、合规审计或集中化密钥管理系统。 |
 | 浏览器插件 | 当前仓库只提供 Web UI 和后端服务。 |
 
@@ -116,6 +116,10 @@ FastAPI backend on 127.0.0.1:10004
         v
 Encrypted vault file
   backend/data/secretbase.enc
+        |
+        | optional Sync Bundle V1 ciphertext
+        v
+User-configured HTTPS WebDAV
 ```
 
 ### 功能概览
@@ -128,6 +132,7 @@ Encrypted vault file
 | 字段保护 | 隐藏字段在列表中默认掩码，详情页可按需显示明文；可复制只控制复制入口。 |
 | 标签管理 | 标签列表、重命名、删除、合并、按数量和名称排序。 |
 | 密码组 | 一个条目可属于多个密码组，密码组有名称和简介，主页可切换到密码组模式并按组查看条目。 |
+| 加密同步 | Web、Windows 和 macOS 可选使用自有 WebDAV；独立同步密钥、强 ETag 条件提交、三方合并、逐项冲突处理和最近 10 个加密历史版本。 |
 | 回收站 | 软删除、恢复、永久删除、清空回收站。 |
 | 批量操作 | 批量删除、批量星标、批量更新标签。 |
 | 备份中心 | 手动/自动备份两列分离、各自分页、固定占位、加载态、可配置自动保留数量、指定备份下载和三步恢复向导。 |
@@ -213,23 +218,23 @@ http://127.0.0.1:8001
 
 `v3.0.0` 已完成由浏览器承载界面的桌面基础模式。`v3.1.0` 在此基础上增加 Windows 独立桌面窗口：使用 PyInstaller one-folder、pywebview 和 Edge WebView2，用户双击 `SecretBase.exe` 即可使用，不需要单独打开浏览器或安装 Python 依赖。
 
-V5.1.3 是当前稳定版本，延续 Windows、macOS 和 Android 的统一签名更新基线，并修复 Android 连续后台指纹认证后可能出现的半屏白屏。GitHub Release 包含：
+V5.2.0 是当前稳定版本。Web、自托管、Windows 和 macOS 新增 WebDAV 端到端加密同步；Android 本版继续保持本地 Vault 模式，但 Rust 核心已经通过同一 Sync Bundle V1 黄金向量，为后续移动端同步复用协议。GitHub Release 包含：
 
 ```text
-SecretBase-v5.1.3-windows-x64-setup.exe
-SecretBase-v5.1.3-windows-x64.zip
-SecretBase-v5.1.3-macos-arm64.dmg
-SecretBase-v5.1.3-macos-arm64.zip
-SecretBase-v5.1.3-android-universal.apk
-SecretBase-v5.1.3-android-arm64-v8a.apk
-SecretBase-v5.1.3-android-armeabi-v7a.apk
-SecretBase-v5.1.3-android-x86_64.apk
+SecretBase-v5.2.0-windows-x64-setup.exe
+SecretBase-v5.2.0-windows-x64.zip
+SecretBase-v5.2.0-macos-arm64.dmg
+SecretBase-v5.2.0-macos-arm64.zip
+SecretBase-v5.2.0-android-universal.apk
+SecretBase-v5.2.0-android-arm64-v8a.apk
+SecretBase-v5.2.0-android-armeabi-v7a.apk
+SecretBase-v5.2.0-android-x86_64.apk
 secretbase-update-v1.json
 secretbase-update-v1.json.sig
 SHA256SUMS.txt
 ```
 
-V5.1.3 的完整审计范围、自动化门禁和真机回归项见 [发布评估](docs/release-assessment-v5.1.3.md) 和 [逐步人工验收清单](docs/manual-qa-checklist-v5.1.3.md)。
+V5.2.0 的协议、安全边界和验收范围见 [Sync Protocol V1](docs/sync-protocol-v1.md)、[发布评估](docs/release-assessment-v5.2.0.md) 和 [逐步人工验收清单](docs/manual-qa-checklist-v5.2.0.md)。同步默认关闭，不改变已有 Vault V1、数据目录或本机备份；恢复码只在再次验证主密码后显示。
 
 Windows 独立版默认将 vault、备份、日志、设置和 WebView 数据保存在 `%LOCALAPPDATA%\SecretBase\`。发布包只包含程序资源，构建时会扫描并拒绝 `.env`、vault、备份、日志和本地设置文件。桌面导出使用 Windows 原生“另存为”，外部网址交给系统默认浏览器打开；重复启动会恢复并聚焦已有窗口。
 
@@ -501,6 +506,7 @@ scripts/
 
 - `docs/api-specification.md`：API 契约和响应格式。
 - `docs/security-design.md`：加密、密钥管理、vault、日志和部署安全设计。
+- `docs/sync-protocol-v1.md`：WebDAV 端到端加密同步、条件提交、恢复码和三方合并规范。
 - `docs/frontend-design.md`：前端结构、状态管理和交互说明。
 - `docs/deployment.md`：通用生产部署步骤。
 - `docs/app-roadmap.md`：桌面和手机 App 长期路线。
@@ -561,7 +567,7 @@ The project is intended to provide a clear, auditable, and backup-friendly passw
 | Out of scope | Description |
 | --- | --- |
 | Multi-user collaboration | No organizations, teams, shared vaults, or multi-tenant permission model. |
-| Cloud sync | SecretBase does not upload, synchronize, or host user vaults by default. |
+| Hosted cloud and account sync | SecretBase does not host user vaults or provide accounts. V5.2 can optionally use a user-owned WebDAV endpoint and uploads only end-to-end encrypted snapshots. |
 | Enterprise KMS | It does not replace HSM, KMS, SSO, compliance audit, or centralized key management systems. |
 | Browser extension | This repository provides a Web UI and backend service only. |
 
@@ -579,6 +585,10 @@ FastAPI backend on 127.0.0.1:10004
         v
 Encrypted vault file
   backend/data/secretbase.enc
+        |
+        | optional Sync Bundle V1 ciphertext
+        v
+User-configured HTTPS WebDAV
 ```
 
 ### Feature Overview
@@ -591,6 +601,7 @@ Encrypted vault file
 | Field protection | Hidden fields are masked in list responses and can be revealed in the detail view; copyable only controls copy actions. |
 | Tags | List, rename, delete, merge, and sort by count or name. |
 | Password groups | Entries can belong to multiple groups; groups have names and descriptions; the workspace can switch to group mode and then filter by group. |
+| Encrypted sync | Web, Windows, and macOS can use a user-owned WebDAV endpoint with an independent sync key, strong-ETag conditional commits, three-way merge, explicit conflict resolution, and ten encrypted history versions. |
 | Trash | Soft delete, restore, permanent delete, and empty trash. |
 | Batch operations | Batch delete, batch star, and batch tag updates. |
 | Backup center | Two-column manual/automatic backups, independent pagination, fixed placeholders, loading states, configurable automatic retention, per-backup downloads, and a three-step restore wizard. |
@@ -676,7 +687,7 @@ http://127.0.0.1:8001
 
 `v3.0.0` completes the browser-hosted desktop foundation. `v3.1.0` adds an independent Windows window built with PyInstaller one-folder, pywebview, and Edge WebView2. Users launch `SecretBase.exe` directly without opening a separate browser or installing Python dependencies.
 
-V5.1.3 is the current stable release. It keeps Android 10+ system Autofill, resumable downloads, immediate background locking, safer biometric credential handling, and the signed cross-platform update baseline while fixing stale keyboard insets that could leave the Android interface half blank after repeated background biometric unlocks. GitHub Release provides the Windows installer and portable ZIP, the macOS DMG and ZIP, universal and ABI-specific Android APKs, the signed update manifest, and `SHA256SUMS.txt`.
+V5.2.0 is the current stable release. Self-hosted Web, Windows, and macOS add optional end-to-end encrypted WebDAV synchronization. Android remains local-only in this release, while its Rust dependency already verifies the same Sync Bundle V1 vector for the later mobile sync implementation. GitHub Release provides the Windows installer and portable ZIP, the macOS DMG and ZIP, universal and ABI-specific Android APKs, the signed update manifest, and `SHA256SUMS.txt`.
 
 Desktop data is stored under `%LOCALAPPDATA%\SecretBase\`. Build validation rejects `.env`, vault, backup, log, and local settings files. Native exports use the Windows Save As dialog, external URLs open in the system browser, and a second launch activates the existing window.
 

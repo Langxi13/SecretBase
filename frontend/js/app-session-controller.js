@@ -15,11 +15,15 @@
         loadDesktopDiagnostics,
         initializeDesktopUpdates = () => null,
         disposeDesktopUpdates = () => {},
+        initializeSync = async () => {},
+        pauseSync = () => {},
+        disposeSync = () => {},
         handleDocumentClick
     }) {
         let aiNowTimer = null;
         const desktopLockCover = window.SecretBaseDesktopLockCover;
         function applyLockedState() {
+            pauseSync();
             api.setToken(null);
             store.setState({ locked: true });
             state.locked.value = true;
@@ -67,19 +71,16 @@
             state.revealedFields.value = [];
             autoLock.clearAutoLockTimer();
         }
-
         function handleDesktopLockRequest() {
             applyLockedState();
             desktopLockCover.scheduleRelease();
         }
-
         function handleDesktopCloseRequest() {
             state.desktopCloseRemember.value = false;
             state.desktopCloseSubmitting.value = false;
             state.desktopCloseError.value = '';
             state.showDesktopCloseConfirm.value = true;
         }
-
         const autoLock = autoLockFactory({
             settingsForm: state.settingsForm,
             locked: state.locked,
@@ -87,7 +88,6 @@
             store,
             applyLockedState
         });
-
         async function initPassword() {
             if (state.password.value !== state.confirmPassword.value) {
                 state.passwordError.value = '两次输入的密码不一致';
@@ -109,6 +109,7 @@
                 state.confirmPassword.value = '';
                 await data.applySettings(await store.loadSettings(), theme);
                 await data.loadAllData();
+                await initializeSync();
                 autoLock.startAutoLockTimer();
                 state.showOnboarding.value = true;
                 showToast('欢迎使用 SecretBase', 'success');
@@ -118,7 +119,6 @@
                 state.submitting.value = false;
             }
         }
-
         async function unlock() {
             if (!state.password.value) {
                 state.unlockError.value = '请输入密码';
@@ -134,6 +134,7 @@
                 state.password.value = '';
                 await data.applySettings(await store.loadSettings(), theme);
                 await data.loadAllData();
+                await initializeSync();
                 autoLock.startAutoLockTimer();
             } catch (error) {
                 state.unlockError.value = error.message || '解锁失败';
@@ -141,7 +142,6 @@
                 state.submitting.value = false;
             }
         }
-
         async function lock() {
             try {
                 await store.lock();
@@ -149,7 +149,6 @@
                 applyLockedState();
             }
         }
-
         async function openSettings() {
             state.showSettings.value = true;
             state.activeSettingsTab.value = 'general';
@@ -157,7 +156,6 @@
                 await loadAiSettingsStatus();
             }
         }
-
         async function selectSettingsTab(tabKey) {
             state.activeSettingsTab.value = tabKey;
             if (tabKey === 'ai') {
@@ -166,7 +164,6 @@
                 await loadDesktopDiagnostics();
             }
         }
-
         async function saveSettings() {
             state.settingsForm.autoBackupRetention = Math.min(
                 200,
@@ -185,7 +182,6 @@
                 await data.loadEntries(1);
             }
         }
-
         async function changePassword() {
             if (state.passwordChanging.value) return;
             state.passwordForm.error = '';
@@ -217,7 +213,6 @@
                 state.passwordForm.error = error.message || '修改失败';
             } finally { state.passwordChanging.value = false; }
         }
-
         function registerLifecycle({ onMounted, onUnmounted }) {
             onMounted(async () => {
                 window.SECRETBASE_DESKTOP_LOCK_READY = true;
@@ -254,6 +249,7 @@
 
                     if (!state.locked.value) {
                         await data.loadAllData();
+                        await initializeSync();
                         autoLock.startAutoLockTimer();
                     }
                 } catch (error) {
@@ -278,6 +274,7 @@
                     aiNowTimer = null;
                 }
                 disposeDesktopUpdates();
+                disposeSync();
             });
         }
         return {

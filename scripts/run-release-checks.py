@@ -21,6 +21,8 @@ PYTHON_TESTS = [
     "scripts/test-password-groups.py",
     "scripts/test-tag-entities.py",
     "scripts/test-vault-v1-compatibility.py",
+    "scripts/test-sync-protocol-v1.py",
+    "scripts/test-webdav-sync.py",
     "scripts/test-backend-module-split.py",
     "scripts/test-release-readiness.py",
     "scripts/test-script-compatibility.py",
@@ -37,6 +39,9 @@ def main() -> int:
     node = shutil.which("node")
     if not node:
         raise RuntimeError("未找到 Node.js，无法执行前端发布检查")
+    cargo = shutil.which("cargo")
+    if not cargo:
+        raise RuntimeError("未找到 Cargo，无法执行同步协议兼容检查")
 
     run([sys.executable, "-m", "compileall", "-q", "backend", "desktop", "scripts"])
     run(
@@ -48,6 +53,8 @@ def main() -> int:
 
     for test in sorted((ROOT / "scripts").glob("test-frontend-*.js")):
         run([node, str(test.relative_to(ROOT))])
+
+    run([cargo, "test", "--locked", "--test", "sync_bundle"], cwd=ROOT / "vault-core")
 
     javascript_files = sorted((ROOT / "frontend" / "js").glob("*.js"))
     javascript_files.extend(sorted((ROOT / "frontend" / "js" / "controllers").glob("*.js")))

@@ -158,7 +158,10 @@ if (!setupBindings) {
     'openBackupCenter',
     'importPlainFile',
     'loadTrash',
-    'openToolsModal'
+    'openToolsModal',
+    'openSyncCenter',
+    'syncStatusLabel',
+    'initializeSync'
 ].forEach(name => {
     if (!(name in setupBindings)) {
         throw new Error(`Vue setup 未暴露 ${name}`);

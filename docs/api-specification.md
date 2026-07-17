@@ -61,6 +61,8 @@
 | RATE_LIMITED | 429 | 请求过于频繁 |
 | REQUEST_TOO_LARGE | 413 | 请求体或上传文件超过限制 |
 | VAULT_LOCKED | 423 | vault 锁文件被占用，可能有旧进程或其他进程正在写入 |
+| WEBDAV_* | 502 | WebDAV 连接、认证、证书、ETag 或条件写入能力失败；不会触发 SecretBase 会话锁定 |
+| SYNC_* | 404 / 409 / 422 | 同步空间缺失、并发变化、冲突失效或协议数据无效 |
 
 ## 3. 认证模块
 
@@ -180,7 +182,7 @@ GET /auth/status
 
 ### 3.5 修改主密码
 
-**修改主密码，重新加密 vault 数据，并同步重加密本机 AI 安全设置。**
+**修改主密码，重新加密 vault 数据，并同步重加密本机 AI 安全设置、同步配置和同步基线。**
 
 ```
 POST /auth/change-password
@@ -1918,6 +1920,166 @@ GET /tools/security-report
 
 返回 HOST、CORS、vault 目录、备份目录和日志目录的检查结果。生产环境如果 `CORS_ORIGINS=*` 或后端监听非 `127.0.0.1`，应显示 warning。
 
+## 8B. WebDAV 端到端加密同步
+
+阶段：V5.2。完整二进制协议、WebDAV 条件提交和三方合并规则见 [Sync Protocol V1](sync-protocol-v1.md)。所有接口都要求 Vault 已解锁并携带有效 session token。
+
+同步 API 同时挂载在 `/sync/*` 和 `/api/sync/*`。WebDAV 密码、同步密钥、恢复码和字段值不得出现在状态、冲突或历史列表响应中。
+
+### 8B.1 查询同步状态
+
+```
+GET /sync/status
+```
+
+响应 `data` 包含 `configured`、`pending_join`、`phase`、`message`、`last_error`、`pending_conflicts`、`auto_sync`、`host`、`base_url`、脱敏 `username_mask`、`device_name`、`vault_id`、`last_synced_at` 和 `generation`。加入现有 Vault 产生冲突时，`pending_join=true` 且 `configured=false`，避免客户端把尚未持久化的配置误当成可用同步连接。
+
+### 8B.2 测试 WebDAV 能力
+
+```
+POST /sync/config/test
+```
+
+```json
+{
+  "base_url": "https://dav.example.invalid/secretbase",
+  "username": "user",
+  "password": "app-password",
+  "device_name": "Windows 工作站",
+  "auto_sync": true
+}
+```
+
+服务端会创建临时探测目录，验证强 ETag、`If-None-Match`、当前/过期 `If-Match`、条件删除和读写一致性后清理。生产接口只允许 HTTPS；本机 HTTP 仅用于注入式自动化传输测试。
+
+### 8B.3 创建同步空间
+
+```
+POST /sync/create
+```
+
+请求体与连接测试相同。成功后上传当前完整 Vault 的首个加密快照，只返回同步状态，不直接返回恢复码。前端必须再通过 8B.9 验证主密码后显示配对材料。
+
+### 8B.4 加入同步空间
+
+```
+POST /sync/join
+```
+
+```json
+{
+  "base_url": "https://dav.example.invalid/secretbase",
+  "username": "user",
+  "password": "app-password",
+  "device_name": "macOS 笔记本",
+  "auto_sync": true,
+  "recovery_code": "SBSYNC1-...",
+  "merge_existing": false
+}
+```
+
+当前 Vault 有内容时必须显式设置 `merge_existing=true`。无冲突时直接加入；存在同实体双端修改时返回 `conflict_token` 和脱敏 `conflicts`，本机配置仅在冲突成功处理后持久化。
+
+### 8B.5 更新或断开本机配置
+
+```
+PUT /sync/config
+DELETE /sync/config
+```
+
+`PUT` 可选更新 `base_url`、`username`、`password`、`device_name` 和 `auto_sync`。连接字段变化时会验证远端当前 Vault；仅修改设备名或自动同步偏好时只更新本机加密配置，不依赖网络。空密码表示继续使用已保存密码。`DELETE` 只清除本机加密配置、基线或待处理加入计划，不删除远端密文。
+
+### 8B.6 立即同步
+
+```
+POST /sync/run
+```
+
+成功响应的 `action` 为 `none`、`uploaded`、`downloaded` 或 `merged`。存在冲突时返回：
+
+```json
+{
+  "status": { "phase": "conflict", "pending_conflicts": 1 },
+  "conflict_token": "opaque-token",
+  "conflicts": [
+    {
+      "conflict_id": "entry:uuid",
+      "kind": "entry",
+      "label": "条目标题",
+      "local": { "state": "active", "updated_at": "...", "field_count": 3 },
+      "remote": { "state": "active", "updated_at": "...", "field_count": 4 },
+      "changed_sections": ["自定义字段"],
+      "allow_both": true
+    }
+  ]
+}
+```
+
+冲突摘要不得包含 `fields`、字段名列表或任何字段值。
+
+### 8B.7 读取和处理冲突
+
+```
+GET /sync/conflicts
+POST /sync/conflicts/resolve
+```
+
+```json
+{
+  "conflict_token": "opaque-token",
+  "resolutions": {
+    "entry:uuid": "both",
+    "tags_meta:工作": "remote"
+  }
+}
+```
+
+处理方式仅允许 `local`、`remote` 和条目可用的 `both`。计划绑定解锁会话、Vault revision 和远端 ETag，任一变化后返回 `SYNC_CONFLICT_EXPIRED` 或 `SYNC_REMOTE_CHANGED`。
+
+### 8B.8 历史版本
+
+```
+GET /sync/history
+POST /sync/history/{snapshot_id}/restore
+```
+
+历史列表最多 10 项，只返回快照 ID、时间和设备信息。恢复会把所选加密快照发布为新的最新版本，并返回新的 Vault revision。
+
+### 8B.9 显示恢复材料
+
+```
+POST /sync/recovery-code
+```
+
+```json
+{ "password": "current-master-password" }
+```
+
+主密码验证成功后返回 `recovery_code`、`pairing_uri` 和仅用于当前界面显示的 SVG `qr_data_uri`。这些字段等同于同步密钥。
+
+### 8B.10 轮换同步密钥
+
+```
+POST /sync/rotate-key
+```
+
+请求体同 8B.9。成功后返回新的恢复材料和 `previous_key_invalidated=true`；旧设备、旧恢复码和旧加密历史立即失效。
+
+### 8B.11 删除远端同步数据
+
+```
+POST /sync/reset
+```
+
+```json
+{
+  "password": "current-master-password",
+  "confirmation": "DELETE"
+}
+```
+
+删除当前 Vault 的远端 head 和最近 10 个加密快照，并清除本机同步配置。本机 Vault 不会删除。
+
 ## 9. 设置模块
 
 阶段：V1。
@@ -2069,7 +2231,7 @@ GET /health
   "success": true,
   "data": {
     "status": "healthy",
-    "version": "5.1.3",
+    "version": "5.2.0",
     "uptime": 3600
   }
 }

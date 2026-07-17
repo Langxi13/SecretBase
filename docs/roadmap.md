@@ -12,6 +12,7 @@ SecretBase is intentionally scoped as a single-user encrypted vault. The priorit
 - Maintain the released Android-first Flutter/Rust client across hardware, encrypted migration, biometric unlock, system Autofill, AI safety, and three-ABI/API 29/36 gates.
 - Maintain the released V5 signed-update baseline: Windows in-place updates, Android system-confirmed replacement, and macOS signed-manifest notifications.
 - Keep Web, desktop, and Android AI plans behaviorally aligned while preserving the no-existing-field-values network boundary.
+- Maintain the V5.2 user-owned WebDAV synchronization protocol for self-hosted Web, Windows, and macOS without introducing a hosted account service.
 
 ## Implemented
 
@@ -32,6 +33,7 @@ SecretBase is intentionally scoped as a single-user encrypted vault. The priorit
 - Android 10+ Flutter/Rust client with private storage, lifecycle locking, Keystore-backed biometric unlock, entries, tags, groups, trash, encrypted transfer, a conversational AI manager, and revision-bound AI undo.
 - Android system Autofill with local authentication, explicit candidate selection, encrypted target bindings, inline suggestions, and save confirmation.
 - Signed stable update manifests, Windows installer handoff, Android package identity verification, and protected release-key environments.
+- Sync Bundle V1 with independent 256-bit keys, encrypted WebDAV head/snapshots, strong-ETag conditional commits, three-way merge, explicit conflicts, ten-version history, and Python/Rust golden vectors.
 
 ## Later, If Needed
 
@@ -41,6 +43,7 @@ SecretBase is intentionally scoped as a single-user encrypted vault. The priorit
 - Additional production health check automation.
 - macOS signing and notarization when an Apple Developer account is available.
 - Tablet-specific two-pane layouts and store distribution only after the signed Android MVP is stable.
+- Android V5.3 synchronization that reuses Sync Bundle V1 directly in Rust, with mobile-specific background, weak-network, QR pairing, and conflict UX.
 
 ## Out of Scope
 

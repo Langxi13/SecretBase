@@ -36,6 +36,8 @@ class RuntimeConfig:
     settings_path: Path
     secure_settings_path: Path
     conversation_history_path: Path
+    sync_settings_path: Path
+    sync_base_path: Path
     frontend_dir: Path
     cors_origins: str
     log_level: str
@@ -53,6 +55,8 @@ def load_runtime_config() -> RuntimeConfig:
     settings_path = resolve_backend_path(os.getenv("SETTINGS_PATH", data_dir / "settings.json"))
     secure_settings_path = data_dir / "secure-settings.enc"
     conversation_history_path = data_dir / "ai-history.enc"
+    sync_settings_path = data_dir / "sync-settings.enc"
+    sync_base_path = data_dir / "sync-base.enc"
     frontend_dir = resolve_backend_path(os.getenv("SECRETBASE_FRONTEND_DIR", BASE_DIR.parent / "frontend"))
 
     port = int(os.getenv("PORT", 10004))
@@ -70,6 +74,8 @@ def load_runtime_config() -> RuntimeConfig:
         settings_path=settings_path,
         secure_settings_path=secure_settings_path,
         conversation_history_path=conversation_history_path,
+        sync_settings_path=sync_settings_path,
+        sync_base_path=sync_base_path,
         frontend_dir=frontend_dir,
         cors_origins=os.getenv("CORS_ORIGINS", default_cors_origins),
         log_level=os.getenv("LOG_LEVEL", "INFO"),
@@ -91,6 +97,8 @@ VAULT_PATH = str(RUNTIME_CONFIG.vault_path)
 SETTINGS_PATH = str(RUNTIME_CONFIG.settings_path)
 SECURE_SETTINGS_FILE = str(RUNTIME_CONFIG.secure_settings_path)
 AI_HISTORY_FILE = str(RUNTIME_CONFIG.conversation_history_path)
+SYNC_SETTINGS_FILE = str(RUNTIME_CONFIG.sync_settings_path)
+SYNC_BASE_FILE = str(RUNTIME_CONFIG.sync_base_path)
 FRONTEND_DIR = RUNTIME_CONFIG.frontend_dir
 
 # CORS 配置
@@ -123,6 +131,8 @@ def ensure_runtime_dirs() -> None:
     Path(SETTINGS_PATH).parent.mkdir(parents=True, exist_ok=True)
     Path(SECURE_SETTINGS_FILE).parent.mkdir(parents=True, exist_ok=True)
     Path(AI_HISTORY_FILE).parent.mkdir(parents=True, exist_ok=True)
+    Path(SYNC_SETTINGS_FILE).parent.mkdir(parents=True, exist_ok=True)
+    Path(SYNC_BASE_FILE).parent.mkdir(parents=True, exist_ok=True)
 
 
 def get_cors_origins() -> list[str]:

@@ -337,6 +337,15 @@
             showConfirmDialog: ui.showConfirmDialog,
             state
         });
+        const sync = window.SecretBaseSyncController.createSyncController({
+            computed,
+            api,
+            showToast,
+            showConfirmDialog: ui.showConfirmDialog,
+            copyToClipboard,
+            state,
+            loadAllData: data.loadAllData
+        });
 
         const groupActions = window.SecretBaseGroupController.createGroupController({
             api,
@@ -420,6 +429,7 @@
                 allCurrentPageSelected,
                 selectedImportPreviewCount,
                 selectedImportConflictCount,
+                ...sync.views,
                 ...desktop.views
             },
             actions: {
@@ -432,6 +442,7 @@
                 ...listControllerActions,
                 ...maintenanceActions,
                 ...groupActions,
+                ...sync.actions,
                 ...desktop.actions,
                 resetAdvancedFilterForm,
                 removeAdvancedFilterChip,

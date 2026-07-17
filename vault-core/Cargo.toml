@@ -12,11 +12,13 @@ test-vectors = []
 
 [dependencies]
 aes-gcm = "=0.10.3"
+flate2 = { version = "=1.1.2", default-features = false, features = ["rust_backend"] }
 pbkdf2 = "=0.12.2"
 rand_core = { version = "=0.6.4", features = ["getrandom"] }
 serde_json = "=1.0.140"
 sha2 = "=0.10.9"
 thiserror = "=2.0.12"
+uuid = "=1.16.0"
 zeroize = "=1.8.1"
 
 [dev-dependencies]

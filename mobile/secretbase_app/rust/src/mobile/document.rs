@@ -13,6 +13,7 @@ pub fn new_document(now: &str) -> Value {
         "version": "1.0",
         "created_at": now,
         "app_name": "SecretBase",
+        "vault_id": Uuid::new_v4().to_string(),
         "entries": [],
         "deleted_entries": [],
         "tags_meta": {},

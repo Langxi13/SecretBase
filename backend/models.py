@@ -501,6 +501,48 @@ class ImportConflictRequest(BaseModel):
     conflict_strategy: str = Field(default="skip", pattern="^(skip|overwrite|ask)$")
 
 
+class SyncConnectionRequest(BaseModel):
+    base_url: str = Field(..., min_length=8, max_length=2000)
+    username: str = Field(..., min_length=1, max_length=300)
+    password: str = Field(..., min_length=1, max_length=1000)
+    device_name: str = Field(default="", max_length=100)
+    auto_sync: bool = True
+
+
+class SyncJoinRequest(SyncConnectionRequest):
+    recovery_code: str = Field(..., min_length=40, max_length=300)
+    merge_existing: bool = False
+
+
+class SyncConfigUpdateRequest(BaseModel):
+    base_url: Optional[str] = Field(default=None, min_length=8, max_length=2000)
+    username: Optional[str] = Field(default=None, min_length=1, max_length=300)
+    password: Optional[str] = Field(default=None, max_length=1000)
+    device_name: Optional[str] = Field(default=None, max_length=100)
+    auto_sync: Optional[bool] = None
+
+
+class SyncConflictResolutionRequest(BaseModel):
+    conflict_token: str = Field(..., min_length=20, max_length=200)
+    resolutions: dict[str, str] = Field(..., min_length=1, max_length=1000)
+
+    @field_validator("resolutions")
+    @classmethod
+    def validate_resolutions(cls, value: dict[str, str]) -> dict[str, str]:
+        allowed = {"local", "remote", "both"}
+        if any(str(choice) not in allowed for choice in value.values()):
+            raise ValueError("同步冲突处理方式无效")
+        return {str(key): str(choice) for key, choice in value.items()}
+
+
+class SyncPasswordRequest(BaseModel):
+    password: str = Field(..., min_length=1, max_length=128)
+
+
+class SyncResetRequest(SyncPasswordRequest):
+    confirmation: str = Field(..., max_length=20)
+
+
 class Settings(BaseModel):
     """用户设置"""
     theme: str = Field(default="system", pattern="^(dark|light|system)$")
@@ -529,10 +571,21 @@ class VaultData(BaseModel):
     version: str = "1.0"
     created_at: str = Field(default_factory=lambda: datetime.now().isoformat())
     app_name: str = "SecretBase"
+    vault_id: Optional[str] = None
     entries: List[Entry] = Field(default_factory=list)
     deleted_entries: List[Entry] = Field(default_factory=list)
     tags_meta: dict = Field(default_factory=dict)
     groups_meta: dict = Field(default_factory=dict)
+
+    @field_validator("vault_id")
+    @classmethod
+    def validate_vault_id(cls, value: Optional[str]) -> Optional[str]:
+        if value is None:
+            return None
+        try:
+            return str(uuid.UUID(str(value)))
+        except (TypeError, ValueError, AttributeError) as error:
+            raise ValueError("Vault ID 无效") from error
 
     @field_validator("version")
     @classmethod

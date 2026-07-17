@@ -99,6 +99,17 @@ class ApiClient {
         };
     }
 
+    notifyVaultMutation(response, path) {
+        if (String(path || '').startsWith('/sync')) return;
+        if (response.headers?.get?.('X-SecretBase-Vault-Changed') !== '1') return;
+        window.dispatchEvent(new CustomEvent('secretbase:vault-mutated', {
+            detail: {
+                path,
+                revision: response.headers.get('X-SecretBase-Vault-Revision') || ''
+            }
+        }));
+    }
+
     /**
      * 发送请求
      */
@@ -154,6 +165,7 @@ class ApiClient {
             throw new ApiError('INVALID_RESPONSE', '服务器返回了无法识别的响应', response.status);
         }
 
+        this.notifyVaultMutation(response, path);
         return result;
     }
 
@@ -225,6 +237,7 @@ class ApiClient {
             throw new ApiError('INVALID_RESPONSE', '服务器返回了无法识别的响应', response.status);
         }
 
+        this.notifyVaultMutation(response, path);
         return result;
     }
 
