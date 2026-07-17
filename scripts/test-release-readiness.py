@@ -53,6 +53,7 @@ def test_local_and_remote_release_entrypoints_exist() -> None:
         ".github/workflows/release.yml",
         ".github/workflows/macos-desktop.yml",
         "scripts/build-desktop-macos.sh",
+        "scripts/macos-hdiutil.sh",
         "docs/v3.3-macos-desktop.md",
         "docs/manual-qa-checklist-v3.3.md",
         "docs/vault-format-v1.md",
@@ -94,12 +95,26 @@ def test_sensitive_runtime_files_are_not_tracked() -> None:
     assert not violations, violations
 
 
+def test_android_update_permissions_are_release_gated() -> None:
+    manifest = read("mobile/secretbase_app/android/app/src/main/AndroidManifest.xml")
+    verifier = read("scripts/verify_android_apk.sh")
+    required_permissions = (
+        "android.permission.INTERNET",
+        "android.permission.ACCESS_NETWORK_STATE",
+        "android.permission.REQUEST_INSTALL_PACKAGES",
+    )
+    for permission in required_permissions:
+        assert permission in manifest, permission
+        assert permission in verifier, permission
+
+
 def main() -> None:
     tests = [
         test_version_is_centralized,
         test_runtime_dependencies_are_pinned,
         test_local_and_remote_release_entrypoints_exist,
         test_sensitive_runtime_files_are_not_tracked,
+        test_android_update_permissions_are_release_gated,
     ]
     for test in tests:
         test()

@@ -100,6 +100,12 @@ class MobileUpdateService {
       ]).timeout(mobileUpdateRequestTimeout);
     } on TimeoutException {
       throw const MobileUpdateException('获取正式版本信息超时，请稍后重试');
+    } on HandshakeException {
+      throw const MobileUpdateException('HTTPS 证书验证失败，请检查系统时间、VPN 或代理证书');
+    } on SocketException {
+      throw const MobileUpdateException('无法连接 GitHub 更新服务，请检查网络、DNS 或 VPN');
+    } on http.ClientException {
+      throw const MobileUpdateException('更新服务连接失败，请检查网络后重试');
     }
     if (responses[0].statusCode == 404) {
       throw const MobileUpdateUnavailable(
@@ -107,13 +113,13 @@ class MobileUpdateService {
       );
     }
     if (responses[0].statusCode != 200) {
-      throw const MobileUpdateException('无法获取正式版本信息');
+      throw MobileUpdateException('无法获取正式版本信息：HTTP ${responses[0].statusCode}');
     }
     if (responses[1].statusCode == 404) {
       throw const MobileUpdateException('正式更新清单缺少签名文件');
     }
     if (responses[1].statusCode != 200) {
-      throw const MobileUpdateException('无法获取正式版本签名');
+      throw MobileUpdateException('无法获取正式版本签名：HTTP ${responses[1].statusCode}');
     }
     final manifestBytes = responses[0].bodyBytes;
     if (manifestBytes.isEmpty || manifestBytes.length > 512 * 1024) {
@@ -216,6 +222,15 @@ class MobileUpdateService {
     } on TimeoutException {
       await _deleteIfExists(temporary);
       throw const MobileUpdateException('更新下载超时，请检查网络后重试');
+    } on HandshakeException {
+      await _deleteIfExists(temporary);
+      throw const MobileUpdateException('更新下载的 HTTPS 证书验证失败，请检查系统时间、VPN 或代理证书');
+    } on SocketException {
+      await _deleteIfExists(temporary);
+      throw const MobileUpdateException('无法连接更新下载服务，请检查网络、DNS 或 VPN');
+    } on http.ClientException {
+      await _deleteIfExists(temporary);
+      throw const MobileUpdateException('更新下载连接失败，请检查网络后重试');
     } catch (_) {
       await _deleteIfExists(temporary);
       rethrow;

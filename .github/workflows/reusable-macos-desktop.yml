@@ -83,12 +83,13 @@ jobs:
           "$app/Contents/MacOS/SecretBase" \
             --desktop-runtime-self-test \
             --report "$RUNNER_TEMP/secretbase-macos-runtime-self-test.json"
+          source scripts/macos-hdiutil.sh
           mount_root="$RUNNER_TEMP/secretbase-macos-dmg"
           mkdir -p "$mount_root"
-          hdiutil attach -quiet -readonly -nobrowse -mountpoint "$mount_root" "$dmg"
-          trap 'hdiutil detach -quiet "$mount_root" >/dev/null 2>&1 || true' EXIT
+          secretbase_hdiutil_attach_dmg "$dmg" "$mount_root"
+          trap 'secretbase_hdiutil_detach "$mount_root" >/dev/null 2>&1 || true' EXIT
           python scripts/verify_macos_package.py "$mount_root/SecretBase.app"
-          hdiutil detach -quiet "$mount_root"
+          secretbase_hdiutil_detach "$mount_root"
           trap - EXIT
       - name: Upload packaged self-test reports
         if: always()

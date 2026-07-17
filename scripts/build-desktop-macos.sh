@@ -3,6 +3,7 @@ set -euo pipefail
 
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$PROJECT_ROOT"
+source "$PROJECT_ROOT/scripts/macos-hdiutil.sh"
 
 SKIP_DEPENDENCY_INSTALL=false
 if [[ "${1:-}" == "--skip-dependency-install" ]]; then
@@ -111,14 +112,14 @@ DMG_ROOT="$BUILD_ROOT/dmg"
 mkdir -p "$DMG_ROOT"
 ditto "$APP_PATH" "$DMG_ROOT/SecretBase.app"
 ln -s /Applications "$DMG_ROOT/Applications"
-hdiutil create -quiet -volname "SecretBase" -srcfolder "$DMG_ROOT" -ov -format UDZO "$DMG_PATH"
+secretbase_hdiutil_create_dmg "$DMG_ROOT" "SecretBase" "$DMG_PATH"
 
 MOUNT_ROOT="$BUILD_ROOT/mount"
 mkdir -p "$MOUNT_ROOT"
-hdiutil attach -quiet -readonly -nobrowse -mountpoint "$MOUNT_ROOT" "$DMG_PATH"
-trap 'hdiutil detach -quiet "$MOUNT_ROOT" >/dev/null 2>&1 || true' EXIT
+secretbase_hdiutil_attach_dmg "$DMG_PATH" "$MOUNT_ROOT"
+trap 'secretbase_hdiutil_detach "$MOUNT_ROOT" >/dev/null 2>&1 || true' EXIT
 "$PYTHON_BIN" scripts/verify_macos_package.py "$MOUNT_ROOT/SecretBase.app"
-hdiutil detach -quiet "$MOUNT_ROOT"
+secretbase_hdiutil_detach "$MOUNT_ROOT"
 trap - EXIT
 
 (

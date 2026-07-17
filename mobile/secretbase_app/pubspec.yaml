@@ -1,7 +1,7 @@
 name: secretbase
 description: "SecretBase 离线加密密码库 Android 客户端。"
 publish_to: 'none'
-version: 5.1.0+5010000
+version: 5.1.1+5010100
 
 environment:
   sdk: ^3.12.2

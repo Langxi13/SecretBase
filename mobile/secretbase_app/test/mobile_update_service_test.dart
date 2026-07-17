@@ -101,6 +101,76 @@ Future<_SignedFixture> _fixture({
 }
 
 void main() {
+  test('检查更新断网时返回可操作的网络提示', () async {
+    final current = MobileApplicationInfo(
+      packageId: 'io.github.langxi13.secretbase',
+      versionName: '5.1.0',
+      versionCode: 5010000,
+      signerSha256: List.filled(64, 'a').join(),
+      cacheRoot: Directory.systemTemp.path,
+    );
+    final service = MobileUpdateService(
+      platform: _FakePlatform(
+        current: current,
+        package: MobilePackageInfo(
+          packageId: current.packageId,
+          versionName: current.versionName,
+          versionCode: current.versionCode,
+          signerSha256: current.signerSha256,
+        ),
+      ),
+      client: MockClient((request) async {
+        throw const SocketException('offline');
+      }),
+    );
+
+    expect(
+      () => service.checkForUpdate(current),
+      throwsA(
+        isA<MobileUpdateException>().having(
+          (error) => error.message,
+          'message',
+          allOf(contains('GitHub'), contains('DNS'), contains('VPN')),
+        ),
+      ),
+    );
+  });
+
+  test('检查更新证书失败时提示检查系统时间和代理证书', () async {
+    final current = MobileApplicationInfo(
+      packageId: 'io.github.langxi13.secretbase',
+      versionName: '5.1.0',
+      versionCode: 5010000,
+      signerSha256: List.filled(64, 'a').join(),
+      cacheRoot: Directory.systemTemp.path,
+    );
+    final service = MobileUpdateService(
+      platform: _FakePlatform(
+        current: current,
+        package: MobilePackageInfo(
+          packageId: current.packageId,
+          versionName: current.versionName,
+          versionCode: current.versionCode,
+          signerSha256: current.signerSha256,
+        ),
+      ),
+      client: MockClient((request) async {
+        throw HandshakeException('certificate rejected');
+      }),
+    );
+
+    expect(
+      () => service.checkForUpdate(current),
+      throwsA(
+        isA<MobileUpdateException>().having(
+          (error) => error.message,
+          'message',
+          allOf(contains('系统时间'), contains('代理证书')),
+        ),
+      ),
+    );
+  });
+
   test('尚无正式更新清单时返回中性状态而不是网络失败', () async {
     final current = MobileApplicationInfo(
       packageId: 'io.github.langxi13.secretbase',

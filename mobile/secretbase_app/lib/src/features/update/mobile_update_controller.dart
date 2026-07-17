@@ -148,13 +148,21 @@ class MobileUpdateController extends Notifier<MobileUpdateState> {
       );
       final preferences = ref.read(preferencesProvider);
       if (!preferences.updateAutoDownload) return;
-      final network = await platform.networkType();
+      final MobileNetworkType network;
+      try {
+        network = await platform.networkType();
+      } catch (_) {
+        state = state.copyWith(message: '已发现新版本，但无法判断当前网络类型，请手动下载更新');
+        return;
+      }
       if (network == MobileNetworkType.unmetered ||
           (network == MobileNetworkType.metered &&
               preferences.updateAllowMeteredDownload)) {
         await download();
       } else if (network == MobileNetworkType.metered) {
         state = state.copyWith(message: '已发现新版本，当前设置为仅在 Wi-Fi 下自动下载');
+      } else {
+        state = state.copyWith(message: '已发现新版本，请联网后手动下载更新');
       }
     } on MobileUpdateUnavailable catch (error) {
       await ref
@@ -218,9 +226,8 @@ class MobileUpdateController extends Notifier<MobileUpdateState> {
     } catch (error) {
       final cancelled = _cancellation?.cancelled == true;
       state = state.copyWith(
-        phase: cancelled
-            ? MobileUpdatePhase.available
-            : MobileUpdatePhase.error,
+        phase: MobileUpdatePhase.available,
+        progress: 0,
         message: cancelled
             ? '更新下载已取消'
             : error is MobileUpdateException
@@ -262,9 +269,13 @@ class MobileUpdateController extends Notifier<MobileUpdateState> {
         message: '正在打开 Android 系统安装界面',
       );
       await platform.installPackage(path);
+      state = state.copyWith(
+        phase: MobileUpdatePhase.ready,
+        message: '已打开 Android 系统安装界面；若取消安装，可以再次点击安装更新',
+      );
     } catch (error) {
       state = state.copyWith(
-        phase: MobileUpdatePhase.error,
+        phase: MobileUpdatePhase.ready,
         message: error is MobileUpdateException
             ? error.message
             : '无法启动系统安装，请重试',

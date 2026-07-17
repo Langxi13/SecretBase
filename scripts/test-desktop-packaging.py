@@ -218,6 +218,9 @@ def test_macos_build_and_workflows_are_arm64_and_reproducible() -> None:
     build_script = (ROOT / "scripts" / "build-desktop-macos.sh").read_bytes()
     build_script.decode("ascii")
     text = build_script.decode("ascii")
+    hdiutil_helper = (ROOT / "scripts" / "macos-hdiutil.sh").read_bytes()
+    hdiutil_helper.decode("ascii")
+    hdiutil_text = hdiutil_helper.decode("ascii")
     assert '"$(uname -m)" != "arm64"' in text
     assert 'MACOSX_DEPLOYMENT_TARGET="13.0"' in text
     assert 'SECRETBASE_TARGET_ARCH="arm64"' in text
@@ -226,7 +229,15 @@ def test_macos_build_and_workflows_are_arm64_and_reproducible() -> None:
     assert "--desktop-runtime-self-test" in text
     assert "verify_macos_package.py" in text
     assert "ditto -c -k --keepParent" in text
-    assert "hdiutil create" in text
+    assert 'source "$PROJECT_ROOT/scripts/macos-hdiutil.sh"' in text
+    assert "secretbase_hdiutil_create_dmg" in text
+    assert "secretbase_hdiutil_attach_dmg" in text
+    assert "secretbase_hdiutil_detach" in text
+    assert 'SECRETBASE_HDIUTIL_RETRY_ATTEMPTS:-3' in hdiutil_text
+    assert "hdiutil create" in hdiutil_text
+    assert "hdiutil attach" in hdiutil_text
+    assert "hdiutil detach" in hdiutil_text
+    assert "-quiet" not in hdiutil_text
     assert "macos-arm64.dmg" in text
     assert "macos-arm64.zip" in text
     assert "SHA256SUMS.txt" in text
@@ -242,6 +253,9 @@ def test_macos_build_and_workflows_are_arm64_and_reproducible() -> None:
     assert "actions/download-artifact@v8" in reusable
     assert "secretbase-macos-arm64" in reusable
     assert "verify_macos_package.py" in reusable
+    assert "source scripts/macos-hdiutil.sh" in reusable
+    assert "secretbase_hdiutil_attach_dmg" in reusable
+    assert "secretbase_hdiutil_detach" in reusable
     assert "uses: ./.github/workflows/reusable-macos-desktop.yml" in entry
     assert "macos-15" in ci
     assert "macos-desktop:" in release
