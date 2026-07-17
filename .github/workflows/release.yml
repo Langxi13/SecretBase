@@ -80,7 +80,7 @@ jobs:
       - name: Download Android release assets
         uses: actions/download-artifact@v8
         with:
-          name: secretbase-android-universal
+          name: secretbase-android-packages
           path: release-input/android
       - name: Prepare unified release assets
         run: |
@@ -92,7 +92,7 @@ jobs:
           cp release-input/windows/SecretBase-v*-windows-x64-setup.exe release-assets/
           cp release-input/macos/SecretBase-v*-macos-arm64.dmg release-assets/
           cp release-input/macos/SecretBase-v*-macos-arm64.zip release-assets/
-          cp release-input/android/SecretBase-v*-android-universal.apk release-assets/
+          cp release-input/android/SecretBase-v*-android-*.apk release-assets/
           cp release-input/android/ANDROID-METADATA.json release-assets/
       - name: Validate release tag
         run: |

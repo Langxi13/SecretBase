@@ -37,11 +37,13 @@ archive_entries=$(unzip -Z1 "$apk_path")
 
 IFS=',' read -r -a abi_list <<<"$required_abis"
 for abi in "${abi_list[@]}"; do
-  library_path="lib/$abi/libsecretbase_mobile.so"
-  if ! grep -Fxq "$library_path" <<<"$archive_entries"; then
-    echo "Required Rust library is missing: $library_path" >&2
-    exit 1
-  fi
+  for library in libflutter.so libapp.so libsecretbase_mobile.so; do
+    library_path="lib/$abi/$library"
+    if ! grep -Fxq "$library_path" <<<"$archive_entries"; then
+      echo "Required native library is missing: $library_path" >&2
+      exit 1
+    fi
+  done
 done
 
 manifest=$($apkanalyzer manifest print "$apk_path")

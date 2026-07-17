@@ -6,8 +6,8 @@ SecretBase V5 Android 客户端是一个完全本地运行的 Flutter + Rust 密
 
 - 最低 Android 10（API 29），目标 API 36。
 - Flutter 3.44.6、Dart 3.12、Java 17、Rust 1.88.0、NDK 28.2、CMake 3.22.1。
-- `v5.1.1` 是当前正式版本；增强更新重试、网络诊断和发布权限门禁，并继续使用三 ABI、API 29/36 模拟器及永久签名。
-- Android CI 已通过 `armeabi-v7a`、`arm64-v8a`、`x86_64` 通用 APK 构建及 API 29/36 模拟器启动验证。
+- `v5.1.2` 是当前正式版本；增加断点续传、后台立即锁定、指纹临时异常保护和按 ABI 分发。
+- Android CI 同时生成通用 APK 与 `armeabi-v7a`、`arm64-v8a`、`x86_64` 独立 APK，并继续执行 API 29/36 模拟器启动验证。
 
 ## 功能范围
 
@@ -53,7 +53,7 @@ CARGO_BUILD_JOBS=1 CARGOKIT_RUST_TOOLCHAIN=1.88.0 \
   build/app/outputs/flutter-apk/app-debug.apk arm64-v8a
 ```
 
-本机不要为了验证而同时构建三个 ABI；三架构 Release APK 与 API 29/36 模拟器交给 `.github/workflows/android.yml`。
+本机不要日常并行构建三个 ABI；正式通用包、三架构独立包与 API 29/36 模拟器交给 `.github/workflows/android.yml`。
 
 ## 正式签名
 

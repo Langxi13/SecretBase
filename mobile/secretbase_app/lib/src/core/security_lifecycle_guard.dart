@@ -9,7 +9,7 @@ import 'package:secretbase/src/state/vault_controller.dart';
 class SecurityLifecycleGuard extends ConsumerStatefulWidget {
   const SecurityLifecycleGuard({
     required this.child,
-    this.backgroundLockDelay = const Duration(minutes: 5),
+    this.backgroundLockDelay = Duration.zero,
     super.key,
   });
 
@@ -47,6 +47,7 @@ class _SecurityLifecycleGuardState extends ConsumerState<SecurityLifecycleGuard>
   void didChangeAppLifecycleState(AppLifecycleState state) {
     switch (state) {
       case AppLifecycleState.inactive:
+        _setObscured(true);
       case AppLifecycleState.hidden:
       case AppLifecycleState.paused:
         _backgroundedAt ??= DateTime.now();
@@ -57,8 +58,9 @@ class _SecurityLifecycleGuardState extends ConsumerState<SecurityLifecycleGuard>
         final backgroundedAt = _backgroundedAt;
         _backgroundedAt = null;
         if (backgroundedAt != null &&
-            DateTime.now().difference(backgroundedAt) >=
-                widget.backgroundLockDelay) {
+            (widget.backgroundLockDelay == Duration.zero ||
+                DateTime.now().difference(backgroundedAt) >=
+                    widget.backgroundLockDelay)) {
           unawaited(_lockNow());
         } else {
           _setObscured(false);

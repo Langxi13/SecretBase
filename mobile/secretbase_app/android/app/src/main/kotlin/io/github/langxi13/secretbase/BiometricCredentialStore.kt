@@ -6,6 +6,7 @@ import android.security.keystore.KeyInfo
 import android.security.keystore.KeyPermanentlyInvalidatedException
 import android.security.keystore.KeyProperties
 import android.security.keystore.StrongBoxUnavailableException
+import android.security.keystore.UserNotAuthenticatedException
 import android.util.AtomicFile
 import androidx.biometric.BiometricManager
 import androidx.biometric.BiometricPrompt
@@ -14,6 +15,7 @@ import androidx.fragment.app.FragmentActivity
 import io.flutter.plugin.common.MethodChannel
 import java.io.File
 import java.security.KeyStore
+import java.security.UnrecoverableKeyException
 import javax.crypto.AEADBadTagException
 import javax.crypto.Cipher
 import javax.crypto.KeyGenerator
@@ -45,6 +47,7 @@ internal class BiometricCredentialStore(
 
     private var activeResult: ActiveResult? = null
     private var pendingCredential: ByteArray? = null
+    private enum class KeyAvailability { PRESENT, MISSING, UNKNOWN }
 
     fun status(result: MethodChannel.Result) {
         result.success(status())
@@ -54,14 +57,19 @@ internal class BiometricCredentialStore(
         val authentication = biometricManager.canAuthenticate(
             BiometricManager.Authenticators.BIOMETRIC_STRONG,
         )
-        if (credentialFile.baseFile.exists() && !keyExists()) {
+        val keyAvailability = keyAvailability()
+        if (credentialFile.baseFile.exists() && keyAvailability == KeyAvailability.MISSING) {
             clearCredential()
         }
         return mapOf(
             "supported" to (authentication != BiometricManager.BIOMETRIC_ERROR_NO_HARDWARE),
             "enrolled" to (authentication == BiometricManager.BIOMETRIC_SUCCESS),
-            "credentialStored" to (credentialFile.baseFile.exists() && keyExists()),
-            "hardwareBacked" to keyIsHardwareBacked(),
+            "credentialStored" to (
+                credentialFile.baseFile.exists() && keyAvailability != KeyAvailability.MISSING
+            ),
+            "hardwareBacked" to (
+                keyAvailability == KeyAvailability.PRESENT && keyIsHardwareBacked()
+            ),
             "code" to authentication,
         )
     }
@@ -129,38 +137,72 @@ internal class BiometricCredentialStore(
             return
         }
         if (!ensureAvailable()) return
-        try {
-            val stored = readCredential()
-            pendingCredential = stored.second
-            val key = loadKey() ?: run {
-                clearCredential()
-                fail("BIOMETRIC_CREDENTIAL_INVALID", "指纹解锁凭据已失效")
-                return
-            }
-            val cipher = Cipher.getInstance(TRANSFORMATION).apply {
+        val stored = try {
+            readCredential()
+        } catch (_: IllegalStateException) {
+            clearCredential()
+            fail("BIOMETRIC_CREDENTIAL_INVALID", "指纹解锁凭据已损坏，请重新开启")
+            return
+        } catch (_: Exception) {
+            fail("BIOMETRIC_STORAGE_FAILED", "暂时无法读取指纹解锁凭据，请重试")
+            return
+        }
+        pendingCredential = stored.second
+        val key = try {
+            loadKey()
+        } catch (_: KeyPermanentlyInvalidatedException) {
+            clearCredential()
+            fail("BIOMETRIC_CREDENTIAL_INVALID", "设备指纹已发生变化，请重新开启指纹解锁")
+            return
+        } catch (_: UserNotAuthenticatedException) {
+            fail("BIOMETRIC_TEMPORARILY_UNAVAILABLE", "设备尚未完成解锁，请稍后重试")
+            return
+        } catch (_: UnrecoverableKeyException) {
+            fail("BIOMETRIC_TEMPORARILY_UNAVAILABLE", "Android 安全存储暂时不可用，请稍后重试")
+            return
+        } catch (_: Exception) {
+            fail("BIOMETRIC_TEMPORARILY_UNAVAILABLE", "Android 安全存储暂时不可用，请稍后重试")
+            return
+        }
+        if (key == null) {
+            clearCredential()
+            fail("BIOMETRIC_CREDENTIAL_INVALID", "指纹解锁凭据已失效，请重新开启")
+            return
+        }
+        val cipher = try {
+            Cipher.getInstance(TRANSFORMATION).apply {
                 init(Cipher.DECRYPT_MODE, key, GCMParameterSpec(128, stored.first))
-            }
-            authenticate(
-                cipher = cipher,
-                title = "解锁 SecretBase",
-                subtitle = "使用已录入的指纹继续",
-            ) { authenticatedCipher ->
-                try {
-                    val plaintext = authenticatedCipher.doFinal(stored.second)
-                    finish(plaintext)
-                } catch (_: AEADBadTagException) {
-                    clearCredential()
-                    fail("BIOMETRIC_CREDENTIAL_INVALID", "指纹解锁凭据已失效")
-                } catch (_: Exception) {
-                    fail("BIOMETRIC_STORAGE_FAILED", "无法读取指纹解锁凭据")
-                }
             }
         } catch (_: KeyPermanentlyInvalidatedException) {
             clearCredential()
             fail("BIOMETRIC_CREDENTIAL_INVALID", "设备指纹已发生变化，请重新开启指纹解锁")
+            return
+        } catch (_: UserNotAuthenticatedException) {
+            fail("BIOMETRIC_TEMPORARILY_UNAVAILABLE", "设备尚未完成解锁，请稍后重试")
+            return
         } catch (_: Exception) {
-            clearCredential()
-            fail("BIOMETRIC_CREDENTIAL_INVALID", "指纹解锁凭据已失效")
+            fail("BIOMETRIC_TEMPORARILY_UNAVAILABLE", "暂时无法启动指纹解锁，请稍后重试")
+            return
+        }
+        authenticate(
+            cipher = cipher,
+            title = "解锁 SecretBase",
+            subtitle = "使用已录入的指纹继续",
+        ) { authenticatedCipher ->
+            try {
+                val plaintext = authenticatedCipher.doFinal(stored.second)
+                finish(plaintext)
+            } catch (_: AEADBadTagException) {
+                clearCredential()
+                fail("BIOMETRIC_CREDENTIAL_INVALID", "指纹解锁凭据已损坏，请重新开启")
+            } catch (_: KeyPermanentlyInvalidatedException) {
+                clearCredential()
+                fail("BIOMETRIC_CREDENTIAL_INVALID", "设备指纹已发生变化，请重新开启指纹解锁")
+            } catch (_: UserNotAuthenticatedException) {
+                fail("BIOMETRIC_TEMPORARILY_UNAVAILABLE", "本次指纹认证已失效，请重试")
+            } catch (_: Exception) {
+                fail("BIOMETRIC_STORAGE_FAILED", "暂时无法读取指纹解锁凭据，请重试")
+            }
         }
     }
 
@@ -174,7 +216,8 @@ internal class BiometricCredentialStore(
 
     fun delete(): Boolean {
         if (activeResult != null) return false
-        val existed = credentialFile.baseFile.exists() || keyExists()
+        val existed = credentialFile.baseFile.exists() ||
+            keyAvailability() == KeyAvailability.PRESENT
         clearCredential()
         return existed
     }
@@ -319,11 +362,15 @@ internal class BiometricCredentialStore(
         return keyStore.getKey(KEY_ALIAS, null) as? SecretKey
     }
 
-    private fun keyExists(): Boolean = try {
+    private fun keyAvailability(): KeyAvailability = try {
         val keyStore = KeyStore.getInstance(KEYSTORE).apply { load(null) }
-        keyStore.containsAlias(KEY_ALIAS)
+        if (keyStore.containsAlias(KEY_ALIAS)) {
+            KeyAvailability.PRESENT
+        } else {
+            KeyAvailability.MISSING
+        }
     } catch (_: Exception) {
-        false
+        KeyAvailability.UNKNOWN
     }
 
     private fun keyIsHardwareBacked(): Boolean = try {

@@ -9,6 +9,7 @@ class MobileApplicationInfo {
     required this.versionCode,
     required this.signerSha256,
     required this.cacheRoot,
+    this.supportedAbis = const [],
   });
 
   final String packageId;
@@ -16,6 +17,7 @@ class MobileApplicationInfo {
   final int versionCode;
   final String signerSha256;
   final String cacheRoot;
+  final List<String> supportedAbis;
 
   factory MobileApplicationInfo.fromMap(Map<Object?, Object?> value) {
     return MobileApplicationInfo(
@@ -24,6 +26,9 @@ class MobileApplicationInfo {
       versionCode: (value['versionCode'] as num?)?.toInt() ?? 0,
       signerSha256: (value['signerSha256'] as String? ?? '').toLowerCase(),
       cacheRoot: value['cacheRoot'] as String? ?? '',
+      supportedAbis: (value['supportedAbis'] as List<Object?>? ?? const [])
+          .whereType<String>()
+          .toList(growable: false),
     );
   }
 }

@@ -38,7 +38,7 @@ permissions:
 
 jobs:
   build:
-    name: Verify and build Android universal APK
+    name: Verify and build Android APKs
     runs-on: ubuntu-24.04
     environment: ${{ inputs.environment-name }}
     timeout-minutes: 60
@@ -140,50 +140,98 @@ jobs:
             echo "SECRETBASE_ANDROID_SIGNING_MODE=$signing_mode"
           } >>"$GITHUB_ENV"
           echo "mode=$signing_mode" >>"$GITHUB_OUTPUT"
-      - name: Build signed three-ABI release APK
+      - name: Build signed universal and ABI-specific release APKs
         working-directory: mobile/secretbase_app
-        run: >-
-          flutter build apk --release --no-pub
-          --target-platform android-arm,android-arm64,android-x64
+        run: |
+          flutter build apk --release --no-pub \
+            --target-platform android-arm,android-arm64,android-x64
+          cp build/app/outputs/flutter-apk/app-release.apk \
+            build/secretbase-universal-release.apk
+          flutter build apk --release --no-pub --split-per-abi \
+            --target-platform android-arm,android-arm64,android-x64
       - name: Prepare and verify Android artifact
         id: artifact
         run: |
           set -euo pipefail
-          source_apk=$(find mobile/secretbase_app/build/app/outputs/flutter-apk \
-            -maxdepth 1 -type f -name 'app-release*.apk' -print -quit)
-          test -n "$source_apk"
+          output_dir=mobile/secretbase_app/build/app/outputs/flutter-apk
+          universal_source=mobile/secretbase_app/build/secretbase-universal-release.apk
+          armv7_source="$output_dir/app-armeabi-v7a-release.apk"
+          arm64_source="$output_dir/app-arm64-v8a-release.apk"
+          x64_source="$output_dir/app-x86_64-release.apk"
+          test -f "$universal_source"
+          test -f "$armv7_source"
+          test -f "$arm64_source"
+          test -f "$x64_source"
           version=$(sed -n 's/^version: \([^+]*\).*/\1/p' mobile/secretbase_app/pubspec.yaml)
           test -n "$version"
           mkdir -p artifacts/android
           if [[ "$SECRETBASE_ANDROID_SIGNING_MODE" == "production" ]]; then
-            filename="SecretBase-v${version}-android-universal.apk"
+            suffix=""
           else
-            filename="SecretBase-v${version}-android-universal-ci.apk"
+            suffix="-ci"
           fi
-          artifact="artifacts/android/$filename"
-          cp "$source_apk" "$artifact"
-          scripts/verify_android_apk.sh "$artifact" armeabi-v7a,arm64-v8a,x86_64
-          "$ANDROID_SDK_ROOT/build-tools/36.0.0/apksigner" \
-            verify --verbose --print-certs "$artifact"
+          universal="artifacts/android/SecretBase-v${version}-android-universal${suffix}.apk"
+          armv7="artifacts/android/SecretBase-v${version}-android-armeabi-v7a${suffix}.apk"
+          arm64="artifacts/android/SecretBase-v${version}-android-arm64-v8a${suffix}.apk"
+          x64="artifacts/android/SecretBase-v${version}-android-x86_64${suffix}.apk"
+          cp "$universal_source" "$universal"
+          cp "$armv7_source" "$armv7"
+          cp "$arm64_source" "$arm64"
+          cp "$x64_source" "$x64"
+          scripts/verify_android_apk.sh "$universal" armeabi-v7a,arm64-v8a,x86_64
+          scripts/verify_android_apk.sh "$armv7" armeabi-v7a
+          scripts/verify_android_apk.sh "$arm64" arm64-v8a
+          scripts/verify_android_apk.sh "$x64" x86_64
+          for artifact in "$universal" "$armv7" "$arm64" "$x64"; do
+            "$ANDROID_SDK_ROOT/build-tools/36.0.0/apksigner" \
+              verify --verbose --print-certs "$artifact"
+          done
           signer_sha256=$("$ANDROID_SDK_ROOT/build-tools/36.0.0/apksigner" \
-            verify --print-certs "$artifact" \
+            verify --print-certs "$universal" \
             | sed -n 's/^Signer #1 certificate SHA-256 digest: //p' \
             | head -n 1)
-          version_code=$(sed -n 's/^version: [^+]*+\([0-9][0-9]*\)$/\1/p' mobile/secretbase_app/pubspec.yaml)
+          base_version_code=$(sed -n 's/^version: [^+]*+\([0-9][0-9]*\)$/\1/p' mobile/secretbase_app/pubspec.yaml)
+          apkanalyzer="$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/apkanalyzer"
+          universal_version_code=$("$apkanalyzer" manifest version-code "$universal")
+          armv7_version_code=$("$apkanalyzer" manifest version-code "$armv7")
+          arm64_version_code=$("$apkanalyzer" manifest version-code "$arm64")
+          x64_version_code=$("$apkanalyzer" manifest version-code "$x64")
           test -n "$signer_sha256"
-          test -n "$version_code"
-          python - "$version" "$version_code" "$signer_sha256" <<'PY'
+          test "$universal_version_code" = "$base_version_code"
+          ((armv7_version_code > universal_version_code))
+          ((arm64_version_code > universal_version_code))
+          ((x64_version_code > universal_version_code))
+          python - \
+            "$version" \
+            "$universal_version_code" \
+            "$armv7_version_code" \
+            "$arm64_version_code" \
+            "$x64_version_code" \
+            "$signer_sha256" <<'PY'
           import json
           import sys
           from pathlib import Path
 
-          version_name, version_code, signer_sha256 = sys.argv[1:]
+          (
+              version_name,
+              universal_version_code,
+              armv7_version_code,
+              arm64_version_code,
+              x64_version_code,
+              signer_sha256,
+          ) = sys.argv[1:]
           Path("artifacts/android/ANDROID-METADATA.json").write_text(
               json.dumps(
                   {
                       "package_id": "io.github.langxi13.secretbase",
                       "version_name": version_name,
-                      "version_code": int(version_code),
+                      "version_code": int(universal_version_code),
+                      "version_codes": {
+                          "android-universal": int(universal_version_code),
+                          "android-armeabi-v7a": int(armv7_version_code),
+                          "android-arm64-v8a": int(arm64_version_code),
+                          "android-x86_64": int(x64_version_code),
+                      },
                       "signer_sha256": signer_sha256.lower(),
                   },
                   sort_keys=True,
@@ -194,12 +242,12 @@ jobs:
           PY
           printf 'signing_mode=%s\n' "$SECRETBASE_ANDROID_SIGNING_MODE" \
             >artifacts/android/ANDROID-BUILD.txt
-          (cd artifacts/android && sha256sum -- "$filename" >SHA256SUMS.txt)
-          echo "apk=$artifact" >>"$GITHUB_OUTPUT"
+          (cd artifacts/android && sha256sum -- *.apk >SHA256SUMS.txt)
+          echo "apk=$universal" >>"$GITHUB_OUTPUT"
       - name: Upload Android package
         uses: actions/upload-artifact@v7
         with:
-          name: secretbase-android-universal
+          name: secretbase-android-packages
           path: artifacts/android/
           if-no-files-found: error
           retention-days: ${{ inputs.retention-days }}
@@ -242,7 +290,7 @@ jobs:
       - name: Download Android package
         uses: actions/download-artifact@v8
         with:
-          name: secretbase-android-universal
+          name: secretbase-android-packages
           path: artifacts/android
       - name: Boot emulator and launch SecretBase
         uses: reactivecircus/android-emulator-runner@v2

@@ -5,7 +5,11 @@ import 'dart:io';
 import 'package:crypto/crypto.dart';
 import 'package:cryptography/cryptography.dart';
 import 'package:http/http.dart' as http;
+import 'package:secretbase/src/features/update/mobile_update_download.dart';
 import 'package:secretbase/src/features/update/mobile_update_platform.dart';
+
+export 'package:secretbase/src/features/update/mobile_update_download.dart'
+    show DownloadCancellation;
 
 const mobileUpdateManifestUrl =
     'https://github.com/Langxi13/SecretBase/releases/latest/download/secretbase-update-v1.json';
@@ -15,8 +19,8 @@ const mobileUpdatePublicKeys = {
 };
 const mobileProductionSignerSha256 =
     '1597489d9e88d47313792e6883cd295c72268a1ce9330138a81e3c3d038c1c64';
-const mobileUpdateRequestTimeout = Duration(seconds: 12);
-const mobileUpdateDownloadIdleTimeout = Duration(seconds: 30);
+const mobileUpdateRequestTimeout = Duration(seconds: 20);
+const mobileUpdateCheckMaxAttempts = 3;
 const mobileUpdateMaxSignatureBytes = 4096;
 
 class MobileUpdateException implements Exception {
@@ -62,23 +66,17 @@ class MobileUpdateAsset {
   final String notes;
 }
 
-class DownloadCancellation {
-  bool _cancelled = false;
-
-  bool get cancelled => _cancelled;
-
-  void cancel() => _cancelled = true;
-}
-
 class MobileUpdateService {
   MobileUpdateService({
     required this.platform,
     http.Client? client,
     this.publicKeys = mobileUpdatePublicKeys,
     this.expectedSignerSha256 = mobileProductionSignerSha256,
+    this.checkMaxAttempts = mobileUpdateCheckMaxAttempts,
     Uri? manifestUri,
     Uri? signatureUri,
-  }) : client = client ?? http.Client(),
+  }) : assert(checkMaxAttempts > 0),
+       client = client ?? http.Client(),
        manifestUri = manifestUri ?? Uri.parse(mobileUpdateManifestUrl),
        signatureUri = signatureUri ?? Uri.parse(mobileUpdateSignatureUrl);
 
@@ -86,8 +84,13 @@ class MobileUpdateService {
   final http.Client client;
   final Map<String, String> publicKeys;
   final String expectedSignerSha256;
+  final int checkMaxAttempts;
   final Uri manifestUri;
   final Uri signatureUri;
+
+  late final MobileUpdateDownloader _downloader = MobileUpdateDownloader(
+    client: client,
+  );
 
   Future<MobileUpdateAsset?> checkForUpdate(
     MobileApplicationInfo current,
@@ -95,9 +98,12 @@ class MobileUpdateService {
     late final List<http.Response> responses;
     try {
       responses = await Future.wait([
-        client.get(manifestUri, headers: const {'Accept': 'application/json'}),
-        client.get(signatureUri),
-      ]).timeout(mobileUpdateRequestTimeout);
+        _getWithRetry(
+          manifestUri,
+          headers: const {'Accept': 'application/json'},
+        ),
+        _getWithRetry(signatureUri),
+      ]);
     } on TimeoutException {
       throw const MobileUpdateException('获取正式版本信息超时，请稍后重试');
     } on HandshakeException {
@@ -160,6 +166,7 @@ class MobileUpdateService {
     MobileApplicationInfo current, {
     required DownloadCancellation cancellation,
     required void Function(int downloaded, int total) onProgress,
+    bool restart = false,
   }) async {
     final updates = Directory('${current.cacheRoot}/updates/${asset.version}');
     await updates.create(recursive: true);
@@ -174,67 +181,39 @@ class MobileUpdateService {
         rethrow;
       }
     }
-    if (await temporary.exists()) await temporary.delete();
 
+    for (var integrityAttempt = 0; integrityAttempt < 2; integrityAttempt++) {
+      try {
+        await _downloader.download(
+          url: asset.url,
+          temporary: temporary,
+          expectedSize: asset.size,
+          userAgent: 'SecretBase/${current.versionName}',
+          cancellation: cancellation,
+          onProgress: onProgress,
+          restart: restart || integrityAttempt > 0,
+        );
+      } on MobileUpdateDownloadFailure catch (error) {
+        throw MobileUpdateException(error.message);
+      }
+      if (await _validFile(temporary, asset)) break;
+      await _deleteIfExists(temporary);
+      if (integrityAttempt == 1) {
+        throw const MobileUpdateException('更新文件完整性校验失败，请重新下载');
+      }
+    }
+    if (cancellation.cancelled) {
+      throw const MobileUpdateException('更新下载已暂停');
+    }
+    await _deleteIfExists(target);
+    await temporary.rename(target.path);
     try {
-      final request = http.Request('GET', asset.url)
-        ..headers['User-Agent'] = 'SecretBase/${current.versionName}';
-      final response = await client
-          .send(request)
-          .timeout(mobileUpdateRequestTimeout);
-      if (response.statusCode != 200) {
-        throw MobileUpdateException('更新下载失败：HTTP ${response.statusCode}');
-      }
-      var downloaded = 0;
-      final output = temporary.openWrite();
-      try {
-        await for (final chunk in response.stream.timeout(
-          mobileUpdateDownloadIdleTimeout,
-        )) {
-          if (cancellation.cancelled) {
-            throw const MobileUpdateException('更新下载已取消');
-          }
-          downloaded += chunk.length;
-          if (downloaded > asset.size) {
-            throw const MobileUpdateException('更新文件超过清单大小');
-          }
-          output.add(chunk);
-          onProgress(downloaded, asset.size);
-        }
-        await output.flush();
-      } finally {
-        await output.close();
-      }
-      if (cancellation.cancelled) {
-        throw const MobileUpdateException('更新下载已取消');
-      }
-      if (!await _validFile(temporary, asset)) {
-        throw const MobileUpdateException('更新文件完整性校验失败');
-      }
-      await temporary.rename(target.path);
-      try {
-        await validatePackage(target.path, asset, current);
-      } catch (_) {
-        await _deleteIfExists(target);
-        rethrow;
-      }
-      return target.path;
-    } on TimeoutException {
-      await _deleteIfExists(temporary);
-      throw const MobileUpdateException('更新下载超时，请检查网络后重试');
-    } on HandshakeException {
-      await _deleteIfExists(temporary);
-      throw const MobileUpdateException('更新下载的 HTTPS 证书验证失败，请检查系统时间、VPN 或代理证书');
-    } on SocketException {
-      await _deleteIfExists(temporary);
-      throw const MobileUpdateException('无法连接更新下载服务，请检查网络、DNS 或 VPN');
-    } on http.ClientException {
-      await _deleteIfExists(temporary);
-      throw const MobileUpdateException('更新下载连接失败，请检查网络后重试');
+      await validatePackage(target.path, asset, current);
     } catch (_) {
-      await _deleteIfExists(temporary);
+      await _deleteIfExists(target);
       rethrow;
     }
+    return target.path;
   }
 
   Future<void> validatePackage(
@@ -284,7 +263,7 @@ class MobileUpdateService {
     if (assets is! Map<String, Object?>) {
       throw const MobileUpdateException('更新清单缺少 Android 文件');
     }
-    final rawAsset = assets['android-universal'];
+    final rawAsset = _selectAndroidAsset(assets, current.supportedAbis);
     if (rawAsset is! Map<String, Object?>) {
       throw const MobileUpdateException('更新清单缺少 Android 文件');
     }
@@ -362,6 +341,58 @@ class MobileUpdateService {
     } catch (_) {
       // Cache cleanup is best effort; the original update error is more useful.
     }
+  }
+
+  Future<http.Response> _getWithRetry(
+    Uri uri, {
+    Map<String, String>? headers,
+  }) async {
+    for (var attempt = 0; attempt < checkMaxAttempts; attempt++) {
+      try {
+        final response = await client
+            .get(uri, headers: headers)
+            .timeout(mobileUpdateRequestTimeout);
+        if ((response.statusCode == HttpStatus.tooManyRequests ||
+                response.statusCode >= 500) &&
+            attempt + 1 < checkMaxAttempts) {
+          await _waitBeforeCheckRetry(attempt);
+          continue;
+        }
+        return response;
+      } on HandshakeException {
+        rethrow;
+      } catch (error, stackTrace) {
+        final transient =
+            error is TimeoutException ||
+            error is SocketException ||
+            error is http.ClientException;
+        if (!transient || attempt + 1 >= checkMaxAttempts) {
+          Error.throwWithStackTrace(error, stackTrace);
+        }
+        await _waitBeforeCheckRetry(attempt);
+      }
+    }
+    throw TimeoutException('update check retries exhausted');
+  }
+
+  static Future<void> _waitBeforeCheckRetry(int attempt) {
+    return Future<void>.delayed(Duration(seconds: attempt == 0 ? 1 : 3));
+  }
+
+  static Object? _selectAndroidAsset(
+    Map<String, Object?> assets,
+    List<String> supportedAbis,
+  ) {
+    const keysByAbi = {
+      'arm64-v8a': 'android-arm64-v8a',
+      'armeabi-v7a': 'android-armeabi-v7a',
+      'x86_64': 'android-x86_64',
+    };
+    for (final abi in supportedAbis) {
+      final key = keysByAbi[abi];
+      if (key != null && assets.containsKey(key)) return assets[key];
+    }
+    return assets['android-universal'];
   }
 
   static Uri _trustedReleaseUri(String value) {

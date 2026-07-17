@@ -221,6 +221,7 @@ class MainActivity : FlutterFragmentActivity() {
             "versionCode" to info.longVersionCode,
             "signerSha256" to signerSha256(info),
             "cacheRoot" to cacheDir.absolutePath,
+            "supportedAbis" to Build.SUPPORTED_ABIS.toList(),
         )
     }
 

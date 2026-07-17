@@ -73,10 +73,26 @@ def main() -> int:
     output_dir.mkdir(parents=True, exist_ok=True)
     windows = require_asset(assets_dir, f"SecretBase-v{version}-windows-x64-setup.exe")
     macos = require_asset(assets_dir, f"SecretBase-v{version}-macos-arm64.dmg")
-    android = require_asset(assets_dir, f"SecretBase-v{version}-android-universal.apk")
+    android_assets = {
+        "android-universal": require_asset(
+            assets_dir, f"SecretBase-v{version}-android-universal.apk"
+        ),
+        "android-arm64-v8a": require_asset(
+            assets_dir, f"SecretBase-v{version}-android-arm64-v8a.apk"
+        ),
+        "android-armeabi-v7a": require_asset(
+            assets_dir, f"SecretBase-v{version}-android-armeabi-v7a.apk"
+        ),
+        "android-x86_64": require_asset(
+            assets_dir, f"SecretBase-v{version}-android-x86_64.apk"
+        ),
+    }
     android_metadata = json.loads(require_asset(assets_dir, "ANDROID-METADATA.json").read_text(encoding="utf-8"))
     if android_metadata.get("version_name") != version:
         raise ValueError("Android metadata version does not match release version")
+    android_version_codes = android_metadata.get("version_codes", {})
+    if not isinstance(android_version_codes, dict):
+        raise ValueError("Android metadata version_codes must be an object")
 
     private_key = read_private_key(args.private_key_file)
     public_raw = private_key.public_key().public_bytes(
@@ -86,12 +102,17 @@ def main() -> int:
     key_id = hashlib.sha256(public_raw).hexdigest()[:16]
     if key_id != args.expected_key_id:
         raise ValueError("update signing key does not match the public key embedded in clients")
-    android_payload = asset_payload(android, version=version)
-    android_payload.update({
-        "package_id": android_metadata["package_id"],
-        "version_code": int(android_metadata["version_code"]),
-        "signer_sha256": str(android_metadata["signer_sha256"]).lower(),
-    })
+    android_payloads = {}
+    for key, path in android_assets.items():
+        current_payload = asset_payload(path, version=version)
+        current_payload.update({
+            "package_id": android_metadata["package_id"],
+            "version_code": int(
+                android_version_codes.get(key, android_metadata["version_code"])
+            ),
+            "signer_sha256": str(android_metadata["signer_sha256"]).lower(),
+        })
+        android_payloads[key] = current_payload
     published_at = args.published_at or datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace(
         "+00:00", "Z"
     )
@@ -106,7 +127,7 @@ def main() -> int:
         "assets": {
             "windows-x64-installer": asset_payload(windows, version=version),
             "macos-arm64-dmg": asset_payload(macos, version=version),
-            "android-universal": android_payload,
+            **android_payloads,
         },
     }
     manifest_bytes = (

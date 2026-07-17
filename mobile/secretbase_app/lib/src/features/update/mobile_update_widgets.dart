@@ -89,7 +89,10 @@ class MobileUpdateBanner extends ConsumerWidget {
                     MobileUpdatePhase.ready =>
                       '${state.asset?.version ?? '新版本'} 已准备安装',
                     MobileUpdatePhase.reinstallRequired => '当前测试版需要迁移到正式签名版本',
-                    _ => '发现新版本 ${state.asset?.version ?? ''}',
+                    _ =>
+                      state.downloadedBytes > 0
+                          ? '更新已暂停 · ${state.progress}%'
+                          : '发现新版本 ${state.asset?.version ?? ''}',
                   },
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,

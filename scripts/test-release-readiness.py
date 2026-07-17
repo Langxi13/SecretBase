@@ -108,6 +108,23 @@ def test_android_update_permissions_are_release_gated() -> None:
         assert permission in verifier, permission
 
 
+def test_android_release_keeps_universal_and_abi_specific_packages() -> None:
+    workflow = read(".github/workflows/reusable-android.yml")
+    generator = read("scripts/generate-update-manifest.py")
+    updater = read(
+        "mobile/secretbase_app/lib/src/features/update/mobile_update_service.dart"
+    )
+    verifier = read("scripts/verify_android_apk.sh")
+    for abi in ("armeabi-v7a", "arm64-v8a", "x86_64"):
+        assert f"android-{abi}" in workflow, abi
+        assert f'"android-{abi}"' in generator, abi
+        assert f"'android-{abi}'" in updater, abi
+    assert "android-universal" in workflow
+    assert '"version_codes"' in workflow
+    for library in ("libflutter.so", "libapp.so", "libsecretbase_mobile.so"):
+        assert library in verifier, library
+
+
 def main() -> None:
     tests = [
         test_version_is_centralized,
@@ -115,6 +132,7 @@ def main() -> None:
         test_local_and_remote_release_entrypoints_exist,
         test_sensitive_runtime_files_are_not_tracked,
         test_android_update_permissions_are_release_gated,
+        test_android_release_keeps_universal_and_abi_specific_packages,
     ]
     for test in tests:
         test()

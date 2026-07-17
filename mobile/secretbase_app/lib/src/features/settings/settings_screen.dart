@@ -294,11 +294,31 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                                       .setUpdateAllowMeteredDownload(value)
                                 : null,
                           ),
-                          if (update.phase == MobileUpdatePhase.downloading)
+                          if (update.totalBytes > 0 &&
+                              update.downloadedBytes > 0 &&
+                              update.phase != MobileUpdatePhase.ready)
                             Padding(
                               padding: const EdgeInsets.fromLTRB(16, 10, 16, 2),
-                              child: LinearProgressIndicator(
-                                value: update.progress / 100,
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  LinearProgressIndicator(
+                                    value: update.progress / 100,
+                                  ),
+                                  const SizedBox(height: 6),
+                                  Text(
+                                    '${_formatBytes(update.downloadedBytes)} / '
+                                    '${_formatBytes(update.totalBytes)}',
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .labelSmall
+                                        ?.copyWith(
+                                          color: Theme.of(
+                                            context,
+                                          ).colorScheme.onSurfaceVariant,
+                                        ),
+                                  ),
+                                ],
                               ),
                             ),
                           if (update.message.isNotEmpty)
@@ -345,7 +365,27 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                                       Icons.download_outlined,
                                       size: 18,
                                     ),
-                                    label: const Text('下载更新'),
+                                    label: Text(
+                                      update.downloadedBytes > 0
+                                          ? '继续下载'
+                                          : '下载更新',
+                                    ),
+                                  ),
+                                if (update.phase ==
+                                        MobileUpdatePhase.available &&
+                                    update.downloadedBytes > 0)
+                                  OutlinedButton.icon(
+                                    onPressed: ref
+                                        .read(
+                                          mobileUpdateControllerProvider
+                                              .notifier,
+                                        )
+                                        .restartDownload,
+                                    icon: const Icon(
+                                      Icons.restart_alt,
+                                      size: 18,
+                                    ),
+                                    label: const Text('重新下载'),
                                   ),
                                 if (update.phase ==
                                     MobileUpdatePhase.downloading)
@@ -634,8 +674,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   String _updateStatusText(MobileUpdateState update) {
     return switch (update.phase) {
       MobileUpdatePhase.checking => '正在检查正式版本',
-      MobileUpdatePhase.available => '可更新到 ${update.asset?.version ?? ''}',
-      MobileUpdatePhase.downloading => '正在下载 ${update.progress}%',
+      MobileUpdatePhase.available =>
+        update.downloadedBytes > 0
+            ? '已暂停于 ${update.progress}%，可继续下载'
+            : '可更新到 ${update.asset?.version ?? ''}',
+      MobileUpdatePhase.downloading =>
+        '正在下载 ${update.progress}% · ${_formatBytes(update.downloadedBytes)}',
       MobileUpdatePhase.ready => '${update.asset?.version ?? '新版本'} 已准备安装',
       MobileUpdatePhase.installing => '正在打开 Android 系统安装界面',
       MobileUpdatePhase.upToDate => '当前已是最新正式版本',
@@ -649,6 +693,11 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   String _currentVersion(MobileUpdateState update) {
     final version = update.application?.versionName.trim() ?? '';
     return version.isEmpty ? '读取中' : version;
+  }
+
+  String _formatBytes(int bytes) {
+    if (bytes <= 0) return '0 MB';
+    return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
   }
 
   Future<void> _confirmInstallUpdate() async {

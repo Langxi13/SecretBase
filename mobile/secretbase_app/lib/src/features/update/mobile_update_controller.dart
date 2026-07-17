@@ -27,6 +27,8 @@ class MobileUpdateState {
     this.asset,
     this.downloadPath,
     this.progress = 0,
+    this.downloadedBytes = 0,
+    this.totalBytes = 0,
     this.message = '',
   });
 
@@ -35,6 +37,8 @@ class MobileUpdateState {
   final MobileUpdateAsset? asset;
   final String? downloadPath;
   final int progress;
+  final int downloadedBytes;
+  final int totalBytes;
   final String message;
 
   bool get busy => const {
@@ -49,6 +53,8 @@ class MobileUpdateState {
     MobileUpdateAsset? asset,
     String? downloadPath,
     int? progress,
+    int? downloadedBytes,
+    int? totalBytes,
     String? message,
     bool clearAsset = false,
     bool clearDownload = false,
@@ -59,6 +65,8 @@ class MobileUpdateState {
       asset: clearAsset ? null : asset ?? this.asset,
       downloadPath: clearDownload ? null : downloadPath ?? this.downloadPath,
       progress: progress ?? this.progress,
+      downloadedBytes: downloadedBytes ?? this.downloadedBytes,
+      totalBytes: totalBytes ?? this.totalBytes,
       message: message ?? this.message,
     );
   }
@@ -88,6 +96,7 @@ final mobileUpdateControllerProvider =
 
 class MobileUpdateController extends Notifier<MobileUpdateState> {
   DownloadCancellation? _cancellation;
+  DateTime? _lastFailedCheckAt;
 
   @override
   MobileUpdateState build() => const MobileUpdateState();
@@ -106,6 +115,11 @@ class MobileUpdateController extends Notifier<MobileUpdateState> {
       }
     }
     if (!preferences.updateAutoCheck) return;
+    final lastFailure = _lastFailedCheckAt;
+    if (lastFailure != null) {
+      final elapsed = DateTime.now().difference(lastFailure);
+      if (!elapsed.isNegative && elapsed < const Duration(minutes: 15)) return;
+    }
     final lastCheck = preferences.lastUpdateCheckAt;
     if (lastCheck != null) {
       final elapsed = DateTime.now().difference(lastCheck);
@@ -119,6 +133,8 @@ class MobileUpdateController extends Notifier<MobileUpdateState> {
     state = state.copyWith(
       phase: MobileUpdatePhase.checking,
       progress: 0,
+      downloadedBytes: 0,
+      totalBytes: 0,
       message: '',
       clearAsset: true,
       clearDownload: true,
@@ -132,6 +148,7 @@ class MobileUpdateController extends Notifier<MobileUpdateState> {
       await ref
           .read(preferencesProvider.notifier)
           .setLastUpdateCheckAt(DateTime.now());
+      _lastFailedCheckAt = null;
       if (asset == null) {
         state = state.copyWith(
           phase: MobileUpdatePhase.upToDate,
@@ -172,6 +189,7 @@ class MobileUpdateController extends Notifier<MobileUpdateState> {
         phase: MobileUpdatePhase.unavailable,
         message: error.message,
       );
+      _lastFailedCheckAt = null;
     } on MobileUpdateReinstallRequired catch (error) {
       await ref
           .read(preferencesProvider.notifier)
@@ -180,10 +198,9 @@ class MobileUpdateController extends Notifier<MobileUpdateState> {
         phase: MobileUpdatePhase.reinstallRequired,
         message: error.message,
       );
+      _lastFailedCheckAt = null;
     } catch (error) {
-      await ref
-          .read(preferencesProvider.notifier)
-          .setLastUpdateCheckAt(DateTime.now());
+      _lastFailedCheckAt = DateTime.now();
       state = state.copyWith(
         phase: MobileUpdatePhase.error,
         message: error is MobileUpdateException
@@ -193,15 +210,17 @@ class MobileUpdateController extends Notifier<MobileUpdateState> {
     }
   }
 
-  Future<void> download() async {
+  Future<void> download({bool restart = false}) async {
     final asset = state.asset;
     final application = state.application;
     if (asset == null || application == null || state.busy) return;
     _cancellation = DownloadCancellation();
     state = state.copyWith(
       phase: MobileUpdatePhase.downloading,
-      progress: 0,
-      message: '正在下载更新',
+      progress: restart ? 0 : state.progress,
+      downloadedBytes: restart ? 0 : state.downloadedBytes,
+      totalBytes: asset.size,
+      message: restart ? '正在重新下载更新' : '正在下载更新',
       clearDownload: true,
     );
     try {
@@ -214,22 +233,26 @@ class MobileUpdateController extends Notifier<MobileUpdateState> {
             onProgress: (downloaded, total) {
               state = state.copyWith(
                 progress: total <= 0 ? 0 : (downloaded * 100 / total).floor(),
+                downloadedBytes: downloaded,
+                totalBytes: total,
               );
             },
+            restart: restart,
           );
       state = state.copyWith(
         phase: MobileUpdatePhase.ready,
         downloadPath: path,
         progress: 100,
+        downloadedBytes: asset.size,
+        totalBytes: asset.size,
         message: '更新已下载，确认后由 Android 系统完成安装',
       );
     } catch (error) {
       final cancelled = _cancellation?.cancelled == true;
       state = state.copyWith(
         phase: MobileUpdatePhase.available,
-        progress: 0,
         message: cancelled
-            ? '更新下载已取消'
+            ? '更新下载已暂停，已保留下载进度'
             : error is MobileUpdateException
             ? error.message
             : '更新下载失败，请稍后重试',
@@ -240,6 +263,8 @@ class MobileUpdateController extends Notifier<MobileUpdateState> {
   }
 
   void cancelDownload() => _cancellation?.cancel();
+
+  Future<void> restartDownload() => download(restart: true);
 
   Future<void> install() async {
     final path = state.downloadPath;

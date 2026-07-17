@@ -44,6 +44,7 @@ class _SignedFixture {
     required this.publicKeys,
     required this.assetBytes,
     required this.assetUrl,
+    required this.arm64AssetUrl,
   });
 
   final List<int> manifest;
@@ -51,6 +52,7 @@ class _SignedFixture {
   final Map<String, String> publicKeys;
   final List<int> assetBytes;
   final Uri assetUrl;
+  final Uri arm64AssetUrl;
 }
 
 Future<_SignedFixture> _fixture({
@@ -68,6 +70,19 @@ Future<_SignedFixture> _fixture({
     'https://github.com/Langxi13/SecretBase/releases/download/'
     'v$version/SecretBase-v$version-android-universal.apk',
   );
+  final arm64AssetUrl = Uri.parse(
+    'https://github.com/Langxi13/SecretBase/releases/download/'
+    'v$version/SecretBase-v$version-android-arm64-v8a.apk',
+  );
+  Map<String, Object> androidAsset(Uri url, {int? assetVersionCode}) => {
+    'filename': url.pathSegments.last,
+    'url': url.toString(),
+    'size': assetBytes.length,
+    'sha256': sha256.convert(assetBytes).toString(),
+    'package_id': 'io.github.langxi13.secretbase',
+    'version_code': assetVersionCode ?? versionCode,
+    'signer_sha256': signerHash,
+  };
   final payload = {
     'schema_version': 1,
     'key_id': keyId,
@@ -78,15 +93,11 @@ Future<_SignedFixture> _fixture({
         'https://github.com/Langxi13/SecretBase/releases/tag/v$version',
     'notes': '移动更新测试',
     'assets': {
-      'android-universal': {
-        'filename': 'SecretBase-v$version-android-universal.apk',
-        'url': assetUrl.toString(),
-        'size': assetBytes.length,
-        'sha256': sha256.convert(assetBytes).toString(),
-        'package_id': 'io.github.langxi13.secretbase',
-        'version_code': versionCode,
-        'signer_sha256': signerHash,
-      },
+      'android-universal': androidAsset(assetUrl),
+      'android-arm64-v8a': androidAsset(
+        arm64AssetUrl,
+        assetVersionCode: versionCode + 2000,
+      ),
     },
   };
   final manifest = utf8.encode(jsonEncode(payload));
@@ -97,6 +108,7 @@ Future<_SignedFixture> _fixture({
     publicKeys: {keyId: base64Encode(publicKey.bytes)},
     assetBytes: assetBytes,
     assetUrl: assetUrl,
+    arm64AssetUrl: arm64AssetUrl,
   );
 }
 
@@ -122,6 +134,7 @@ void main() {
       client: MockClient((request) async {
         throw const SocketException('offline');
       }),
+      checkMaxAttempts: 1,
     );
 
     expect(
@@ -157,6 +170,7 @@ void main() {
       client: MockClient((request) async {
         throw HandshakeException('certificate rejected');
       }),
+      checkMaxAttempts: 1,
     );
 
     expect(
@@ -253,6 +267,43 @@ void main() {
     );
     expect(await File(path).readAsBytes(), fixture.assetBytes);
     await service.validatePackage(path, asset, current);
+  });
+
+  test('签名清单优先选择当前设备的 ABI 独立包', () async {
+    final fixture = await _fixture();
+    final current = MobileApplicationInfo(
+      packageId: 'io.github.langxi13.secretbase',
+      versionName: '5.0.0',
+      versionCode: 5000000,
+      signerSha256: List.filled(64, 'a').join(),
+      cacheRoot: Directory.systemTemp.path,
+      supportedAbis: const ['arm64-v8a', 'armeabi-v7a'],
+    );
+    final service = MobileUpdateService(
+      platform: _FakePlatform(
+        current: current,
+        package: MobilePackageInfo(
+          packageId: current.packageId,
+          versionName: '5.0.1',
+          versionCode: 5000100,
+          signerSha256: current.signerSha256,
+        ),
+      ),
+      publicKeys: fixture.publicKeys,
+      expectedSignerSha256: List.filled(64, 'a').join(),
+      client: MockClient((request) async {
+        if (request.url.toString() == mobileUpdateManifestUrl) {
+          return http.Response.bytes(fixture.manifest, 200);
+        }
+        return http.Response(fixture.signature, 200);
+      }),
+    );
+
+    final asset = await service.checkForUpdate(current);
+
+    expect(asset?.url, fixture.arm64AssetUrl);
+    expect(asset?.filename, endsWith('android-arm64-v8a.apk'));
+    expect(asset?.versionCode, 5002100);
   });
 
   test('临时签名测试版会明确要求一次迁移', () async {

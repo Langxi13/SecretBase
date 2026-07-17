@@ -2069,7 +2069,7 @@ GET /health
   "success": true,
   "data": {
     "status": "healthy",
-    "version": "5.1.1",
+    "version": "5.1.2",
     "uptime": 3600
   }
 }

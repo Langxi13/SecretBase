@@ -56,17 +56,23 @@ class _FakeUpdateService extends MobileUpdateService {
   _FakeUpdateService({
     required super.platform,
     required this.asset,
+    this.checkError,
     this.downloadError,
   }) : super(client: MockClient((request) async => http.Response('', 500)));
 
   final MobileUpdateAsset asset;
+  final MobileUpdateException? checkError;
   final MobileUpdateException? downloadError;
   final String downloadPath = '/tmp/secretbase-update.apk';
 
   @override
   Future<MobileUpdateAsset?> checkForUpdate(
     MobileApplicationInfo current,
-  ) async => asset;
+  ) async {
+    final error = checkError;
+    if (error != null) throw error;
+    return asset;
+  }
 
   @override
   Future<String> download(
@@ -74,6 +80,7 @@ class _FakeUpdateService extends MobileUpdateService {
     MobileApplicationInfo current, {
     required DownloadCancellation cancellation,
     required void Function(int downloaded, int total) onProgress,
+    bool restart = false,
   }) async {
     final error = downloadError;
     if (error != null) throw error;
@@ -188,6 +195,30 @@ void main() {
     expect(state.asset?.version, '5.1.1');
     expect(state.message, '测试下载失败');
     expect(state.progress, 0);
+  });
+
+  test('临时检查失败不会写入二十四小时成功检查时间', () async {
+    final application = _application();
+    final platform = _FakePlatform(application: application);
+    final service = _FakeUpdateService(
+      platform: platform,
+      asset: _asset(application),
+      checkError: const MobileUpdateException('临时网络失败'),
+    );
+    final container = await _container(
+      platform: platform,
+      service: service,
+      autoDownload: false,
+    );
+    addTearDown(container.dispose);
+
+    await container.read(mobileUpdateControllerProvider.notifier).check();
+
+    expect(
+      container.read(mobileUpdateControllerProvider).phase,
+      MobileUpdatePhase.error,
+    );
+    expect(container.read(preferencesProvider).lastUpdateCheckAt, isNull);
   });
 
   test('系统安装界面启动失败后仍可再次安装', () async {

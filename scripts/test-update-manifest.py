@@ -252,6 +252,9 @@ def test_release_manifest_generator() -> None:
             "SecretBase-v5.0.0-windows-x64-setup.exe",
             "SecretBase-v5.0.0-macos-arm64.dmg",
             "SecretBase-v5.0.0-android-universal.apk",
+            "SecretBase-v5.0.0-android-arm64-v8a.apk",
+            "SecretBase-v5.0.0-android-armeabi-v7a.apk",
+            "SecretBase-v5.0.0-android-x86_64.apk",
         ):
             (assets / filename).write_bytes(filename.encode("ascii"))
         (assets / "ANDROID-METADATA.json").write_text(
@@ -259,6 +262,12 @@ def test_release_manifest_generator() -> None:
                 "package_id": "io.github.langxi13.secretbase",
                 "version_name": "5.0.0",
                 "version_code": 5000000,
+                "version_codes": {
+                    "android-universal": 5000000,
+                    "android-armeabi-v7a": 5001000,
+                    "android-arm64-v8a": 5002000,
+                    "android-x86_64": 5004000,
+                },
                 "signer_sha256": "a" * 64,
             }),
             encoding="utf-8",
@@ -292,6 +301,10 @@ def test_release_manifest_generator() -> None:
         ):
             payload = verify_signed_manifest(manifest, signature)
         assert payload["assets"]["android-universal"]["version_code"] == 5000000
+        assert payload["assets"]["android-arm64-v8a"]["filename"].endswith(
+            "android-arm64-v8a.apk"
+        )
+        assert payload["assets"]["android-arm64-v8a"]["version_code"] == 5002000
 
 
 def main() -> int:

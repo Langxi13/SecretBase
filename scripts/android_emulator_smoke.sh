@@ -45,7 +45,12 @@ install_apk() {
   return 1
 }
 
-apk=$(find artifacts/android -maxdepth 1 -type f -name '*.apk' -print -quit)
+apk=$(find artifacts/android -maxdepth 1 -type f \
+  -name '*-android-x86_64*.apk' -print -quit)
+if [[ -z "$apk" ]]; then
+  apk=$(find artifacts/android -maxdepth 1 -type f \
+    -name '*-android-universal*.apk' -print -quit)
+fi
 if [[ -z "$apk" ]]; then
   echo "Android artifact was not found." >&2
   exit 1
