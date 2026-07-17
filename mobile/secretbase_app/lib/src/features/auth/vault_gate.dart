@@ -1,6 +1,5 @@
-import 'dart:typed_data';
-
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:secretbase/src/core/biometric_unlock.dart';
@@ -45,6 +44,7 @@ class _VaultGateState extends ConsumerState<VaultGate> {
       } else {
         await controller.unlock(_passwordController.text);
       }
+      await _dismissKeyboard();
       if (mounted) context.go('/vault');
     } catch (error) {
       if (mounted) setState(() => _error = mobileUnlockErrorMessage(error));
@@ -55,6 +55,8 @@ class _VaultGateState extends ConsumerState<VaultGate> {
     if (_biometricBusy || !mounted) return;
     if (automatic && _biometricAttempted) return;
     if (automatic) _biometricAttempted = true;
+    await _dismissKeyboard();
+    if (!mounted) return;
 
     final platform = ref.read(biometricPlatformProvider);
     Uint8List? credential;
@@ -69,6 +71,7 @@ class _VaultGateState extends ConsumerState<VaultGate> {
       await ref
           .read(vaultControllerProvider.notifier)
           .unlockWithDeviceCredential(credential);
+      await _dismissKeyboard();
       if (mounted) context.go('/vault');
     } catch (error) {
       if (error is BiometricException && error.canceled) return;
@@ -96,6 +99,16 @@ class _VaultGateState extends ConsumerState<VaultGate> {
       if (credential != null) clearSensitiveBytes(credential);
       if (mounted) setState(() => _biometricBusy = false);
     }
+  }
+
+  Future<void> _dismissKeyboard() async {
+    FocusManager.instance.primaryFocus?.unfocus();
+    try {
+      await SystemChannels.textInput.invokeMethod<void>('TextInput.hide');
+    } catch (_) {
+      // The native biometric bridge still restores window insets on Android.
+    }
+    if (mounted) await WidgetsBinding.instance.endOfFrame;
   }
 
   @override
@@ -181,7 +194,7 @@ class _VaultGateState extends ConsumerState<VaultGate> {
                           TextFormField(
                             controller: _passwordController,
                             obscureText: _obscurePassword,
-                            autofocus: true,
+                            autofocus: creating,
                             autofillHints: [
                               creating
                                   ? AutofillHints.newPassword

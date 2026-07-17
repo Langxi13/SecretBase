@@ -89,4 +89,26 @@ void main() {
     expect(controller.lockCount, 0);
     expect(find.text('密码库内容'), findsOneWidget);
   });
+
+  testWidgets('进入后台时会清除输入焦点并隐藏软键盘', (tester) async {
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          vaultControllerProvider.overrideWith(_LockedVaultController.new),
+        ],
+        child: const MaterialApp(
+          home: SecurityLifecycleGuard(child: Scaffold(body: TextField())),
+        ),
+      ),
+    );
+    await tester.showKeyboard(find.byType(TextField));
+    expect(tester.testTextInput.isVisible, isTrue);
+
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+    await tester.pump();
+
+    expect(tester.testTextInput.isVisible, isFalse);
+    final editable = tester.widget<EditableText>(find.byType(EditableText));
+    expect(editable.focusNode.hasFocus, isFalse);
+  });
 }

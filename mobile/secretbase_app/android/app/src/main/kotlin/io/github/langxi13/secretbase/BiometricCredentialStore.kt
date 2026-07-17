@@ -11,6 +11,9 @@ import android.util.AtomicFile
 import androidx.biometric.BiometricManager
 import androidx.biometric.BiometricPrompt
 import androidx.core.content.ContextCompat
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
 import androidx.fragment.app.FragmentActivity
 import io.flutter.plugin.common.MethodChannel
 import java.io.File
@@ -280,6 +283,7 @@ internal class BiometricCredentialStore(
         subtitle: String,
         onSuccess: (Cipher) -> Unit,
     ) {
+        restoreWindowAfterPrompt()
         val callback = object : BiometricPrompt.AuthenticationCallback() {
             override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
                 val authenticatedCipher = result.cryptoObject?.cipher
@@ -441,6 +445,7 @@ internal class BiometricCredentialStore(
         pendingCredential = null
         result.success(value)
         if (value is ByteArray) value.fill(0)
+        restoreWindowAfterPrompt()
     }
 
     private fun fail(code: String, message: String) {
@@ -450,5 +455,16 @@ internal class BiometricCredentialStore(
         pendingCredential?.fill(0)
         pendingCredential = null
         result.error(code, message)
+        restoreWindowAfterPrompt()
+    }
+
+    private fun restoreWindowAfterPrompt() {
+        val decorView = activity.window.decorView
+        decorView.post {
+            WindowCompat.getInsetsController(activity.window, decorView)
+                .hide(WindowInsetsCompat.Type.ime())
+            ViewCompat.requestApplyInsets(decorView)
+            decorView.requestLayout()
+        }
     }
 }

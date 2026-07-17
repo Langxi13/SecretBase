@@ -1,7 +1,7 @@
 VSVersionInfo(
   ffi=FixedFileInfo(
-    filevers=(5, 1, 2, 0),
-    prodvers=(5, 1, 2, 0),
+    filevers=(5, 1, 3, 0),
+    prodvers=(5, 1, 3, 0),
     mask=0x3f,
     flags=0x0,
     OS=0x40004,
@@ -16,12 +16,12 @@ VSVersionInfo(
         [
           StringStruct('CompanyName', 'SecretBase contributors'),
           StringStruct('FileDescription', 'SecretBase password manager'),
-          StringStruct('FileVersion', '5.1.2'),
+          StringStruct('FileVersion', '5.1.3'),
           StringStruct('InternalName', 'SecretBase'),
           StringStruct('LegalCopyright', 'Copyright (c) 2026 SecretBase contributors'),
           StringStruct('OriginalFilename', 'SecretBase.exe'),
           StringStruct('ProductName', 'SecretBase'),
-          StringStruct('ProductVersion', '5.1.2')
+          StringStruct('ProductVersion', '5.1.3')
         ]
       )
     ]),

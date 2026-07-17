@@ -51,6 +51,7 @@ class _SecurityLifecycleGuardState extends ConsumerState<SecurityLifecycleGuard>
       case AppLifecycleState.hidden:
       case AppLifecycleState.paused:
         _backgroundedAt ??= DateTime.now();
+        unawaited(_dismissKeyboard());
         _setObscured(true);
       case AppLifecycleState.detached:
         unawaited(_lockNow());
@@ -70,8 +71,18 @@ class _SecurityLifecycleGuardState extends ConsumerState<SecurityLifecycleGuard>
 
   Future<void> _handleNativeEvent(MethodCall call) async {
     if (call.method == 'deviceLocked') {
+      await _dismissKeyboard();
       _setObscured(true);
       await _lockNow();
+    }
+  }
+
+  Future<void> _dismissKeyboard() async {
+    FocusManager.instance.primaryFocus?.unfocus();
+    try {
+      await SystemChannels.textInput.invokeMethod<void>('TextInput.hide');
+    } catch (_) {
+      // Content protection and vault locking remain the required operations.
     }
   }
 

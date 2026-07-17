@@ -213,23 +213,23 @@ http://127.0.0.1:8001
 
 `v3.0.0` 已完成由浏览器承载界面的桌面基础模式。`v3.1.0` 在此基础上增加 Windows 独立桌面窗口：使用 PyInstaller one-folder、pywebview 和 Edge WebView2，用户双击 `SecretBase.exe` 即可使用，不需要单独打开浏览器或安装 Python 依赖。
 
-V5.1.2 是当前稳定版本，延续 Windows、macOS 和 Android 的统一签名更新基线，并增强 Android 断点续传、后台锁定、指纹凭据稳定性与 ABI 分包。GitHub Release 包含：
+V5.1.3 是当前稳定版本，延续 Windows、macOS 和 Android 的统一签名更新基线，并修复 Android 连续后台指纹认证后可能出现的半屏白屏。GitHub Release 包含：
 
 ```text
-SecretBase-v5.1.2-windows-x64-setup.exe
-SecretBase-v5.1.2-windows-x64.zip
-SecretBase-v5.1.2-macos-arm64.dmg
-SecretBase-v5.1.2-macos-arm64.zip
-SecretBase-v5.1.2-android-universal.apk
-SecretBase-v5.1.2-android-arm64-v8a.apk
-SecretBase-v5.1.2-android-armeabi-v7a.apk
-SecretBase-v5.1.2-android-x86_64.apk
+SecretBase-v5.1.3-windows-x64-setup.exe
+SecretBase-v5.1.3-windows-x64.zip
+SecretBase-v5.1.3-macos-arm64.dmg
+SecretBase-v5.1.3-macos-arm64.zip
+SecretBase-v5.1.3-android-universal.apk
+SecretBase-v5.1.3-android-arm64-v8a.apk
+SecretBase-v5.1.3-android-armeabi-v7a.apk
+SecretBase-v5.1.3-android-x86_64.apk
 secretbase-update-v1.json
 secretbase-update-v1.json.sig
 SHA256SUMS.txt
 ```
 
-V5.1.2 的完整审计范围、自动化门禁和真机回归项见 [发布评估](docs/release-assessment-v5.1.2.md) 和 [逐步人工验收清单](docs/manual-qa-checklist-v5.1.2.md)。
+V5.1.3 的完整审计范围、自动化门禁和真机回归项见 [发布评估](docs/release-assessment-v5.1.3.md) 和 [逐步人工验收清单](docs/manual-qa-checklist-v5.1.3.md)。
 
 Windows 独立版默认将 vault、备份、日志、设置和 WebView 数据保存在 `%LOCALAPPDATA%\SecretBase\`。发布包只包含程序资源，构建时会扫描并拒绝 `.env`、vault、备份、日志和本地设置文件。桌面导出使用 Windows 原生“另存为”，外部网址交给系统默认浏览器打开；重复启动会恢复并聚焦已有窗口。
 
@@ -676,7 +676,7 @@ http://127.0.0.1:8001
 
 `v3.0.0` completes the browser-hosted desktop foundation. `v3.1.0` adds an independent Windows window built with PyInstaller one-folder, pywebview, and Edge WebView2. Users launch `SecretBase.exe` directly without opening a separate browser or installing Python dependencies.
 
-V5.1.2 is the current stable release. It keeps Android 10+ system Autofill and the signed cross-platform update baseline while adding resumable Android downloads, immediate background locking, safer biometric credential handling, and ABI-specific APKs. GitHub Release provides the Windows installer and portable ZIP, the macOS DMG and ZIP, universal and ABI-specific Android APKs, the signed update manifest, and `SHA256SUMS.txt`.
+V5.1.3 is the current stable release. It keeps Android 10+ system Autofill, resumable downloads, immediate background locking, safer biometric credential handling, and the signed cross-platform update baseline while fixing stale keyboard insets that could leave the Android interface half blank after repeated background biometric unlocks. GitHub Release provides the Windows installer and portable ZIP, the macOS DMG and ZIP, universal and ABI-specific Android APKs, the signed update manifest, and `SHA256SUMS.txt`.
 
 Desktop data is stored under `%LOCALAPPDATA%\SecretBase\`. Build validation rejects `.env`, vault, backup, log, and local settings files. Native exports use the Windows Save As dialog, external URLs open in the system browser, and a second launch activates the existing window.
 
