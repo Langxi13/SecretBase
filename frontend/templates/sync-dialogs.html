@@ -9,7 +9,7 @@
                     <div class="modal-body">
                         <div class="sync-mode-switch" role="tablist" aria-label="同步配置方式">
                             <button type="button" :class="{ active: syncSetupMode === 'create' }" @click="syncSetupMode = 'create'">创建新空间</button>
-                            <button type="button" :class="{ active: syncSetupMode === 'join' }" @click="syncSetupMode = 'join'">使用恢复码加入</button>
+                            <button type="button" :class="{ active: syncSetupMode === 'join' }" @click="syncSetupMode = 'join'">使用恢复码/配对链接加入</button>
                         </div>
                         <div class="form-group sync-protocol-picker">
                             <label for="sync_protocol_version">同步模式</label>
@@ -40,6 +40,12 @@
                             <input id="sync_device_name" type="text" v-model.trim="syncSetupForm.deviceName" maxlength="100" placeholder="留空时使用当前设备名称">
                         </div>
                         <div v-if="syncSetupMode === 'join'" class="form-group">
+                            <div class="sync-pairing-import">
+                                <label for="sync_pairing_uri">配对链接（可选）</label>
+                                <textarea id="sync_pairing_uri" class="sync-pairing-input" v-model.trim="syncSetupForm.pairingUri" rows="2" spellcheck="false" placeholder="从电脑端复制 secretbase:// 配对链接"></textarea>
+                                <button type="button" class="btn-secondary inline" @click="applySyncPairingUri" :disabled="syncBusy || syncSetupTesting || syncPairingReading || !syncSetupForm.pairingUri">{{ syncPairingReading ? '读取中...' : '读取配对信息' }}</button>
+                                <small>只会自动填充 WebDAV 地址、用户名和恢复码；应用密码仍需手动输入。</small>
+                            </div>
                             <label for="sync_recovery_code">同步恢复码</label>
                             <textarea id="sync_recovery_code" class="sync-recovery-input" v-model.trim="syncSetupForm.recoveryCode" @input="inferSyncProtocolFromRecovery" rows="4" spellcheck="false" required></textarea>
                             <label class="compact-check-option sync-merge-option">
@@ -184,7 +190,7 @@
                             <div v-else class="sync-qr-unavailable">配对信息较长，请复制配对链接或使用恢复码加入。</div>
                             <div>
                                 <strong>{{ syncRecoveryMode === 'rotate' ? '新同步密钥已生效' : syncRecoveryMode === 'migrate' ? 'V2 快照模式已生效' : syncRecoveryMode === 'compact' ? '历史已压缩，新同步空间已生效' : '在新设备上加入同步空间' }}</strong>
-                                <p>请在可信设备上使用。完成配对后关闭此窗口。</p>
+                                <p>Android 可直接扫描二维码；其他设备可复制配对链接或恢复码加入。完成配对后关闭此窗口。</p>
                                 <button class="btn-secondary" @click="copySyncSecret(syncRecoveryMaterial.pairing_uri, '配对链接')">复制配对链接</button>
                             </div>
                         </div>

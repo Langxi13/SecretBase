@@ -308,6 +308,35 @@
     overflow-wrap: anywhere;
 }
 
+.sync-pairing-import {
+    display: grid;
+    gap: 7px;
+    margin-bottom: 12px;
+    padding: 10px 12px;
+    border: 1px dashed var(--border-strong);
+    border-radius: 8px;
+    background: var(--surface-3);
+}
+
+.sync-pairing-import label {
+    color: var(--text-secondary);
+    font-size: var(--font-size-xs);
+    font-weight: 700;
+}
+
+.sync-pairing-input {
+    min-height: 58px !important;
+    width: 100%;
+    font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+    overflow-wrap: anywhere;
+}
+
+.sync-pairing-import small {
+    color: var(--text-secondary);
+    font-size: var(--font-size-xs);
+    line-height: 1.45;
+}
+
 .sync-merge-option {
     margin-top: 10px;
 }

@@ -151,12 +151,37 @@ def decode_recovery_code(value: str) -> tuple[str, str, bytes]:
     return str(uuid.UUID(bytes=raw[1:17])), str(uuid.UUID(bytes=raw[17:33])), raw[33:65]
 
 
-def pairing_uri(*, vault_id: str, space_id: str, key: bytes, base_url: str, username: str) -> str:
+def pairing_uri(
+    *,
+    vault_id: str,
+    space_id: str,
+    key: bytes,
+    base_url: str,
+    username: str,
+    recovery_code: str | None = None,
+) -> str:
+    """Build a V2 pairing URI without including the WebDAV password.
+
+    The recovery code already contains the space identity and sync key.  New
+    links therefore expose that single importable secret instead of duplicating
+    the raw key in a second query parameter.  ``key`` remains an argument so
+    older callers retain validation of the current configuration.
+    """
+    if recovery_code:
+        decoded_vault, decoded_space, decoded_key = decode_recovery_code(recovery_code)
+        if (
+            decoded_vault != _uuid(vault_id, "Vault ID")
+            or decoded_space != _uuid(space_id, "同步空间 ID")
+            or not hmac.compare_digest(decoded_key, key)
+        ):
+            raise SyncV2CryptoError("恢复码与当前同步空间不匹配")
+    else:
+        recovery_code = encode_recovery_code(vault_id, space_id, key)
     query = urlencode({
         "v": VERSION,
         "vault_id": _uuid(vault_id, "Vault ID"),
         "space_id": _uuid(space_id, "同步空间 ID"),
-        "key": encode_key(key),
+        "recovery_code": recovery_code,
         "url": str(base_url),
         "username": str(username),
     })

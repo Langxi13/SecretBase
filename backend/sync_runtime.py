@@ -211,6 +211,7 @@ def pairing_material(config: dict) -> dict:
         key=key,
         base_url=config["base_url"],
         username=config["username"],
+        recovery_code=recovery_code,
     )
     try:
         image = qrcode.make(uri, image_factory=SvgPathImage, box_size=8, border=3)

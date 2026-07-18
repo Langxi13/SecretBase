@@ -157,6 +157,7 @@
                 protocolVersion: 2,
                 autoSync: true,
                 recoveryCode: '',
+                pairingUri: '',
                 mergeExisting: false
             });
             state.syncSetupMessage.value = '';
@@ -174,11 +175,33 @@
             else if (value.startsWith('SBSYNC2')) state.syncSetupForm.protocolVersion = 2;
         }
 
+        async function applySyncPairingUri() {
+            if (state.syncPairingReading.value) return false;
+            state.syncPairingReading.value = true;
+            state.syncError.value = '';
+            try {
+                const pairing = await window.SecretBaseSyncPairing.parse(state.syncSetupForm.pairingUri);
+                state.syncSetupForm.protocolVersion = pairing.version;
+                state.syncSetupForm.baseUrl = pairing.baseUrl;
+                state.syncSetupForm.username = pairing.username;
+                state.syncSetupForm.recoveryCode = pairing.recoveryCode;
+                state.syncSetupForm.pairingUri = '';
+                state.syncSetupMessage.value = '已读取配对信息，请输入 WebDAV 应用密码后加入';
+                return true;
+            } catch (error) {
+                state.syncError.value = error.message || '配对链接格式无效';
+                return false;
+            } finally {
+                state.syncPairingReading.value = false;
+            }
+        }
+
         function closeSyncSetup() {
             if (state.syncBusy.value || state.syncSetupTesting.value) return;
             state.showSyncSetup.value = false;
             state.syncSetupForm.password = '';
             state.syncSetupForm.recoveryCode = '';
+            state.syncSetupForm.pairingUri = '';
         }
 
         function connectionPayload() {
@@ -232,10 +255,12 @@
                 if (result.data?.conflicts?.length) {
                     state.showSyncSetup.value = false;
                     state.syncSetupForm.recoveryCode = '';
+                    state.syncSetupForm.pairingUri = '';
                     setConflicts(result.data);
                 } else {
                     state.showSyncSetup.value = false;
                     state.syncSetupForm.recoveryCode = '';
+                    state.syncSetupForm.pairingUri = '';
                     if (state.syncSetupMode.value === 'join') {
                         await loadAllData();
                         if (!responseBelongsToCurrentSession(epoch)) return;
@@ -446,6 +471,7 @@
             state.syncStatusLoading.value = false;
             state.syncBusy.value = false;
             state.syncSetupTesting.value = false;
+            state.syncPairingReading.value = false;
             state.syncHistoryLoading.value = false;
             state.syncRecoveryBusy.value = false;
             state.syncError.value = '';
@@ -466,6 +492,7 @@
             }
             state.syncSetupForm.password = '';
             state.syncSetupForm.recoveryCode = '';
+            state.syncSetupForm.pairingUri = '';
             state.syncConfigForm.password = '';
             state.syncDeleteForm.password = '';
             state.syncDeleteForm.confirmation = '';
@@ -495,6 +522,7 @@
                 openSyncCenter,
                 openSyncSetup,
                 inferSyncProtocolFromRecovery,
+                applySyncPairingUri,
                 closeSyncSetup,
                 testSyncConnection,
                 submitSyncSetup,

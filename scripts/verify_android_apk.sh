@@ -57,6 +57,7 @@ for expected in \
   'android.permission.INTERNET' \
   'android.permission.ACCESS_NETWORK_STATE' \
   'android.permission.USE_BIOMETRIC' \
+  'android.permission.CAMERA' \
   'android.permission.REQUEST_INSTALL_PACKAGES' \
   'android.permission.BIND_AUTOFILL_SERVICE' \
   'android.service.autofill.AutofillService' \

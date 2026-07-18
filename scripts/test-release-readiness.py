@@ -104,11 +104,35 @@ def test_android_update_permissions_are_release_gated() -> None:
     required_permissions = (
         "android.permission.INTERNET",
         "android.permission.ACCESS_NETWORK_STATE",
+        "android.permission.CAMERA",
         "android.permission.REQUEST_INSTALL_PACKAGES",
     )
     for permission in required_permissions:
         assert permission in manifest, permission
         assert permission in verifier, permission
+
+
+def test_android_pairing_scanner_is_release_gated() -> None:
+    pubspec = read("mobile/secretbase_app/pubspec.yaml")
+    scanner = read(
+        "mobile/secretbase_app/lib/src/features/sync/mobile_sync_pairing_scanner.dart"
+    )
+    pairing = read(
+        "mobile/secretbase_app/lib/src/features/sync/mobile_sync_pairing.dart"
+    )
+    assert "mobile_scanner:" in pubspec
+    assert "MobileScanner(" in scanner
+    assert "secretbase" in pairing and "recovery_code" in pairing
+
+
+def test_desktop_pairing_import_is_release_gated() -> None:
+    index = read("frontend/index.html")
+    parser = read("frontend/js/sync-pairing.js")
+    controller = read("frontend/js/controllers/sync-controller.js")
+    assert 'js/sync-pairing.js?v=' in index
+    assert "SecretBaseSyncPairing" in parser
+    assert "crypto.subtle" in parser
+    assert "await window.SecretBaseSyncPairing.parse" in controller
 
 
 def test_android_release_keeps_universal_and_abi_specific_packages() -> None:
@@ -135,6 +159,8 @@ def main() -> None:
         test_local_and_remote_release_entrypoints_exist,
         test_sensitive_runtime_files_are_not_tracked,
         test_android_update_permissions_are_release_gated,
+        test_android_pairing_scanner_is_release_gated,
+        test_desktop_pairing_import_is_release_gated,
         test_android_release_keeps_universal_and_abi_specific_packages,
     ]
     for test in tests:

@@ -151,11 +151,31 @@ def decode_recovery_code(value: str) -> tuple[str, bytes]:
     return str(uuid.UUID(bytes=raw[1:17])), raw[17:49]
 
 
-def pairing_uri(*, vault_id: str, key: bytes, base_url: str, username: str) -> str:
+def pairing_uri(
+    *,
+    vault_id: str,
+    key: bytes,
+    base_url: str,
+    username: str,
+    recovery_code: str | None = None,
+) -> str:
+    """Build a pairing URI without putting the WebDAV password in it.
+
+    New URIs carry the validated recovery code so clients can import them
+    without duplicating the recovery-code encoding algorithm.  The vault ID
+    and key remain accepted by this helper for V1 compatibility, but are no
+    longer serialized into newly generated links.
+    """
+    if recovery_code:
+        decoded_vault, decoded_key = decode_recovery_code(recovery_code)
+        if decoded_vault != str(uuid.UUID(vault_id)) or not hmac.compare_digest(decoded_key, key):
+            raise SyncCryptoError("恢复码与当前同步空间不匹配")
+    else:
+        recovery_code = encode_recovery_code(vault_id, key)
     query = urlencode({
         "v": VERSION,
         "vault_id": str(uuid.UUID(vault_id)),
-        "key": encode_key(key),
+        "recovery_code": recovery_code,
         "url": str(base_url),
         "username": str(username),
     })

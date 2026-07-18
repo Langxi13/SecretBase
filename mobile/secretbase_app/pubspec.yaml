@@ -1,7 +1,7 @@
 name: secretbase
 description: "SecretBase 离线加密密码库 Android 客户端。"
 publish_to: 'none'
-version: 5.3.0+5030000
+version: 5.3.1+5030100
 
 environment:
   sdk: ^3.12.2
@@ -20,6 +20,7 @@ dependencies:
   go_router: ^17.3.0
   http: ^1.6.0
   intl: ^0.20.2
+  mobile_scanner: ^7.3.0
   secretbase_mobile:
     path: rust_builder
   shared_preferences: ^2.5.5

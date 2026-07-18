@@ -25,6 +25,11 @@ const context = vm.createContext({
     Boolean,
     Number,
     Promise,
+    URL,
+    TextEncoder,
+    Uint8Array,
+    atob,
+    crypto: require('crypto').webcrypto,
     encodeURIComponent,
     window: null,
     document: {
@@ -44,6 +49,7 @@ context.addEventListener = (type, handler) => windowListeners.set(type, handler)
 context.removeEventListener = type => windowListeners.delete(type);
 
 vm.runInContext(read('frontend/js/sync-state.js'), context, { filename: 'sync-state.js' });
+vm.runInContext(read('frontend/js/sync-pairing.js'), context, { filename: 'sync-pairing.js' });
 vm.runInContext(read('frontend/js/sync-lifecycle.js'), context, { filename: 'sync-lifecycle.js' });
 vm.runInContext(read('frontend/js/controllers/sync-management-controller.js'), context, { filename: 'sync-management-controller.js' });
 vm.runInContext(read('frontend/js/controllers/sync-controller.js'), context, { filename: 'sync-controller.js' });
@@ -160,6 +166,28 @@ const actions = controller.actions;
         };
     };
     actions.openSyncSetup('join');
+    state.syncSetupForm.pairingUri = 'secretbase://sync/join?v=2&vault_id=11111111-1111-4111-8111-111111111111&space_id=22222222-2222-4222-8222-222222222222&recovery_code=SBSYNC2-AIIRC-EIRCE-IUCEM-BCEIR-CEIRC-EISEI-RCEIR-CEQRC-QIRCE-IRCEI-RCEAI-CAMCA-KBQHB-AEQUC-YMBUH-A6EAR-CIJRI-FIWC4-MBSGQ-3DQOR-4HZAJ-QFRST-Q&url=https%3A%2F%2Fdav.example.invalid%2Fsecretbase&username=tester';
+    assert(await actions.applySyncPairingUri() === true, '配对链接应自动填充同步连接信息');
+    assert(state.syncSetupForm.baseUrl === 'https://dav.example.invalid/secretbase', '配对链接应填充 WebDAV 地址');
+    assert(state.syncSetupForm.username === 'tester', '配对链接应填充 WebDAV 用户名');
+    assert(state.syncSetupForm.recoveryCode.startsWith('SBSYNC2-'), '配对链接应填充 V2 恢复码');
+    state.syncSetupForm.pairingUri = '';
+    const legacyPairing = await context.SecretBaseSyncPairing.parse(
+        'secretbase://sync/join?v=2&vault_id=11111111-1111-4111-8111-111111111111&space_id=22222222-2222-4222-8222-222222222222&key=AQIDBAUGBwgJCgsMDQ4PEBESExQVFhcYGRobHB0eHyA&url=https%3A%2F%2Fdav.example.invalid%2Fsecretbase&username=tester'
+    );
+    assert(legacyPairing.recoveryCode.startsWith('SBSYNC2-'), '旧版 V2 配对链接应转换为恢复码');
+    assert(!legacyPairing.recoveryCode.includes('key='), '转换结果不得保留裸同步密钥');
+    const webCrypto = context.crypto;
+    context.crypto = undefined;
+    const fallbackPairing = await context.SecretBaseSyncPairing.parse(
+        'secretbase://sync/join?v=2&vault_id=11111111-1111-4111-8111-111111111111&space_id=22222222-2222-4222-8222-222222222222&key=AQIDBAUGBwgJCgsMDQ4PEBESExQVFhcYGRobHB0eHyA&url=https%3A%2F%2Fdav.example.invalid%2Fsecretbase&username=tester'
+    );
+    assert(fallbackPairing.recoveryCode === legacyPairing.recoveryCode, '无 Web Crypto 时仍应完成配对校验');
+    context.crypto = webCrypto;
+    const v1Pairing = await context.SecretBaseSyncPairing.parse(
+        'secretbase://sync/join?v=1&vault_id=11111111-1111-4111-8111-111111111111&recovery_code=SBSYNC1-AEIRC-EIRCE-IUCEM-BCEIR-CEIRC-EIQCA-QDAQC-QMBYI-BEFAW-DANBY-HRAEI-SCMKB-KFQXD-AMRUG-Y4DUP-B6IDR-H3HFC&url=https%3A%2F%2Fdav.example.invalid%2Fsecretbase&username=tester'
+    );
+    assert(v1Pairing.version === 1, 'V1 配对链接应保留协议版本');
     Object.assign(state.syncSetupForm, {
         baseUrl: 'https://dav.example.invalid/secretbase',
         username: 'tester',

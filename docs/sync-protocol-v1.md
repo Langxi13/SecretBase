@@ -141,7 +141,7 @@ version(1 byte) || vault_uuid(16 bytes) || sync_key(32 bytes) || checksum(4 byte
 
 `checksum` 是 `SHA256(UTF8("SBSYNC1") || preceding_payload)` 的前 4 字节。整体使用无 padding 的 Base32 编码，每 5 个字符分组，并加前缀 `SBSYNC1-`。
 
-配对 URI 为 `secretbase://sync/join`，包含协议版本、Vault ID、同步密钥、WebDAV 地址和用户名，不包含 WebDAV 密码。
+配对 URI 为 `secretbase://sync/join`，包含协议版本、Vault ID、恢复码、WebDAV 地址和用户名，不包含 WebDAV 密码。旧版 URI 可能使用 `key` 参数；新客户端应优先使用恢复码参数。
 
 轮换同步密钥时，用新密钥发布只包含当前文档的新 head 和快照。旧历史必须等本机新配置成功保存后再清理；旧设备随后必须使用新恢复码重新加入。若本机新配置保存失败，实现应使用新 head 的 ETag 把 head 回退为旧密钥，同时保留原历史链并恢复本机旧配置与基线，避免远端与本机密钥永久失配。
 

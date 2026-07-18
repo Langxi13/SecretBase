@@ -10,6 +10,7 @@ from sync_v2_crypto import (
     decrypt_snapshot,
     encode_recovery_code,
     encrypt_snapshot,
+    pairing_uri,
 )
 from sync_v2_remote import SyncV2Repository
 import sync_v2_management
@@ -150,6 +151,27 @@ class SyncV2Tests(unittest.TestCase):
         )
         recovery = encode_recovery_code(VAULT_ID, SPACE_ID, KEY)
         self.assertEqual(decode_recovery_code(recovery), (VAULT_ID, SPACE_ID, KEY))
+
+        pairing = pairing_uri(
+            vault_id=VAULT_ID,
+            space_id=SPACE_ID,
+            key=KEY,
+            base_url="https://dav.example.test/secretbase",
+            username="tester",
+            recovery_code=recovery,
+        )
+        self.assertIn("recovery_code=", pairing)
+        self.assertNotIn("key=", pairing)
+        self.assertNotIn("password=", pairing)
+        with self.assertRaises(ValueError):
+            pairing_uri(
+                vault_id=VAULT_ID,
+                space_id=SPACE_ID,
+                key=b"x" * 32,
+                base_url="https://dav.example.test/secretbase",
+                username="tester",
+                recovery_code=recovery,
+            )
 
     def test_repository_discovers_concurrent_frontier_without_etag(self):
         dav = MemoryDav()

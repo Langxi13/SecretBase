@@ -1,11 +1,18 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:secretbase/src/core/secure_clipboard.dart';
 import 'package:secretbase/src/core/mobile_error_presenter.dart';
 import 'package:secretbase/src/core/widgets/responsive_dialog.dart';
 import 'package:secretbase/src/features/sync/mobile_sync_auto.dart';
+import 'package:secretbase/src/features/sync/mobile_sync_configured_view.dart';
+import 'package:secretbase/src/features/sync/mobile_sync_conflict_view.dart';
 import 'package:secretbase/src/features/sync/mobile_sync_management_dialogs.dart';
+import 'package:secretbase/src/features/sync/mobile_sync_pairing.dart';
+import 'package:secretbase/src/features/sync/mobile_sync_pairing_scanner.dart';
+import 'package:secretbase/src/features/sync/mobile_sync_setup_form.dart';
 import 'package:secretbase/src/features/sync/mobile_sync_service.dart';
 import 'package:secretbase/src/features/sync/mobile_webdav.dart';
 import 'package:secretbase/src/rust/mobile/models.dart' as rust_models;
@@ -122,6 +129,7 @@ class _MobileSyncDialogState extends ConsumerState<_MobileSyncDialog> {
       if (!mounted) return;
       setState(() {
         _password.clear();
+        _recovery.clear();
         _conflict = result.conflictSession;
         _resolutions = {};
       });
@@ -131,6 +139,106 @@ class _MobileSyncDialogState extends ConsumerState<_MobileSyncDialog> {
         _showMessage(result.message);
       }
     });
+  }
+
+  Future<void> _testConnection() async {
+    if (_url.text.trim().isEmpty ||
+        _username.text.trim().isEmpty ||
+        _password.text.isEmpty) {
+      setState(() => _error = '请先填写 WebDAV 地址、用户名和应用密码');
+      return;
+    }
+    await _run(() async {
+      await _coordinator.testConnection(
+        baseUrl: _url.text,
+        username: _username.text,
+        password: _password.text,
+      );
+      _showMessage('WebDAV 连接测试通过');
+    });
+  }
+
+  Future<void> _scanPairing() async {
+    final pairing = await showMobileSyncPairingScanner(context);
+    if (!mounted || pairing == null) return;
+    setState(() {
+      _joining = true;
+      _url.text = pairing.baseUrl;
+      _username.text = pairing.username;
+      _recovery.text = pairing.recoveryCode;
+      _error = null;
+    });
+    _showMessage('已读取配对信息，请输入 WebDAV 应用密码');
+  }
+
+  Future<void> _pastePairing() async {
+    try {
+      final data = await Clipboard.getData(Clipboard.kTextPlain);
+      final raw = data?.text?.trim() ?? '';
+      if (raw.isEmpty) throw const MobileSyncPairingException('剪贴板没有配对链接');
+      final pairing = MobileSyncPairing.parse(raw);
+      await _clearClipboardIfMatches(raw);
+      if (!mounted) return;
+      setState(() {
+        _joining = true;
+        _url.text = pairing.baseUrl;
+        _username.text = pairing.username;
+        _recovery.text = pairing.recoveryCode;
+        _error = null;
+      });
+      _showMessage('已读取配对信息，请输入 WebDAV 应用密码');
+    } on MobileSyncPairingException catch (error) {
+      if (mounted) setState(() => _error = error.message);
+    } catch (_) {
+      if (mounted) setState(() => _error = '读取剪贴板失败，请手动粘贴恢复码');
+    }
+  }
+
+  Future<void> _clearClipboardIfMatches(String value) async {
+    try {
+      final current = await Clipboard.getData(Clipboard.kTextPlain);
+      if (current?.text?.trim() == value.trim()) {
+        await Clipboard.setData(const ClipboardData(text: ''));
+      }
+    } catch (_) {
+      // 剪贴板清理失败不影响配对流程，表单仍不会持久化链接。
+    }
+  }
+
+  void _setJoining(bool value) {
+    setState(() {
+      _joining = value;
+      _error = null;
+      if (!value) {
+        _recovery.clear();
+        _mergeExisting = false;
+      }
+    });
+  }
+
+  Future<void> _copyRecoveryCode() async {
+    final code = _recoveryCode;
+    if (code == null || code.isEmpty) return;
+    await copySensitiveValue(ref, code);
+    _showMessage('恢复码已复制，将按剪贴板设置自动清理');
+  }
+
+  Future<void> _copyPairingUri() async {
+    final code = _recoveryCode;
+    final status = _status;
+    if (code == null || status == null || !status.configured) return;
+    try {
+      final connection = await _coordinator.connection();
+      final pairing = MobileSyncPairing(
+        baseUrl: connection.baseUrl,
+        username: connection.username,
+        recoveryCode: code,
+      );
+      await copySensitiveValue(ref, pairing.uri.toString());
+      _showMessage('配对链接已复制，将按剪贴板设置自动清理');
+    } catch (error) {
+      if (mounted) setState(() => _error = mobileErrorMessage(error));
+    }
   }
 
   Future<void> _syncNow() async {
@@ -212,7 +320,16 @@ class _MobileSyncDialogState extends ConsumerState<_MobileSyncDialog> {
         setState(() {
           _status = status;
           _recoveryCode = null;
+          _url.clear();
+          _username.clear();
+          _password.clear();
+          _recovery.clear();
+          _device.clear();
+          _joining = false;
+          _mergeExisting = false;
+          _autoSync = true;
         });
+        _showMessage('已断开本机同步');
       }
     });
   }
@@ -348,6 +465,14 @@ class _MobileSyncDialogState extends ConsumerState<_MobileSyncDialog> {
       setState(() {
         _status = status;
         _recoveryCode = null;
+        _url.clear();
+        _username.clear();
+        _password.clear();
+        _recovery.clear();
+        _device.clear();
+        _joining = false;
+        _mergeExisting = false;
+        _autoSync = true;
       });
       ref.read(mobileSyncAutoStateProvider.notifier).reset();
       _showMessage('远端同步数据已删除');
@@ -356,6 +481,19 @@ class _MobileSyncDialogState extends ConsumerState<_MobileSyncDialog> {
 
   Future<void> _refreshVault() =>
       ref.read(vaultControllerProvider.notifier).refreshStatus();
+
+  void _handleMoreAction(String value) {
+    switch (value) {
+      case 'disconnect':
+        _disconnect();
+      case 'compact':
+        _compactHistory();
+      case 'rotate':
+        _rotateKey();
+      case 'delete':
+        _deleteRemote();
+    }
+  }
 
   void _showMessage(String message) {
     if (!mounted || message.isEmpty) return;
@@ -383,6 +521,15 @@ class _MobileSyncDialogState extends ConsumerState<_MobileSyncDialog> {
 
   @override
   Widget build(BuildContext context) {
+    ref.listen(vaultControllerProvider, (previous, next) {
+      if (previous?.phase == VaultPhase.unlocked &&
+          next.phase != VaultPhase.unlocked) {
+        _clearSensitiveState();
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          _closeDialogsAfterLock();
+        });
+      }
+    });
     return DialogFrame(
       title: '加密快照同步',
       canClose: !_working,
@@ -396,312 +543,87 @@ class _MobileSyncDialogState extends ConsumerState<_MobileSyncDialog> {
   }
 
   Widget _body(BuildContext context) {
+    if (_conflict != null) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (_error != null) ...[
+            _errorPanel(_error!),
+            const SizedBox(height: 12),
+          ],
+          _conflictView(),
+        ],
+      );
+    }
     if (_error != null) {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           _errorPanel(_error!),
           const SizedBox(height: 12),
-          if (_status?.configured != true)
-            _setupForm(context)
-          else
-            _configuredView(context),
+          if (_status?.configured != true) _setupForm() else _configuredView(),
         ],
       );
     }
-    if (_conflict != null) return _conflictView(context);
-    return _status?.configured == true
-        ? _configuredView(context)
-        : _setupForm(context);
+    return _status?.configured == true ? _configuredView() : _setupForm();
   }
 
-  Widget _setupForm(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        SegmentedButton<bool>(
-          segments: const [
-            ButtonSegment(
-              value: false,
-              label: Text('创建空间'),
-              icon: Icon(Icons.add_link_outlined),
-            ),
-            ButtonSegment(
-              value: true,
-              label: Text('加入空间'),
-              icon: Icon(Icons.login_outlined),
-            ),
-          ],
-          selected: {_joining},
-          onSelectionChanged: _working
-              ? null
-              : (value) => setState(() => _joining = value.first),
-        ),
-        const SizedBox(height: 14),
-        _field(_url, 'WebDAV 地址', 'https://dav.example/secretbase'),
-        _field(_username, '用户名', 'WebDAV 用户名'),
-        _field(_password, '应用密码', '不会上传到 AI 或写入界面偏好', obscure: true),
-        _field(_device, '设备名称', '例如：我的 Android 手机'),
-        if (_joining) ...[
-          _field(_recovery, 'SBSYNC2 恢复码', '从已配置设备复制', maxLines: 3),
-          CheckboxListTile(
-            contentPadding: EdgeInsets.zero,
-            dense: true,
-            value: _mergeExisting,
-            onChanged: _working
-                ? null
-                : (value) => setState(() => _mergeExisting = value ?? false),
-            title: const Text('当前 Vault 有数据时尝试合并'),
-          ),
-        ],
-        SwitchListTile(
-          contentPadding: EdgeInsets.zero,
-          dense: true,
-          value: _autoSync,
-          onChanged: _working
-              ? null
-              : (value) => setState(() => _autoSync = value),
-          title: const Text('自动同步'),
-        ),
-        const SizedBox(height: 8),
-        Text(
-          '使用不可变加密快照，不要求 WebDAV 提供 ETag；密码字段和值不会以明文上传。',
-          style: Theme.of(context).textTheme.bodySmall,
-        ),
-        const SizedBox(height: 14),
-        FilledButton.icon(
-          onPressed: _working ? null : (_joining ? _join : _create),
-          icon: Icon(_joining ? Icons.login : Icons.cloud_upload_outlined),
-          label: Text(
-            _working
-                ? '处理中...'
-                : _joining
-                ? '加入并同步'
-                : '创建并上传',
-          ),
-        ),
-      ],
+  Widget _setupForm() {
+    return MobileSyncSetupForm(
+      url: _url,
+      username: _username,
+      password: _password,
+      recovery: _recovery,
+      device: _device,
+      joining: _joining,
+      working: _working,
+      mergeExisting: _mergeExisting,
+      autoSync: _autoSync,
+      onJoiningChanged: _setJoining,
+      onMergeChanged: (value) => setState(() => _mergeExisting = value),
+      onAutoSyncChanged: (value) => setState(() => _autoSync = value),
+      onScanPairing: _scanPairing,
+      onPastePairing: _pastePairing,
+      onTestConnection: _testConnection,
+      onSubmit: _joining ? _join : _create,
+      onInputChanged: () {
+        if (_error != null) setState(() => _error = null);
+      },
     );
   }
 
-  Widget _configuredView(BuildContext context) {
+  Widget _configuredView() {
     final status = _status;
-    final automatic = ref.watch(mobileSyncAutoStateProvider);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        if (status != null) ...[
-          ListTile(
-            contentPadding: EdgeInsets.zero,
-            leading: automatic.running
-                ? const SizedBox.square(
-                    dimension: 24,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : Icon(
-                    automatic.conflict || automatic.lastError.isNotEmpty
-                        ? Icons.cloud_off_outlined
-                        : Icons.cloud_done_outlined,
-                  ),
-            title: Text(status.phase == 'error' ? '同步异常' : '已配置快照同步'),
-            subtitle: Text(
-              '${status.baseUrl}\n${status.usernameMask} · 第 ${status.generation} 代 · '
-              '${status.frontier.length} 个分支 · ${status.autoSync ? '自动' : '手动'}',
-            ),
-          ),
-          if (automatic.lastError.isNotEmpty) ...[
-            Material(
-              color: Theme.of(context).colorScheme.errorContainer,
-              child: Padding(
-                padding: const EdgeInsets.all(10),
-                child: Text(automatic.lastError),
-              ),
-            ),
-            const SizedBox(height: 10),
-          ],
-          const Divider(),
-        ],
-        if (_recoveryCode != null) ...[
-          const Text('新设备恢复码', style: TextStyle(fontWeight: FontWeight.w700)),
-          SelectableText(
-            _recoveryCode!,
-            style: const TextStyle(fontFamily: 'monospace'),
-          ),
-          const SizedBox(height: 10),
-        ],
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: [
-            FilledButton.icon(
-              onPressed: _working ? null : _syncNow,
-              icon: const Icon(Icons.sync),
-              label: const Text('立即同步'),
-            ),
-            OutlinedButton.icon(
-              onPressed: _working ? null : _showRecoveryCode,
-              icon: const Icon(Icons.key_outlined),
-              label: const Text('恢复码'),
-            ),
-            OutlinedButton.icon(
-              onPressed: _working ? null : _showHistory,
-              icon: const Icon(Icons.history),
-              label: const Text('历史'),
-            ),
-            OutlinedButton.icon(
-              onPressed: _working ? null : _editConfig,
-              icon: const Icon(Icons.tune),
-              label: const Text('设置'),
-            ),
-            PopupMenuButton<String>(
-              enabled: !_working,
-              tooltip: '更多同步操作',
-              icon: const Icon(Icons.more_horiz),
-              onSelected: (value) {
-                switch (value) {
-                  case 'disconnect':
-                    _disconnect();
-                  case 'compact':
-                    _compactHistory();
-                  case 'rotate':
-                    _rotateKey();
-                  case 'delete':
-                    _deleteRemote();
-                }
-              },
-              itemBuilder: (context) => const [
-                PopupMenuItem(
-                  value: 'disconnect',
-                  child: ListTile(
-                    leading: Icon(Icons.link_off),
-                    title: Text('断开本机'),
-                    contentPadding: EdgeInsets.zero,
-                  ),
-                ),
-                PopupMenuItem(
-                  value: 'compact',
-                  child: ListTile(
-                    leading: Icon(Icons.cleaning_services_outlined),
-                    title: Text('压缩历史'),
-                    contentPadding: EdgeInsets.zero,
-                  ),
-                ),
-                PopupMenuItem(
-                  value: 'rotate',
-                  child: ListTile(
-                    leading: Icon(Icons.vpn_key_outlined),
-                    title: Text('轮换密钥'),
-                    contentPadding: EdgeInsets.zero,
-                  ),
-                ),
-                PopupMenuItem(
-                  value: 'delete',
-                  child: ListTile(
-                    leading: Icon(Icons.delete_forever_outlined),
-                    title: Text('删除远端数据'),
-                    contentPadding: EdgeInsets.zero,
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ],
+    if (status == null) return const SizedBox.shrink();
+    return MobileSyncConfiguredView(
+      status: status,
+      automatic: ref.watch(mobileSyncAutoStateProvider),
+      recoveryCode: _recoveryCode,
+      working: _working,
+      onSync: _syncNow,
+      onShowRecovery: _showRecoveryCode,
+      onShowHistory: _showHistory,
+      onEditConfig: _editConfig,
+      onCopyRecovery: _copyRecoveryCode,
+      onCopyPairing: _copyPairingUri,
+      onMoreAction: _handleMoreAction,
     );
   }
 
-  Widget _conflictView(BuildContext context) {
-    final conflict = _conflict!;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        const Text('需要处理同步冲突', style: TextStyle(fontWeight: FontWeight.w700)),
-        const SizedBox(height: 6),
-        const Text('这里只显示标题、状态和变化区块，不显示字段值。'),
-        const SizedBox(height: 10),
-        for (final item in conflict.conflicts) ...[
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(10),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Text(
-                    item.label,
-                    style: const TextStyle(fontWeight: FontWeight.w700),
-                  ),
-                  Text(
-                    item.changedSections.join('、'),
-                    style: Theme.of(context).textTheme.bodySmall,
-                  ),
-                  const SizedBox(height: 6),
-                  DropdownButtonFormField<String>(
-                    initialValue: _resolutions[item.conflictId],
-                    decoration: const InputDecoration(
-                      labelText: '处理方式',
-                      isDense: true,
-                    ),
-                    items: [
-                      const DropdownMenuItem(
-                        value: 'local',
-                        child: Text('保留本机'),
-                      ),
-                      const DropdownMenuItem(
-                        value: 'remote',
-                        child: Text('保留远端'),
-                      ),
-                      if (item.allowBoth)
-                        const DropdownMenuItem(
-                          value: 'both',
-                          child: Text('保留两份'),
-                        ),
-                    ],
-                    onChanged: _working
-                        ? null
-                        : (value) => setState(
-                            () => _resolutions[item.conflictId] = value ?? '',
-                          ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ],
-        const SizedBox(height: 8),
-        FilledButton(
-          onPressed:
-              _working ||
-                  conflict.conflicts.any(
-                    (item) => !_resolutions.containsKey(item.conflictId),
-                  )
-              ? null
-              : _resolve,
-          child: Text(_working ? '应用中...' : '应用选择'),
-        ),
-      ],
-    );
-  }
-
-  Widget _field(
-    TextEditingController controller,
-    String label,
-    String hint, {
-    bool obscure = false,
-    int maxLines = 1,
-  }) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
-      child: TextField(
-        controller: controller,
-        obscureText: obscure,
-        maxLines: obscure ? 1 : maxLines,
-        decoration: InputDecoration(
-          labelText: label,
-          hintText: hint,
-          border: const OutlineInputBorder(),
-          isDense: true,
-        ),
-      ),
+  Widget _conflictView() {
+    final conflict = _conflict;
+    if (conflict == null) return const SizedBox.shrink();
+    return MobileSyncConflictView(
+      conflict: conflict,
+      resolutions: _resolutions,
+      working: _working,
+      onResolutionChanged: (id, value) {
+        setState(() {
+          _resolutions[id] = value;
+          _error = null;
+        });
+      },
+      onResolve: _resolve,
     );
   }
 
@@ -709,4 +631,33 @@ class _MobileSyncDialogState extends ConsumerState<_MobileSyncDialog> {
     color: Theme.of(context).colorScheme.errorContainer,
     child: Padding(padding: const EdgeInsets.all(10), child: Text(message)),
   );
+
+  void _clearSensitiveState() {
+    if (!mounted) return;
+    MobileWebDavClient.cancelAll();
+    unawaited(_coordinator.cancelPending().onError((_, _) {}));
+    setState(() {
+      _password.clear();
+      _recovery.clear();
+      _url.clear();
+      _username.clear();
+      _device.clear();
+      _recoveryCode = null;
+      _error = null;
+      _conflict = null;
+      _resolutions = {};
+      _working = false;
+      _joining = false;
+      _mergeExisting = false;
+      _autoSync = true;
+    });
+  }
+
+  Future<void> _closeDialogsAfterLock() async {
+    if (!mounted) return;
+    final navigator = Navigator.of(context);
+    if (navigator.canPop()) navigator.pop();
+    await Future<void>.delayed(Duration.zero);
+    if (mounted && navigator.canPop()) navigator.pop();
+  }
 }

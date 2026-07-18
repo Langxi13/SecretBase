@@ -28,6 +28,7 @@
         const showSyncSetup = ref(false);
         const syncSetupMode = ref('create');
         const syncSetupTesting = ref(false);
+        const syncPairingReading = ref(false);
         const syncSetupMessage = ref('');
         const syncSetupForm = reactive({
             baseUrl: '',
@@ -37,6 +38,7 @@
             protocolVersion: 2,
             autoSync: true,
             recoveryCode: '',
+            pairingUri: '',
             mergeExisting: false
         });
         const showSyncConfig = ref(false);
@@ -72,6 +74,7 @@
             showSyncSetup,
             syncSetupMode,
             syncSetupTesting,
+            syncPairingReading,
             syncSetupMessage,
             syncSetupForm,
             showSyncConfig,

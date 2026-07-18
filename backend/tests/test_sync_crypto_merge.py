@@ -11,6 +11,7 @@ from sync_crypto import (
     encode_recovery_code,
     encrypt_bundle,
     generate_sync_key,
+    pairing_uri,
 )
 from sync_merge import apply_resolutions, merge_documents
 from sync_remote import RemoteHead, SyncRepository
@@ -65,6 +66,23 @@ class SyncCryptoMergeTests(unittest.TestCase):
         recovery_code = encode_recovery_code(VAULT_ID, key)
         self.assertEqual(decode_recovery_code(recovery_code), (VAULT_ID, key))
         self.assertEqual(decode_recovery_code(recovery_code.replace("-", " -\n ")), (VAULT_ID, key))
+        pairing = pairing_uri(
+            vault_id=VAULT_ID,
+            key=key,
+            base_url="https://dav.example.test/secretbase",
+            username="tester",
+            recovery_code=recovery_code,
+        )
+        self.assertIn("recovery_code=", pairing)
+        self.assertNotIn("key=", pairing)
+        with self.assertRaises(ValueError):
+            pairing_uri(
+                vault_id=VAULT_ID,
+                key=b"x" * 32,
+                base_url="https://dav.example.test/secretbase",
+                username="tester",
+                recovery_code=recovery_code,
+            )
 
         damaged = bytearray(encrypted)
         damaged[-1] ^= 1

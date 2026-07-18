@@ -255,6 +255,9 @@ def main() -> None:
             )
             assert recovery["recovery_code"].startswith("SBSYNC1-")
             assert recovery["qr_data_uri"].startswith("data:image/svg+xml;base64,")
+            assert "recovery_code=" in recovery["pairing_uri"]
+            assert "key=" not in recovery["pairing_uri"]
+            assert "password=" not in recovery["pairing_uri"]
             with STATE.lock:
                 remote_bytes = b"".join(content for content, _ in STATE.objects.values())
             assert b"never-visible-on-webdav" not in remote_bytes

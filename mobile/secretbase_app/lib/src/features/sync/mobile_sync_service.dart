@@ -63,6 +63,23 @@ class MobileSyncCoordinator {
 
   Future<rust_models.SyncConnection> connection() => rust_api.syncConnection();
 
+  Future<void> testConnection({
+    required String baseUrl,
+    required String username,
+    required String password,
+  }) => MobileSyncGate.run(() async {
+    final client = MobileWebDavClient(
+      baseUrl: baseUrl,
+      username: username,
+      password: password,
+    );
+    try {
+      await client.probeV2();
+    } finally {
+      client.close();
+    }
+  });
+
   Future<rust_models.SyncStatus> create({
     required String baseUrl,
     required String username,

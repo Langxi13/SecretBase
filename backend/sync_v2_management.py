@@ -97,12 +97,14 @@ def pairing_material(config: dict) -> dict:
     from sync_v2_crypto import decode_key, encode_recovery_code
 
     key = decode_key(config["sync_key"])
+    recovery_code = encode_recovery_code(config["vault_id"], config["space_id"], key)
     uri = pairing_uri(
         vault_id=config["vault_id"],
         space_id=config["space_id"],
         key=key,
         base_url=config["base_url"],
         username=config["username"],
+        recovery_code=recovery_code,
     )
     qr_data_uri = ""
     try:
@@ -118,7 +120,7 @@ def pairing_material(config: dict) -> dict:
     except Exception:
         qr_data_uri = ""
     return {
-        "recovery_code": encode_recovery_code(config["vault_id"], config["space_id"], key),
+        "recovery_code": recovery_code,
         "pairing_uri": uri,
         "qr_data_uri": qr_data_uri,
     }

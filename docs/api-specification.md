@@ -2055,7 +2055,7 @@ POST /sync/recovery-code
 { "password": "current-master-password" }
 ```
 
-主密码验证成功后返回 `recovery_code`、`pairing_uri` 和仅用于当前界面显示的 SVG `qr_data_uri`。这些字段等同于同步密钥。
+主密码验证成功后返回 `recovery_code`、`pairing_uri` 和仅用于当前界面显示的 SVG `qr_data_uri`。这些字段等同于同步密钥。新生成的配对 URI 使用 `recovery_code` 参数，不包含 WebDAV 应用密码或重复的裸 `key` 参数；客户端应兼容旧版 V2 URI 的 `key` 参数。
 
 ### 8B.10 轮换同步密钥
 
@@ -2241,7 +2241,7 @@ GET /health
   "success": true,
   "data": {
     "status": "healthy",
-    "version": "5.3.0",
+    "version": "5.3.1",
     "uptime": 3600
   }
 }
