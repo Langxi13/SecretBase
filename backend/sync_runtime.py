@@ -200,6 +200,10 @@ def rollback_local(value: dict, expected_revision: int) -> None:
 
 
 def pairing_material(config: dict) -> dict:
+    if int(config.get("protocol_version", 1)) == 2:
+        from sync_v2_service import pairing_material as pairing_material_v2
+
+        return pairing_material_v2(config)
     key = decode_key(config["sync_key"])
     recovery_code = encode_recovery_code(config["vault_id"], key)
     uri = pairing_uri(
@@ -230,15 +234,21 @@ def _public_status(config: dict | None, base: dict | None) -> dict:
         return {
             "configured": False,
             "pending_join": False,
+            "protocol_version": 2,
+            "sync_mode": "坚果云兼容快照模式",
             "phase": "disabled",
             "message": "尚未配置 WebDAV 同步",
             "pending_conflicts": 0,
             "auto_sync": True,
+            "space_id": "",
+            "frontier": [],
         }
     parsed = urlsplit(config["base_url"])
     return {
         "configured": True,
         "pending_join": False,
+        "protocol_version": int(config.get("protocol_version", 1)),
+        "sync_mode": "坚果云兼容快照模式" if int(config.get("protocol_version", 1)) == 2 else "严格 ETag 模式",
         "phase": _runtime_status["phase"],
         "message": _runtime_status["message"],
         "last_error": _runtime_status["last_error"],
@@ -249,8 +259,10 @@ def _public_status(config: dict | None, base: dict | None) -> dict:
         "username_mask": _public_username(config["username"]),
         "device_name": config["device_name"],
         "vault_id": config["vault_id"],
+        "space_id": config.get("space_id", ""),
         "last_synced_at": (base or {}).get("synced_at", ""),
         "generation": int((base or {}).get("generation") or 0),
+        "frontier": list((base or {}).get("frontier") or []),
     }
 
 
@@ -269,11 +281,15 @@ def status() -> dict:
         return {
             "configured": False,
             "pending_join": False,
+            "protocol_version": 2,
+            "sync_mode": "坚果云兼容快照模式",
             "phase": "error",
             "message": "同步设置无法读取",
             "last_error": "请重新配置 WebDAV 同步",
             "pending_conflicts": 0,
             "auto_sync": True,
+            "space_id": "",
+            "frontier": [],
         }
 
 
@@ -285,6 +301,17 @@ def test_connection(payload: dict) -> dict:
         payload.get("password", ""),
     ) as webdav:
         capabilities = webdav.test_capabilities()
+    return {"base_url": base_url, "host": urlsplit(base_url).hostname or "", "capabilities": capabilities}
+
+
+def test_connection_v2(payload: dict) -> dict:
+    base_url = normalize_webdav_url(payload.get("base_url", ""))
+    with WebDavClient(
+        base_url,
+        payload.get("username", ""),
+        payload.get("password", ""),
+    ) as webdav:
+        capabilities = webdav.test_basic_capabilities()
     return {"base_url": base_url, "host": urlsplit(base_url).hostname or "", "capabilities": capabilities}
 
 

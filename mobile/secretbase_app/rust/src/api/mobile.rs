@@ -4,7 +4,8 @@ use crate::mobile::{
         AiApplyResult, AiAssistantRequestPlan, AiAssistantTurnResult, AiConversation,
         AiConversationSummary, AiHttpRequest, AiPreview, AiRequestPlan, AiStatus, AiUndoState,
         EntryDraft, EntryPage, EntryRecord, ImportPreview, OperationResult, RecoverySnapshot,
-        TaxonomyRecord, VaultStatus,
+        SyncConnection, SyncLocalState, SyncSetupPlan, SyncSnapshotInfo, SyncStatus,
+        SyncUploadPlan, TaxonomyRecord, VaultStatus,
     },
     runtime,
 };
@@ -42,6 +43,154 @@ pub fn unlock_vault_with_device_credential(
 
 pub fn lock_vault() -> Result<VaultStatus, MobileError> {
     runtime::lock_vault()
+}
+
+pub fn sync_status() -> Result<SyncStatus, MobileError> {
+    runtime::sync_status()
+}
+
+pub fn sync_connection() -> Result<SyncConnection, MobileError> {
+    runtime::sync_connection()
+}
+
+pub fn sync_update_config(
+    base_url: String,
+    username: String,
+    password: Option<String>,
+    device_name: String,
+    auto_sync: bool,
+) -> Result<SyncStatus, MobileError> {
+    runtime::sync_update_config(base_url, username, password, device_name, auto_sync)
+}
+
+pub fn sync_prepare_create(
+    base_url: String,
+    username: String,
+    password: String,
+    device_name: String,
+    auto_sync: bool,
+) -> Result<SyncSetupPlan, MobileError> {
+    runtime::sync_prepare_create(base_url, username, password, device_name, auto_sync)
+}
+
+pub fn sync_commit_create(token: String) -> Result<SyncStatus, MobileError> {
+    runtime::sync_commit_create(token)
+}
+
+pub fn sync_prepare_compact(
+    password: String,
+    expected_revision: u64,
+) -> Result<SyncSetupPlan, MobileError> {
+    runtime::sync_prepare_compact(password, expected_revision)
+}
+
+pub fn sync_commit_compact(token: String) -> Result<SyncStatus, MobileError> {
+    runtime::sync_commit_compact(token)
+}
+
+pub fn sync_prepare_rotate(
+    password: String,
+    expected_revision: u64,
+) -> Result<SyncSetupPlan, MobileError> {
+    runtime::sync_prepare_rotate(password, expected_revision)
+}
+
+pub fn sync_commit_rotate(token: String) -> Result<SyncStatus, MobileError> {
+    runtime::sync_commit_rotate(token)
+}
+
+pub fn sync_prepare_join(
+    base_url: String,
+    username: String,
+    password: String,
+    recovery_code: String,
+    device_name: String,
+    auto_sync: bool,
+    merge_existing: bool,
+) -> Result<SyncSetupPlan, MobileError> {
+    runtime::sync_prepare_join(
+        base_url,
+        username,
+        password,
+        recovery_code,
+        device_name,
+        auto_sync,
+        merge_existing,
+    )
+}
+
+pub fn sync_decode_snapshot(
+    content: Vec<u8>,
+    snapshot_id: String,
+    setup_token: Option<String>,
+) -> Result<SyncSnapshotInfo, MobileError> {
+    runtime::sync_decode_snapshot(content, snapshot_id, setup_token)
+}
+
+pub fn sync_commit_join(
+    token: String,
+    document_json: String,
+    frontier: Vec<String>,
+    generation: u64,
+    expected_revision: u64,
+) -> Result<OperationResult, MobileError> {
+    runtime::sync_commit_join(
+        token,
+        document_json,
+        frontier,
+        generation,
+        expected_revision,
+    )
+}
+
+pub fn sync_local_state() -> Result<SyncLocalState, MobileError> {
+    runtime::sync_local_state()
+}
+
+pub fn sync_current_document_json() -> Result<String, MobileError> {
+    runtime::sync_current_document_json()
+}
+
+pub fn sync_prepare_upload(
+    document_json: Option<String>,
+    parents: Vec<String>,
+    generation: u64,
+    expected_revision: u64,
+) -> Result<SyncUploadPlan, MobileError> {
+    runtime::sync_prepare_upload(document_json, parents, generation, expected_revision)
+}
+
+pub fn sync_commit_upload(token: String) -> Result<OperationResult, MobileError> {
+    runtime::sync_commit_upload(token)
+}
+
+pub fn sync_apply_remote(
+    document_json: String,
+    frontier: Vec<String>,
+    generation: u64,
+    expected_revision: u64,
+) -> Result<OperationResult, MobileError> {
+    runtime::sync_apply_remote(document_json, frontier, generation, expected_revision)
+}
+
+pub fn sync_recovery_code(password: String) -> Result<String, MobileError> {
+    runtime::sync_recovery_code(password)
+}
+
+pub fn sync_prepare_remote_delete(password: String) -> Result<String, MobileError> {
+    runtime::sync_prepare_remote_delete(password)
+}
+
+pub fn sync_commit_remote_delete(token: String) -> Result<SyncStatus, MobileError> {
+    runtime::sync_commit_remote_delete(token)
+}
+
+pub fn sync_disconnect() -> Result<SyncStatus, MobileError> {
+    runtime::sync_disconnect()
+}
+
+pub fn sync_cancel_pending() -> Result<(), MobileError> {
+    runtime::sync_cancel_pending()
 }
 
 #[allow(clippy::too_many_arguments)]

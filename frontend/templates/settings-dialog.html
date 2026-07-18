@@ -226,7 +226,7 @@
                                     <span class="sync-empty-icon">☁</span>
                                     <div>
                                         <strong>{{ syncStatus.phase === 'error' ? '同步配置需要修复' : '在多台设备间同步加密密码库' }}</strong>
-                                        <p>{{ syncStatus.last_error || '需要支持 HTTPS、强 ETag 和条件写入的 WebDAV 服务。' }}</p>
+                                        <p>{{ syncStatus.last_error || '推荐使用兼容快照模式，可在不提供 ETag 的坚果云等 WebDAV 服务上同步。' }}</p>
                                     </div>
                                 </div>
                                 <div class="setting-actions sync-primary-actions">
@@ -238,9 +238,11 @@
                             <template v-else>
                                 <dl class="sync-summary-grid">
                                     <div><dt>WebDAV</dt><dd>{{ syncStatus.host || '已配置' }}</dd></div>
+                                    <div><dt>同步模式</dt><dd>{{ syncStatus.sync_mode || '加密快照模式' }}</dd></div>
                                     <div><dt>设备</dt><dd>{{ syncStatus.device_name || '本机' }}</dd></div>
                                     <div><dt>最近同步</dt><dd>{{ formatSyncTime(syncStatus.last_synced_at) }}</dd></div>
                                     <div><dt>远端版本</dt><dd>第 {{ syncStatus.generation || 0 }} 代</dd></div>
+                                    <div v-if="syncStatus.protocol_version === 2"><dt>当前分支</dt><dd>{{ (syncStatus.frontier || []).length }} 个</dd></div>
                                 </dl>
                                 <div class="sync-auto-row">
                                     <div>
@@ -262,9 +264,11 @@
                                     <button class="btn-secondary" @click="openSyncRecovery('reveal')" :disabled="syncBusy">加入新设备</button>
                                     <button class="btn-secondary" @click="openSyncConfig" :disabled="syncBusy">连接设置</button>
                                 </div>
-                                <div class="sync-danger-zone">
-                                    <strong>同步管理</strong>
-                                    <div class="setting-actions">
+                                    <div class="sync-danger-zone">
+                                        <strong>同步管理</strong>
+                                        <div class="setting-actions">
+                                        <button v-if="syncStatus.protocol_version === 1" class="btn-secondary" @click="openSyncRecovery('migrate')" :disabled="syncBusy">迁移到兼容模式</button>
+                                        <button v-if="syncStatus.protocol_version === 2" class="btn-secondary" @click="openSyncRecovery('compact')" :disabled="syncBusy">压缩并清理历史</button>
                                         <button class="btn-secondary" @click="openSyncRecovery('rotate')" :disabled="syncBusy">轮换同步密钥</button>
                                         <button class="btn-secondary" @click="disconnectSync" :disabled="syncBusy">断开本机</button>
                                         <button class="btn-danger" @click="openDeleteRemoteSync" :disabled="syncBusy">删除远端数据</button>

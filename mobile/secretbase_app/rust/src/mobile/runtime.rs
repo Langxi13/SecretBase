@@ -18,9 +18,10 @@ use super::{
         AiApplyResult, AiAssistantRequestPlan, AiAssistantTurnResult, AiConversation,
         AiConversationSummary, AiHttpRequest, AiPreview, AiRequestPlan, AiStatus, AiUndoState,
         EntryDraft, EntryPage, EntryRecord, ImportPreview, OperationResult, RecoverySnapshot,
-        TaxonomyRecord, VaultStatus,
+        SyncConnection, SyncLocalState, SyncSetupPlan, SyncSnapshotInfo, SyncStatus,
+        SyncUploadPlan, TaxonomyRecord, VaultStatus,
     },
-    storage,
+    storage, sync,
 };
 
 struct PendingImport {
@@ -28,6 +29,29 @@ struct PendingImport {
     source_revision: u64,
     session: VaultSession,
     preview: ImportPreview,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum PendingSyncKind {
+    Create,
+    Join,
+    Upload,
+    Compact,
+    Rotate,
+    DeleteRemote,
+}
+
+#[derive(Clone)]
+struct PendingSync {
+    token: String,
+    source_revision: u64,
+    kind: PendingSyncKind,
+    config: sync::SyncConfig,
+    document: Value,
+    snapshot_id: String,
+    generation: u64,
+    previous_config: Option<sync::SyncConfig>,
+    previous_base: Option<sync::SyncBase>,
 }
 
 #[derive(Debug, Clone)]
@@ -50,6 +74,7 @@ struct MobileRuntime {
     pending_ai_assistant: Option<PendingAssistantRequest>,
     pending_ai_preview: Option<PendingAiPreview>,
     pending_ai_undo: Option<PendingAiUndo>,
+    pending_sync: Option<PendingSync>,
 }
 
 static RUNTIME: OnceLock<Mutex<MobileRuntime>> = OnceLock::new();
@@ -112,11 +137,23 @@ impl MobileRuntime {
         self.pending_ai_assistant = None;
         self.pending_ai_preview = None;
         self.pending_ai_undo = None;
+        self.pending_sync = None;
         Ok(OperationResult {
             revision: self.revision,
             message,
         })
     }
+}
+
+fn verify_master_password(runtime: &MobileRuntime, password: String) -> Result<(), MobileError> {
+    if password.is_empty() {
+        return Err(MobileError::new("VALIDATION_FAILED", "请输入当前主密码"));
+    }
+    let password = Zeroizing::new(password);
+    let content = storage::read_vault(runtime.root()?)?;
+    VaultSession::unlock(password.as_str(), &content)
+        .map(|_| ())
+        .map_err(|_| MobileError::new("AUTH_FAILED", "主密码错误"))
 }
 
 pub fn initialize_runtime(data_root: String) -> Result<VaultStatus, MobileError> {
@@ -140,6 +177,7 @@ pub fn initialize_runtime(data_root: String) -> Result<VaultStatus, MobileError>
         runtime.pending_ai_assistant = None;
         runtime.pending_ai_preview = None;
         runtime.pending_ai_undo = None;
+        runtime.pending_sync = None;
         status(runtime)
     })
 }
@@ -194,6 +232,7 @@ fn activate_session(
     runtime.pending_ai_assistant = None;
     runtime.pending_ai_preview = None;
     runtime.pending_ai_undo = None;
+    runtime.pending_sync = None;
     status(runtime)
 }
 
@@ -205,6 +244,7 @@ pub fn create_vault(password: String) -> Result<VaultStatus, MobileError> {
             return Err(MobileError::new("VAULT_EXISTS", "本机密码库已经存在"));
         }
         storage::delete_secure_settings(&root)?;
+        sync::clear(&root)?;
         storage::delete_ai_history(&root)?;
         storage::delete_autofill_settings(&root)?;
         let document = VaultDocument::from_value(document::new_document(&now()))?;
@@ -217,6 +257,7 @@ pub fn create_vault(password: String) -> Result<VaultStatus, MobileError> {
         runtime.pending_ai_assistant = None;
         runtime.pending_ai_preview = None;
         runtime.pending_ai_undo = None;
+        runtime.pending_sync = None;
         status(runtime)
     })
 }
@@ -272,10 +313,15 @@ pub fn lock_vault() -> Result<VaultStatus, MobileError> {
         runtime.pending_ai_assistant = None;
         runtime.pending_ai_preview = None;
         runtime.pending_ai_undo = None;
+        runtime.pending_sync = None;
         runtime.revision = runtime.revision.saturating_add(1);
         status(runtime)
     })
 }
+
+// Kept in the runtime module so synchronization can use private pending state
+// without widening the mobile core's internal API.
+include!("sync_runtime.rs");
 
 #[allow(clippy::too_many_arguments)]
 pub fn list_entries(
@@ -403,6 +449,7 @@ fn save_autofill_entry(
         runtime.pending_ai_assistant = None;
         runtime.pending_ai_preview = None;
         runtime.pending_ai_undo = None;
+        runtime.pending_sync = None;
         Ok(OperationResult {
             revision: runtime.revision,
             message: "登录信息已保存为新条目".to_string(),
@@ -595,6 +642,7 @@ pub fn apply_import(token: String) -> Result<OperationResult, MobileError> {
         runtime.pending_ai_assistant = None;
         runtime.pending_ai_preview = None;
         runtime.pending_ai_undo = None;
+        runtime.pending_sync = None;
         storage::delete_ai_history(&root)?;
         autofill::clear_settings(&root)?;
         Ok(OperationResult {
@@ -628,6 +676,8 @@ pub fn change_password(
             ));
         }
         let root = runtime.root()?.to_path_buf();
+        let old_sync_config = sync::load_config(&root, runtime.session()?).ok().flatten();
+        let old_sync_base = sync::load_base(&root, runtime.session()?).ok().flatten();
         let document = VaultDocument::from_value(runtime.session()?.document().as_value().clone())?;
         let replacement = VaultSession::create(&new_password, document)?;
         let autofill_settings_rekeyed =
@@ -648,6 +698,21 @@ pub fn change_password(
         runtime.pending_ai_assistant = None;
         runtime.pending_ai_preview = None;
         runtime.pending_ai_undo = None;
+        runtime.pending_sync = None;
+        let sync_save_failed = if let Some(config) = old_sync_config {
+            if sync::save_config(&root, runtime.session()?, &config).is_err() {
+                true
+            } else if let Some(base) = old_sync_base {
+                sync::save_base(&root, runtime.session()?, &base).is_err()
+            } else {
+                false
+            }
+        } else {
+            false
+        };
+        if sync_save_failed {
+            let _ = sync::clear(&root);
+        }
         storage::delete_ai_history(&root)?;
         runtime.revision = runtime.revision.saturating_add(1);
         Ok(OperationResult {
@@ -1027,6 +1092,7 @@ fn undo_ai_preview_in_runtime(
     runtime.pending_ai_assistant = None;
     runtime.pending_ai_preview = None;
     runtime.pending_ai_undo = None;
+    runtime.pending_sync = None;
 
     if let Some(conversation_id) = conversation_id {
         if let Ok(session) = runtime.session() {
@@ -1082,6 +1148,7 @@ mod tests {
             pending_ai_assistant: None,
             pending_ai_preview: None,
             pending_ai_undo: None,
+            pending_sync: None,
         };
 
         let result = runtime.transaction(3, |value| {
@@ -1114,6 +1181,7 @@ mod tests {
             pending_ai_assistant: None,
             pending_ai_preview: None,
             pending_ai_undo: None,
+            pending_sync: None,
         };
 
         let result = runtime
@@ -1151,6 +1219,7 @@ mod tests {
             pending_ai_assistant: None,
             pending_ai_preview: None,
             pending_ai_undo: None,
+            pending_sync: None,
         };
 
         runtime

@@ -1122,6 +1122,7 @@ dependencies = [
  "chrono",
  "flutter_rust_bridge",
  "jni",
+ "rand_core",
  "secretbase-vault-core",
  "serde",
  "serde_json",

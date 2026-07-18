@@ -12,7 +12,7 @@ SecretBase is intentionally scoped as a single-user encrypted vault. The priorit
 - Maintain the released Android-first Flutter/Rust client across hardware, encrypted migration, biometric unlock, system Autofill, AI safety, and three-ABI/API 29/36 gates.
 - Maintain the released V5 signed-update baseline: Windows in-place updates, Android system-confirmed replacement, and macOS signed-manifest notifications.
 - Keep Web, desktop, and Android AI plans behaviorally aligned while preserving the no-existing-field-values network boundary.
-- Maintain the V5.2 user-owned WebDAV synchronization protocol for self-hosted Web, Windows, and macOS without introducing a hosted account service.
+- Maintain the V5.3 user-owned WebDAV V2 encrypted snapshot protocol across self-hosted Web, Windows, macOS, and Android without introducing a hosted account service.
 
 ## Implemented
 
@@ -34,6 +34,8 @@ SecretBase is intentionally scoped as a single-user encrypted vault. The priorit
 - Android system Autofill with local authentication, explicit candidate selection, encrypted target bindings, inline suggestions, and save confirmation.
 - Signed stable update manifests, Windows installer handoff, Android package identity verification, and protected release-key environments.
 - Sync Bundle V1 with independent 256-bit keys, encrypted WebDAV head/snapshots, strong-ETag conditional commits, three-way merge, explicit conflicts, ten-version history, and Python/Rust golden vectors.
+- Sync Protocol V2 with AES-GCM immutable snapshot DAGs, no-ETag WebDAV transport, staged multi-branch conflict resolution, explicit history compaction, key rotation, recovery codes, Python/Rust/Flutter compatibility checks, and redacted conflict UX.
+- V2 weak-WebDAV cleanup protects unknown objects and re-enumerates after deletion; it deliberately does not claim directory-tree atomic CAS. Discovery limits are 1000 snapshots, 256 MiB aggregate encrypted/decrypted history, and 32 concurrent frontier branches.
 
 ## Later, If Needed
 
@@ -43,7 +45,6 @@ SecretBase is intentionally scoped as a single-user encrypted vault. The priorit
 - Additional production health check automation.
 - macOS signing and notarization when an Apple Developer account is available.
 - Tablet-specific two-pane layouts and store distribution only after the signed Android MVP is stable.
-- Android V5.3 synchronization that reuses Sync Bundle V1 directly in Rust, with mobile-specific background, weak-network, QR pairing, and conflict UX.
 
 ## Out of Scope
 

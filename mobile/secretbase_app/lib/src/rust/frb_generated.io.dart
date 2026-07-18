@@ -175,6 +175,24 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   RecoverySnapshot dco_decode_recovery_snapshot(dynamic raw);
 
   @protected
+  SyncConnection dco_decode_sync_connection(dynamic raw);
+
+  @protected
+  SyncLocalState dco_decode_sync_local_state(dynamic raw);
+
+  @protected
+  SyncSetupPlan dco_decode_sync_setup_plan(dynamic raw);
+
+  @protected
+  SyncSnapshotInfo dco_decode_sync_snapshot_info(dynamic raw);
+
+  @protected
+  SyncStatus dco_decode_sync_status(dynamic raw);
+
+  @protected
+  SyncUploadPlan dco_decode_sync_upload_plan(dynamic raw);
+
+  @protected
   TaxonomyRecord dco_decode_taxonomy_record(dynamic raw);
 
   @protected
@@ -373,6 +391,24 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   RecoverySnapshot sse_decode_recovery_snapshot(SseDeserializer deserializer);
+
+  @protected
+  SyncConnection sse_decode_sync_connection(SseDeserializer deserializer);
+
+  @protected
+  SyncLocalState sse_decode_sync_local_state(SseDeserializer deserializer);
+
+  @protected
+  SyncSetupPlan sse_decode_sync_setup_plan(SseDeserializer deserializer);
+
+  @protected
+  SyncSnapshotInfo sse_decode_sync_snapshot_info(SseDeserializer deserializer);
+
+  @protected
+  SyncStatus sse_decode_sync_status(SseDeserializer deserializer);
+
+  @protected
+  SyncUploadPlan sse_decode_sync_upload_plan(SseDeserializer deserializer);
 
   @protected
   TaxonomyRecord sse_decode_taxonomy_record(SseDeserializer deserializer);
@@ -623,6 +659,36 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   void sse_encode_recovery_snapshot(
     RecoverySnapshot self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_sync_connection(
+    SyncConnection self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_sync_local_state(
+    SyncLocalState self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_sync_setup_plan(SyncSetupPlan self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_sync_snapshot_info(
+    SyncSnapshotInfo self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_sync_status(SyncStatus self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_sync_upload_plan(
+    SyncUploadPlan self,
     SseSerializer serializer,
   );
 

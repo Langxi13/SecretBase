@@ -1,6 +1,7 @@
 //! SecretBase Vault V1 cross-language reference implementation.
 
 pub mod sync_bundle;
+pub mod sync_bundle_v2;
 
 use std::collections::HashSet;
 

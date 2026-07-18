@@ -37,6 +37,10 @@ def history() -> dict:
     config = load_sync_config()
     if not config:
         raise SyncServiceError("SYNC_NOT_CONFIGURED", "尚未配置 WebDAV 同步", status_code=409)
+    if int(config.get("protocol_version", 1)) == 2:
+        from sync_v2_service import history as history_v2
+
+        return history_v2()
     with operation_lock, client(config) as webdav:
         remote = repository(config, webdav)
         head = remote.load_head()
@@ -45,6 +49,11 @@ def history() -> dict:
 
 
 def restore(snapshot_id: str) -> dict:
+    configured = load_sync_config()
+    if configured and int(configured.get("protocol_version", 1)) == 2:
+        from sync_v2_service import restore as restore_v2
+
+        return restore_v2(snapshot_id)
     with operation_lock:
         config = load_sync_config()
         if not config:
@@ -77,6 +86,11 @@ def restore(snapshot_id: str) -> dict:
 
 
 def update_config(payload: dict) -> dict:
+    configured = load_sync_config()
+    if configured and int(configured.get("protocol_version", 1)) == 2:
+        from sync_v2_service import update_config as update_config_v2
+
+        return update_config_v2(payload)
     with operation_lock:
         config = load_sync_config()
         if not config:
@@ -143,6 +157,11 @@ def _rollback_rotated_remote(webdav, old_config: dict, old_head, new_head, value
 
 
 def rotate_key(password: str) -> dict:
+    configured = load_sync_config()
+    if configured and int(configured.get("protocol_version", 1)) == 2:
+        from sync_v2_service import rotate_key as rotate_key_v2
+
+        return rotate_key_v2(password)
     with operation_lock:
         verify_master_password(password)
         config = load_sync_config()
@@ -190,6 +209,11 @@ def rotate_key(password: str) -> dict:
 def reset_remote(password: str, confirmation: str) -> dict:
     if confirmation != "DELETE":
         raise SyncServiceError("CONFIRMATION_REQUIRED", "请输入 DELETE 确认删除远端同步数据", status_code=422)
+    configured = load_sync_config()
+    if configured and int(configured.get("protocol_version", 1)) == 2:
+        from sync_v2_service import reset_remote as reset_remote_v2
+
+        return reset_remote_v2(password, confirmation)
     with operation_lock:
         verify_master_password(password)
         config = load_sync_config()

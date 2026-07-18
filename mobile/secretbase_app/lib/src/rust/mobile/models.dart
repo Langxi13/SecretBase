@@ -750,6 +750,276 @@ class RecoverySnapshot {
           sizeBytes == other.sizeBytes;
 }
 
+class SyncConnection {
+  final String baseUrl;
+  final String username;
+  final String password;
+  final String deviceName;
+  final bool autoSync;
+
+  const SyncConnection({
+    required this.baseUrl,
+    required this.username,
+    required this.password,
+    required this.deviceName,
+    required this.autoSync,
+  });
+
+  @override
+  int get hashCode =>
+      baseUrl.hashCode ^
+      username.hashCode ^
+      password.hashCode ^
+      deviceName.hashCode ^
+      autoSync.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is SyncConnection &&
+          runtimeType == other.runtimeType &&
+          baseUrl == other.baseUrl &&
+          username == other.username &&
+          password == other.password &&
+          deviceName == other.deviceName &&
+          autoSync == other.autoSync;
+}
+
+class SyncLocalState {
+  final BigInt revision;
+  final String currentDocumentJson;
+  final String baseDocumentJson;
+  final List<String> frontier;
+  final BigInt generation;
+
+  const SyncLocalState({
+    required this.revision,
+    required this.currentDocumentJson,
+    required this.baseDocumentJson,
+    required this.frontier,
+    required this.generation,
+  });
+
+  @override
+  int get hashCode =>
+      revision.hashCode ^
+      currentDocumentJson.hashCode ^
+      baseDocumentJson.hashCode ^
+      frontier.hashCode ^
+      generation.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is SyncLocalState &&
+          runtimeType == other.runtimeType &&
+          revision == other.revision &&
+          currentDocumentJson == other.currentDocumentJson &&
+          baseDocumentJson == other.baseDocumentJson &&
+          frontier == other.frontier &&
+          generation == other.generation;
+}
+
+class SyncSetupPlan {
+  final String token;
+  final String vaultId;
+  final String spaceId;
+  final String deviceId;
+  final String snapshotId;
+  final BigInt generation;
+  final List<String> path;
+  final Uint8List content;
+  final String recoveryCode;
+
+  const SyncSetupPlan({
+    required this.token,
+    required this.vaultId,
+    required this.spaceId,
+    required this.deviceId,
+    required this.snapshotId,
+    required this.generation,
+    required this.path,
+    required this.content,
+    required this.recoveryCode,
+  });
+
+  @override
+  int get hashCode =>
+      token.hashCode ^
+      vaultId.hashCode ^
+      spaceId.hashCode ^
+      deviceId.hashCode ^
+      snapshotId.hashCode ^
+      generation.hashCode ^
+      path.hashCode ^
+      content.hashCode ^
+      recoveryCode.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is SyncSetupPlan &&
+          runtimeType == other.runtimeType &&
+          token == other.token &&
+          vaultId == other.vaultId &&
+          spaceId == other.spaceId &&
+          deviceId == other.deviceId &&
+          snapshotId == other.snapshotId &&
+          generation == other.generation &&
+          path == other.path &&
+          content == other.content &&
+          recoveryCode == other.recoveryCode;
+}
+
+class SyncSnapshotInfo {
+  final String snapshotId;
+  final BigInt generation;
+  final List<String> parents;
+  final String deviceId;
+  final String deviceName;
+  final String createdAt;
+  final String documentJson;
+
+  const SyncSnapshotInfo({
+    required this.snapshotId,
+    required this.generation,
+    required this.parents,
+    required this.deviceId,
+    required this.deviceName,
+    required this.createdAt,
+    required this.documentJson,
+  });
+
+  @override
+  int get hashCode =>
+      snapshotId.hashCode ^
+      generation.hashCode ^
+      parents.hashCode ^
+      deviceId.hashCode ^
+      deviceName.hashCode ^
+      createdAt.hashCode ^
+      documentJson.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is SyncSnapshotInfo &&
+          runtimeType == other.runtimeType &&
+          snapshotId == other.snapshotId &&
+          generation == other.generation &&
+          parents == other.parents &&
+          deviceId == other.deviceId &&
+          deviceName == other.deviceName &&
+          createdAt == other.createdAt &&
+          documentJson == other.documentJson;
+}
+
+class SyncStatus {
+  final bool configured;
+  final int protocolVersion;
+  final String phase;
+  final String message;
+  final String lastError;
+  final bool autoSync;
+  final String baseUrl;
+  final String usernameMask;
+  final String deviceName;
+  final String vaultId;
+  final String spaceId;
+  final BigInt generation;
+  final List<String> frontier;
+
+  const SyncStatus({
+    required this.configured,
+    required this.protocolVersion,
+    required this.phase,
+    required this.message,
+    required this.lastError,
+    required this.autoSync,
+    required this.baseUrl,
+    required this.usernameMask,
+    required this.deviceName,
+    required this.vaultId,
+    required this.spaceId,
+    required this.generation,
+    required this.frontier,
+  });
+
+  @override
+  int get hashCode =>
+      configured.hashCode ^
+      protocolVersion.hashCode ^
+      phase.hashCode ^
+      message.hashCode ^
+      lastError.hashCode ^
+      autoSync.hashCode ^
+      baseUrl.hashCode ^
+      usernameMask.hashCode ^
+      deviceName.hashCode ^
+      vaultId.hashCode ^
+      spaceId.hashCode ^
+      generation.hashCode ^
+      frontier.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is SyncStatus &&
+          runtimeType == other.runtimeType &&
+          configured == other.configured &&
+          protocolVersion == other.protocolVersion &&
+          phase == other.phase &&
+          message == other.message &&
+          lastError == other.lastError &&
+          autoSync == other.autoSync &&
+          baseUrl == other.baseUrl &&
+          usernameMask == other.usernameMask &&
+          deviceName == other.deviceName &&
+          vaultId == other.vaultId &&
+          spaceId == other.spaceId &&
+          generation == other.generation &&
+          frontier == other.frontier;
+}
+
+class SyncUploadPlan {
+  final String token;
+  final String snapshotId;
+  final BigInt generation;
+  final String deviceId;
+  final List<String> path;
+  final Uint8List content;
+
+  const SyncUploadPlan({
+    required this.token,
+    required this.snapshotId,
+    required this.generation,
+    required this.deviceId,
+    required this.path,
+    required this.content,
+  });
+
+  @override
+  int get hashCode =>
+      token.hashCode ^
+      snapshotId.hashCode ^
+      generation.hashCode ^
+      deviceId.hashCode ^
+      path.hashCode ^
+      content.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is SyncUploadPlan &&
+          runtimeType == other.runtimeType &&
+          token == other.token &&
+          snapshotId == other.snapshotId &&
+          generation == other.generation &&
+          deviceId == other.deviceId &&
+          path == other.path &&
+          content == other.content;
+}
+
 class TaxonomyRecord {
   final String name;
   final String description;

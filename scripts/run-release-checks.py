@@ -23,7 +23,9 @@ PYTHON_TESTS = [
     "scripts/test-vault-v1-compatibility.py",
     "scripts/test-sync-protocol-v1.py",
     "scripts/test-webdav-sync.py",
+    "scripts/test-webdav-sync-v2.py",
     "scripts/test-backend-module-split.py",
+    "scripts/test-mobile-sync-modules.py",
     "scripts/test-release-readiness.py",
     "scripts/test-script-compatibility.py",
     "scripts/test-update-manifest.py",
@@ -55,6 +57,7 @@ def main() -> int:
         run([node, str(test.relative_to(ROOT))])
 
     run([cargo, "test", "--locked", "--test", "sync_bundle"], cwd=ROOT / "vault-core")
+    run([cargo, "test", "--locked", "--test", "sync_bundle_v2"], cwd=ROOT / "vault-core")
 
     javascript_files = sorted((ROOT / "frontend" / "js").glob("*.js"))
     javascript_files.extend(sorted((ROOT / "frontend" / "js" / "controllers").glob("*.js")))

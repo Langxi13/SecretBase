@@ -11,6 +11,15 @@
                             <button type="button" :class="{ active: syncSetupMode === 'create' }" @click="syncSetupMode = 'create'">创建新空间</button>
                             <button type="button" :class="{ active: syncSetupMode === 'join' }" @click="syncSetupMode = 'join'">使用恢复码加入</button>
                         </div>
+                        <div class="form-group sync-protocol-picker">
+                            <label for="sync_protocol_version">同步模式</label>
+                            <select id="sync_protocol_version" v-model.number="syncSetupForm.protocolVersion">
+                                <option :value="2">兼容快照模式（推荐坚果云）</option>
+                                <option :value="1">严格 ETag 模式（旧版 V1）</option>
+                            </select>
+                            <small v-if="syncSetupForm.protocolVersion === 2">使用不可变加密快照和目录发现，不要求 WebDAV 提供 ETag。</small>
+                            <small v-else>需要稳定强 ETag 和条件写入，适合已有 V1 同步空间。</small>
+                        </div>
                         <p class="sync-security-note">仅支持 HTTPS WebDAV。SecretBase 不提供忽略证书错误的选项。</p>
                         <div class="form-group">
                             <label for="sync_base_url">WebDAV 地址</label>
@@ -32,7 +41,7 @@
                         </div>
                         <div v-if="syncSetupMode === 'join'" class="form-group">
                             <label for="sync_recovery_code">同步恢复码</label>
-                            <textarea id="sync_recovery_code" class="sync-recovery-input" v-model.trim="syncSetupForm.recoveryCode" rows="4" spellcheck="false" required></textarea>
+                            <textarea id="sync_recovery_code" class="sync-recovery-input" v-model.trim="syncSetupForm.recoveryCode" @input="inferSyncProtocolFromRecovery" rows="4" spellcheck="false" required></textarea>
                             <label class="compact-check-option sync-merge-option">
                                 <input type="checkbox" v-model="syncSetupForm.mergeExisting">
                                 当前 Vault 已有数据时进行三方合并
@@ -124,7 +133,7 @@
                     <button class="modal-close" @click="showSyncHistory = false" :disabled="syncBusy">✕</button>
                 </div>
                 <div class="modal-body">
-                    <p class="sync-security-note">远端保留最近 10 个端到端加密版本。恢复会生成新的最新版本，不会改写旧快照。</p>
+                    <p class="sync-security-note">{{ syncStatus.protocol_version === 2 ? '远端保存不可变加密快照。不会自动删除历史，恢复会生成新的最新快照。' : '远端保留最近 10 个端到端加密版本。恢复会生成新的最新版本，不会改写旧快照。' }}</p>
                     <div v-if="syncHistoryLoading" class="sync-inline-loading">正在读取历史版本...</div>
                     <div v-else-if="syncHistory.length === 0" class="sync-inline-loading">暂无历史版本</div>
                     <div v-else class="sync-history-list">
@@ -133,7 +142,7 @@
                                 <strong>{{ formatSyncTime(item.created_at) }}</strong>
                                 <span>{{ item.device_name || '未知设备' }}</span>
                             </div>
-                            <span v-if="item.snapshot_id === syncCurrentSnapshotId" class="sync-current-badge">当前</span>
+                            <span v-if="item.is_frontier || item.snapshot_id === syncCurrentSnapshotId" class="sync-current-badge">当前分支</span>
                             <button v-else class="btn-small" @click="restoreSyncHistory(item)" :disabled="syncBusy">恢复</button>
                         </div>
                     </div>
@@ -146,20 +155,26 @@
         <div v-if="showSyncRecovery" class="modal-overlay">
             <div class="modal-content sync-recovery-modal">
                 <div class="modal-header">
-                    <h2>{{ syncRecoveryMode === 'rotate' ? '轮换同步密钥' : '加入新设备' }}</h2>
+                    <h2>{{ syncRecoveryMode === 'rotate' ? '轮换同步密钥' : syncRecoveryMode === 'migrate' ? '迁移到兼容快照模式' : syncRecoveryMode === 'compact' ? '压缩并清理历史' : '加入新设备' }}</h2>
                     <button class="modal-close" @click="closeSyncRecovery" :disabled="syncRecoveryBusy">✕</button>
                 </div>
                 <div class="modal-body">
                     <template v-if="!syncRecoveryMaterial">
                         <p v-if="syncRecoveryMode === 'rotate'" class="warning-panel">轮换后旧设备和旧恢复码立即失效，远端历史会从当前版本重新开始。</p>
+                        <p v-else-if="syncRecoveryMode === 'migrate'" class="warning-panel">迁移会在同一 WebDAV 账号下创建新的 V2 加密快照空间，旧 V1 空间暂不删除。确认新空间可用后，再从旧服务端手动清理。</p>
+                        <p v-else-if="syncRecoveryMode === 'compact'" class="warning-panel">压缩前请确认所有设备都已完成同步。系统会创建一个新的根快照并清理旧空间；其他设备不会自动迁移，必须使用操作完成后生成的新恢复码重新加入。</p>
                         <p v-else class="sync-security-note">二维码和恢复码等同于同步密钥。显示前必须再次验证当前 Vault 的主密码。</p>
                         <form @submit.prevent="submitSyncRecovery">
                             <div class="form-group">
                                 <label for="sync_master_password">当前主密码</label>
                                 <input id="sync_master_password" type="password" v-model="syncMasterPassword" autocomplete="current-password" required autofocus>
                             </div>
-                            <button class="btn-primary inline" type="submit" :disabled="syncRecoveryBusy || !syncMasterPassword">
-                                {{ syncRecoveryBusy ? '验证中...' : (syncRecoveryMode === 'rotate' ? '验证并轮换' : '验证并显示') }}
+                            <div v-if="syncRecoveryMode === 'compact'" class="form-group">
+                                <label for="sync_compact_confirmation">输入 COMPACT 确认</label>
+                                <input id="sync_compact_confirmation" type="text" v-model.trim="syncCompactConfirmation" autocomplete="off" required>
+                            </div>
+                            <button class="btn-primary inline" type="submit" :disabled="syncRecoveryBusy || !syncMasterPassword || (syncRecoveryMode === 'compact' && syncCompactConfirmation !== 'COMPACT')">
+                                {{ syncRecoveryBusy ? '处理中...' : (syncRecoveryMode === 'rotate' ? '验证并轮换' : syncRecoveryMode === 'migrate' ? '验证并迁移' : syncRecoveryMode === 'compact' ? '验证并压缩' : '验证并显示') }}
                             </button>
                         </form>
                     </template>
@@ -168,7 +183,7 @@
                             <img v-if="syncRecoveryMaterial.qr_data_uri" :src="syncRecoveryMaterial.qr_data_uri" alt="SecretBase 同步配对二维码">
                             <div v-else class="sync-qr-unavailable">配对信息较长，请复制配对链接或使用恢复码加入。</div>
                             <div>
-                                <strong>{{ syncRecoveryMode === 'rotate' ? '新同步密钥已生效' : '在新设备上加入同步空间' }}</strong>
+                                <strong>{{ syncRecoveryMode === 'rotate' ? '新同步密钥已生效' : syncRecoveryMode === 'migrate' ? 'V2 快照模式已生效' : syncRecoveryMode === 'compact' ? '历史已压缩，新同步空间已生效' : '在新设备上加入同步空间' }}</strong>
                                 <p>请在可信设备上使用。完成配对后关闭此窗口。</p>
                                 <button class="btn-secondary" @click="copySyncSecret(syncRecoveryMaterial.pairing_uri, '配对链接')">复制配对链接</button>
                             </div>
@@ -193,6 +208,7 @@
                 </div>
                 <form @submit.prevent="saveSyncConfig">
                     <div class="modal-body">
+                        <p class="sync-security-note">当前模式：{{ syncStatus.sync_mode || '严格 ETag 模式' }}。连接设置不会改变协议；如需切换，请先断开本机同步，再使用对应恢复码重新加入。</p>
                         <div class="form-group">
                             <label for="sync_config_url">WebDAV 地址</label>
                             <input id="sync_config_url" type="url" v-model.trim="syncConfigForm.baseUrl" required>
@@ -234,7 +250,7 @@
                 </div>
                 <form @submit.prevent="deleteRemoteSync">
                     <div class="modal-body">
-                        <p class="warning-panel">此操作会删除 WebDAV 上当前 Vault 的索引和 10 个加密历史版本，并断开本机同步。本机 Vault 不会被删除。</p>
+                        <p class="warning-panel">{{ syncStatus.protocol_version === 2 ? '此操作会逐个删除当前同步空间的全部加密快照，并断开本机同步。删除期间若其他设备写入新快照，系统会停止并要求重试。' : '此操作会删除 WebDAV 上当前 Vault 的索引和 10 个加密历史版本，并断开本机同步。' }} 本机 Vault 不会被删除。</p>
                         <div class="form-group">
                             <label for="sync_delete_password">当前主密码</label>
                             <input id="sync_delete_password" type="password" v-model="syncDeleteForm.password" autocomplete="current-password" required>

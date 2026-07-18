@@ -45,6 +45,7 @@ context.removeEventListener = type => windowListeners.delete(type);
 
 vm.runInContext(read('frontend/js/sync-state.js'), context, { filename: 'sync-state.js' });
 vm.runInContext(read('frontend/js/sync-lifecycle.js'), context, { filename: 'sync-lifecycle.js' });
+vm.runInContext(read('frontend/js/controllers/sync-management-controller.js'), context, { filename: 'sync-management-controller.js' });
 vm.runInContext(read('frontend/js/controllers/sync-controller.js'), context, { filename: 'sync-controller.js' });
 
 const state = {

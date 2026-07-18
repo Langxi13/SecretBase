@@ -78,6 +78,7 @@ assertIncludes(
     'js/controllers/entry-controller.js',
     'js/controllers/group-controller.js',
     'js/sync-lifecycle.js',
+    'js/controllers/sync-management-controller.js',
     'js/controllers/sync-controller.js',
     'js/controllers/tag-controller.js',
     'js/controllers/ai-settings-controller.js',
@@ -114,6 +115,7 @@ assertBefore(indexHtml, 'js/ai-assistant-inspector-state.js', 'js/ai-state.js', 
 assertBefore(indexHtml, 'js/ai-state.js', 'js/app-state.js', 'AI 状态模块必须先于根状态模块加载');
 assertBefore(indexHtml, 'js/sync-state.js', 'js/app-state.js', '同步状态模块必须先于根状态模块加载');
 assertBefore(indexHtml, 'js/sync-lifecycle.js', 'js/controllers/sync-controller.js', '同步生命周期必须先于控制器加载');
+assertBefore(indexHtml, 'js/controllers/sync-management-controller.js', 'js/controllers/sync-controller.js', '同步管理控制器必须先于同步主控制器加载');
 assertBefore(indexHtml, 'js/controllers/ai-assistant-inspector-controller.js', 'js/controllers/ai-assistant-controller.js', 'AI 管家支持模块必须先于主控制器加载');
 assertBefore(indexHtml, 'js/app-state.js', 'js/app.js', '根状态模块必须先于 app.js 加载');
 assertBefore(indexHtml, 'js/ai-feature-composition.js', 'js/app-feature-composition.js', 'AI 领域装配必须先于根领域装配加载');

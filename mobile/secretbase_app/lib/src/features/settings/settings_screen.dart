@@ -14,6 +14,7 @@ import 'package:secretbase/src/core/widgets/responsive_dialog.dart';
 import 'package:secretbase/src/data/vault_providers.dart';
 import 'package:secretbase/src/features/settings/transfer_service.dart';
 import 'package:secretbase/src/features/settings/autofill_settings_dialog.dart';
+import 'package:secretbase/src/features/sync/mobile_sync_dialog.dart';
 import 'package:secretbase/src/features/update/mobile_update_controller.dart';
 import 'package:secretbase/src/rust/api/mobile.dart' as rust_api;
 import 'package:secretbase/src/rust/mobile/error.dart';
@@ -240,6 +241,22 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                               '${vault.status?.deletedCount ?? 0} 条',
                             ),
                             onTap: () => context.push('/trash'),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 10),
+                      _SettingsSection(
+                        title: '跨设备同步',
+                        icon: Icons.sync_outlined,
+                        children: [
+                          ListTile(
+                            leading: const Icon(Icons.cloud_sync_outlined),
+                            title: const Text('WebDAV 加密快照同步'),
+                            subtitle: const Text('兼容坚果云等不提供 ETag 的服务'),
+                            trailing: const Icon(Icons.chevron_right),
+                            onTap: _working
+                                ? null
+                                : () => showMobileSyncDialog(context),
                           ),
                         ],
                       ),

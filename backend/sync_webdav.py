@@ -2,61 +2,31 @@
 
 from __future__ import annotations
 
-import uuid
-from dataclasses import dataclass
-from urllib.parse import quote, urlsplit, urlunsplit
+import time
+import xml.etree.ElementTree as ET
+from urllib.parse import quote, unquote, urlsplit
 
 import httpx
 
+from sync_webdav_capabilities import WebDavCapabilityMixin
+from sync_webdav_common import (
+    MAX_PROPFIND_BYTES,
+    MAX_REMOTE_BYTES,
+    RemoteChild,
+    RemoteObject,
+    SYNC_ROOT,
+    SYNC_ROOT_V2,
+    WebDavError,
+    normalize_webdav_url,
+    strong_etag as _strong_etag,
+)
 
-SYNC_ROOT = "secretbase-sync-v1"
 REQUEST_TIMEOUT = httpx.Timeout(connect=10.0, read=30.0, write=30.0, pool=10.0)
-MAX_REMOTE_BYTES = 64 * 1024 * 1024
+MAX_RETRIES = 3
+RETRYABLE_STATUSES = {408, 425, 429, 500, 502, 503, 504}
 
 
-class WebDavError(RuntimeError):
-    def __init__(self, code: str, message: str, *, status_code: int = 502):
-        super().__init__(message)
-        self.code = code
-        self.message = message
-        self.status_code = status_code
-
-
-@dataclass(frozen=True)
-class RemoteObject:
-    content: bytes
-    etag: str
-
-
-def normalize_webdav_url(value: str, *, allow_loopback_http: bool = False) -> str:
-    raw = str(value or "").strip()
-    try:
-        parsed = urlsplit(raw)
-    except ValueError as error:
-        raise WebDavError("INVALID_WEBDAV_URL", "WebDAV 地址无效", status_code=422) from error
-    hostname = (parsed.hostname or "").lower()
-    loopback = hostname in {"127.0.0.1", "localhost", "::1"}
-    if parsed.scheme != "https" and not (allow_loopback_http and parsed.scheme == "http" and loopback):
-        raise WebDavError("INSECURE_WEBDAV_URL", "WebDAV 必须使用 HTTPS", status_code=422)
-    if not hostname or parsed.username or parsed.password or parsed.query or parsed.fragment:
-        raise WebDavError("INVALID_WEBDAV_URL", "WebDAV 地址不能包含账号、查询参数或片段", status_code=422)
-    path = parsed.path.rstrip("/") or "/"
-    return urlunsplit((parsed.scheme, parsed.netloc, path, "", ""))
-
-
-def _strong_etag(value: str | None) -> str:
-    etag = str(value or "").strip()
-    opaque = etag[1:-1] if len(etag) >= 2 and etag[0] == etag[-1] == '"' else None
-    if (
-        opaque is None
-        or '"' in opaque
-        or any(ord(character) < 0x21 or ord(character) == 0x7F for character in opaque)
-    ):
-        raise WebDavError("WEBDAV_ETAG_UNSUPPORTED", "WebDAV 服务未提供稳定的强 ETag")
-    return etag
-
-
-class WebDavClient:
+class WebDavClient(WebDavCapabilityMixin):
     def __init__(self, base_url: str, username: str, password: str, *, allow_loopback_http: bool = False):
         self.base_url = normalize_webdav_url(base_url, allow_loopback_http=allow_loopback_http)
         username = str(username or "").strip()
@@ -85,17 +55,36 @@ class WebDavClient:
         return f"{self.base_url.rstrip('/')}/{suffix}" if suffix else self.base_url
 
     def _request(self, method: str, url: str, **kwargs) -> httpx.Response:
+        for attempt in range(MAX_RETRIES):
+            try:
+                response = self._client.request(method, url, **kwargs)
+            except httpx.TimeoutException as error:
+                if attempt + 1 < MAX_RETRIES:
+                    time.sleep(0.25 * (2 ** attempt))
+                    continue
+                raise WebDavError("WEBDAV_TIMEOUT", "WebDAV 请求超时，请检查网络后重试") from error
+            except httpx.TransportError as error:
+                if attempt + 1 < MAX_RETRIES:
+                    time.sleep(0.25 * (2 ** attempt))
+                    continue
+                raise WebDavError("WEBDAV_UNREACHABLE", "无法连接 WebDAV 服务") from error
+            if response.status_code in RETRYABLE_STATUSES and attempt + 1 < MAX_RETRIES:
+                time.sleep(self._retry_delay(response, attempt))
+                continue
+            if 300 <= response.status_code < 400:
+                raise WebDavError("WEBDAV_REDIRECT_REJECTED", "WebDAV 服务返回了不受信任的重定向")
+            if response.status_code in {401, 403}:
+                raise WebDavError("WEBDAV_AUTH_FAILED", "WebDAV 用户名、密码或目录权限无效", status_code=401)
+            return response
+        raise WebDavError("WEBDAV_UNREACHABLE", "无法连接 WebDAV 服务")
+
+    @staticmethod
+    def _retry_delay(response: httpx.Response, attempt: int) -> float:
+        header = str(response.headers.get("Retry-After", "")).strip()
         try:
-            response = self._client.request(method, url, **kwargs)
-        except httpx.TimeoutException as error:
-            raise WebDavError("WEBDAV_TIMEOUT", "WebDAV 请求超时，请检查网络后重试") from error
-        except httpx.TransportError as error:
-            raise WebDavError("WEBDAV_UNREACHABLE", "无法连接 WebDAV 服务") from error
-        if 300 <= response.status_code < 400:
-            raise WebDavError("WEBDAV_REDIRECT_REJECTED", "WebDAV 服务返回了不受信任的重定向")
-        if response.status_code in {401, 403}:
-            raise WebDavError("WEBDAV_AUTH_FAILED", "WebDAV 用户名、密码或目录权限无效", status_code=401)
-        return response
+            return min(5.0, max(0.0, float(header)))
+        except ValueError:
+            return min(5.0, 0.25 * (2 ** attempt))
 
     def _validate_stream_response(self, response: httpx.Response) -> None:
         if 300 <= response.status_code < 400:
@@ -109,31 +98,49 @@ class WebDavClient:
             if response.status_code not in {201, 405}:
                 raise WebDavError("WEBDAV_MKCOL_FAILED", f"WebDAV 无法创建同步目录：HTTP {response.status_code}")
 
-    def get(self, *segments: str, optional: bool = False) -> RemoteObject | None:
-        try:
-            with self._client.stream("GET", self._url(*segments)) as response:
-                self._validate_stream_response(response)
-                if optional and response.status_code == 404:
-                    return None
-                if response.status_code != 200:
-                    raise WebDavError("WEBDAV_READ_FAILED", f"WebDAV 读取失败：HTTP {response.status_code}")
-                etag = _strong_etag(response.headers.get("ETag"))
-                try:
-                    declared_length = int(response.headers.get("Content-Length", "0"))
-                except ValueError:
-                    declared_length = 0
-                if declared_length > MAX_REMOTE_BYTES:
-                    raise WebDavError("WEBDAV_OBJECT_TOO_LARGE", "WebDAV 同步对象过大")
-                content = bytearray()
-                for chunk in response.iter_bytes():
-                    content.extend(chunk)
-                    if len(content) > MAX_REMOTE_BYTES:
+    def get(
+        self,
+        *segments: str,
+        optional: bool = False,
+        require_etag: bool = True,
+    ) -> RemoteObject | None:
+        url = self._url(*segments)
+        for attempt in range(MAX_RETRIES):
+            try:
+                with self._client.stream("GET", url) as response:
+                    if response.status_code in RETRYABLE_STATUSES and attempt + 1 < MAX_RETRIES:
+                        time.sleep(self._retry_delay(response, attempt))
+                        continue
+                    self._validate_stream_response(response)
+                    if optional and response.status_code == 404:
+                        return None
+                    if response.status_code != 200:
+                        raise WebDavError("WEBDAV_READ_FAILED", f"WebDAV 读取失败：HTTP {response.status_code}")
+                    etag_header = response.headers.get("ETag")
+                    etag = _strong_etag(etag_header) if require_etag else str(etag_header or "")
+                    try:
+                        declared_length = int(response.headers.get("Content-Length", "0"))
+                    except ValueError:
+                        declared_length = 0
+                    if declared_length > MAX_REMOTE_BYTES:
                         raise WebDavError("WEBDAV_OBJECT_TOO_LARGE", "WebDAV 同步对象过大")
-                return RemoteObject(bytes(content), etag)
-        except httpx.TimeoutException as error:
-            raise WebDavError("WEBDAV_TIMEOUT", "WebDAV 请求超时，请检查网络后重试") from error
-        except httpx.TransportError as error:
-            raise WebDavError("WEBDAV_UNREACHABLE", "无法连接 WebDAV 服务") from error
+                    content = bytearray()
+                    for chunk in response.iter_bytes():
+                        content.extend(chunk)
+                        if len(content) > MAX_REMOTE_BYTES:
+                            raise WebDavError("WEBDAV_OBJECT_TOO_LARGE", "WebDAV 同步对象过大")
+                    return RemoteObject(bytes(content), etag)
+            except httpx.TimeoutException as error:
+                if attempt + 1 < MAX_RETRIES:
+                    time.sleep(0.25 * (2 ** attempt))
+                    continue
+                raise WebDavError("WEBDAV_TIMEOUT", "WebDAV 请求超时，请检查网络后重试") from error
+            except httpx.TransportError as error:
+                if attempt + 1 < MAX_RETRIES:
+                    time.sleep(0.25 * (2 ** attempt))
+                    continue
+                raise WebDavError("WEBDAV_UNREACHABLE", "无法连接 WebDAV 服务") from error
+        raise WebDavError("WEBDAV_UNREACHABLE", "无法连接 WebDAV 服务")
 
     def put(
         self,
@@ -141,6 +148,7 @@ class WebDavClient:
         *segments: str,
         if_match: str | None = None,
         if_none_match: bool = False,
+        require_etag: bool = True,
     ) -> str:
         if len(content) > MAX_REMOTE_BYTES:
             raise WebDavError("WEBDAV_OBJECT_TOO_LARGE", "WebDAV 同步对象过大")
@@ -157,10 +165,16 @@ class WebDavClient:
         etag = response.headers.get("ETag")
         if etag:
             return _strong_etag(etag)
+        if not require_etag:
+            return ""
         stored = self.get(*segments)
         if stored is None:
             raise WebDavError("WEBDAV_WRITE_FAILED", "WebDAV 写入后无法读取对象")
         return stored.etag
+
+    def put_unconditional(self, content: bytes, *segments: str) -> None:
+        """写入 V2 唯一路径，不发送条件头，也不要求服务返回 ETag。"""
+        self.put(content, *segments, require_etag=False)
 
     def delete(self, *segments: str, optional: bool = True, if_match: str | None = None) -> None:
         headers = {"If-Match": if_match} if if_match else None
@@ -172,59 +186,54 @@ class WebDavClient:
         if response.status_code not in {200, 204}:
             raise WebDavError("WEBDAV_DELETE_FAILED", f"WebDAV 删除失败：HTTP {response.status_code}")
 
-    def head_path(self, vault_id: str) -> tuple[str, ...]:
-        return SYNC_ROOT, vault_id, "head.sbh"
-
-    def snapshot_path(self, vault_id: str, snapshot_id: str) -> tuple[str, ...]:
-        return SYNC_ROOT, vault_id, "snapshots", f"{snapshot_id}.sbs"
-
-    def test_capabilities(self) -> dict:
-        probe_vault = str(uuid.uuid4())
-        probe_name = f"probe-{uuid.uuid4()}.bin"
-        self.ensure_layout(probe_vault)
-        path = self.snapshot_path(probe_vault, probe_name.removesuffix(".bin"))
+    def list_children(self, *segments: str, optional: bool = False) -> list[RemoteChild]:
+        """列出 WebDAV 集合的直接子项，不依赖 ETag。"""
+        url = self._url(*segments)
+        headers = {"Depth": "1", "Content-Type": "application/xml; charset=utf-8"}
+        body = b"<?xml version=\"1.0\" encoding=\"utf-8\"?><propfind xmlns=\"DAV:\"><prop><resourcetype/><getcontentlength/></prop></propfind>"
+        response = self._request("PROPFIND", url, content=body, headers=headers)
+        if optional and response.status_code == 404:
+            return []
+        if response.status_code not in {200, 207}:
+            raise WebDavError("WEBDAV_LIST_FAILED", f"WebDAV 目录读取失败：HTTP {response.status_code}")
+        raw = response.content
+        if len(raw) > MAX_PROPFIND_BYTES:
+            raise WebDavError("WEBDAV_DIRECTORY_TOO_LARGE", "WebDAV 目录响应过大")
         try:
-            first_etag = self.put(b"secretbase-webdav-probe-v1", *path, if_none_match=True)
-            stored = self.get(*path)
-            if stored is None or stored.content != b"secretbase-webdav-probe-v1" or stored.etag != first_etag:
-                raise WebDavError("WEBDAV_CAPABILITY_FAILED", "WebDAV 读写一致性检查失败")
-            try:
-                self.put(b"must-not-overwrite", *path, if_none_match=True)
-            except WebDavError as error:
-                if error.code != "WEBDAV_PRECONDITION_FAILED":
-                    raise
-            else:
-                raise WebDavError("WEBDAV_CONDITIONAL_WRITE_UNSUPPORTED", "WebDAV 未正确执行条件写入")
-            replacement_etag = self.put(b"secretbase-webdav-probe-v2", *path, if_match=first_etag)
-            try:
-                self.put(b"must-not-overwrite-v2", *path, if_match=first_etag)
-            except WebDavError as error:
-                if error.code != "WEBDAV_PRECONDITION_FAILED":
-                    raise
-            else:
-                raise WebDavError("WEBDAV_CONDITIONAL_WRITE_UNSUPPORTED", "WebDAV 未拒绝过期 ETag 写入")
-            try:
-                self.delete(*path, optional=False, if_match=first_etag)
-            except WebDavError as error:
-                if error.code != "WEBDAV_PRECONDITION_FAILED":
-                    raise
-            else:
-                raise WebDavError("WEBDAV_CONDITIONAL_DELETE_UNSUPPORTED", "WebDAV 未拒绝过期 ETag 删除")
-            return {
-                "conditional_write": True,
-                "conditional_delete": True,
-                "strong_etag": bool(replacement_etag),
-            }
-        finally:
-            try:
-                self.delete(*path)
-            except WebDavError:
-                pass
-            for collection in (
-                (SYNC_ROOT, probe_vault, "snapshots"),
-                (SYNC_ROOT, probe_vault),
-            ):
-                try:
-                    self.delete(*collection)
-                except WebDavError:
-                    pass
+            root = ET.fromstring(raw)
+        except ET.ParseError as error:
+            raise WebDavError("WEBDAV_LIST_INVALID", "WebDAV 目录响应格式无效") from error
+
+        requested_path = urlsplit(url).path.rstrip("/") or "/"
+        result: dict[str, RemoteChild] = {}
+        for response_node in root.iter():
+            if response_node.tag.rsplit("}", 1)[-1] != "response":
+                continue
+            href = ""
+            is_collection = False
+            content_length = 0
+            for child in response_node.iter():
+                local = child.tag.rsplit("}", 1)[-1]
+                if local == "href" and child.text:
+                    href = child.text.strip()
+                elif local == "collection":
+                    is_collection = True
+                elif local == "getcontentlength" and child.text:
+                    try:
+                        content_length = max(0, int(child.text.strip()))
+                    except ValueError:
+                        content_length = 0
+            if not href:
+                continue
+            parsed = urlsplit(href)
+            path = unquote(parsed.path or href).rstrip("/") or "/"
+            if path == requested_path:
+                continue
+            prefix = requested_path.rstrip("/") + "/"
+            if not path.startswith(prefix):
+                continue
+            relative = path[len(prefix):]
+            if "/" in relative or not relative:
+                continue
+            result[relative] = RemoteChild(relative, is_collection, content_length)
+        return sorted(result.values(), key=lambda item: item.name)

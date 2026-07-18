@@ -56,7 +56,14 @@ def main() -> None:
         "backend/secure_settings.py",
         "backend/sync_crypto.py",
         "backend/sync_webdav.py",
+        "backend/sync_webdav_common.py",
+        "backend/sync_webdav_capabilities.py",
         "backend/sync_remote.py",
+        "backend/sync_v2_shared.py",
+        "backend/sync_v2_conflicts.py",
+        "backend/sync_v2_management.py",
+        "backend/sync_v2_service.py",
+        "backend/sync_v2_remote.py",
         "backend/sync_merge.py",
         "backend/sync_state.py",
         "backend/sync_runtime.py",
@@ -83,6 +90,13 @@ def main() -> None:
     assert_less_than(line_count("backend/storage.py"), 700, "加密存储核心不能继续无控制增长")
     assert_less_than(line_count("backend/sync_crypto.py"), 200, "同步加密协议模块必须保持单一职责")
     assert_less_than(line_count("backend/sync_webdav.py"), 260, "WebDAV 传输模块必须保持可审阅体量")
+    assert_less_than(line_count("backend/sync_webdav_common.py"), 100, "WebDAV 公共定义必须保持轻量")
+    assert_less_than(line_count("backend/sync_webdav_capabilities.py"), 180, "WebDAV 能力探测必须独立且可审阅")
+    assert_less_than(line_count("backend/sync_v2_shared.py"), 260, "V2 共享协议辅助必须保持轻量")
+    assert_less_than(line_count("backend/sync_v2_conflicts.py"), 380, "V2 冲突处理模块必须保持可审阅")
+    assert_less_than(line_count("backend/sync_v2_management.py"), 450, "V2 管理操作必须保持单一职责")
+    assert_less_than(line_count("backend/sync_v2_service.py"), 380, "V2 核心同步服务必须保持轻量")
+    assert_less_than(line_count("backend/sync_v2_remote.py"), 360, "V2 远端仓库模块必须保持可审阅")
     assert_less_than(line_count("backend/sync_remote.py"), 280, "同步远端仓库模块必须保持可审阅体量")
     assert_less_than(line_count("backend/sync_merge.py"), 260, "同步合并模块必须保持可审阅体量")
     assert_less_than(line_count("backend/sync_state.py"), 170, "本机同步状态模块必须保持轻量")

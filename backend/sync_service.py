@@ -39,6 +39,10 @@ logger = logging.getLogger(__name__)
 
 
 def create(payload: dict) -> dict:
+    if int(payload.get("protocol_version", 1)) == 2:
+        from sync_v2_service import create as create_v2
+
+        return create_v2(payload)
     with operation_lock:
         if load_sync_config() is not None:
             raise SyncServiceError("SYNC_ALREADY_CONFIGURED", "当前 Vault 已配置同步", status_code=409)
@@ -93,6 +97,11 @@ def _join_local(remote: dict, local: dict) -> dict:
 
 
 def join(payload: dict) -> dict:
+    recovery_code = str(payload.get("recovery_code") or "").upper()
+    if int(payload.get("protocol_version", 1)) == 2 or recovery_code.startswith("SBSYNC2"):
+        from sync_v2_service import join as join_v2
+
+        return join_v2(payload)
     with operation_lock:
         if load_sync_config() is not None:
             raise SyncServiceError("SYNC_ALREADY_CONFIGURED", "当前 Vault 已配置同步", status_code=409)
@@ -198,6 +207,11 @@ def _pending_conflict(config: dict, head, plan: dict, expected_revision: int, lo
 
 
 def run() -> dict:
+    configured = load_sync_config()
+    if configured and int(configured.get("protocol_version", 1)) == 2:
+        from sync_v2_service import run as run_v2
+
+        return run_v2()
     if not operation_lock.acquire(blocking=False):
         raise SyncServiceError("SYNC_BUSY", "同步正在进行，请稍后重试", status_code=409)
     try:
@@ -293,6 +307,11 @@ def conflicts() -> dict:
 
 
 def resolve_conflicts(token: str, resolutions: dict[str, str]) -> dict:
+    pending = active_pending_plan()
+    if pending and int(pending.get("protocol_version", 1)) == 2:
+        from sync_v2_service import resolve_conflicts as resolve_conflicts_v2
+
+        return resolve_conflicts_v2(token, resolutions)
     with operation_lock:
         pending = active_pending_plan()
         if not pending or not secrets.compare_digest(str(token or ""), pending["token"]):

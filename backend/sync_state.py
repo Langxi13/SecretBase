@@ -20,6 +20,8 @@ from sync_crypto import decode_key
 
 SETTINGS_SCHEMA = 1
 BASE_SCHEMA = 1
+PROTOCOL_V1 = 1
+PROTOCOL_V2 = 2
 
 
 class SyncStateError(ValueError):
@@ -63,9 +65,15 @@ def load_sync_config() -> dict | None:
     if any(not isinstance(payload.get(key), str) or not payload[key] for key in required_text):
         raise SyncStateError("同步设置格式无效")
     try:
+        protocol_version = int(payload.get("protocol_version", PROTOCOL_V1))
+        if protocol_version not in {PROTOCOL_V1, PROTOCOL_V2}:
+            raise ValueError
         payload["vault_id"] = str(uuid.UUID(str(payload["vault_id"])))
         payload["device_id"] = str(uuid.UUID(str(payload["device_id"])))
         decode_key(payload["sync_key"])
+        if protocol_version == PROTOCOL_V2:
+            payload["space_id"] = str(uuid.UUID(str(payload["space_id"])))
+        payload["protocol_version"] = protocol_version
     except (KeyError, TypeError, ValueError, AttributeError) as error:
         raise SyncStateError("同步设置身份或密钥无效") from error
     if not isinstance(payload.get("auto_sync", True), bool):
@@ -95,20 +103,36 @@ def load_sync_base() -> dict | None:
     if payload.get("schema_version") != BASE_SCHEMA:
         raise SyncStateError("同步基线版本不受支持")
     try:
-        payload["snapshot_id"] = str(uuid.UUID(str(payload["snapshot_id"])))
+        protocol_version = int(payload.get("protocol_version", PROTOCOL_V1))
+        if protocol_version not in {PROTOCOL_V1, PROTOCOL_V2}:
+            raise ValueError
         generation = int(payload["generation"])
+        if protocol_version == PROTOCOL_V1:
+            payload["snapshot_id"] = str(uuid.UUID(str(payload["snapshot_id"])))
+        else:
+            payload["space_id"] = str(uuid.UUID(str(payload["space_id"])))
+            frontier = payload["frontier"]
+            if not isinstance(frontier, list) or not frontier or len(frontier) > 32:
+                raise ValueError
+            payload["frontier"] = [str(uuid.UUID(str(item))) for item in frontier]
+            if len(payload["frontier"]) != len(set(payload["frontier"])):
+                raise ValueError
     except (KeyError, TypeError, ValueError, AttributeError) as error:
         raise SyncStateError("同步基线版本信息无效") from error
     if (
         generation < 1
-        or not isinstance(payload.get("head_etag"), str)
-        or not payload["head_etag"]
         or not isinstance(payload.get("document"), dict)
-        or not isinstance(payload.get("history"), list)
-        or len(payload["history"]) > 10
         or not isinstance(payload.get("synced_at"), str)
     ):
         raise SyncStateError("同步基线格式无效")
+    if protocol_version == PROTOCOL_V1 and (
+        not isinstance(payload.get("head_etag"), str)
+        or not payload["head_etag"]
+        or not isinstance(payload.get("history"), list)
+        or len(payload["history"]) > 10
+    ):
+        raise SyncStateError("同步基线格式无效")
+    payload["protocol_version"] = protocol_version
     return payload
 
 

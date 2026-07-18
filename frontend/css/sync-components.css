@@ -291,6 +291,17 @@
     line-height: 1.55;
 }
 
+.sync-protocol-picker {
+    display: grid;
+    gap: 6px;
+}
+
+.sync-protocol-picker small {
+    color: var(--text-secondary);
+    font-size: var(--font-size-xs);
+    line-height: 1.45;
+}
+
 .sync-recovery-input {
     min-height: 88px !important;
     font-family: ui-monospace, SFMono-Regular, Consolas, monospace;

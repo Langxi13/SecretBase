@@ -50,7 +50,8 @@
             if (!payload || typeof payload !== 'object') return;
             Object.assign(state.syncStatus, {
                 pending_join: false, last_error: '', host: '', base_url: '', username_mask: '',
-                device_name: '', vault_id: '', last_synced_at: '', generation: 0
+                device_name: '', vault_id: '', space_id: '', last_synced_at: '', generation: 0,
+                protocol_version: 2, sync_mode: '坚果云兼容快照模式', frontier: []
             }, payload);
             state.syncError.value = payload.last_error || '';
             if (payload.configured === false && payload.pending_join !== true) {
@@ -60,6 +61,18 @@
                 state.syncRecoveryMaterial.value = null;
             }
         }
+
+        const syncManagement = window.SecretBaseSyncManagementController.createSyncManagementController({
+            api,
+            state,
+            showToast,
+            showConfirmDialog,
+            copyToClipboard,
+            lifecycle,
+            applySyncStatus,
+            epochIsCurrent,
+            responseBelongsToCurrentSession
+        });
 
         function formatSyncTime(value) {
             if (!value) return '尚未同步';
@@ -141,6 +154,7 @@
                 username: '',
                 password: '',
                 deviceName: '',
+                protocolVersion: 2,
                 autoSync: true,
                 recoveryCode: '',
                 mergeExisting: false
@@ -152,6 +166,12 @@
             resetSetupForm();
             state.syncSetupMode.value = mode === 'join' ? 'join' : 'create';
             state.showSyncSetup.value = true;
+        }
+
+        function inferSyncProtocolFromRecovery() {
+            const value = String(state.syncSetupForm.recoveryCode || '').trim().toUpperCase();
+            if (value.startsWith('SBSYNC1')) state.syncSetupForm.protocolVersion = 1;
+            else if (value.startsWith('SBSYNC2')) state.syncSetupForm.protocolVersion = 2;
         }
 
         function closeSyncSetup() {
@@ -167,7 +187,8 @@
                 username: state.syncSetupForm.username.trim(),
                 password: state.syncSetupForm.password,
                 device_name: state.syncSetupForm.deviceName.trim(),
-                auto_sync: Boolean(state.syncSetupForm.autoSync)
+                auto_sync: Boolean(state.syncSetupForm.autoSync),
+                protocol_version: Number(state.syncSetupForm.protocolVersion) === 1 ? 1 : 2
             };
         }
 
@@ -221,7 +242,7 @@
                         scheduleAutoSync(5000);
                     }
                     showToast(result.message || '同步空间配置完成', 'success');
-                    if (state.syncSetupMode.value === 'create') openSyncRecovery('reveal');
+                    if (state.syncSetupMode.value === 'create') syncManagement.openSyncRecovery('reveal');
                 }
             } catch (error) {
                 if (!responseBelongsToCurrentSession(epoch)) return;
@@ -289,8 +310,13 @@
                     resolutions: { ...state.syncConflictResolutions }
                 });
                 if (!responseBelongsToCurrentSession(epoch)) return;
-                applySyncStatus(result.data?.status);
-                state.showSyncConflicts.value = false;
+                const payload = result.data || {};
+                applySyncStatus(payload.status);
+                if (Array.isArray(payload.conflicts) && payload.conflicts.length > 0) {
+                    setConflicts(payload);
+                    showToast(`当前选择已保存，请继续处理剩余 ${payload.conflicts.length} 项冲突`, 'warning');
+                    return;
+                }
                 setConflicts({});
                 await loadAllData();
                 if (!responseBelongsToCurrentSession(epoch)) return;
@@ -409,108 +435,6 @@
             );
         }
 
-        function openSyncRecovery(mode = 'reveal') {
-            state.syncRecoveryMode.value = mode === 'rotate' ? 'rotate' : 'reveal';
-            state.syncMasterPassword.value = '';
-            state.syncRecoveryMaterial.value = null;
-            state.syncError.value = '';
-            state.showSyncRecovery.value = true;
-        }
-
-        function closeSyncRecovery() {
-            if (state.syncRecoveryBusy.value) return;
-            state.showSyncRecovery.value = false;
-            state.syncMasterPassword.value = '';
-            state.syncRecoveryMaterial.value = null;
-        }
-
-        async function submitSyncRecovery() {
-            if (state.syncRecoveryBusy.value) return;
-            state.syncRecoveryBusy.value = true;
-            state.syncError.value = '';
-            const epoch = lifecycle.currentEpoch();
-            try {
-                const path = state.syncRecoveryMode.value === 'rotate' ? '/sync/rotate-key' : '/sync/recovery-code';
-                const result = await api.post(path, { password: state.syncMasterPassword.value });
-                if (!responseBelongsToCurrentSession(epoch)) return;
-                state.syncRecoveryMaterial.value = result.data;
-                applySyncStatus(result.data?.status);
-                if (state.syncRecoveryMode.value === 'rotate') {
-                    showToast(result.message || '同步密钥已轮换', 'success');
-                }
-            } catch (error) {
-                if (!responseBelongsToCurrentSession(epoch)) return;
-                state.syncError.value = error.message || '同步恢复信息读取失败';
-            } finally {
-                if (epochIsCurrent(epoch)) {
-                    state.syncMasterPassword.value = '';
-                    state.syncRecoveryBusy.value = false;
-                }
-            }
-        }
-
-        async function copySyncSecret(value, label) {
-            const copied = await copyToClipboard(value || '');
-            showToast(copied ? `${label}已复制` : `${label}复制失败`, copied ? 'success' : 'error');
-        }
-
-        function disconnectSync() {
-            if (state.syncBusy.value) return;
-            const pendingJoin = state.syncStatus.pending_join === true;
-            const title = pendingJoin ? '取消加入同步空间' : '断开本机同步';
-            const message = pendingJoin
-                ? '将丢弃当前待处理的加入冲突，不会修改本机 Vault 或 WebDAV 数据。确认取消？'
-                : '只删除本机保存的同步设置，不会删除 WebDAV 上的加密数据。确认断开？';
-            showConfirmDialog(title, message, async () => {
-                if (!lifecycle.isActive()) return;
-                state.syncBusy.value = true;
-                const epoch = lifecycle.currentEpoch();
-                try {
-                    const result = await api.delete('/sync/config');
-                    if (!responseBelongsToCurrentSession(epoch)) return;
-                    applySyncStatus(result.data);
-                    showToast(result.message || '已断开本机同步', 'success');
-                } catch (error) {
-                    if (!responseBelongsToCurrentSession(epoch)) return;
-                    showToast(error.message || '断开同步失败', 'error');
-                } finally {
-                    if (epochIsCurrent(epoch)) state.syncBusy.value = false;
-                }
-            });
-        }
-
-        function openDeleteRemoteSync() {
-            state.syncDeleteForm.password = '';
-            state.syncDeleteForm.confirmation = '';
-            state.syncError.value = '';
-            state.showSyncDeleteRemote.value = true;
-        }
-
-        async function deleteRemoteSync() {
-            if (state.syncBusy.value) return;
-            state.syncBusy.value = true;
-            state.syncError.value = '';
-            const epoch = lifecycle.currentEpoch();
-            try {
-                const result = await api.post('/sync/reset', {
-                    password: state.syncDeleteForm.password,
-                    confirmation: state.syncDeleteForm.confirmation
-                });
-                if (!responseBelongsToCurrentSession(epoch)) return;
-                applySyncStatus(result.data);
-                state.showSyncDeleteRemote.value = false;
-                showToast(result.message || '远端同步数据已删除', 'success');
-            } catch (error) {
-                if (!responseBelongsToCurrentSession(epoch)) return;
-                state.syncError.value = error.message || '远端同步数据删除失败';
-            } finally {
-                if (epochIsCurrent(epoch)) {
-                    state.syncDeleteForm.password = '';
-                    state.syncBusy.value = false;
-                }
-            }
-        }
-
         async function initializeSync() {
             await lifecycle.initialize({
                 loadStatus: loadSyncStatus,
@@ -533,6 +457,7 @@
             state.showSyncDeleteRemote.value = false;
             state.syncRecoveryMaterial.value = null;
             state.syncMasterPassword.value = '';
+            state.syncCompactConfirmation.value = '';
             state.syncConflictToken.value = '';
             state.syncConflicts.value = [];
             state.syncHistory.value = [];
@@ -569,6 +494,7 @@
                 loadSyncStatus,
                 openSyncCenter,
                 openSyncSetup,
+                inferSyncProtocolFromRecovery,
                 closeSyncSetup,
                 testSyncConnection,
                 submitSyncSetup,
@@ -580,13 +506,7 @@
                 setAutoSync,
                 openSyncHistory,
                 restoreSyncHistory,
-                openSyncRecovery,
-                closeSyncRecovery,
-                submitSyncRecovery,
-                copySyncSecret,
-                disconnectSync,
-                openDeleteRemoteSync,
-                deleteRemoteSync,
+                ...syncManagement,
                 initializeSync,
                 pauseSync,
                 disposeSync

@@ -68,7 +68,7 @@ class RustLib extends BaseEntrypoint<RustLibApi, RustLibApiImpl, RustLibWire> {
   String get codegenVersion => '2.12.0';
 
   @override
-  int get rustContentHash => 577874386;
+  int get rustContentHash => 1309916109;
 
   static const kDefaultExternalLibraryLoaderConfig =
       ExternalLibraryLoaderConfig(
@@ -244,6 +244,102 @@ abstract class RustLibApi extends BaseApi {
     required String description,
     String? color,
     required BigInt expectedRevision,
+  });
+
+  Future<OperationResult> crateApiMobileSyncApplyRemote({
+    required String documentJson,
+    required List<String> frontier,
+    required BigInt generation,
+    required BigInt expectedRevision,
+  });
+
+  Future<void> crateApiMobileSyncCancelPending();
+
+  Future<SyncStatus> crateApiMobileSyncCommitCompact({required String token});
+
+  Future<SyncStatus> crateApiMobileSyncCommitCreate({required String token});
+
+  Future<OperationResult> crateApiMobileSyncCommitJoin({
+    required String token,
+    required String documentJson,
+    required List<String> frontier,
+    required BigInt generation,
+    required BigInt expectedRevision,
+  });
+
+  Future<SyncStatus> crateApiMobileSyncCommitRemoteDelete({
+    required String token,
+  });
+
+  Future<SyncStatus> crateApiMobileSyncCommitRotate({required String token});
+
+  Future<OperationResult> crateApiMobileSyncCommitUpload({
+    required String token,
+  });
+
+  Future<SyncConnection> crateApiMobileSyncConnection();
+
+  Future<String> crateApiMobileSyncCurrentDocumentJson();
+
+  Future<SyncSnapshotInfo> crateApiMobileSyncDecodeSnapshot({
+    required List<int> content,
+    required String snapshotId,
+    String? setupToken,
+  });
+
+  Future<SyncStatus> crateApiMobileSyncDisconnect();
+
+  Future<SyncLocalState> crateApiMobileSyncLocalState();
+
+  Future<SyncSetupPlan> crateApiMobileSyncPrepareCompact({
+    required String password,
+    required BigInt expectedRevision,
+  });
+
+  Future<SyncSetupPlan> crateApiMobileSyncPrepareCreate({
+    required String baseUrl,
+    required String username,
+    required String password,
+    required String deviceName,
+    required bool autoSync,
+  });
+
+  Future<SyncSetupPlan> crateApiMobileSyncPrepareJoin({
+    required String baseUrl,
+    required String username,
+    required String password,
+    required String recoveryCode,
+    required String deviceName,
+    required bool autoSync,
+    required bool mergeExisting,
+  });
+
+  Future<String> crateApiMobileSyncPrepareRemoteDelete({
+    required String password,
+  });
+
+  Future<SyncSetupPlan> crateApiMobileSyncPrepareRotate({
+    required String password,
+    required BigInt expectedRevision,
+  });
+
+  Future<SyncUploadPlan> crateApiMobileSyncPrepareUpload({
+    String? documentJson,
+    required List<String> parents,
+    required BigInt generation,
+    required BigInt expectedRevision,
+  });
+
+  Future<String> crateApiMobileSyncRecoveryCode({required String password});
+
+  Future<SyncStatus> crateApiMobileSyncStatus();
+
+  Future<SyncStatus> crateApiMobileSyncUpdateConfig({
+    required String baseUrl,
+    required String username,
+    String? password,
+    required String deviceName,
+    required bool autoSync,
   });
 
   Future<OperationResult> crateApiMobileTrashEntry({
@@ -1591,6 +1687,771 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   );
 
   @override
+  Future<OperationResult> crateApiMobileSyncApplyRemote({
+    required String documentJson,
+    required List<String> frontier,
+    required BigInt generation,
+    required BigInt expectedRevision,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(documentJson, serializer);
+          sse_encode_list_String(frontier, serializer);
+          sse_encode_u_64(generation, serializer);
+          sse_encode_u_64(expectedRevision, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 41,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_operation_result,
+          decodeErrorData: sse_decode_mobile_error,
+        ),
+        constMeta: kCrateApiMobileSyncApplyRemoteConstMeta,
+        argValues: [documentJson, frontier, generation, expectedRevision],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiMobileSyncApplyRemoteConstMeta =>
+      const TaskConstMeta(
+        debugName: "sync_apply_remote",
+        argNames: [
+          "documentJson",
+          "frontier",
+          "generation",
+          "expectedRevision",
+        ],
+      );
+
+  @override
+  Future<void> crateApiMobileSyncCancelPending() {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 42,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_unit,
+          decodeErrorData: sse_decode_mobile_error,
+        ),
+        constMeta: kCrateApiMobileSyncCancelPendingConstMeta,
+        argValues: [],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiMobileSyncCancelPendingConstMeta =>
+      const TaskConstMeta(debugName: "sync_cancel_pending", argNames: []);
+
+  @override
+  Future<SyncStatus> crateApiMobileSyncCommitCompact({required String token}) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(token, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 43,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_sync_status,
+          decodeErrorData: sse_decode_mobile_error,
+        ),
+        constMeta: kCrateApiMobileSyncCommitCompactConstMeta,
+        argValues: [token],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiMobileSyncCommitCompactConstMeta =>
+      const TaskConstMeta(
+        debugName: "sync_commit_compact",
+        argNames: ["token"],
+      );
+
+  @override
+  Future<SyncStatus> crateApiMobileSyncCommitCreate({required String token}) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(token, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 44,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_sync_status,
+          decodeErrorData: sse_decode_mobile_error,
+        ),
+        constMeta: kCrateApiMobileSyncCommitCreateConstMeta,
+        argValues: [token],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiMobileSyncCommitCreateConstMeta =>
+      const TaskConstMeta(debugName: "sync_commit_create", argNames: ["token"]);
+
+  @override
+  Future<OperationResult> crateApiMobileSyncCommitJoin({
+    required String token,
+    required String documentJson,
+    required List<String> frontier,
+    required BigInt generation,
+    required BigInt expectedRevision,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(token, serializer);
+          sse_encode_String(documentJson, serializer);
+          sse_encode_list_String(frontier, serializer);
+          sse_encode_u_64(generation, serializer);
+          sse_encode_u_64(expectedRevision, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 45,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_operation_result,
+          decodeErrorData: sse_decode_mobile_error,
+        ),
+        constMeta: kCrateApiMobileSyncCommitJoinConstMeta,
+        argValues: [
+          token,
+          documentJson,
+          frontier,
+          generation,
+          expectedRevision,
+        ],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiMobileSyncCommitJoinConstMeta =>
+      const TaskConstMeta(
+        debugName: "sync_commit_join",
+        argNames: [
+          "token",
+          "documentJson",
+          "frontier",
+          "generation",
+          "expectedRevision",
+        ],
+      );
+
+  @override
+  Future<SyncStatus> crateApiMobileSyncCommitRemoteDelete({
+    required String token,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(token, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 46,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_sync_status,
+          decodeErrorData: sse_decode_mobile_error,
+        ),
+        constMeta: kCrateApiMobileSyncCommitRemoteDeleteConstMeta,
+        argValues: [token],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiMobileSyncCommitRemoteDeleteConstMeta =>
+      const TaskConstMeta(
+        debugName: "sync_commit_remote_delete",
+        argNames: ["token"],
+      );
+
+  @override
+  Future<SyncStatus> crateApiMobileSyncCommitRotate({required String token}) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(token, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 47,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_sync_status,
+          decodeErrorData: sse_decode_mobile_error,
+        ),
+        constMeta: kCrateApiMobileSyncCommitRotateConstMeta,
+        argValues: [token],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiMobileSyncCommitRotateConstMeta =>
+      const TaskConstMeta(debugName: "sync_commit_rotate", argNames: ["token"]);
+
+  @override
+  Future<OperationResult> crateApiMobileSyncCommitUpload({
+    required String token,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(token, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 48,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_operation_result,
+          decodeErrorData: sse_decode_mobile_error,
+        ),
+        constMeta: kCrateApiMobileSyncCommitUploadConstMeta,
+        argValues: [token],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiMobileSyncCommitUploadConstMeta =>
+      const TaskConstMeta(debugName: "sync_commit_upload", argNames: ["token"]);
+
+  @override
+  Future<SyncConnection> crateApiMobileSyncConnection() {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 49,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_sync_connection,
+          decodeErrorData: sse_decode_mobile_error,
+        ),
+        constMeta: kCrateApiMobileSyncConnectionConstMeta,
+        argValues: [],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiMobileSyncConnectionConstMeta =>
+      const TaskConstMeta(debugName: "sync_connection", argNames: []);
+
+  @override
+  Future<String> crateApiMobileSyncCurrentDocumentJson() {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 50,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_String,
+          decodeErrorData: sse_decode_mobile_error,
+        ),
+        constMeta: kCrateApiMobileSyncCurrentDocumentJsonConstMeta,
+        argValues: [],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiMobileSyncCurrentDocumentJsonConstMeta =>
+      const TaskConstMeta(
+        debugName: "sync_current_document_json",
+        argNames: [],
+      );
+
+  @override
+  Future<SyncSnapshotInfo> crateApiMobileSyncDecodeSnapshot({
+    required List<int> content,
+    required String snapshotId,
+    String? setupToken,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_list_prim_u_8_loose(content, serializer);
+          sse_encode_String(snapshotId, serializer);
+          sse_encode_opt_String(setupToken, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 51,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_sync_snapshot_info,
+          decodeErrorData: sse_decode_mobile_error,
+        ),
+        constMeta: kCrateApiMobileSyncDecodeSnapshotConstMeta,
+        argValues: [content, snapshotId, setupToken],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiMobileSyncDecodeSnapshotConstMeta =>
+      const TaskConstMeta(
+        debugName: "sync_decode_snapshot",
+        argNames: ["content", "snapshotId", "setupToken"],
+      );
+
+  @override
+  Future<SyncStatus> crateApiMobileSyncDisconnect() {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 52,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_sync_status,
+          decodeErrorData: sse_decode_mobile_error,
+        ),
+        constMeta: kCrateApiMobileSyncDisconnectConstMeta,
+        argValues: [],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiMobileSyncDisconnectConstMeta =>
+      const TaskConstMeta(debugName: "sync_disconnect", argNames: []);
+
+  @override
+  Future<SyncLocalState> crateApiMobileSyncLocalState() {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 53,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_sync_local_state,
+          decodeErrorData: sse_decode_mobile_error,
+        ),
+        constMeta: kCrateApiMobileSyncLocalStateConstMeta,
+        argValues: [],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiMobileSyncLocalStateConstMeta =>
+      const TaskConstMeta(debugName: "sync_local_state", argNames: []);
+
+  @override
+  Future<SyncSetupPlan> crateApiMobileSyncPrepareCompact({
+    required String password,
+    required BigInt expectedRevision,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(password, serializer);
+          sse_encode_u_64(expectedRevision, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 54,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_sync_setup_plan,
+          decodeErrorData: sse_decode_mobile_error,
+        ),
+        constMeta: kCrateApiMobileSyncPrepareCompactConstMeta,
+        argValues: [password, expectedRevision],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiMobileSyncPrepareCompactConstMeta =>
+      const TaskConstMeta(
+        debugName: "sync_prepare_compact",
+        argNames: ["password", "expectedRevision"],
+      );
+
+  @override
+  Future<SyncSetupPlan> crateApiMobileSyncPrepareCreate({
+    required String baseUrl,
+    required String username,
+    required String password,
+    required String deviceName,
+    required bool autoSync,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(baseUrl, serializer);
+          sse_encode_String(username, serializer);
+          sse_encode_String(password, serializer);
+          sse_encode_String(deviceName, serializer);
+          sse_encode_bool(autoSync, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 55,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_sync_setup_plan,
+          decodeErrorData: sse_decode_mobile_error,
+        ),
+        constMeta: kCrateApiMobileSyncPrepareCreateConstMeta,
+        argValues: [baseUrl, username, password, deviceName, autoSync],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiMobileSyncPrepareCreateConstMeta =>
+      const TaskConstMeta(
+        debugName: "sync_prepare_create",
+        argNames: ["baseUrl", "username", "password", "deviceName", "autoSync"],
+      );
+
+  @override
+  Future<SyncSetupPlan> crateApiMobileSyncPrepareJoin({
+    required String baseUrl,
+    required String username,
+    required String password,
+    required String recoveryCode,
+    required String deviceName,
+    required bool autoSync,
+    required bool mergeExisting,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(baseUrl, serializer);
+          sse_encode_String(username, serializer);
+          sse_encode_String(password, serializer);
+          sse_encode_String(recoveryCode, serializer);
+          sse_encode_String(deviceName, serializer);
+          sse_encode_bool(autoSync, serializer);
+          sse_encode_bool(mergeExisting, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 56,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_sync_setup_plan,
+          decodeErrorData: sse_decode_mobile_error,
+        ),
+        constMeta: kCrateApiMobileSyncPrepareJoinConstMeta,
+        argValues: [
+          baseUrl,
+          username,
+          password,
+          recoveryCode,
+          deviceName,
+          autoSync,
+          mergeExisting,
+        ],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiMobileSyncPrepareJoinConstMeta =>
+      const TaskConstMeta(
+        debugName: "sync_prepare_join",
+        argNames: [
+          "baseUrl",
+          "username",
+          "password",
+          "recoveryCode",
+          "deviceName",
+          "autoSync",
+          "mergeExisting",
+        ],
+      );
+
+  @override
+  Future<String> crateApiMobileSyncPrepareRemoteDelete({
+    required String password,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(password, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 57,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_String,
+          decodeErrorData: sse_decode_mobile_error,
+        ),
+        constMeta: kCrateApiMobileSyncPrepareRemoteDeleteConstMeta,
+        argValues: [password],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiMobileSyncPrepareRemoteDeleteConstMeta =>
+      const TaskConstMeta(
+        debugName: "sync_prepare_remote_delete",
+        argNames: ["password"],
+      );
+
+  @override
+  Future<SyncSetupPlan> crateApiMobileSyncPrepareRotate({
+    required String password,
+    required BigInt expectedRevision,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(password, serializer);
+          sse_encode_u_64(expectedRevision, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 58,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_sync_setup_plan,
+          decodeErrorData: sse_decode_mobile_error,
+        ),
+        constMeta: kCrateApiMobileSyncPrepareRotateConstMeta,
+        argValues: [password, expectedRevision],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiMobileSyncPrepareRotateConstMeta =>
+      const TaskConstMeta(
+        debugName: "sync_prepare_rotate",
+        argNames: ["password", "expectedRevision"],
+      );
+
+  @override
+  Future<SyncUploadPlan> crateApiMobileSyncPrepareUpload({
+    String? documentJson,
+    required List<String> parents,
+    required BigInt generation,
+    required BigInt expectedRevision,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_opt_String(documentJson, serializer);
+          sse_encode_list_String(parents, serializer);
+          sse_encode_u_64(generation, serializer);
+          sse_encode_u_64(expectedRevision, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 59,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_sync_upload_plan,
+          decodeErrorData: sse_decode_mobile_error,
+        ),
+        constMeta: kCrateApiMobileSyncPrepareUploadConstMeta,
+        argValues: [documentJson, parents, generation, expectedRevision],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiMobileSyncPrepareUploadConstMeta =>
+      const TaskConstMeta(
+        debugName: "sync_prepare_upload",
+        argNames: ["documentJson", "parents", "generation", "expectedRevision"],
+      );
+
+  @override
+  Future<String> crateApiMobileSyncRecoveryCode({required String password}) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(password, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 60,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_String,
+          decodeErrorData: sse_decode_mobile_error,
+        ),
+        constMeta: kCrateApiMobileSyncRecoveryCodeConstMeta,
+        argValues: [password],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiMobileSyncRecoveryCodeConstMeta =>
+      const TaskConstMeta(
+        debugName: "sync_recovery_code",
+        argNames: ["password"],
+      );
+
+  @override
+  Future<SyncStatus> crateApiMobileSyncStatus() {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 61,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_sync_status,
+          decodeErrorData: sse_decode_mobile_error,
+        ),
+        constMeta: kCrateApiMobileSyncStatusConstMeta,
+        argValues: [],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiMobileSyncStatusConstMeta =>
+      const TaskConstMeta(debugName: "sync_status", argNames: []);
+
+  @override
+  Future<SyncStatus> crateApiMobileSyncUpdateConfig({
+    required String baseUrl,
+    required String username,
+    String? password,
+    required String deviceName,
+    required bool autoSync,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(baseUrl, serializer);
+          sse_encode_String(username, serializer);
+          sse_encode_opt_String(password, serializer);
+          sse_encode_String(deviceName, serializer);
+          sse_encode_bool(autoSync, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 62,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_sync_status,
+          decodeErrorData: sse_decode_mobile_error,
+        ),
+        constMeta: kCrateApiMobileSyncUpdateConfigConstMeta,
+        argValues: [baseUrl, username, password, deviceName, autoSync],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiMobileSyncUpdateConfigConstMeta =>
+      const TaskConstMeta(
+        debugName: "sync_update_config",
+        argNames: ["baseUrl", "username", "password", "deviceName", "autoSync"],
+      );
+
+  @override
   Future<OperationResult> crateApiMobileTrashEntry({
     required String id,
     required BigInt expectedRevision,
@@ -1604,7 +2465,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 41,
+            funcId: 63,
             port: port_,
           );
         },
@@ -1638,7 +2499,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 42,
+            funcId: 64,
             port: port_,
           );
         },
@@ -1669,7 +2530,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 43,
+            funcId: 65,
             port: port_,
           );
         },
@@ -1699,7 +2560,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 44,
+            funcId: 66,
             port: port_,
           );
         },
@@ -1729,7 +2590,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 45,
+            funcId: 67,
             port: port_,
           );
         },
@@ -1757,7 +2618,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 46,
+            funcId: 68,
             port: port_,
           );
         },
@@ -2289,6 +3150,111 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       id: dco_decode_String(arr[0]),
       createdAt: dco_decode_String(arr[1]),
       sizeBytes: dco_decode_u_64(arr[2]),
+    );
+  }
+
+  @protected
+  SyncConnection dco_decode_sync_connection(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 5)
+      throw Exception('unexpected arr length: expect 5 but see ${arr.length}');
+    return SyncConnection(
+      baseUrl: dco_decode_String(arr[0]),
+      username: dco_decode_String(arr[1]),
+      password: dco_decode_String(arr[2]),
+      deviceName: dco_decode_String(arr[3]),
+      autoSync: dco_decode_bool(arr[4]),
+    );
+  }
+
+  @protected
+  SyncLocalState dco_decode_sync_local_state(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 5)
+      throw Exception('unexpected arr length: expect 5 but see ${arr.length}');
+    return SyncLocalState(
+      revision: dco_decode_u_64(arr[0]),
+      currentDocumentJson: dco_decode_String(arr[1]),
+      baseDocumentJson: dco_decode_String(arr[2]),
+      frontier: dco_decode_list_String(arr[3]),
+      generation: dco_decode_u_64(arr[4]),
+    );
+  }
+
+  @protected
+  SyncSetupPlan dco_decode_sync_setup_plan(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 9)
+      throw Exception('unexpected arr length: expect 9 but see ${arr.length}');
+    return SyncSetupPlan(
+      token: dco_decode_String(arr[0]),
+      vaultId: dco_decode_String(arr[1]),
+      spaceId: dco_decode_String(arr[2]),
+      deviceId: dco_decode_String(arr[3]),
+      snapshotId: dco_decode_String(arr[4]),
+      generation: dco_decode_u_64(arr[5]),
+      path: dco_decode_list_String(arr[6]),
+      content: dco_decode_list_prim_u_8_strict(arr[7]),
+      recoveryCode: dco_decode_String(arr[8]),
+    );
+  }
+
+  @protected
+  SyncSnapshotInfo dco_decode_sync_snapshot_info(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 7)
+      throw Exception('unexpected arr length: expect 7 but see ${arr.length}');
+    return SyncSnapshotInfo(
+      snapshotId: dco_decode_String(arr[0]),
+      generation: dco_decode_u_64(arr[1]),
+      parents: dco_decode_list_String(arr[2]),
+      deviceId: dco_decode_String(arr[3]),
+      deviceName: dco_decode_String(arr[4]),
+      createdAt: dco_decode_String(arr[5]),
+      documentJson: dco_decode_String(arr[6]),
+    );
+  }
+
+  @protected
+  SyncStatus dco_decode_sync_status(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 13)
+      throw Exception('unexpected arr length: expect 13 but see ${arr.length}');
+    return SyncStatus(
+      configured: dco_decode_bool(arr[0]),
+      protocolVersion: dco_decode_u_32(arr[1]),
+      phase: dco_decode_String(arr[2]),
+      message: dco_decode_String(arr[3]),
+      lastError: dco_decode_String(arr[4]),
+      autoSync: dco_decode_bool(arr[5]),
+      baseUrl: dco_decode_String(arr[6]),
+      usernameMask: dco_decode_String(arr[7]),
+      deviceName: dco_decode_String(arr[8]),
+      vaultId: dco_decode_String(arr[9]),
+      spaceId: dco_decode_String(arr[10]),
+      generation: dco_decode_u_64(arr[11]),
+      frontier: dco_decode_list_String(arr[12]),
+    );
+  }
+
+  @protected
+  SyncUploadPlan dco_decode_sync_upload_plan(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 6)
+      throw Exception('unexpected arr length: expect 6 but see ${arr.length}');
+    return SyncUploadPlan(
+      token: dco_decode_String(arr[0]),
+      snapshotId: dco_decode_String(arr[1]),
+      generation: dco_decode_u_64(arr[2]),
+      deviceId: dco_decode_String(arr[3]),
+      path: dco_decode_list_String(arr[4]),
+      content: dco_decode_list_prim_u_8_strict(arr[5]),
     );
   }
 
@@ -3020,6 +3986,138 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  SyncConnection sse_decode_sync_connection(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_baseUrl = sse_decode_String(deserializer);
+    var var_username = sse_decode_String(deserializer);
+    var var_password = sse_decode_String(deserializer);
+    var var_deviceName = sse_decode_String(deserializer);
+    var var_autoSync = sse_decode_bool(deserializer);
+    return SyncConnection(
+      baseUrl: var_baseUrl,
+      username: var_username,
+      password: var_password,
+      deviceName: var_deviceName,
+      autoSync: var_autoSync,
+    );
+  }
+
+  @protected
+  SyncLocalState sse_decode_sync_local_state(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_revision = sse_decode_u_64(deserializer);
+    var var_currentDocumentJson = sse_decode_String(deserializer);
+    var var_baseDocumentJson = sse_decode_String(deserializer);
+    var var_frontier = sse_decode_list_String(deserializer);
+    var var_generation = sse_decode_u_64(deserializer);
+    return SyncLocalState(
+      revision: var_revision,
+      currentDocumentJson: var_currentDocumentJson,
+      baseDocumentJson: var_baseDocumentJson,
+      frontier: var_frontier,
+      generation: var_generation,
+    );
+  }
+
+  @protected
+  SyncSetupPlan sse_decode_sync_setup_plan(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_token = sse_decode_String(deserializer);
+    var var_vaultId = sse_decode_String(deserializer);
+    var var_spaceId = sse_decode_String(deserializer);
+    var var_deviceId = sse_decode_String(deserializer);
+    var var_snapshotId = sse_decode_String(deserializer);
+    var var_generation = sse_decode_u_64(deserializer);
+    var var_path = sse_decode_list_String(deserializer);
+    var var_content = sse_decode_list_prim_u_8_strict(deserializer);
+    var var_recoveryCode = sse_decode_String(deserializer);
+    return SyncSetupPlan(
+      token: var_token,
+      vaultId: var_vaultId,
+      spaceId: var_spaceId,
+      deviceId: var_deviceId,
+      snapshotId: var_snapshotId,
+      generation: var_generation,
+      path: var_path,
+      content: var_content,
+      recoveryCode: var_recoveryCode,
+    );
+  }
+
+  @protected
+  SyncSnapshotInfo sse_decode_sync_snapshot_info(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_snapshotId = sse_decode_String(deserializer);
+    var var_generation = sse_decode_u_64(deserializer);
+    var var_parents = sse_decode_list_String(deserializer);
+    var var_deviceId = sse_decode_String(deserializer);
+    var var_deviceName = sse_decode_String(deserializer);
+    var var_createdAt = sse_decode_String(deserializer);
+    var var_documentJson = sse_decode_String(deserializer);
+    return SyncSnapshotInfo(
+      snapshotId: var_snapshotId,
+      generation: var_generation,
+      parents: var_parents,
+      deviceId: var_deviceId,
+      deviceName: var_deviceName,
+      createdAt: var_createdAt,
+      documentJson: var_documentJson,
+    );
+  }
+
+  @protected
+  SyncStatus sse_decode_sync_status(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_configured = sse_decode_bool(deserializer);
+    var var_protocolVersion = sse_decode_u_32(deserializer);
+    var var_phase = sse_decode_String(deserializer);
+    var var_message = sse_decode_String(deserializer);
+    var var_lastError = sse_decode_String(deserializer);
+    var var_autoSync = sse_decode_bool(deserializer);
+    var var_baseUrl = sse_decode_String(deserializer);
+    var var_usernameMask = sse_decode_String(deserializer);
+    var var_deviceName = sse_decode_String(deserializer);
+    var var_vaultId = sse_decode_String(deserializer);
+    var var_spaceId = sse_decode_String(deserializer);
+    var var_generation = sse_decode_u_64(deserializer);
+    var var_frontier = sse_decode_list_String(deserializer);
+    return SyncStatus(
+      configured: var_configured,
+      protocolVersion: var_protocolVersion,
+      phase: var_phase,
+      message: var_message,
+      lastError: var_lastError,
+      autoSync: var_autoSync,
+      baseUrl: var_baseUrl,
+      usernameMask: var_usernameMask,
+      deviceName: var_deviceName,
+      vaultId: var_vaultId,
+      spaceId: var_spaceId,
+      generation: var_generation,
+      frontier: var_frontier,
+    );
+  }
+
+  @protected
+  SyncUploadPlan sse_decode_sync_upload_plan(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_token = sse_decode_String(deserializer);
+    var var_snapshotId = sse_decode_String(deserializer);
+    var var_generation = sse_decode_u_64(deserializer);
+    var var_deviceId = sse_decode_String(deserializer);
+    var var_path = sse_decode_list_String(deserializer);
+    var var_content = sse_decode_list_prim_u_8_strict(deserializer);
+    return SyncUploadPlan(
+      token: var_token,
+      snapshotId: var_snapshotId,
+      generation: var_generation,
+      deviceId: var_deviceId,
+      path: var_path,
+      content: var_content,
+    );
+  }
+
+  @protected
   TaxonomyRecord sse_decode_taxonomy_record(SseDeserializer deserializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     var var_name = sse_decode_String(deserializer);
@@ -3634,6 +4732,96 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     sse_encode_String(self.id, serializer);
     sse_encode_String(self.createdAt, serializer);
     sse_encode_u_64(self.sizeBytes, serializer);
+  }
+
+  @protected
+  void sse_encode_sync_connection(
+    SyncConnection self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_String(self.baseUrl, serializer);
+    sse_encode_String(self.username, serializer);
+    sse_encode_String(self.password, serializer);
+    sse_encode_String(self.deviceName, serializer);
+    sse_encode_bool(self.autoSync, serializer);
+  }
+
+  @protected
+  void sse_encode_sync_local_state(
+    SyncLocalState self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_u_64(self.revision, serializer);
+    sse_encode_String(self.currentDocumentJson, serializer);
+    sse_encode_String(self.baseDocumentJson, serializer);
+    sse_encode_list_String(self.frontier, serializer);
+    sse_encode_u_64(self.generation, serializer);
+  }
+
+  @protected
+  void sse_encode_sync_setup_plan(
+    SyncSetupPlan self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_String(self.token, serializer);
+    sse_encode_String(self.vaultId, serializer);
+    sse_encode_String(self.spaceId, serializer);
+    sse_encode_String(self.deviceId, serializer);
+    sse_encode_String(self.snapshotId, serializer);
+    sse_encode_u_64(self.generation, serializer);
+    sse_encode_list_String(self.path, serializer);
+    sse_encode_list_prim_u_8_strict(self.content, serializer);
+    sse_encode_String(self.recoveryCode, serializer);
+  }
+
+  @protected
+  void sse_encode_sync_snapshot_info(
+    SyncSnapshotInfo self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_String(self.snapshotId, serializer);
+    sse_encode_u_64(self.generation, serializer);
+    sse_encode_list_String(self.parents, serializer);
+    sse_encode_String(self.deviceId, serializer);
+    sse_encode_String(self.deviceName, serializer);
+    sse_encode_String(self.createdAt, serializer);
+    sse_encode_String(self.documentJson, serializer);
+  }
+
+  @protected
+  void sse_encode_sync_status(SyncStatus self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_bool(self.configured, serializer);
+    sse_encode_u_32(self.protocolVersion, serializer);
+    sse_encode_String(self.phase, serializer);
+    sse_encode_String(self.message, serializer);
+    sse_encode_String(self.lastError, serializer);
+    sse_encode_bool(self.autoSync, serializer);
+    sse_encode_String(self.baseUrl, serializer);
+    sse_encode_String(self.usernameMask, serializer);
+    sse_encode_String(self.deviceName, serializer);
+    sse_encode_String(self.vaultId, serializer);
+    sse_encode_String(self.spaceId, serializer);
+    sse_encode_u_64(self.generation, serializer);
+    sse_encode_list_String(self.frontier, serializer);
+  }
+
+  @protected
+  void sse_encode_sync_upload_plan(
+    SyncUploadPlan self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_String(self.token, serializer);
+    sse_encode_String(self.snapshotId, serializer);
+    sse_encode_u_64(self.generation, serializer);
+    sse_encode_String(self.deviceId, serializer);
+    sse_encode_list_String(self.path, serializer);
+    sse_encode_list_prim_u_8_strict(self.content, serializer);
   }
 
   @protected

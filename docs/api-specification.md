@@ -1922,7 +1922,7 @@ GET /tools/security-report
 
 ## 8B. WebDAV 端到端加密同步
 
-阶段：V5.2。完整二进制协议、WebDAV 条件提交和三方合并规则见 [Sync Protocol V1](sync-protocol-v1.md)。所有接口都要求 Vault 已解锁并携带有效 session token。
+阶段：V5.3。V1 严格 ETag 语义见 [Sync Protocol V1](sync-protocol-v1.md)；推荐的无 ETag 快照语义、压缩和跨端约束见 [Sync Protocol V2](sync-protocol-v2.md) 与 [Sync API V2](sync-api-v2.md)。所有接口都要求 Vault 已解锁并携带有效 session token。
 
 同步 API 同时挂载在 `/sync/*` 和 `/api/sync/*`。WebDAV 密码、同步密钥、恢复码和字段值不得出现在状态、冲突或历史列表响应中。
 
@@ -1950,7 +1950,7 @@ POST /sync/config/test
 }
 ```
 
-服务端会创建临时探测目录，验证强 ETag、`If-None-Match`、当前/过期 `If-Match`、条件删除和读写一致性后清理。生产接口只允许 HTTPS；本机 HTTP 仅用于注入式自动化传输测试。
+V1 请求会创建临时探测目录并验证强 ETag 与条件写入；V2 请求验证基础读写、`PROPFIND` 目录发现和上传后读取一致性，不要求 ETag。生产接口只允许 HTTPS；本机 HTTP 仅用于注入式自动化传输测试。
 
 ### 8B.3 创建同步空间
 
@@ -1973,7 +1973,7 @@ POST /sync/join
   "password": "app-password",
   "device_name": "macOS 笔记本",
   "auto_sync": true,
-  "recovery_code": "SBSYNC1-...",
+  "recovery_code": "SBSYNC2-...",
   "merge_existing": false
 }
 ```
@@ -2034,7 +2034,7 @@ POST /sync/conflicts/resolve
 }
 ```
 
-处理方式仅允许 `local`、`remote` 和条目可用的 `both`。计划绑定解锁会话、Vault revision 和远端 ETag，任一变化后返回 `SYNC_CONFLICT_EXPIRED` 或 `SYNC_REMOTE_CHANGED`。
+处理方式仅允许 `local`、`remote` 和条目可用的 `both`。V2 计划绑定解锁会话、Vault revision、space_id 和发现时的远端 frontier，任一变化后返回 `SYNC_CONFLICT_EXPIRED` 或 `SYNC_REMOTE_CHANGED`；V1 继续使用 ETag 条件保护。
 
 ### 8B.8 历史版本
 
@@ -2043,7 +2043,7 @@ GET /sync/history
 POST /sync/history/{snapshot_id}/restore
 ```
 
-历史列表最多 10 项，只返回快照 ID、时间和设备信息。恢复会把所选加密快照发布为新的最新版本，并返回新的 Vault revision。
+V1 历史列表最多 10 项；V2 返回当前已验证 DAG 中的快照元数据，协议上限为 1000 项。列表只包含快照 ID、generation、时间、设备、frontier 状态和密文大小，不返回文档内容。恢复会把所选加密快照发布为新的最新版本，并返回新的 Vault revision。
 
 ### 8B.9 显示恢复材料
 
@@ -2065,7 +2065,17 @@ POST /sync/rotate-key
 
 请求体同 8B.9。成功后返回新的恢复材料和 `previous_key_invalidated=true`；旧设备、旧恢复码和旧加密历史立即失效。
 
-### 8B.11 删除远端同步数据
+### 8B.11 压缩并清理 V2 历史
+
+```
+POST /sync/compact
+```
+
+请求体为 `{"password":"当前主密码","confirmation":"COMPACT"}`。服务端只在本机文档、远端 frontier 和远端折叠文档都与本机基线一致时执行；成功后切换到新的同步空间根快照，并返回新的恢复码。其他设备必须重新加入，旧空间清理失败会以状态消息保留新空间并提示后续处理。
+
+旧空间清理会保护未知对象并在删除后重新枚举；基础 WebDAV 不提供目录树级原子 CAS，最后一次空目录检查与删除之间仍可能发生服务端竞态。因此接口只承诺检测到变化时停止、保留新空间和本机 Vault，不承诺远端删除事务原子性。
+
+### 8B.12 删除远端同步数据
 
 ```
 POST /sync/reset
@@ -2078,7 +2088,7 @@ POST /sync/reset
 }
 ```
 
-删除当前 Vault 的远端 head 和最近 10 个加密快照，并清除本机同步配置。本机 Vault 不会删除。
+V1 删除远端 head 和其保留历史；V2 逐对象删除当前 space 的已验证加密快照和空目录。V2 遇到未知对象、并发新增或删除失败时停止并返回受控错误，不把远端误报为已清空。本机 Vault 始终保留；只有远端清理确认完成后才清除本机同步配置。
 
 ## 9. 设置模块
 
@@ -2231,7 +2241,7 @@ GET /health
   "success": true,
   "data": {
     "status": "healthy",
-    "version": "5.2.0",
+    "version": "5.3.0",
     "uptime": 3600
   }
 }

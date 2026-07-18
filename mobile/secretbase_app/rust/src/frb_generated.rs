@@ -38,7 +38,7 @@ flutter_rust_bridge::frb_generated_boilerplate!(
     default_rust_auto_opaque = RustAutoOpaqueMoi,
 );
 pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_VERSION: &str = "2.12.0";
-pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = 577874386;
+pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = 1309916109;
 
 // Section: executor
 
@@ -1447,6 +1447,800 @@ fn wire__crate__api__mobile__save_taxonomy_impl(
         },
     )
 }
+fn wire__crate__api__mobile__sync_apply_remote_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "sync_apply_remote",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_document_json = <String>::sse_decode(&mut deserializer);
+            let api_frontier = <Vec<String>>::sse_decode(&mut deserializer);
+            let api_generation = <u64>::sse_decode(&mut deserializer);
+            let api_expected_revision = <u64>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, crate::mobile::error::MobileError>((move || {
+                    let output_ok = crate::api::mobile::sync_apply_remote(
+                        api_document_json,
+                        api_frontier,
+                        api_generation,
+                        api_expected_revision,
+                    )?;
+                    Ok(output_ok)
+                })())
+            }
+        },
+    )
+}
+fn wire__crate__api__mobile__sync_cancel_pending_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "sync_cancel_pending",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, crate::mobile::error::MobileError>((move || {
+                    let output_ok = crate::api::mobile::sync_cancel_pending()?;
+                    Ok(output_ok)
+                })())
+            }
+        },
+    )
+}
+fn wire__crate__api__mobile__sync_commit_compact_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "sync_commit_compact",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_token = <String>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, crate::mobile::error::MobileError>((move || {
+                    let output_ok = crate::api::mobile::sync_commit_compact(api_token)?;
+                    Ok(output_ok)
+                })())
+            }
+        },
+    )
+}
+fn wire__crate__api__mobile__sync_commit_create_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "sync_commit_create",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_token = <String>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, crate::mobile::error::MobileError>((move || {
+                    let output_ok = crate::api::mobile::sync_commit_create(api_token)?;
+                    Ok(output_ok)
+                })())
+            }
+        },
+    )
+}
+fn wire__crate__api__mobile__sync_commit_join_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "sync_commit_join",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_token = <String>::sse_decode(&mut deserializer);
+            let api_document_json = <String>::sse_decode(&mut deserializer);
+            let api_frontier = <Vec<String>>::sse_decode(&mut deserializer);
+            let api_generation = <u64>::sse_decode(&mut deserializer);
+            let api_expected_revision = <u64>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, crate::mobile::error::MobileError>((move || {
+                    let output_ok = crate::api::mobile::sync_commit_join(
+                        api_token,
+                        api_document_json,
+                        api_frontier,
+                        api_generation,
+                        api_expected_revision,
+                    )?;
+                    Ok(output_ok)
+                })())
+            }
+        },
+    )
+}
+fn wire__crate__api__mobile__sync_commit_remote_delete_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "sync_commit_remote_delete",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_token = <String>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, crate::mobile::error::MobileError>((move || {
+                    let output_ok = crate::api::mobile::sync_commit_remote_delete(api_token)?;
+                    Ok(output_ok)
+                })())
+            }
+        },
+    )
+}
+fn wire__crate__api__mobile__sync_commit_rotate_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "sync_commit_rotate",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_token = <String>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, crate::mobile::error::MobileError>((move || {
+                    let output_ok = crate::api::mobile::sync_commit_rotate(api_token)?;
+                    Ok(output_ok)
+                })())
+            }
+        },
+    )
+}
+fn wire__crate__api__mobile__sync_commit_upload_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "sync_commit_upload",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_token = <String>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, crate::mobile::error::MobileError>((move || {
+                    let output_ok = crate::api::mobile::sync_commit_upload(api_token)?;
+                    Ok(output_ok)
+                })())
+            }
+        },
+    )
+}
+fn wire__crate__api__mobile__sync_connection_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "sync_connection",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, crate::mobile::error::MobileError>((move || {
+                    let output_ok = crate::api::mobile::sync_connection()?;
+                    Ok(output_ok)
+                })())
+            }
+        },
+    )
+}
+fn wire__crate__api__mobile__sync_current_document_json_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "sync_current_document_json",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, crate::mobile::error::MobileError>((move || {
+                    let output_ok = crate::api::mobile::sync_current_document_json()?;
+                    Ok(output_ok)
+                })())
+            }
+        },
+    )
+}
+fn wire__crate__api__mobile__sync_decode_snapshot_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "sync_decode_snapshot",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_content = <Vec<u8>>::sse_decode(&mut deserializer);
+            let api_snapshot_id = <String>::sse_decode(&mut deserializer);
+            let api_setup_token = <Option<String>>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, crate::mobile::error::MobileError>((move || {
+                    let output_ok = crate::api::mobile::sync_decode_snapshot(
+                        api_content,
+                        api_snapshot_id,
+                        api_setup_token,
+                    )?;
+                    Ok(output_ok)
+                })())
+            }
+        },
+    )
+}
+fn wire__crate__api__mobile__sync_disconnect_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "sync_disconnect",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, crate::mobile::error::MobileError>((move || {
+                    let output_ok = crate::api::mobile::sync_disconnect()?;
+                    Ok(output_ok)
+                })())
+            }
+        },
+    )
+}
+fn wire__crate__api__mobile__sync_local_state_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "sync_local_state",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, crate::mobile::error::MobileError>((move || {
+                    let output_ok = crate::api::mobile::sync_local_state()?;
+                    Ok(output_ok)
+                })())
+            }
+        },
+    )
+}
+fn wire__crate__api__mobile__sync_prepare_compact_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "sync_prepare_compact",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_password = <String>::sse_decode(&mut deserializer);
+            let api_expected_revision = <u64>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, crate::mobile::error::MobileError>((move || {
+                    let output_ok = crate::api::mobile::sync_prepare_compact(
+                        api_password,
+                        api_expected_revision,
+                    )?;
+                    Ok(output_ok)
+                })())
+            }
+        },
+    )
+}
+fn wire__crate__api__mobile__sync_prepare_create_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "sync_prepare_create",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_base_url = <String>::sse_decode(&mut deserializer);
+            let api_username = <String>::sse_decode(&mut deserializer);
+            let api_password = <String>::sse_decode(&mut deserializer);
+            let api_device_name = <String>::sse_decode(&mut deserializer);
+            let api_auto_sync = <bool>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, crate::mobile::error::MobileError>((move || {
+                    let output_ok = crate::api::mobile::sync_prepare_create(
+                        api_base_url,
+                        api_username,
+                        api_password,
+                        api_device_name,
+                        api_auto_sync,
+                    )?;
+                    Ok(output_ok)
+                })())
+            }
+        },
+    )
+}
+fn wire__crate__api__mobile__sync_prepare_join_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "sync_prepare_join",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_base_url = <String>::sse_decode(&mut deserializer);
+            let api_username = <String>::sse_decode(&mut deserializer);
+            let api_password = <String>::sse_decode(&mut deserializer);
+            let api_recovery_code = <String>::sse_decode(&mut deserializer);
+            let api_device_name = <String>::sse_decode(&mut deserializer);
+            let api_auto_sync = <bool>::sse_decode(&mut deserializer);
+            let api_merge_existing = <bool>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, crate::mobile::error::MobileError>((move || {
+                    let output_ok = crate::api::mobile::sync_prepare_join(
+                        api_base_url,
+                        api_username,
+                        api_password,
+                        api_recovery_code,
+                        api_device_name,
+                        api_auto_sync,
+                        api_merge_existing,
+                    )?;
+                    Ok(output_ok)
+                })())
+            }
+        },
+    )
+}
+fn wire__crate__api__mobile__sync_prepare_remote_delete_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "sync_prepare_remote_delete",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_password = <String>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, crate::mobile::error::MobileError>((move || {
+                    let output_ok = crate::api::mobile::sync_prepare_remote_delete(api_password)?;
+                    Ok(output_ok)
+                })())
+            }
+        },
+    )
+}
+fn wire__crate__api__mobile__sync_prepare_rotate_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "sync_prepare_rotate",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_password = <String>::sse_decode(&mut deserializer);
+            let api_expected_revision = <u64>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, crate::mobile::error::MobileError>((move || {
+                    let output_ok = crate::api::mobile::sync_prepare_rotate(
+                        api_password,
+                        api_expected_revision,
+                    )?;
+                    Ok(output_ok)
+                })())
+            }
+        },
+    )
+}
+fn wire__crate__api__mobile__sync_prepare_upload_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "sync_prepare_upload",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_document_json = <Option<String>>::sse_decode(&mut deserializer);
+            let api_parents = <Vec<String>>::sse_decode(&mut deserializer);
+            let api_generation = <u64>::sse_decode(&mut deserializer);
+            let api_expected_revision = <u64>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, crate::mobile::error::MobileError>((move || {
+                    let output_ok = crate::api::mobile::sync_prepare_upload(
+                        api_document_json,
+                        api_parents,
+                        api_generation,
+                        api_expected_revision,
+                    )?;
+                    Ok(output_ok)
+                })())
+            }
+        },
+    )
+}
+fn wire__crate__api__mobile__sync_recovery_code_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "sync_recovery_code",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_password = <String>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, crate::mobile::error::MobileError>((move || {
+                    let output_ok = crate::api::mobile::sync_recovery_code(api_password)?;
+                    Ok(output_ok)
+                })())
+            }
+        },
+    )
+}
+fn wire__crate__api__mobile__sync_status_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "sync_status",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, crate::mobile::error::MobileError>((move || {
+                    let output_ok = crate::api::mobile::sync_status()?;
+                    Ok(output_ok)
+                })())
+            }
+        },
+    )
+}
+fn wire__crate__api__mobile__sync_update_config_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "sync_update_config",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_base_url = <String>::sse_decode(&mut deserializer);
+            let api_username = <String>::sse_decode(&mut deserializer);
+            let api_password = <Option<String>>::sse_decode(&mut deserializer);
+            let api_device_name = <String>::sse_decode(&mut deserializer);
+            let api_auto_sync = <bool>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, crate::mobile::error::MobileError>((move || {
+                    let output_ok = crate::api::mobile::sync_update_config(
+                        api_base_url,
+                        api_username,
+                        api_password,
+                        api_device_name,
+                        api_auto_sync,
+                    )?;
+                    Ok(output_ok)
+                })())
+            }
+        },
+    )
+}
 fn wire__crate__api__mobile__trash_entry_impl(
     port_: flutter_rust_bridge::for_generated::MessagePort,
     ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
@@ -2311,6 +3105,144 @@ impl SseDecode for crate::mobile::models::RecoverySnapshot {
     }
 }
 
+impl SseDecode for crate::mobile::models::SyncConnection {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut var_baseUrl = <String>::sse_decode(deserializer);
+        let mut var_username = <String>::sse_decode(deserializer);
+        let mut var_password = <String>::sse_decode(deserializer);
+        let mut var_deviceName = <String>::sse_decode(deserializer);
+        let mut var_autoSync = <bool>::sse_decode(deserializer);
+        return crate::mobile::models::SyncConnection {
+            base_url: var_baseUrl,
+            username: var_username,
+            password: var_password,
+            device_name: var_deviceName,
+            auto_sync: var_autoSync,
+        };
+    }
+}
+
+impl SseDecode for crate::mobile::models::SyncLocalState {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut var_revision = <u64>::sse_decode(deserializer);
+        let mut var_currentDocumentJson = <String>::sse_decode(deserializer);
+        let mut var_baseDocumentJson = <String>::sse_decode(deserializer);
+        let mut var_frontier = <Vec<String>>::sse_decode(deserializer);
+        let mut var_generation = <u64>::sse_decode(deserializer);
+        return crate::mobile::models::SyncLocalState {
+            revision: var_revision,
+            current_document_json: var_currentDocumentJson,
+            base_document_json: var_baseDocumentJson,
+            frontier: var_frontier,
+            generation: var_generation,
+        };
+    }
+}
+
+impl SseDecode for crate::mobile::models::SyncSetupPlan {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut var_token = <String>::sse_decode(deserializer);
+        let mut var_vaultId = <String>::sse_decode(deserializer);
+        let mut var_spaceId = <String>::sse_decode(deserializer);
+        let mut var_deviceId = <String>::sse_decode(deserializer);
+        let mut var_snapshotId = <String>::sse_decode(deserializer);
+        let mut var_generation = <u64>::sse_decode(deserializer);
+        let mut var_path = <Vec<String>>::sse_decode(deserializer);
+        let mut var_content = <Vec<u8>>::sse_decode(deserializer);
+        let mut var_recoveryCode = <String>::sse_decode(deserializer);
+        return crate::mobile::models::SyncSetupPlan {
+            token: var_token,
+            vault_id: var_vaultId,
+            space_id: var_spaceId,
+            device_id: var_deviceId,
+            snapshot_id: var_snapshotId,
+            generation: var_generation,
+            path: var_path,
+            content: var_content,
+            recovery_code: var_recoveryCode,
+        };
+    }
+}
+
+impl SseDecode for crate::mobile::models::SyncSnapshotInfo {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut var_snapshotId = <String>::sse_decode(deserializer);
+        let mut var_generation = <u64>::sse_decode(deserializer);
+        let mut var_parents = <Vec<String>>::sse_decode(deserializer);
+        let mut var_deviceId = <String>::sse_decode(deserializer);
+        let mut var_deviceName = <String>::sse_decode(deserializer);
+        let mut var_createdAt = <String>::sse_decode(deserializer);
+        let mut var_documentJson = <String>::sse_decode(deserializer);
+        return crate::mobile::models::SyncSnapshotInfo {
+            snapshot_id: var_snapshotId,
+            generation: var_generation,
+            parents: var_parents,
+            device_id: var_deviceId,
+            device_name: var_deviceName,
+            created_at: var_createdAt,
+            document_json: var_documentJson,
+        };
+    }
+}
+
+impl SseDecode for crate::mobile::models::SyncStatus {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut var_configured = <bool>::sse_decode(deserializer);
+        let mut var_protocolVersion = <u32>::sse_decode(deserializer);
+        let mut var_phase = <String>::sse_decode(deserializer);
+        let mut var_message = <String>::sse_decode(deserializer);
+        let mut var_lastError = <String>::sse_decode(deserializer);
+        let mut var_autoSync = <bool>::sse_decode(deserializer);
+        let mut var_baseUrl = <String>::sse_decode(deserializer);
+        let mut var_usernameMask = <String>::sse_decode(deserializer);
+        let mut var_deviceName = <String>::sse_decode(deserializer);
+        let mut var_vaultId = <String>::sse_decode(deserializer);
+        let mut var_spaceId = <String>::sse_decode(deserializer);
+        let mut var_generation = <u64>::sse_decode(deserializer);
+        let mut var_frontier = <Vec<String>>::sse_decode(deserializer);
+        return crate::mobile::models::SyncStatus {
+            configured: var_configured,
+            protocol_version: var_protocolVersion,
+            phase: var_phase,
+            message: var_message,
+            last_error: var_lastError,
+            auto_sync: var_autoSync,
+            base_url: var_baseUrl,
+            username_mask: var_usernameMask,
+            device_name: var_deviceName,
+            vault_id: var_vaultId,
+            space_id: var_spaceId,
+            generation: var_generation,
+            frontier: var_frontier,
+        };
+    }
+}
+
+impl SseDecode for crate::mobile::models::SyncUploadPlan {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut var_token = <String>::sse_decode(deserializer);
+        let mut var_snapshotId = <String>::sse_decode(deserializer);
+        let mut var_generation = <u64>::sse_decode(deserializer);
+        let mut var_deviceId = <String>::sse_decode(deserializer);
+        let mut var_path = <Vec<String>>::sse_decode(deserializer);
+        let mut var_content = <Vec<u8>>::sse_decode(deserializer);
+        return crate::mobile::models::SyncUploadPlan {
+            token: var_token,
+            snapshot_id: var_snapshotId,
+            generation: var_generation,
+            device_id: var_deviceId,
+            path: var_path,
+            content: var_content,
+        };
+    }
+}
+
 impl SseDecode for crate::mobile::models::TaxonomyRecord {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
@@ -2476,17 +3408,58 @@ fn pde_ffi_dispatcher_primary_impl(
         38 => wire__crate__api__mobile__save_entry_impl(port, ptr, rust_vec_len, data_len),
         39 => wire__crate__api__mobile__save_group_order_impl(port, ptr, rust_vec_len, data_len),
         40 => wire__crate__api__mobile__save_taxonomy_impl(port, ptr, rust_vec_len, data_len),
-        41 => wire__crate__api__mobile__trash_entry_impl(port, ptr, rust_vec_len, data_len),
-        42 => wire__crate__api__mobile__undo_ai_preview_impl(port, ptr, rust_vec_len, data_len),
-        43 => wire__crate__api__mobile__unlock_vault_impl(port, ptr, rust_vec_len, data_len),
-        44 => wire__crate__api__mobile__unlock_vault_with_device_credential_impl(
+        41 => wire__crate__api__mobile__sync_apply_remote_impl(port, ptr, rust_vec_len, data_len),
+        42 => wire__crate__api__mobile__sync_cancel_pending_impl(port, ptr, rust_vec_len, data_len),
+        43 => wire__crate__api__mobile__sync_commit_compact_impl(port, ptr, rust_vec_len, data_len),
+        44 => wire__crate__api__mobile__sync_commit_create_impl(port, ptr, rust_vec_len, data_len),
+        45 => wire__crate__api__mobile__sync_commit_join_impl(port, ptr, rust_vec_len, data_len),
+        46 => wire__crate__api__mobile__sync_commit_remote_delete_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        45 => wire__crate__api__mobile__vault_status_impl(port, ptr, rust_vec_len, data_len),
-        46 => wire__crate__api__mobile__verify_ai_response_impl(port, ptr, rust_vec_len, data_len),
+        47 => wire__crate__api__mobile__sync_commit_rotate_impl(port, ptr, rust_vec_len, data_len),
+        48 => wire__crate__api__mobile__sync_commit_upload_impl(port, ptr, rust_vec_len, data_len),
+        49 => wire__crate__api__mobile__sync_connection_impl(port, ptr, rust_vec_len, data_len),
+        50 => wire__crate__api__mobile__sync_current_document_json_impl(
+            port,
+            ptr,
+            rust_vec_len,
+            data_len,
+        ),
+        51 => {
+            wire__crate__api__mobile__sync_decode_snapshot_impl(port, ptr, rust_vec_len, data_len)
+        }
+        52 => wire__crate__api__mobile__sync_disconnect_impl(port, ptr, rust_vec_len, data_len),
+        53 => wire__crate__api__mobile__sync_local_state_impl(port, ptr, rust_vec_len, data_len),
+        54 => {
+            wire__crate__api__mobile__sync_prepare_compact_impl(port, ptr, rust_vec_len, data_len)
+        }
+        55 => wire__crate__api__mobile__sync_prepare_create_impl(port, ptr, rust_vec_len, data_len),
+        56 => wire__crate__api__mobile__sync_prepare_join_impl(port, ptr, rust_vec_len, data_len),
+        57 => wire__crate__api__mobile__sync_prepare_remote_delete_impl(
+            port,
+            ptr,
+            rust_vec_len,
+            data_len,
+        ),
+        58 => wire__crate__api__mobile__sync_prepare_rotate_impl(port, ptr, rust_vec_len, data_len),
+        59 => wire__crate__api__mobile__sync_prepare_upload_impl(port, ptr, rust_vec_len, data_len),
+        60 => wire__crate__api__mobile__sync_recovery_code_impl(port, ptr, rust_vec_len, data_len),
+        61 => wire__crate__api__mobile__sync_status_impl(port, ptr, rust_vec_len, data_len),
+        62 => wire__crate__api__mobile__sync_update_config_impl(port, ptr, rust_vec_len, data_len),
+        63 => wire__crate__api__mobile__trash_entry_impl(port, ptr, rust_vec_len, data_len),
+        64 => wire__crate__api__mobile__undo_ai_preview_impl(port, ptr, rust_vec_len, data_len),
+        65 => wire__crate__api__mobile__unlock_vault_impl(port, ptr, rust_vec_len, data_len),
+        66 => wire__crate__api__mobile__unlock_vault_with_device_credential_impl(
+            port,
+            ptr,
+            rust_vec_len,
+            data_len,
+        ),
+        67 => wire__crate__api__mobile__vault_status_impl(port, ptr, rust_vec_len, data_len),
+        68 => wire__crate__api__mobile__verify_ai_response_impl(port, ptr, rust_vec_len, data_len),
         _ => unreachable!(),
     }
 }
@@ -3065,6 +4038,165 @@ impl flutter_rust_bridge::IntoIntoDart<crate::mobile::models::RecoverySnapshot>
     }
 }
 // Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::mobile::models::SyncConnection {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        [
+            self.base_url.into_into_dart().into_dart(),
+            self.username.into_into_dart().into_dart(),
+            self.password.into_into_dart().into_dart(),
+            self.device_name.into_into_dart().into_dart(),
+            self.auto_sync.into_into_dart().into_dart(),
+        ]
+        .into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for crate::mobile::models::SyncConnection
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<crate::mobile::models::SyncConnection>
+    for crate::mobile::models::SyncConnection
+{
+    fn into_into_dart(self) -> crate::mobile::models::SyncConnection {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::mobile::models::SyncLocalState {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        [
+            self.revision.into_into_dart().into_dart(),
+            self.current_document_json.into_into_dart().into_dart(),
+            self.base_document_json.into_into_dart().into_dart(),
+            self.frontier.into_into_dart().into_dart(),
+            self.generation.into_into_dart().into_dart(),
+        ]
+        .into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for crate::mobile::models::SyncLocalState
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<crate::mobile::models::SyncLocalState>
+    for crate::mobile::models::SyncLocalState
+{
+    fn into_into_dart(self) -> crate::mobile::models::SyncLocalState {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::mobile::models::SyncSetupPlan {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        [
+            self.token.into_into_dart().into_dart(),
+            self.vault_id.into_into_dart().into_dart(),
+            self.space_id.into_into_dart().into_dart(),
+            self.device_id.into_into_dart().into_dart(),
+            self.snapshot_id.into_into_dart().into_dart(),
+            self.generation.into_into_dart().into_dart(),
+            self.path.into_into_dart().into_dart(),
+            self.content.into_into_dart().into_dart(),
+            self.recovery_code.into_into_dart().into_dart(),
+        ]
+        .into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for crate::mobile::models::SyncSetupPlan
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<crate::mobile::models::SyncSetupPlan>
+    for crate::mobile::models::SyncSetupPlan
+{
+    fn into_into_dart(self) -> crate::mobile::models::SyncSetupPlan {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::mobile::models::SyncSnapshotInfo {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        [
+            self.snapshot_id.into_into_dart().into_dart(),
+            self.generation.into_into_dart().into_dart(),
+            self.parents.into_into_dart().into_dart(),
+            self.device_id.into_into_dart().into_dart(),
+            self.device_name.into_into_dart().into_dart(),
+            self.created_at.into_into_dart().into_dart(),
+            self.document_json.into_into_dart().into_dart(),
+        ]
+        .into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for crate::mobile::models::SyncSnapshotInfo
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<crate::mobile::models::SyncSnapshotInfo>
+    for crate::mobile::models::SyncSnapshotInfo
+{
+    fn into_into_dart(self) -> crate::mobile::models::SyncSnapshotInfo {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::mobile::models::SyncStatus {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        [
+            self.configured.into_into_dart().into_dart(),
+            self.protocol_version.into_into_dart().into_dart(),
+            self.phase.into_into_dart().into_dart(),
+            self.message.into_into_dart().into_dart(),
+            self.last_error.into_into_dart().into_dart(),
+            self.auto_sync.into_into_dart().into_dart(),
+            self.base_url.into_into_dart().into_dart(),
+            self.username_mask.into_into_dart().into_dart(),
+            self.device_name.into_into_dart().into_dart(),
+            self.vault_id.into_into_dart().into_dart(),
+            self.space_id.into_into_dart().into_dart(),
+            self.generation.into_into_dart().into_dart(),
+            self.frontier.into_into_dart().into_dart(),
+        ]
+        .into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for crate::mobile::models::SyncStatus
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<crate::mobile::models::SyncStatus>
+    for crate::mobile::models::SyncStatus
+{
+    fn into_into_dart(self) -> crate::mobile::models::SyncStatus {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::mobile::models::SyncUploadPlan {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        [
+            self.token.into_into_dart().into_dart(),
+            self.snapshot_id.into_into_dart().into_dart(),
+            self.generation.into_into_dart().into_dart(),
+            self.device_id.into_into_dart().into_dart(),
+            self.path.into_into_dart().into_dart(),
+            self.content.into_into_dart().into_dart(),
+        ]
+        .into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for crate::mobile::models::SyncUploadPlan
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<crate::mobile::models::SyncUploadPlan>
+    for crate::mobile::models::SyncUploadPlan
+{
+    fn into_into_dart(self) -> crate::mobile::models::SyncUploadPlan {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
 impl flutter_rust_bridge::IntoDart for crate::mobile::models::TaxonomyRecord {
     fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
         [
@@ -3563,6 +4695,87 @@ impl SseEncode for crate::mobile::models::RecoverySnapshot {
         <String>::sse_encode(self.id, serializer);
         <String>::sse_encode(self.created_at, serializer);
         <u64>::sse_encode(self.size_bytes, serializer);
+    }
+}
+
+impl SseEncode for crate::mobile::models::SyncConnection {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <String>::sse_encode(self.base_url, serializer);
+        <String>::sse_encode(self.username, serializer);
+        <String>::sse_encode(self.password, serializer);
+        <String>::sse_encode(self.device_name, serializer);
+        <bool>::sse_encode(self.auto_sync, serializer);
+    }
+}
+
+impl SseEncode for crate::mobile::models::SyncLocalState {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <u64>::sse_encode(self.revision, serializer);
+        <String>::sse_encode(self.current_document_json, serializer);
+        <String>::sse_encode(self.base_document_json, serializer);
+        <Vec<String>>::sse_encode(self.frontier, serializer);
+        <u64>::sse_encode(self.generation, serializer);
+    }
+}
+
+impl SseEncode for crate::mobile::models::SyncSetupPlan {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <String>::sse_encode(self.token, serializer);
+        <String>::sse_encode(self.vault_id, serializer);
+        <String>::sse_encode(self.space_id, serializer);
+        <String>::sse_encode(self.device_id, serializer);
+        <String>::sse_encode(self.snapshot_id, serializer);
+        <u64>::sse_encode(self.generation, serializer);
+        <Vec<String>>::sse_encode(self.path, serializer);
+        <Vec<u8>>::sse_encode(self.content, serializer);
+        <String>::sse_encode(self.recovery_code, serializer);
+    }
+}
+
+impl SseEncode for crate::mobile::models::SyncSnapshotInfo {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <String>::sse_encode(self.snapshot_id, serializer);
+        <u64>::sse_encode(self.generation, serializer);
+        <Vec<String>>::sse_encode(self.parents, serializer);
+        <String>::sse_encode(self.device_id, serializer);
+        <String>::sse_encode(self.device_name, serializer);
+        <String>::sse_encode(self.created_at, serializer);
+        <String>::sse_encode(self.document_json, serializer);
+    }
+}
+
+impl SseEncode for crate::mobile::models::SyncStatus {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <bool>::sse_encode(self.configured, serializer);
+        <u32>::sse_encode(self.protocol_version, serializer);
+        <String>::sse_encode(self.phase, serializer);
+        <String>::sse_encode(self.message, serializer);
+        <String>::sse_encode(self.last_error, serializer);
+        <bool>::sse_encode(self.auto_sync, serializer);
+        <String>::sse_encode(self.base_url, serializer);
+        <String>::sse_encode(self.username_mask, serializer);
+        <String>::sse_encode(self.device_name, serializer);
+        <String>::sse_encode(self.vault_id, serializer);
+        <String>::sse_encode(self.space_id, serializer);
+        <u64>::sse_encode(self.generation, serializer);
+        <Vec<String>>::sse_encode(self.frontier, serializer);
+    }
+}
+
+impl SseEncode for crate::mobile::models::SyncUploadPlan {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <String>::sse_encode(self.token, serializer);
+        <String>::sse_encode(self.snapshot_id, serializer);
+        <u64>::sse_encode(self.generation, serializer);
+        <String>::sse_encode(self.device_id, serializer);
+        <Vec<String>>::sse_encode(self.path, serializer);
+        <Vec<u8>>::sse_encode(self.content, serializer);
     }
 }
 

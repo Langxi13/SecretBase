@@ -212,3 +212,72 @@ pub struct AiPreview {
     pub warnings: Vec<String>,
     pub privacy_note: String,
 }
+
+#[derive(Debug, Clone)]
+pub struct SyncStatus {
+    pub configured: bool,
+    pub protocol_version: u32,
+    pub phase: String,
+    pub message: String,
+    pub last_error: String,
+    pub auto_sync: bool,
+    pub base_url: String,
+    pub username_mask: String,
+    pub device_name: String,
+    pub vault_id: String,
+    pub space_id: String,
+    pub generation: u64,
+    pub frontier: Vec<String>,
+}
+
+#[derive(Debug, Clone)]
+pub struct SyncConnection {
+    pub base_url: String,
+    pub username: String,
+    pub password: String,
+    pub device_name: String,
+    pub auto_sync: bool,
+}
+
+#[derive(Debug, Clone)]
+pub struct SyncSetupPlan {
+    pub token: String,
+    pub vault_id: String,
+    pub space_id: String,
+    pub device_id: String,
+    pub snapshot_id: String,
+    pub generation: u64,
+    pub path: Vec<String>,
+    pub content: Vec<u8>,
+    pub recovery_code: String,
+}
+
+#[derive(Debug, Clone)]
+pub struct SyncUploadPlan {
+    pub token: String,
+    pub snapshot_id: String,
+    pub generation: u64,
+    pub device_id: String,
+    pub path: Vec<String>,
+    pub content: Vec<u8>,
+}
+
+#[derive(Debug, Clone)]
+pub struct SyncSnapshotInfo {
+    pub snapshot_id: String,
+    pub generation: u64,
+    pub parents: Vec<String>,
+    pub device_id: String,
+    pub device_name: String,
+    pub created_at: String,
+    pub document_json: String,
+}
+
+#[derive(Debug, Clone)]
+pub struct SyncLocalState {
+    pub revision: u64,
+    pub current_document_json: String,
+    pub base_document_json: String,
+    pub frontier: Vec<String>,
+    pub generation: u64,
+}

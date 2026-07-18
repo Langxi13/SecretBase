@@ -507,6 +507,7 @@ class SyncConnectionRequest(BaseModel):
     password: str = Field(..., min_length=1, max_length=1000)
     device_name: str = Field(default="", max_length=100)
     auto_sync: bool = True
+    protocol_version: int = Field(default=1, ge=1, le=2)
 
 
 class SyncJoinRequest(SyncConnectionRequest):
@@ -541,6 +542,10 @@ class SyncPasswordRequest(BaseModel):
 
 class SyncResetRequest(SyncPasswordRequest):
     confirmation: str = Field(..., max_length=20)
+
+
+class SyncCompactRequest(SyncPasswordRequest):
+    confirmation: str = Field(..., pattern="^COMPACT$", max_length=20)
 
 
 class Settings(BaseModel):

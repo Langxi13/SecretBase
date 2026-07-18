@@ -7,6 +7,7 @@ import 'package:secretbase/src/features/ai/ai_manager_screen.dart';
 import 'package:secretbase/src/features/entries/entries_screen.dart';
 import 'package:secretbase/src/features/groups/groups_screen.dart';
 import 'package:secretbase/src/features/settings/settings_screen.dart';
+import 'package:secretbase/src/features/sync/mobile_sync_auto.dart';
 import 'package:secretbase/src/features/tags/tags_screen.dart';
 import 'package:secretbase/src/features/update/mobile_update_widgets.dart';
 import 'package:secretbase/src/state/vault_controller.dart';
@@ -155,11 +156,13 @@ class _AppShellState extends ConsumerState<AppShell> {
             ),
           );
 
-    return AndroidBackExitGuard(
-      resetToken: '$_index:$_filterGeneration',
-      onBeforeExit: _handleBackBeforeExit,
-      onExit: _lockBeforeExit,
-      child: scaffold,
+    return MobileSyncAutoCoordinator(
+      child: AndroidBackExitGuard(
+        resetToken: '$_index:$_filterGeneration',
+        onBeforeExit: _handleBackBeforeExit,
+        onExit: _lockBeforeExit,
+        child: scaffold,
+      ),
     );
   }
 

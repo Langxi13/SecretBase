@@ -6,6 +6,8 @@
         const syncStatus = reactive({
             configured: false,
             pending_join: false,
+            protocol_version: 2,
+            sync_mode: '坚果云兼容快照模式',
             phase: 'disabled',
             message: '尚未配置 WebDAV 同步',
             last_error: '',
@@ -17,7 +19,8 @@
             device_name: '',
             vault_id: '',
             last_synced_at: '',
-            generation: 0
+            generation: 0,
+            frontier: []
         });
         const syncStatusLoading = ref(false);
         const syncBusy = ref(false);
@@ -31,6 +34,7 @@
             username: '',
             password: '',
             deviceName: '',
+            protocolVersion: 2,
             autoSync: true,
             recoveryCode: '',
             mergeExisting: false
@@ -56,6 +60,7 @@
         const syncMasterPassword = ref('');
         const syncRecoveryMaterial = ref(null);
         const syncRecoveryBusy = ref(false);
+        const syncCompactConfirmation = ref('');
         const showSyncDeleteRemote = ref(false);
         const syncDeleteForm = reactive({ password: '', confirmation: '' });
 
@@ -84,6 +89,7 @@
             syncMasterPassword,
             syncRecoveryMaterial,
             syncRecoveryBusy,
+            syncCompactConfirmation,
             showSyncDeleteRemote,
             syncDeleteForm
         };

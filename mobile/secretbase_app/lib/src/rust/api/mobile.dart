@@ -34,6 +34,157 @@ Future<VaultStatus> unlockVaultWithDeviceCredential({
 Future<VaultStatus> lockVault() =>
     RustLib.instance.api.crateApiMobileLockVault();
 
+Future<SyncStatus> syncStatus() =>
+    RustLib.instance.api.crateApiMobileSyncStatus();
+
+Future<SyncConnection> syncConnection() =>
+    RustLib.instance.api.crateApiMobileSyncConnection();
+
+Future<SyncStatus> syncUpdateConfig({
+  required String baseUrl,
+  required String username,
+  String? password,
+  required String deviceName,
+  required bool autoSync,
+}) => RustLib.instance.api.crateApiMobileSyncUpdateConfig(
+  baseUrl: baseUrl,
+  username: username,
+  password: password,
+  deviceName: deviceName,
+  autoSync: autoSync,
+);
+
+Future<SyncSetupPlan> syncPrepareCreate({
+  required String baseUrl,
+  required String username,
+  required String password,
+  required String deviceName,
+  required bool autoSync,
+}) => RustLib.instance.api.crateApiMobileSyncPrepareCreate(
+  baseUrl: baseUrl,
+  username: username,
+  password: password,
+  deviceName: deviceName,
+  autoSync: autoSync,
+);
+
+Future<SyncStatus> syncCommitCreate({required String token}) =>
+    RustLib.instance.api.crateApiMobileSyncCommitCreate(token: token);
+
+Future<SyncSetupPlan> syncPrepareCompact({
+  required String password,
+  required BigInt expectedRevision,
+}) => RustLib.instance.api.crateApiMobileSyncPrepareCompact(
+  password: password,
+  expectedRevision: expectedRevision,
+);
+
+Future<SyncStatus> syncCommitCompact({required String token}) =>
+    RustLib.instance.api.crateApiMobileSyncCommitCompact(token: token);
+
+Future<SyncSetupPlan> syncPrepareRotate({
+  required String password,
+  required BigInt expectedRevision,
+}) => RustLib.instance.api.crateApiMobileSyncPrepareRotate(
+  password: password,
+  expectedRevision: expectedRevision,
+);
+
+Future<SyncStatus> syncCommitRotate({required String token}) =>
+    RustLib.instance.api.crateApiMobileSyncCommitRotate(token: token);
+
+Future<SyncSetupPlan> syncPrepareJoin({
+  required String baseUrl,
+  required String username,
+  required String password,
+  required String recoveryCode,
+  required String deviceName,
+  required bool autoSync,
+  required bool mergeExisting,
+}) => RustLib.instance.api.crateApiMobileSyncPrepareJoin(
+  baseUrl: baseUrl,
+  username: username,
+  password: password,
+  recoveryCode: recoveryCode,
+  deviceName: deviceName,
+  autoSync: autoSync,
+  mergeExisting: mergeExisting,
+);
+
+Future<SyncSnapshotInfo> syncDecodeSnapshot({
+  required List<int> content,
+  required String snapshotId,
+  String? setupToken,
+}) => RustLib.instance.api.crateApiMobileSyncDecodeSnapshot(
+  content: content,
+  snapshotId: snapshotId,
+  setupToken: setupToken,
+);
+
+Future<OperationResult> syncCommitJoin({
+  required String token,
+  required String documentJson,
+  required List<String> frontier,
+  required BigInt generation,
+  required BigInt expectedRevision,
+}) => RustLib.instance.api.crateApiMobileSyncCommitJoin(
+  token: token,
+  documentJson: documentJson,
+  frontier: frontier,
+  generation: generation,
+  expectedRevision: expectedRevision,
+);
+
+Future<SyncLocalState> syncLocalState() =>
+    RustLib.instance.api.crateApiMobileSyncLocalState();
+
+Future<String> syncCurrentDocumentJson() =>
+    RustLib.instance.api.crateApiMobileSyncCurrentDocumentJson();
+
+Future<SyncUploadPlan> syncPrepareUpload({
+  String? documentJson,
+  required List<String> parents,
+  required BigInt generation,
+  required BigInt expectedRevision,
+}) => RustLib.instance.api.crateApiMobileSyncPrepareUpload(
+  documentJson: documentJson,
+  parents: parents,
+  generation: generation,
+  expectedRevision: expectedRevision,
+);
+
+Future<OperationResult> syncCommitUpload({required String token}) =>
+    RustLib.instance.api.crateApiMobileSyncCommitUpload(token: token);
+
+Future<OperationResult> syncApplyRemote({
+  required String documentJson,
+  required List<String> frontier,
+  required BigInt generation,
+  required BigInt expectedRevision,
+}) => RustLib.instance.api.crateApiMobileSyncApplyRemote(
+  documentJson: documentJson,
+  frontier: frontier,
+  generation: generation,
+  expectedRevision: expectedRevision,
+);
+
+Future<String> syncRecoveryCode({required String password}) =>
+    RustLib.instance.api.crateApiMobileSyncRecoveryCode(password: password);
+
+Future<String> syncPrepareRemoteDelete({required String password}) => RustLib
+    .instance
+    .api
+    .crateApiMobileSyncPrepareRemoteDelete(password: password);
+
+Future<SyncStatus> syncCommitRemoteDelete({required String token}) =>
+    RustLib.instance.api.crateApiMobileSyncCommitRemoteDelete(token: token);
+
+Future<SyncStatus> syncDisconnect() =>
+    RustLib.instance.api.crateApiMobileSyncDisconnect();
+
+Future<void> syncCancelPending() =>
+    RustLib.instance.api.crateApiMobileSyncCancelPending();
+
 Future<EntryPage> listEntries({
   required int page,
   required int pageSize,

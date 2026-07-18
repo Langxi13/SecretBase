@@ -9,13 +9,14 @@ from models import (
     SyncConfigUpdateRequest,
     SyncConflictResolutionRequest,
     SyncConnectionRequest,
+    SyncCompactRequest,
     SyncJoinRequest,
     SyncPasswordRequest,
     SyncResetRequest,
 )
 from storage import ConflictError, VaultLockTimeoutError
 from sync_crypto import SyncCryptoError
-from sync_runtime import SyncServiceError, status, test_connection
+from sync_runtime import SyncServiceError, status, test_connection, test_connection_v2
 import sync_service
 import sync_management
 from sync_state import SyncStateError
@@ -58,8 +59,10 @@ async def get_status():
 
 @router.post("/config/test")
 async def test_config(request: SyncConnectionRequest):
-    data = await _call(test_connection, request.model_dump())
-    return {"success": True, "data": data, "message": "WebDAV 连接与条件写入测试通过"}
+    tester = test_connection_v2 if request.protocol_version == 2 else test_connection
+    data = await _call(tester, request.model_dump())
+    message = "WebDAV 基础读写与目录发现测试通过" if request.protocol_version == 2 else "WebDAV 连接与条件写入测试通过"
+    return {"success": True, "data": data, "message": message}
 
 
 @router.post("/create")
@@ -132,7 +135,23 @@ async def rotate_key(request: SyncPasswordRequest):
     return {"success": True, "data": data, "message": "同步密钥已轮换"}
 
 
+@router.post("/migrate-v2")
+async def migrate_to_v2(request: SyncPasswordRequest):
+    from sync_v2_service import migrate_from_v1
+
+    data = await _call(migrate_from_v1, request.password)
+    return {"success": True, "data": data, "message": "已迁移到坚果云兼容快照模式"}
+
+
 @router.post("/reset")
 async def reset_remote(request: SyncResetRequest):
     data = await _call(sync_management.reset_remote, request.password, request.confirmation)
     return {"success": True, "data": data, "message": "远端同步数据已删除"}
+
+
+@router.post("/compact")
+async def compact_history(request: SyncCompactRequest):
+    from sync_v2_service import compact_history as compact_history_v2
+
+    data = await _call(compact_history_v2, request.password, request.confirmation)
+    return {"success": True, "data": data, "message": "同步历史已压缩并清理"}
