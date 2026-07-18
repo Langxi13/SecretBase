@@ -14,6 +14,8 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import quote, urlsplit
 
+from test_runtime_support import close_logging_before_temp_cleanup
+
 ROOT = Path(__file__).resolve().parents[1]
 BACKEND = ROOT / "backend"
 sys.path.insert(0, str(BACKEND))
@@ -158,7 +160,7 @@ def main() -> None:
     transport_url = f"http://127.0.0.1:{server.server_port}/dav"
     public_url = "https://dav.example.invalid/secretbase"
     try:
-        with tempfile.TemporaryDirectory() as raw:
+        with tempfile.TemporaryDirectory() as raw, close_logging_before_temp_cleanup():
             root = Path(raw)
             os.environ.update({
                 "DATA_DIR": str(root / "data"),
