@@ -24,6 +24,7 @@ const state = {
     confirmTitle: ref(''),
     confirmMessage: ref(''),
     confirmSubmitting: ref(false),
+    confirmError: ref(''),
     showConfirm: ref(false)
 };
 
@@ -58,6 +59,17 @@ const controller = sandbox.window.SecretBaseAppUiController.createAppUiControlle
     controller.cancelConfirmAction();
     if (state.showConfirm.value) {
         throw new Error('取消确认没有关闭弹窗');
+    }
+
+    let finishOld;
+    controller.showConfirmDialog('旧操作', '等待中', () => new Promise(resolve => { finishOld = resolve; }));
+    const oldAction = controller.confirmAction();
+    await Promise.resolve();
+    controller.showConfirmDialog('新操作', '不能被旧操作关闭', async () => false);
+    finishOld(true);
+    await oldAction;
+    if (!state.showConfirm.value || state.confirmTitle.value !== '新操作') {
+        throw new Error('迟到的旧确认回调关闭或覆盖了新的确认弹窗');
     }
 
     console.log('PASS frontend confirm interaction');

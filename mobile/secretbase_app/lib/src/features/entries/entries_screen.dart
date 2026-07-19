@@ -106,15 +106,26 @@ class _EntriesScreenState extends ConsumerState<EntriesScreen> {
         const <TaxonomyRecord>[];
     final compactFab = MediaQuery.sizeOf(context).width < 600;
     final origin = widget.preset.origin;
-    final pageTitle = origin == EntryFilterOrigin.groups
+    final originCategoryMatches = _originCategoryMatches;
+    final pageTitle =
+        originCategoryMatches && origin == EntryFilterOrigin.groups
         ? (_group ?? '密码组条目')
-        : origin == EntryFilterOrigin.tags
+        : originCategoryMatches && origin == EntryFilterOrigin.tags
         ? (_tag ?? '标签条目')
+        : _group != null
+        ? _group!
+        : _tag != null
+        ? _tag!
         : '全部条目';
     final total = entries.asData?.value.total;
-    final subtitlePrefix = origin == EntryFilterOrigin.groups
+    final subtitlePrefix =
+        originCategoryMatches && origin == EntryFilterOrigin.groups
         ? '密码组'
-        : origin == EntryFilterOrigin.tags
+        : originCategoryMatches && origin == EntryFilterOrigin.tags
+        ? '标签'
+        : _group != null
+        ? '密码组'
+        : _tag != null
         ? '标签'
         : null;
     final pageSubtitle = total == null
@@ -304,7 +315,19 @@ class _EntriesScreenState extends ConsumerState<EntriesScreen> {
   }
 
   bool get _canReturnToOrigin =>
-      widget.preset.origin != null && widget.onExitPreset != null;
+      _originCategoryMatches &&
+      widget.preset.origin != null &&
+      widget.onExitPreset != null;
+
+  bool get _originCategoryMatches {
+    return switch (widget.preset.origin) {
+      EntryFilterOrigin.groups =>
+        _group == widget.preset.group && _tag == null && !_starred,
+      EntryFilterOrigin.tags =>
+        _tag == widget.preset.tag && _group == null && !_starred,
+      null => false,
+    };
+  }
 
   String get _returnLabel => switch (widget.preset.origin) {
     EntryFilterOrigin.groups => '返回密码组',

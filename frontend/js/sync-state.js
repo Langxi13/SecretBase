@@ -30,6 +30,8 @@
         const syncSetupTesting = ref(false);
         const syncPairingReading = ref(false);
         const syncSetupMessage = ref('');
+        const syncSetupError = ref('');
+        const syncSetupTestPassed = ref(false);
         const syncSetupForm = reactive({
             baseUrl: '',
             username: '',
@@ -52,6 +54,8 @@
         const showSyncConflicts = ref(false);
         const syncConflictToken = ref('');
         const syncConflicts = ref([]);
+        const syncConflictsLoading = ref(false);
+        const syncConflictsError = ref('');
         const syncConflictResolutions = reactive({});
         const showSyncHistory = ref(false);
         const syncHistory = ref([]);
@@ -76,12 +80,16 @@
             syncSetupTesting,
             syncPairingReading,
             syncSetupMessage,
+            syncSetupError,
+            syncSetupTestPassed,
             syncSetupForm,
             showSyncConfig,
             syncConfigForm,
             showSyncConflicts,
             syncConflictToken,
             syncConflicts,
+            syncConflictsLoading,
+            syncConflictsError,
             syncConflictResolutions,
             showSyncHistory,
             syncHistory,

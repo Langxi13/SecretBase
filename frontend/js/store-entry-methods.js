@@ -5,7 +5,7 @@
 (function () {
     function createEntryMethods({ api, showToast, normalizePagination, buildEntrySearchParams }) {
         return {
-            async loadEntries(page = 1) {
+            async loadEntries(page = 1, { shouldCommit } = {}) {
                 try {
                     const pageSize = this.state.settings.pageSize || 20;
                     const params = buildEntrySearchParams({
@@ -15,6 +15,9 @@
                     });
                     const result = await api.get(`/entries?${params}`);
                     const pagination = normalizePagination(result.data.pagination);
+                    if (typeof shouldCommit === 'function' && !shouldCommit()) {
+                        return { ...result.data, pagination };
+                    }
                     this.setState({
                         entries: result.data.items,
                         pagination
@@ -22,11 +25,7 @@
                     return { ...result.data, pagination };
                 } catch (error) {
                     console.error('加载条目失败:', error);
-                    showToast(error.message || '加载条目失败', 'error');
-                    return {
-                        items: this.state.entries,
-                        pagination: this.state.pagination
-                    };
+                    throw error;
                 }
             },
 
@@ -36,7 +35,7 @@
                     return result.data;
                 } catch (error) {
                     console.error('获取条目失败:', error);
-                    showToast('获取条目失败', 'error');
+                    showToast(error.message || '获取条目失败', 'error');
                     return null;
                 }
             },
@@ -48,7 +47,7 @@
                     return result.data;
                 } catch (error) {
                     console.error('创建条目失败:', error);
-                    showToast('创建条目失败', 'error');
+                    showToast(error.message || '创建条目失败', 'error');
                     return null;
                 }
             },
@@ -60,7 +59,7 @@
                     return result.data;
                 } catch (error) {
                     console.error('更新条目失败:', error);
-                    showToast('更新条目失败', 'error');
+                    showToast(error.message || '更新条目失败', 'error');
                     return null;
                 }
             },

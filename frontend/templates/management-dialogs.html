@@ -3,7 +3,7 @@
             <div class="modal-content">
                 <div class="modal-header">
                     <h2>修改主密码</h2>
-                    <button class="modal-close" @click="showChangePassword = false" :disabled="passwordChanging">✕</button>
+                    <button class="modal-close" @click="closeChangePassword" :disabled="passwordChanging">✕</button>
                 </div>
                 <div class="modal-body" :inert="passwordChanging ? '' : null">
                     <div class="form-group">
@@ -21,7 +21,7 @@
                     <p v-if="passwordForm.error" class="error-message">{{ passwordForm.error }}</p>
                 </div>
                 <div class="modal-footer">
-                    <button class="btn-secondary" @click="showChangePassword = false" :disabled="passwordChanging">取消</button>
+                    <button class="btn-secondary" @click="closeChangePassword" :disabled="passwordChanging">取消</button>
                     <button class="btn-primary" @click="changePassword" :disabled="passwordChanging">
                         {{ passwordChanging ? '修改中...' : '确认修改' }}
                     </button>
@@ -34,10 +34,20 @@
             <div class="modal-content trash-modal">
                 <div class="modal-header">
                     <h2>🗑️ 回收站</h2>
-                    <button class="modal-close" @click="showTrash = false">✕</button>
+                    <button class="modal-close" @click="closeTrash" :disabled="trashLoading || trashEmptying || trashActionIds.length > 0">✕</button>
                 </div>
                 <div class="modal-body">
-                    <div v-if="trashItems.length === 0" class="empty-state">
+                    <div v-if="trashLoading" class="loading-state">
+                        <span class="loading-spinner"></span>
+                        <span>正在加载回收站...</span>
+                    </div>
+                    <div v-else-if="trashError" class="empty-state error-state">
+                        <p>{{ trashError }}</p>
+                        <button class="btn-secondary" @click="retryTrash" :disabled="trashLoading">
+                            {{ trashLoading ? '重试中...' : '重新加载' }}
+                        </button>
+                    </div>
+                    <div v-else-if="trashItems.length === 0" class="empty-state">
                         <p>回收站是空的</p>
                     </div>
                     <div v-else>
@@ -47,13 +57,15 @@
                                 <p>删除于 {{ formatDate(item.deleted_at) }} · 剩余 {{ item.remaining_days }} 天</p>
                             </div>
                             <div class="trash-item-actions">
-                                <button class="btn-small" @click="restoreTrashItem(item.id)">恢复</button>
-                                <button class="btn-small btn-danger" @click="deleteTrashItem(item.id)">彻底删除</button>
+                                <button class="btn-small" @click="restoreTrashItem(item.id)" :disabled="trashLoading || trashActionIds.includes(item.id)">
+                                    {{ trashActionIds.includes(item.id) ? '处理中...' : '恢复' }}
+                                </button>
+                                <button class="btn-small btn-danger" @click="deleteTrashItem(item.id)" :disabled="trashLoading || trashActionIds.includes(item.id)">彻底删除</button>
                             </div>
                         </div>
                     </div>
                 </div>
-                <div class="modal-footer" v-if="trashItems.length > 0">
+                <div class="modal-footer" v-if="!trashLoading && !trashError && trashItems.length > 0">
                     <label class="tag-page-size-control" title="输入自定义条数或选择">
                         <span>每页</span>
                         <input type="number" class="page-size-input" v-model.number="trashPageSize" min="1" max="500">
@@ -63,10 +75,12 @@
                         </select>
                         <span>条</span>
                     </label>
-                    <button class="btn-secondary" :disabled="trashPage <= 1" @click="goToTrashPage(trashPage - 1)">上一页</button>
+                    <button class="btn-secondary" :disabled="trashLoading || trashEmptying || trashActionIds.length > 0 || trashPage <= 1" @click="goToTrashPage(trashPage - 1)">上一页</button>
                     <span class="page-info">{{ trashPage }} / {{ trashTotalPages }} · 共 {{ trashTotal }} 条</span>
-                    <button class="btn-secondary" :disabled="trashPage >= trashTotalPages" @click="goToTrashPage(trashPage + 1)">下一页</button>
-                    <button class="btn-danger" @click="emptyTrashConfirm">清空回收站</button>
+                    <button class="btn-secondary" :disabled="trashLoading || trashEmptying || trashActionIds.length > 0 || trashPage >= trashTotalPages" @click="goToTrashPage(trashPage + 1)">下一页</button>
+                    <button class="btn-danger" @click="emptyTrashConfirm" :disabled="trashEmptying || trashLoading || trashActionIds.length > 0">
+                        {{ trashEmptying ? '清空中...' : '清空回收站' }}
+                    </button>
                 </div>
             </div>
         </div>
@@ -76,20 +90,20 @@
             <div class="modal-content tag-manager-modal">
                 <div class="modal-header">
                     <h2>🏷️ 标签管理</h2>
-                    <button class="modal-close" @click="closeTagManager" :disabled="tagMerging">✕</button>
+                    <button class="modal-close" @click="closeTagManager" :disabled="tagMerging || tagSaving">✕</button>
                 </div>
                 <div class="modal-body">
                     <div class="tag-manager-segmented" role="tablist" aria-label="标签管理功能">
                         <button
                             type="button"
                             :class="{ active: tagManagerPanel === 'list' }"
-                            :disabled="tagMerging"
+                            :disabled="tagMerging || tagSaving"
                             @click="tagManagerPanel = 'list'"
                         >标签列表</button>
                         <button
                             type="button"
                             :class="{ active: tagManagerPanel === 'merge' }"
-                            :disabled="tagMerging"
+                            :disabled="tagMerging || tagSaving"
                             @click="tagManagerPanel = 'merge'"
                         >合并标签</button>
                     </div>
@@ -102,30 +116,36 @@
                         <div class="tag-manager-actions">
                             <label class="tag-page-size-control">
                                 <span>每页</span>
-                                <select v-model.number="tagManagerPageSize">
+                                <select v-model.number="tagManagerPageSize" :disabled="tagMerging || tagSaving">
                                     <option v-for="size in tagPageSizeOptions" :key="'manager-size-' + size" :value="size">{{ size }}</option>
                                 </select>
                             </label>
-                            <button class="btn-secondary" @click="openCreateTagModal">新建标签</button>
-                            <button class="btn-danger" @click="batchDeleteManagedTags" :disabled="selectedManagedTagNames.length === 0">
+                            <button class="btn-secondary" @click="openCreateTagModal" :disabled="tagMerging || tagSaving">新建标签</button>
+                            <button class="btn-danger" @click="batchDeleteManagedTags" :disabled="tagMerging || tagSaving || selectedManagedTagNames.length === 0">
                                 批量删除（{{ selectedManagedTagNames.length }}）
                             </button>
                         </div>
                     </div>
-                    <div v-if="tags.length === 0" class="empty-state">
+                    <div v-if="hasLoadError('tags')" class="empty-state error-state" role="alert">
+                        <p>标签暂时无法加载，请稍后重试。</p>
+                        <button class="btn-secondary" @click="retryDataLoad" :disabled="dataLoading">
+                            {{ dataLoading ? '重试中...' : '重新加载标签' }}
+                        </button>
+                    </div>
+                    <div v-else-if="tags.length === 0" class="empty-state">
                         <p>暂无标签</p>
                     </div>
                     <div v-else class="tag-manager-list">
                         <div class="tag-manager-list-head">
                             <label class="tag-select-control">
-                                <input type="checkbox" :checked="allManagedPageTagsSelected" @change="toggleManagedTagPageSelection">
+                                <input type="checkbox" :checked="allManagedPageTagsSelected" @change="toggleManagedTagPageSelection" :disabled="tagMerging || tagSaving">
                                 <span>选择当前页</span>
                             </label>
                             <span>{{ paginatedManagedTags.length }} / {{ tags.length }}</span>
                         </div>
                         <div v-for="tag in paginatedManagedTags" :key="tag.name" class="tag-item">
                             <label class="tag-select-box" :aria-label="`选择标签 ${tag.name}`">
-                                <input type="checkbox" :checked="isManagedTagSelected(tag.name)" @change="toggleManagedTagSelection(tag.name)">
+                                <input type="checkbox" :checked="isManagedTagSelected(tag.name)" @change="toggleManagedTagSelection(tag.name)" :disabled="tagMerging || tagSaving">
                             </label>
                             <span class="tag-dot" :style="{ backgroundColor: tag.color }"></span>
                             <div class="tag-main">
@@ -133,22 +153,22 @@
                                 <span class="tag-description">{{ tag.description || '暂无简介' }}</span>
                             </div>
                             <span class="tag-count">{{ tag.count }} 个条目</span>
-                            <button class="btn-small" @click="startEditManagedTag(tag)">编辑</button>
-                            <button class="btn-small btn-danger" @click="deleteTag(tag)">删除</button>
+                            <button class="btn-small" @click="startEditManagedTag(tag)" :disabled="tagMerging || tagSaving">编辑</button>
+                            <button class="btn-small btn-danger" @click="deleteTag(tag)" :disabled="tagMerging || tagSaving">删除</button>
                         </div>
                         <div class="tag-manager-pagination">
                             <label class="tag-page-size-control" title="输入自定义条数或选择">
                                 <span>每页</span>
-                                <input type="number" class="page-size-input" v-model.number="tagManagerPageSize" min="1" max="500">
-                                <select class="page-size-quick-select" :value="tagManagerPageSize" @change="tagManagerPageSize = Number($event.target.value)">
+                                <input type="number" class="page-size-input" v-model.number="tagManagerPageSize" min="1" max="500" :disabled="tagMerging || tagSaving">
+                                <select class="page-size-quick-select" :value="tagManagerPageSize" :disabled="tagMerging || tagSaving" @change="tagManagerPageSize = Number($event.target.value)">
                                     <option :value="tagManagerPageSize" v-if="!(tagPageSizeOptions || [5, 10, 20, 50, 100]).includes(tagManagerPageSize)">{{ tagManagerPageSize }} (自定)</option>
                                     <option v-for="size in (tagPageSizeOptions || [5, 10, 20, 50, 100])" :key="'manager-size-' + size" :value="size">{{ size }}</option>
                                 </select>
                                 <span>条</span>
                             </label>
-                            <button class="btn-secondary" :disabled="tagManagerPage <= 1" @click="goToTagManagerPage(tagManagerPage - 1)">上一页</button>
+                            <button class="btn-secondary" :disabled="tagMerging || tagSaving || tagManagerPage <= 1" @click="goToTagManagerPage(tagManagerPage - 1)">上一页</button>
                             <span class="page-info">{{ tagManagerPage }} / {{ tagManagerTotalPages }}</span>
-                            <button class="btn-secondary" :disabled="tagManagerPage >= tagManagerTotalPages" @click="goToTagManagerPage(tagManagerPage + 1)">下一页</button>
+                            <button class="btn-secondary" :disabled="tagMerging || tagSaving || tagManagerPage >= tagManagerTotalPages" @click="goToTagManagerPage(tagManagerPage + 1)">下一页</button>
                         </div>
                     </div>
                     </section>

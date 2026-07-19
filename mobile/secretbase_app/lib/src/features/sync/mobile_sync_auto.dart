@@ -139,10 +139,20 @@ class _MobileSyncAutoCoordinatorState
         state.failure('请打开“设置 > 加密快照同步”处理冲突。', conflict: true);
         return;
       }
+      var refreshed = true;
       if (result.action == 'downloaded' || result.action == 'merged') {
-        await ref.read(vaultControllerProvider.notifier).refreshStatus();
+        try {
+          await ref.read(vaultControllerProvider.notifier).refreshStatus();
+        } catch (_) {
+          refreshed = false;
+        }
       }
-      state.success(result.message);
+      if (refreshed) {
+        state.success(result.message);
+      } else {
+        state.success('${result.message}，但本地界面刷新不完整，将稍后重试。');
+        _schedule(const Duration(seconds: 10));
+      }
     } on MobileSyncBusyException {
       if (!_disposed) _schedule(const Duration(seconds: 2));
     } catch (error) {

@@ -566,8 +566,15 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         // The rekeyed Vault salt also makes any stale device credential unusable.
       }
       ref.invalidate(biometricStatusProvider);
-      await ref.read(vaultControllerProvider.notifier).refreshStatus();
-      return '${result.message}；请按需重新开启指纹解锁';
+      var refreshed = true;
+      try {
+        await ref.read(vaultControllerProvider.notifier).refreshStatus();
+      } catch (_) {
+        refreshed = false;
+      }
+      return refreshed
+          ? '${result.message}；请按需重新开启指纹解锁'
+          : '${result.message}；请按需重新开启指纹解锁，但界面刷新不完整，请稍后重试。';
     });
   }
 

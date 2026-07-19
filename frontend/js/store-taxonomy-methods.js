@@ -5,14 +5,17 @@
 (function () {
     function createTaxonomyMethods({ api, showToast }) {
         return {
-            async loadTags() {
+            async loadTags({ shouldCommit } = {}) {
                 try {
                     const result = await api.get('/tags');
+                    if (typeof shouldCommit === 'function' && !shouldCommit()) {
+                        return result.data.tags;
+                    }
                     this.setState({ tags: result.data.tags });
                     return result.data.tags;
                 } catch (error) {
                     console.error('加载标签失败:', error);
-                    return [];
+                    throw error;
                 }
             },
 
@@ -64,14 +67,17 @@
                 }
             },
 
-            async loadGroups() {
+            async loadGroups({ shouldCommit } = {}) {
                 try {
                     const result = await api.get('/groups');
+                    if (typeof shouldCommit === 'function' && !shouldCommit()) {
+                        return result.data.groups;
+                    }
                     this.setState({ groups: result.data.groups });
                     return result.data.groups;
                 } catch (error) {
                     console.error('加载密码组失败:', error);
-                    return [];
+                    throw error;
                 }
             },
 

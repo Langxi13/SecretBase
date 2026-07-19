@@ -231,16 +231,22 @@ class _AiScopeDialogState extends State<AiScopeDialog> {
   }
 }
 
-Future<String?> showAiHistoryDialog({required BuildContext context}) {
+Future<String?> showAiHistoryDialog({
+  required BuildContext context,
+  String? currentConversationId,
+}) {
   return showResponsiveDialog<String>(
     context: context,
     maxWidth: 720,
-    builder: (_) => const AiHistoryDialog(),
+    builder: (_) =>
+        AiHistoryDialog(currentConversationId: currentConversationId),
   );
 }
 
 class AiHistoryDialog extends StatefulWidget {
-  const AiHistoryDialog({super.key});
+  const AiHistoryDialog({this.currentConversationId, super.key});
+
+  final String? currentConversationId;
 
   @override
   State<AiHistoryDialog> createState() => _AiHistoryDialogState();
@@ -261,6 +267,24 @@ class _AiHistoryDialogState extends State<AiHistoryDialog> {
 
   Future<void> _delete(AiConversationSummary conversation) async {
     if (_working) return;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('删除对话'),
+        content: Text('确认删除“${conversation.title}”吗？删除后无法恢复。'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('删除'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
     setState(() {
       _working = true;
       _error = null;
@@ -268,8 +292,12 @@ class _AiHistoryDialogState extends State<AiHistoryDialog> {
     try {
       await rust_api.deleteAiConversation(id: conversation.id);
       if (mounted) {
-        setState(() => _working = false);
-        _reload();
+        if (conversation.id == widget.currentConversationId) {
+          Navigator.of(context).pop('');
+        } else {
+          setState(() => _working = false);
+          _reload();
+        }
       }
     } catch (error) {
       if (mounted) {

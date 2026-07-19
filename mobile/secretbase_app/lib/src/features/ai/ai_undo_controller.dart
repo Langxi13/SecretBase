@@ -68,11 +68,16 @@ class AiUndoController extends Notifier<AiUndoUiState> {
         expectedRevision: pending.revision,
       );
       state = state.copyWith(clear: true, working: false);
-      await ref.read(vaultControllerProvider.notifier).refreshStatus();
+      var refreshed = true;
+      try {
+        await ref.read(vaultControllerProvider.notifier).refreshStatus();
+      } catch (_) {
+        refreshed = false;
+      }
       ref.invalidate(entryPageProvider);
       ref.invalidate(taxonomyProvider);
       ref.invalidate(recoverySnapshotsProvider);
-      return result.message;
+      return refreshed ? result.message : '${result.message}，但界面刷新不完整，请稍后重试。';
     } catch (_) {
       state = state.copyWith(clear: true, working: false);
       rethrow;

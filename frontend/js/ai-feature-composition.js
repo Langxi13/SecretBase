@@ -13,7 +13,8 @@
         data,
         ui,
         viewHelpers,
-        settingsActions
+        settingsActions,
+        openEntryDetail = () => false
     }) {
         const views = window.SecretBaseAiView.createAiView({
             computed,
@@ -36,6 +37,7 @@
         const providerActions = window.SecretBaseAiSettingsController.createAiSettingsController({
             api,
             showToast,
+            showConfirmDialog: ui.showConfirmDialog,
             aiSettingsForm: state.aiSettingsForm,
             aiProviders: state.aiProviders,
             aiManualModel: state.aiManualModel,
@@ -67,6 +69,7 @@
             aiStatusError: state.aiStatusError,
             aiFailureMessage: state.aiFailureMessage,
             aiOrganizing: state.aiOrganizing,
+            aiRequestCancelable: state.aiRequestCancelable,
             aiOrganizeError: state.aiOrganizeError,
             aiOrganizeResult: state.aiOrganizeResult,
             aiOrganizeMode: state.aiOrganizeMode,
@@ -125,6 +128,7 @@
             api,
             store,
             showToast,
+            showConfirmDialog: ui.showConfirmDialog,
             copyToClipboard,
             showAiAssistant: state.showAiAssistant,
             showAiParse: state.showAiParse,
@@ -154,6 +158,7 @@
             loadGroups: data.loadGroups,
             openSettings: (...args) => settingsActions.openSettings(...args),
             selectSettingsTab: (...args) => settingsActions.selectSettingsTab(...args),
+            openEntryDetail,
             normalizeAssistantActionTargets: inspectorActions.normalizeAssistantActionTargets,
             resetAssistantInspector: inspectorActions.resetAssistantInspector,
             assistantPlanHasSelectedConflicts: inspectorActions.assistantPlanHasSelectedConflicts

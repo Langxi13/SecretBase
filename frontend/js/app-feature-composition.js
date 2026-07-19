@@ -21,6 +21,7 @@
         pagination
     }) {
         const listActions = {};
+        let openEntryDetail;
         const aiFeature = window.SecretBaseAiFeatureComposition.createAiFeatureComposition({
             computed,
             nextTick,
@@ -32,7 +33,8 @@
             data,
             ui,
             viewHelpers,
-            settingsActions
+            settingsActions,
+            openEntryDetail: (...args) => openEntryDetail?.(...args)
         });
 
         const selectedSearchScopeLabels = computed(() => {
@@ -40,6 +42,13 @@
                 .filter(scope => state.selectedSearchScopes.value.includes(scope.key))
                 .map(scope => scope.label);
         });
+        const settingsWriteBusy = computed(() => (
+            state.settingsSaving.value
+            || state.transferBusy.value
+            || state.aiSettingsSaving.value
+            || state.syncBusy.value
+            || state.syncRecoveryBusy.value
+        ));
 
         const {
             tagBrowserSortOptions,
@@ -85,6 +94,7 @@
             handleAdvancedTagInput
         } = window.SecretBaseFilterController.createAdvancedFilterController({
             computed,
+            showToast,
             advancedTagDraft: state.advancedTagDraft,
             advancedTagList: state.advancedTagList,
             advancedFilters: state.advancedFilters,
@@ -98,7 +108,8 @@
             sortBy: state.sortBy,
             sortOrder: state.sortOrder,
             applyAdvancedFilters: (...args) => listActions.applyAdvancedFilters(...args),
-            clearAdvancedFilters: (...args) => listActions.clearAdvancedFilters(...args)
+            clearAdvancedFilters: (...args) => listActions.clearAdvancedFilters(...args),
+            showPromptDialog: ui.showPromptDialog
         });
 
         const allCurrentPageSelected = computed(() => {
@@ -168,6 +179,11 @@
             tagBrowserTotalPages,
             loadEntries: data.loadEntries,
             resetAdvancedFilterForm,
+            resetSearchScopes: ui.resetSearchScopes,
+            searchQuery: state.searchQuery,
+            selectedEntryIds: state.selectedEntryIds,
+            sortBy: state.sortBy,
+            sortOrder: state.sortOrder,
             showTagManager: state.showTagManager,
             showTagEditorModal: state.showTagEditorModal,
             tagEditorForm: state.tagEditorForm,
@@ -188,9 +204,11 @@
             api,
             showToast,
             showConfirmDialog: ui.showConfirmDialog,
+            showPromptDialog: ui.showPromptDialog,
             friendlyApiMessage: viewHelpers.friendlyApiMessage,
             downloadProtectedFile: window.SecretBaseDownload.downloadProtectedFile,
             backups: state.backups,
+            backupError: state.backupError,
             highlightedBackupFilename: state.highlightedBackupFilename,
             backupListLoading: state.backupListLoading,
             showBackupCenter: state.showBackupCenter,
@@ -199,7 +217,8 @@
             restoringBackupFilename: state.restoringBackupFilename,
             downloadingBackupFilename: state.downloadingBackupFilename,
             restoreWizard: state.restoreWizard,
-            loadAllData: data.loadAllData
+            loadAllData: data.loadAllData,
+            locked: state.locked
         });
 
         const trashActions = window.SecretBaseTrashController.createTrashController({
@@ -211,18 +230,27 @@
             trashTotalPages: state.trashTotalPages,
             trashTotal: state.trashTotal,
             trashPageSize: state.trashPageSize,
-            loadEntries: data.loadEntries
+            trashActionIds: state.trashActionIds,
+            trashEmptying: state.trashEmptying,
+            loadEntries: data.loadEntries,
+            trashLoading: state.trashLoading,
+            trashError: state.trashError,
+            showTrash: state.showTrash,
+            locked: state.locked
         });
 
         const transferActions = window.SecretBaseTransferController.createTransferController({
             api,
             showToast,
             showConfirmDialog: ui.showConfirmDialog,
+            showPromptDialog: ui.showPromptDialog,
             friendlyApiMessage: viewHelpers.friendlyApiMessage,
             downloadProtectedFile: window.SecretBaseDownload.downloadProtectedFile,
             loadAllData: data.loadAllData,
             importConflictStrategy: state.importConflictStrategy,
             importConflictMessage: state.importConflictMessage,
+            transferBusy: state.transferBusy,
+            transferError: state.transferError,
             showImportConflicts: state.showImportConflicts,
             importConflicts: state.importConflicts,
             showImportReport: state.showImportReport,
@@ -236,11 +264,19 @@
             lastImportConflictResolutions: state.lastImportConflictResolutions
         });
 
-        const entryActions = window.SecretBaseEntryController.createEntryController({
+        const entryOnboardingActions = window.SecretBaseEntryOnboardingController.createEntryOnboardingController({
             api,
+            showToast,
+            showOnboarding: state.showOnboarding,
+            importingSamples: state.importingSamples,
+            loadAllData: data.loadAllData
+        });
+
+        const entryActions = window.SecretBaseEntryController.createEntryController({
             store,
             showToast,
             copyToClipboard,
+            openExternalUrl,
             normalizeFieldForEdit: viewHelpers.normalizeFieldForEdit,
             entries: state.entries,
             filter: state.filter,
@@ -249,7 +285,14 @@
             currentPage: state.currentPage,
             totalPages: state.totalPages,
             selectedEntry: state.selectedEntry,
+            showEntryDetail: state.showEntryDetail,
+            entryDetailTargetId: state.entryDetailTargetId,
+            entryDetailLoading: state.entryDetailLoading,
+            entryDetailError: state.entryDetailError,
             editingEntry: state.editingEntry,
+            entryEditLoading: state.entryEditLoading,
+            entryEditTargetId: state.entryEditTargetId,
+            entryEditError: state.entryEditError,
             entryForm: state.entryForm,
             entryTemplates: state.entryTemplates,
             selectedTemplate: state.selectedTemplate,
@@ -260,10 +303,10 @@
             showCreateModal: state.showCreateModal,
             showEditModal: state.showEditModal,
             entrySaving: state.entrySaving,
-            showOnboarding: state.showOnboarding,
-            importingSamples: state.importingSamples,
+            entryActionIds: state.entryActionIds,
             selectedEntryIds: state.selectedEntryIds,
             batchTagName: state.batchTagName,
+            batchBusy: state.batchBusy,
             allCurrentPageSelected,
             copyMenuEntryId: state.copyMenuEntryId,
             showTagDropdown: state.showTagDropdown,
@@ -272,9 +315,9 @@
             loadEntries: data.loadEntries,
             loadTags: data.loadTags,
             loadGroups: data.loadGroups,
-            loadAllData: data.loadAllData,
             showConfirmDialog: ui.showConfirmDialog
         });
+        openEntryDetail = entryActions.openEntryDetail;
 
         const listControllerActions = window.SecretBaseListController.createListController({
             debounce,
@@ -308,6 +351,7 @@
             store,
             showToast,
             showConfirmDialog: ui.showConfirmDialog,
+            showPromptDialog: ui.showPromptDialog,
             friendlyApiMessage: viewHelpers.friendlyApiMessage,
             showTools: state.showTools,
             healthReport: state.healthReport,
@@ -368,6 +412,7 @@
             editingGroupName: state.editingGroupName,
             groupForm: state.groupForm,
             groupSaving: state.groupSaving,
+            groupOrdering: state.groupOrdering,
             showGroupModal: state.showGroupModal,
             loadGroups: data.loadGroups,
             loadEntries: data.loadEntries,
@@ -379,13 +424,35 @@
             groupPickerGroupFilter: state.groupPickerGroupFilter,
             groupPickerPage: state.groupPickerPage,
             groupPickerLoading: state.groupPickerLoading,
+            groupPickerError: state.groupPickerError,
             groupPickerSaving: state.groupPickerSaving,
             groupPickerTotalPages,
             paginatedGroupPickerEntries,
-            allGroupPickerEntriesSelected
+            allGroupPickerEntriesSelected,
+            locked: state.locked
         });
         Object.assign(listActions, {
             returnToGroupMode: groupActions.showGroupMode
+        });
+
+        const keyboard = window.SecretBaseAppKeyboardController.createAppKeyboardController({
+            state,
+            ui,
+            backupBusy,
+            actions: {
+                ai: aiFeature.actions,
+                backup: backupActions,
+                desktop: desktop.actions,
+                entry: entryActions,
+                group: groupActions,
+                maintenance: maintenanceActions,
+                onboarding: entryOnboardingActions,
+                settings: settingsActions,
+                sync: sync.actions,
+                tag: tagActions,
+                transfer: transferActions,
+                trash: trashActions
+            }
         });
 
         const selectedImportPreviewCount = computed(() => state.importPreviewSelectedIds.value.length);
@@ -399,6 +466,7 @@
             views: {
                 ...aiFeature.views,
                 selectedSearchScopeLabels,
+                settingsWriteBusy,
                 tagBrowserSortOptions,
                 sortedTagBrowserTags,
                 visibleSidebarTags,
@@ -439,6 +507,7 @@
                 ...trashActions,
                 ...transferActions,
                 ...entryActions,
+                ...entryOnboardingActions,
                 ...listControllerActions,
                 ...maintenanceActions,
                 ...groupActions,
@@ -457,7 +526,8 @@
                 removeAdvancedTag,
                 commitAndApplyAdvancedTags,
                 handleAdvancedTagKey,
-                handleAdvancedTagInput
+                handleAdvancedTagInput,
+                handleDocumentKeydown: keyboard.handleDocumentKeydown
             }
         };
     }

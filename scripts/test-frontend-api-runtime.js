@@ -33,6 +33,7 @@ const sandbox = {
     },
     setTimeout,
     clearTimeout,
+    AbortController,
     fetch: async () => ({
         ok: true,
         status: 200,
@@ -61,6 +62,12 @@ vm.runInContext(read('frontend/js/api.js'), context, { filename: 'api.js' });
 
 const api = vm.runInContext('api', context);
 api.setToken('session-only-token');
+if (api.defaultTimeoutMs('/ai/organize/preview') < 120000) {
+    throw new Error('AI 整理请求前端超时必须覆盖后端长任务时限');
+}
+if (api.defaultTimeoutMs('/ai/status') > 30000) {
+    throw new Error('AI 状态读取不应使用长任务超时，避免故障时界面长时间无反馈');
+}
 if (api.getToken() !== 'session-only-token') {
     throw new Error('浏览器存储不可用时认证 token 必须保留在当前内存会话');
 }
@@ -134,6 +141,32 @@ async function expectApiError(promise, expectedCode, expectedStatus) {
     if (events.filter(event => event.type === 'secretbase:vault-mutated').length !== mutationEvents.length) {
         throw new Error('同步接口自身不得再次触发自动同步事件');
     }
+
+    context.fetch = (_url, options) => new Promise((_resolve, reject) => {
+        options.signal.addEventListener('abort', () => {
+            const error = new Error('aborted');
+            error.name = 'AbortError';
+            reject(error);
+        });
+    });
+    const staleRequest = api.get('/sensitive-data');
+    api.invalidateSession();
+    await expectApiError(staleRequest, 'SESSION_INVALIDATED', 401);
+    if (api.activeControllers.size !== 0) {
+        throw new Error('会话失效后仍保留已取消的网络请求控制器');
+    }
+
+    context.fetch = (_url, options) => new Promise((_resolve, reject) => {
+        options.signal.addEventListener('abort', () => {
+            const error = new Error('aborted by user');
+            error.name = 'AbortError';
+            reject(error);
+        });
+    });
+    const userAbort = new AbortController();
+    const cancelledRequest = api.get('/cancelled', { signal: userAbort.signal });
+    userAbort.abort();
+    await expectApiError(cancelledRequest, 'REQUEST_CANCELLED', 499);
 
     console.log('PASS frontend api runtime');
 })().catch(error => {

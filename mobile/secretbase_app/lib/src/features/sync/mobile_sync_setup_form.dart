@@ -22,6 +22,9 @@ class MobileSyncSetupForm extends StatefulWidget {
     required this.onPastePairing,
     required this.onTestConnection,
     required this.onSubmit,
+    this.errorMessage,
+    this.connectionTestPassed = false,
+    this.onReload,
     this.onInputChanged,
     super.key,
   });
@@ -42,6 +45,9 @@ class MobileSyncSetupForm extends StatefulWidget {
   final VoidCallback onPastePairing;
   final VoidCallback onTestConnection;
   final VoidCallback onSubmit;
+  final String? errorMessage;
+  final bool connectionTestPassed;
+  final VoidCallback? onReload;
   final VoidCallback? onInputChanged;
 
   @override
@@ -99,14 +105,6 @@ class _MobileSyncSetupFormState extends State<MobileSyncSetupForm> {
   void _rebuild() {
     if (mounted) setState(() {});
   }
-
-  bool get _canTest =>
-      widget.url.text.trim().isNotEmpty &&
-      widget.username.text.trim().isNotEmpty &&
-      widget.password.text.isNotEmpty;
-
-  bool get _canSubmit =>
-      _canTest && (!widget.joining || widget.recovery.text.trim().isNotEmpty);
 
   void _inputChanged(String _) {
     widget.onInputChanged?.call();
@@ -191,6 +189,21 @@ class _MobileSyncSetupFormState extends State<MobileSyncSetupForm> {
           '使用不可变加密快照，不要求 WebDAV 提供 ETag；密码字段和值不会以明文上传。',
           style: Theme.of(context).textTheme.bodySmall,
         ),
+        if (widget.joining && widget.recovery.text.trim().isEmpty) ...[
+          const SizedBox(height: 10),
+          _feedbackPanel(
+            '加入现有空间还需要同步恢复码，或先扫描/粘贴配对信息。测试连接只验证 WebDAV，不会替代恢复码。',
+            warning: true,
+          ),
+        ],
+        if (widget.connectionTestPassed) ...[
+          const SizedBox(height: 10),
+          _feedbackPanel('WebDAV 连接测试已通过，可以继续提交配置。', success: true),
+        ],
+        if (widget.errorMessage != null && widget.errorMessage!.isNotEmpty) ...[
+          const SizedBox(height: 10),
+          _feedbackPanel(widget.errorMessage!, onReload: widget.onReload),
+        ],
         const SizedBox(height: 14),
         Wrap(
           spacing: 8,
@@ -198,14 +211,12 @@ class _MobileSyncSetupFormState extends State<MobileSyncSetupForm> {
           alignment: WrapAlignment.end,
           children: [
             OutlinedButton.icon(
-              onPressed: widget.working || !_canTest
-                  ? null
-                  : widget.onTestConnection,
+              onPressed: widget.working ? null : widget.onTestConnection,
               icon: const Icon(Icons.network_check_outlined),
               label: const Text('测试连接'),
             ),
             FilledButton.icon(
-              onPressed: widget.working || !_canSubmit ? null : widget.onSubmit,
+              onPressed: widget.working ? null : widget.onSubmit,
               icon: Icon(
                 widget.joining ? Icons.login : Icons.cloud_upload_outlined,
               ),
@@ -220,6 +231,54 @@ class _MobileSyncSetupFormState extends State<MobileSyncSetupForm> {
           ],
         ),
       ],
+    );
+  }
+
+  Widget _feedbackPanel(
+    String message, {
+    bool warning = false,
+    bool success = false,
+    VoidCallback? onReload,
+  }) {
+    final scheme = Theme.of(context).colorScheme;
+    final background = success
+        ? scheme.tertiaryContainer
+        : warning
+        ? scheme.secondaryContainer
+        : scheme.errorContainer;
+    final foreground = success
+        ? scheme.onTertiaryContainer
+        : warning
+        ? scheme.onSecondaryContainer
+        : scheme.onErrorContainer;
+    return Material(
+      color: background,
+      borderRadius: BorderRadius.circular(8),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(
+              success
+                  ? Icons.check_circle_outline
+                  : warning
+                  ? Icons.info_outline
+                  : Icons.error_outline,
+              size: 18,
+              color: foreground,
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(message, style: TextStyle(color: foreground)),
+            ),
+            if (onReload != null) ...[
+              const SizedBox(width: 8),
+              TextButton(onPressed: onReload, child: const Text('重新读取')),
+            ],
+          ],
+        ),
+      ),
     );
   }
 

@@ -7,8 +7,21 @@
         state,
         views,
         actions,
-        savePageSizePreference
+        savePageSizePreference,
+        normalizeUniversalPageSize = (value, fallback = 12) => {
+            const numeric = Number(value);
+            return Number.isFinite(numeric) && numeric >= 1 && numeric <= 500
+                ? Math.round(numeric)
+                : fallback;
+        }
     }) {
+        function normalizePageSize(target, key, fallback) {
+            const normalized = normalizeUniversalPageSize(target.value, fallback);
+            if (target.value !== normalized) target.value = normalized;
+            savePageSizePreference(key, normalized);
+            return normalized;
+        }
+
         watch(state.showTrash, value => {
             if (value) actions.loadTrash();
         });
@@ -34,8 +47,7 @@
 
         watch([state.groupPickerTagFilter, state.groupPickerGroupFilter], () => {
             state.groupPickerPage.value = 1;
-            const visibleIds = new Set(views.availableGroupPickerEntries.value.map(entry => entry.id));
-            state.groupPickerSelectedIds.value = state.groupPickerSelectedIds.value.filter(id => visibleIds.has(id));
+            // 筛选只改变当前可见页；跨筛选条件的已选条目必须继续保留，提交时一次性加入密码组。
         });
 
         watch(state.groups, () => {
@@ -51,32 +63,36 @@
         });
 
         watch(state.tagBrowserPageSize, () => {
-            savePageSizePreference('secretbase.tagBrowserPageSize', state.tagBrowserPageSize.value);
+            normalizePageSize(state.tagBrowserPageSize, 'secretbase.tagBrowserPageSize', 5);
             state.tagBrowserPage.value = 1;
         });
 
         watch(state.tagManagerPageSize, () => {
-            savePageSizePreference('secretbase.tagManagerPageSize', state.tagManagerPageSize.value);
+            normalizePageSize(state.tagManagerPageSize, 'secretbase.tagManagerPageSize', 5);
             state.tagManagerPage.value = 1;
         });
 
         watch(state.groupPageSize, () => {
-            savePageSizePreference('secretbase.groupPageSize', state.groupPageSize.value);
+            normalizePageSize(state.groupPageSize, 'secretbase.groupPageSize', 12);
             state.groupCurrentPage.value = 1;
         });
 
         watch(state.groupPickerPageSize, () => {
-            savePageSizePreference('secretbase.groupPickerPageSize', state.groupPickerPageSize.value);
+            normalizePageSize(state.groupPickerPageSize, 'secretbase.groupPickerPageSize', 10);
             state.groupPickerPage.value = 1;
         });
 
         watch(state.backupPageSize, () => {
-            savePageSizePreference('secretbase.backupPageSize', state.backupPageSize.value);
+            normalizePageSize(state.backupPageSize, 'secretbase.backupPageSize', 3);
+            state.backupPages.manual = 1;
+            state.backupPages.auto = 1;
+            state.backupPages.legacy = 1;
         });
 
         watch(state.trashPageSize, () => {
-            savePageSizePreference('secretbase.trashPageSize', state.trashPageSize.value);
-            actions.goToTrashPage(1);
+            normalizePageSize(state.trashPageSize, 'secretbase.trashPageSize', 10);
+            state.trashPage.value = 1;
+            if (state.showTrash.value) actions.loadTrash(1);
         });
     }
 

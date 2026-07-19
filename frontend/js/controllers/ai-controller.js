@@ -18,6 +18,7 @@
             aiStatusError,
             aiFailureMessage,
             aiOrganizing,
+            aiRequestCancelable = { value: false },
             aiOrganizeError,
             aiOrganizeResult,
             aiOrganizeMode,
@@ -49,8 +50,58 @@
             openSettings,
             selectSettingsTab
         } = options;
+        let aiRequestEpoch = 0;
+        const requestLifecycle = window.SecretBaseAiAssistantRequest.createAiAssistantRequestLifecycle();
+
+        function isCurrentAiSession(epoch) {
+            return epoch === aiRequestEpoch;
+        }
+
+        function disposeAiTools() {
+            requestLifecycle.abort();
+            aiRequestEpoch += 1;
+            aiParsing.value = false;
+            aiOrganizing.value = false;
+            aiRequestCancelable.value = false;
+            aiFailureMessage.value = '';
+            aiStatusError.value = '';
+            aiOrganizeError.value = '';
+            aiActionError.value = '';
+        }
+
+        function cancelAiRequest() {
+            if (!aiRequestCancelable.value) return false;
+            requestLifecycle.abort();
+            aiRequestEpoch += 1;
+            aiParsing.value = false;
+            aiOrganizing.value = false;
+            aiRequestCancelable.value = false;
+            aiFailureMessage.value = '已取消本次 AI 请求。';
+            aiOrganizeError.value = '已取消本次 AI 请求。';
+            aiActionError.value = '已取消本次 AI 请求。';
+            showToast('已取消本次 AI 请求', 'info');
+            return true;
+        }
+
+        function beginCancelableRequest() {
+            aiRequestCancelable.value = true;
+            return requestLifecycle.begin();
+        }
+
+        function finishCancelableRequest(controller) {
+            requestLifecycle.finish(controller);
+            if (!requestLifecycle.hasActive()) aiRequestCancelable.value = false;
+        }
+
+        function closeAiParse() {
+            if (aiParsing.value || aiOrganizing.value) return;
+            disposeAiTools();
+            showAiParse.value = false;
+        }
 
         async function openAiParse() {
+            if (aiParsing.value || aiOrganizing.value) return false;
+            const epoch = ++aiRequestEpoch;
             showAiParse.value = true;
             aiMode.value = 'parse';
             aiStatus.value = null;
@@ -60,18 +111,22 @@
             aiActionError.value = '';
             try {
                 const result = await api.get('/ai/status');
-                aiStatus.value = result.data;
+                if (isCurrentAiSession(epoch)) aiStatus.value = result.data;
             } catch (error) {
-                aiStatusError.value = error.message || '无法获取 AI 配置状态，可继续手动录入';
+                if (isCurrentAiSession(epoch)) {
+                    aiStatusError.value = error.message || '无法获取 AI 配置状态，可继续手动录入';
+                }
             }
         }
 
         async function manualEntryFromAi(showMessage = true) {
+            const epoch = aiRequestEpoch;
             resetEntryForm();
             entryForm.remarks = aiText.value;
             aiResult.value = null;
             showAiParse.value = false;
             await nextTick();
+            if (!isCurrentAiSession(epoch)) return;
             showCreateModal.value = true;
             if (showMessage) {
                 showToast('已将原文转入备注，可继续手动录入', 'warning');
@@ -88,6 +143,7 @@
         }
 
         function setAiMode(mode) {
+            if (aiParsing.value || aiOrganizing.value) return;
             aiMode.value = mode;
             aiFailureMessage.value = '';
             aiOrganizeError.value = '';
@@ -95,16 +151,19 @@
         }
 
         function clearAiOrganize() {
+            if (aiOrganizing.value) return;
             aiOrganizeResult.value = null;
             aiOrganizeError.value = '';
         }
 
         function clearAiActions() {
+            if (aiOrganizing.value) return;
             aiActionResult.value = null;
             aiActionError.value = '';
         }
 
         function setAiOrganizeMode(mode) {
+            if (aiOrganizing.value) return;
             aiOrganizeMode.value = mode;
             aiOrganizeOptions.organizeTags = mode === 'tags';
             aiOrganizeOptions.organizeGroups = mode === 'groups';
@@ -122,6 +181,7 @@
         }
 
         async function previewAiOrganize() {
+            if (aiOrganizing.value || aiParsing.value) return;
             if (!canPreviewAiOrganize.value) {
                 if (!aiStatus.value?.configured) {
                     aiOrganizeError.value = 'AI 未配置，请先到设置页填写接入信息。';
@@ -129,6 +189,8 @@
                 return;
             }
             aiOrganizing.value = true;
+            const requestController = beginCancelableRequest();
+            const epoch = aiRequestEpoch;
             aiOrganizeError.value = '';
             aiOrganizeResult.value = null;
             try {
@@ -136,25 +198,39 @@
                     ? await api.post('/ai/tags/preview', {
                         filters: currentAiOrganizeFilters(),
                         user_prompt: currentAiOrganizePrompt.value
-                    })
+                    }, { signal: requestController?.signal || null })
                     : await api.post('/ai/organize/preview', {
                         filters: currentAiOrganizeFilters(),
                         organize_tags: aiOrganizeOptions.organizeTags,
                         organize_groups: aiOrganizeOptions.organizeGroups,
                         user_prompt: currentAiOrganizePrompt.value
-                    });
-                aiOrganizeResult.value = result.data;
+                    }, { signal: requestController?.signal || null });
+                if (isCurrentAiSession(epoch)) aiOrganizeResult.value = result.data;
             } catch (error) {
-                aiOrganizeError.value = error.message || 'AI 整理建议生成失败';
-                showToast(aiOrganizeError.value, 'warning');
+                if (isCurrentAiSession(epoch)) {
+                    aiOrganizeError.value = error.message || 'AI 整理建议生成失败';
+                    showToast(aiOrganizeError.value, 'warning');
+                }
             } finally {
-                aiOrganizing.value = false;
+                finishCancelableRequest(requestController);
+                if (isCurrentAiSession(epoch)) aiOrganizing.value = false;
             }
         }
 
         function removeAiOrganizeItem(suggestion, key, value) {
             if (!Array.isArray(suggestion[key])) return;
             suggestion[key] = suggestion[key].filter(item => item !== value);
+        }
+
+        async function refreshAiDataAfterMutation() {
+            const results = await Promise.allSettled([
+                loadEntries(currentPage.value),
+                loadTags(),
+                loadGroups()
+            ]);
+            return results.every(result => (
+                result.status === 'fulfilled' && result.value !== false
+            ));
         }
 
         async function applyAiOrganize() {
@@ -164,6 +240,8 @@
                 return;
             }
             aiOrganizing.value = true;
+            aiRequestCancelable.value = false;
+            const epoch = aiRequestEpoch;
             aiOrganizeError.value = '';
             try {
                 const result = isAiTagGovernanceMode.value
@@ -177,18 +255,26 @@
                         selected_ids: suggestions.map(item => item.id),
                         expected_revision: aiOrganizeResult.value.source_revision
                     });
-                showToast(result.message || 'AI 整理已应用', 'success');
+                if (!isCurrentAiSession(epoch)) return;
                 aiOrganizeResult.value = null;
-                await Promise.all([loadEntries(currentPage.value), loadTags(), loadGroups()]);
+                const refreshed = await refreshAiDataAfterMutation();
+                if (!isCurrentAiSession(epoch)) return;
+                const message = refreshed
+                    ? (result.message || 'AI 整理已应用')
+                    : `${result.message || 'AI 整理已应用'}，但界面刷新不完整，请稍后重试。`;
+                showToast(message, refreshed ? 'success' : 'warning');
             } catch (error) {
-                aiOrganizeError.value = error.message || '应用 AI 整理失败';
-                showToast(aiOrganizeError.value, 'error');
+                if (isCurrentAiSession(epoch)) {
+                    aiOrganizeError.value = error.message || '应用 AI 整理失败';
+                    showToast(aiOrganizeError.value, 'error');
+                }
             } finally {
-                aiOrganizing.value = false;
+                if (isCurrentAiSession(epoch)) aiOrganizing.value = false;
             }
         }
 
         async function previewAiActions() {
+            if (aiOrganizing.value || aiParsing.value) return;
             const instruction = aiActionInstruction.value.trim();
             if (!instruction) {
                 aiActionError.value = '请输入希望 AI 执行的整理指令。';
@@ -199,19 +285,24 @@
                 return;
             }
             aiOrganizing.value = true;
+            const requestController = beginCancelableRequest();
+            const epoch = aiRequestEpoch;
             aiActionError.value = '';
             aiActionResult.value = null;
             try {
                 const result = await api.post('/ai/actions/preview', {
                     instruction,
                     filters: currentAiOrganizeFilters()
-                });
-                aiActionResult.value = result.data;
+                }, { signal: requestController?.signal || null });
+                if (isCurrentAiSession(epoch)) aiActionResult.value = result.data;
             } catch (error) {
-                aiActionError.value = error.message || 'AI 操作计划生成失败';
-                showToast(aiActionError.value, 'warning');
+                if (isCurrentAiSession(epoch)) {
+                    aiActionError.value = error.message || 'AI 操作计划生成失败';
+                    showToast(aiActionError.value, 'warning');
+                }
             } finally {
-                aiOrganizing.value = false;
+                finishCancelableRequest(requestController);
+                if (isCurrentAiSession(epoch)) aiOrganizing.value = false;
             }
         }
 
@@ -222,6 +313,8 @@
                 return;
             }
             aiOrganizing.value = true;
+            aiRequestCancelable.value = false;
+            const epoch = aiRequestEpoch;
             aiActionError.value = '';
             try {
                 const result = await api.post('/ai/actions/apply', {
@@ -229,24 +322,33 @@
                     selected_ids: actions.map(item => item.id),
                     expected_revision: aiActionResult.value.source_revision
                 });
-                showToast(result.message || 'AI 操作计划已应用', 'success');
+                if (!isCurrentAiSession(epoch)) return;
                 aiActionResult.value = null;
-                await Promise.all([loadEntries(currentPage.value), loadTags(), loadGroups()]);
+                const refreshed = await refreshAiDataAfterMutation();
+                if (!isCurrentAiSession(epoch)) return;
+                const message = refreshed
+                    ? (result.message || 'AI 操作计划已应用')
+                    : `${result.message || 'AI 操作计划已应用'}，但界面刷新不完整，请稍后重试。`;
+                showToast(message, refreshed ? 'success' : 'warning');
             } catch (error) {
-                aiActionError.value = error.message || '应用 AI 操作计划失败';
-                showToast(aiActionError.value, 'error');
+                if (isCurrentAiSession(epoch)) {
+                    aiActionError.value = error.message || '应用 AI 操作计划失败';
+                    showToast(aiActionError.value, 'error');
+                }
             } finally {
-                aiOrganizing.value = false;
+                if (isCurrentAiSession(epoch)) aiOrganizing.value = false;
             }
         }
 
         async function openAiSettingsFromParse() {
+            const epoch = aiRequestEpoch;
             showAiParse.value = false;
             await openSettings();
-            selectSettingsTab('ai');
+            if (isCurrentAiSession(epoch)) selectSettingsTab('ai');
         }
 
         async function parseAiText() {
+            if (aiParsing.value || aiOrganizing.value) return;
             const text = aiText.value.trim();
             if (!text) return;
             if (!aiStatus.value?.configured) {
@@ -271,11 +373,14 @@
             }
 
             aiParsing.value = true;
+            const requestController = beginCancelableRequest();
+            const epoch = aiRequestEpoch;
             aiResult.value = null;
             aiFailureMessage.value = '';
             try {
-                const result = await api.post('/ai/parse', { text });
+                const result = await api.post('/ai/parse', { text }, { signal: requestController?.signal || null });
                 const parsedEntries = viewHelpers.normalizeAiParsedEntries(result.data);
+                if (!isCurrentAiSession(epoch)) return;
                 aiResult.value = {
                     entries: parsedEntries,
                     entryCount: parsedEntries.length,
@@ -285,6 +390,7 @@
                 aiNow.value = Date.now();
                 aiCooldownUntil.value = aiNow.value + 5000;
             } catch (error) {
+                if (!isCurrentAiSession(epoch)) return;
                 if (error.status === 429) {
                     aiFailureMessage.value = error.message || '请求过于频繁，请等待冷却结束后再试。你也可以直接转为手动录入。';
                 } else {
@@ -292,7 +398,8 @@
                 }
                 showToast(aiFailureMessage.value, 'warning');
             } finally {
-                aiParsing.value = false;
+                finishCancelableRequest(requestController);
+                if (isCurrentAiSession(epoch)) aiParsing.value = false;
             }
         }
 
@@ -302,6 +409,7 @@
                 .map(viewHelpers.normalizeEditableAiEntry)
                 .filter(entry => entry.title);
             if (entriesToApply.length === 0) return;
+            const epoch = aiRequestEpoch;
 
             const buildAiRemarks = entryRemarks => viewHelpers.buildAiRemarks(entryRemarks, aiText.value);
             if (entriesToApply.length === 1) {
@@ -320,8 +428,10 @@
                 return;
             }
 
+            let createdCount = 0;
             try {
                 for (const entry of entriesToApply) {
+                    if (!isCurrentAiSession(epoch)) return;
                     await api.post('/entries', {
                         title: entry.title,
                         url: entry.url || '',
@@ -331,15 +441,40 @@
                         fields: entry.fields || [],
                         remarks: buildAiRemarks(entry.remarks)
                     });
+                    createdCount += 1;
                 }
-                showToast(`已创建 ${entriesToApply.length} 条 AI 解析条目`, 'success');
+                if (!isCurrentAiSession(epoch)) return;
                 showAiParse.value = false;
                 aiResult.value = null;
                 aiText.value = '';
-                await loadEntries(1);
-                await Promise.all([loadTags(), loadGroups()]);
+                const refreshed = await Promise.allSettled([
+                    loadEntries(1),
+                    loadTags(),
+                    loadGroups()
+                ]);
+                const refreshOk = refreshed.every(item => (
+                    item.status === 'fulfilled' && item.value !== false
+                ));
+                showToast(
+                    refreshOk
+                        ? `已创建 ${createdCount} 条 AI 解析条目`
+                        : `已创建 ${createdCount} 条 AI 解析条目，但界面刷新不完整，请稍后重试。`,
+                    refreshOk ? 'success' : 'warning'
+                );
             } catch (error) {
-                showToast(error.message || 'AI 多条目创建失败，请检查解析结果', 'error');
+                if (isCurrentAiSession(epoch)) {
+                    if (createdCount > 0) {
+                        showAiParse.value = false;
+                        aiResult.value = null;
+                        aiText.value = '';
+                        showToast(
+                            `已创建 ${createdCount} 条 AI 解析条目，后续条目创建失败，请检查列表后再继续。`,
+                            'warning'
+                        );
+                    } else {
+                        showToast(error.message || 'AI 多条目创建失败，请检查解析结果', 'error');
+                    }
+                }
             }
         }
 
@@ -359,11 +494,13 @@
 
         return {
             openAiParse,
+            closeAiParse,
             manualEntryFromAi,
             clearAiParse,
             setAiMode,
             clearAiOrganize,
             clearAiActions,
+            cancelAiRequest,
             setAiOrganizeMode,
             previewAiOrganize,
             removeAiOrganizeItem,
@@ -375,7 +512,8 @@
             applyAiResult,
             toggleAiEntrySelection,
             addAiEntryField,
-            removeAiEntryField
+            removeAiEntryField,
+            disposeAiTools
         };
     }
 

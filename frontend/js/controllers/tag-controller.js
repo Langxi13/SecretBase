@@ -19,6 +19,11 @@
             tagBrowserTotalPages,
             loadEntries,
             resetAdvancedFilterForm,
+            resetSearchScopes,
+            searchQuery,
+            selectedEntryIds,
+            sortBy,
+            sortOrder,
             showTagManager,
             showTagEditorModal,
             tagEditorForm,
@@ -35,18 +40,48 @@
             loadTags
         } = options;
 
+        async function refreshTagMutationView(page = currentPage.value, reloadEntries = true) {
+            const results = await Promise.allSettled([
+                loadTags(),
+                ...(reloadEntries ? [loadEntries(page)] : [])
+            ]);
+            return results.every(result => result.status === 'fulfilled' && result.value !== false);
+        }
+
+        async function returnToAllEntries() {
+            searchQuery.value = '';
+            resetSearchScopes();
+            resetAdvancedFilterForm();
+            store.clearFilters();
+            sortBy.value = store.state.filters.sortBy;
+            sortOrder.value = store.state.filters.sortOrder;
+            filter.value = 'all';
+            activeTagName.value = '';
+            activeGroupName.value = '';
+            listContextNotice.value = '';
+            selectedEntryIds.value = [];
+            return loadEntries(1);
+        }
+
         async function filterByTag(tagName) {
+            searchQuery.value = '';
+            resetSearchScopes();
+            resetAdvancedFilterForm();
+            store.clearFilters();
             store.setFilter('entryIds', []);
             listContextNotice.value = '';
             store.setFilter('tag', tagName);
             store.setFilter('group', null);
             store.setFilter('starred', false);
+            sortBy.value = store.state.filters.sortBy;
+            sortOrder.value = store.state.filters.sortOrder;
             filter.value = 'tag';
             activeTagName.value = tagName;
             activeGroupName.value = '';
             showTagDropdown.value = false;
             showTagBrowser.value = false;
-            await loadEntries(1);
+            selectedEntryIds.value = [];
+            return loadEntries(1);
         }
 
         function openTagBrowser() {
@@ -66,11 +101,18 @@
         }
 
         function deleteTag(tag) {
+            if (tagSaving.value || tagMerging.value) return;
             showConfirmDialog('删除标签', `确认删除标签 "${tag.name}"？`, async () => {
                 const deleted = await store.deleteTag(tag.name);
-                if (deleted) {
-                    selectedManagedTagNames.value = selectedManagedTagNames.value.filter(name => name !== tag.name);
-                    await Promise.all([loadTags(), loadEntries(currentPage.value)]);
+                if (!deleted) return false;
+                const wasActive = activeTagName.value === tag.name;
+                selectedManagedTagNames.value = selectedManagedTagNames.value.filter(name => name !== tag.name);
+                const tagsRefreshed = await loadTags();
+                const entriesRefreshed = wasActive
+                    ? await returnToAllEntries()
+                    : await loadEntries(currentPage.value);
+                if (tagsRefreshed === false || entriesRefreshed === false) {
+                    showToast('标签已删除，但相关列表刷新不完整，请稍后重试。', 'warning');
                 }
             });
         }
@@ -84,6 +126,7 @@
         }
 
         function startEditManagedTag(tag) {
+            if (tagSaving.value || tagMerging.value) return;
             tagEditorForm.mode = 'edit';
             tagEditorForm.originalName = tag.name;
             tagEditorForm.name = tag.name;
@@ -97,18 +140,23 @@
         }
 
         function openCreateTagModal() {
+            if (tagSaving.value || tagMerging.value) return;
             resetTagEditorForm();
             showTagEditorModal.value = true;
         }
 
-        function closeTagEditorModal() {
+        function closeTagEditorModal(force = false) {
+            if (tagSaving.value && !force) return false;
             showTagEditorModal.value = false;
             resetTagEditorForm();
+            return true;
         }
 
-        function closeTagManager() {
+        function closeTagManager(force = false) {
+            if ((tagSaving.value || tagMerging.value) && !force) return false;
             showTagManager.value = false;
-            closeTagEditorModal();
+            closeTagEditorModal(force);
+            return true;
         }
 
         async function createTagFromManager() {
@@ -126,9 +174,13 @@
                     color: tagEditorForm.color
                 });
                 if (created) {
-                    closeTagEditorModal();
-                    await loadTags();
+                    closeTagEditorModal(true);
+                    if (!(await refreshTagMutationView(currentPage.value, false))) {
+                        showToast('标签已创建，但标签列表刷新不完整，请稍后重试。', 'warning');
+                    }
                 }
+            } catch (error) {
+                showToast(error.message || '创建标签失败，请重试', 'error');
             } finally {
                 tagSaving.value = false;
             }
@@ -147,15 +199,31 @@
             }
             tagSaving.value = true;
             try {
+                const originalName = tagEditorForm.originalName;
                 const updated = await store.updateTag(tagEditorForm.originalName, {
                     name,
                     description: tagEditorForm.description.trim(),
                     color: tagEditorForm.color
                 });
                 if (updated) {
-                    closeTagEditorModal();
-                    await Promise.all([loadTags(), loadEntries(currentPage.value)]);
+                    closeTagEditorModal(true);
+                    const nextName = updated.new_name || name;
+                    const wasActive = activeTagName.value === originalName;
+                    const tagsRefreshed = await refreshTagMutationView(currentPage.value, false);
+                    if (wasActive) {
+                        const entriesRefreshed = await filterByTag(nextName);
+                        if (!tagsRefreshed || entriesRefreshed === false) {
+                            showToast('标签已更新，但当前视图刷新不完整，请稍后重试。', 'warning');
+                        }
+                    } else {
+                        const entriesRefreshed = await loadEntries(currentPage.value);
+                        if (!tagsRefreshed || entriesRefreshed === false) {
+                            showToast('标签已更新，但相关列表刷新不完整，请稍后重试。', 'warning');
+                        }
+                    }
                 }
+            } catch (error) {
+                showToast(error.message || '保存标签失败，请重试', 'error');
             } finally {
                 tagSaving.value = false;
             }
@@ -190,6 +258,7 @@
         }
 
         async function batchDeleteManagedTags() {
+            if (tagSaving.value || tagMerging.value) return;
             const names = [...selectedManagedTagNames.value];
             if (names.length === 0) {
                 showToast('请选择要删除的标签', 'warning');
@@ -197,10 +266,21 @@
             }
             showConfirmDialog('批量删除标签', `确认删除已选 ${names.length} 个标签？这些标签会从相关条目中移除。`, async () => {
                 const result = await store.batchDeleteTags(names);
-                if (result) {
-                    selectedManagedTagNames.value = [];
-                    await Promise.all([loadTags(), loadEntries(currentPage.value)]);
+                if (!result) return false;
+                selectedManagedTagNames.value = [];
+                const activeWasDeleted = names.includes(activeTagName.value);
+                const tagsRefreshed = await loadTags();
+                if (activeWasDeleted) {
+                    const entriesRefreshed = await returnToAllEntries();
+                    if (tagsRefreshed === false || entriesRefreshed === false) {
+                        showToast('标签已删除，但当前视图刷新不完整，请稍后重试。', 'warning');
+                    }
+                } else {
+                    const entriesRefreshed = await loadEntries(currentPage.value);
                     goToTagManagerPage(tagManagerPage.value);
+                    if (tagsRefreshed === false || entriesRefreshed === false) {
+                        showToast('标签已删除，但相关列表刷新不完整，请稍后重试。', 'warning');
+                    }
                 }
             });
         }
@@ -243,7 +323,7 @@
         }
 
         async function mergeTags() {
-            if (tagMerging.value) return;
+            if (tagMerging.value || tagSaving.value) return;
             commitTagMergeSourceTags();
             const sourceTags = [...tagMergeSourceList.value];
             const targetTag = tagMergeForm.targetTag.trim();
@@ -262,8 +342,18 @@
                 tagMergeForm.targetTag = '';
                 tagMergeSourceList.value = [];
                 showToast(result.message || '标签已合并', 'success');
-                await loadTags();
-                await loadEntries(currentPage.value);
+                const tagsRefreshed = await loadTags();
+                if (sourceTags.includes(activeTagName.value)) {
+                    const entriesRefreshed = await filterByTag(targetTag);
+                    if (tagsRefreshed === false || entriesRefreshed === false) {
+                        showToast('标签已合并，但当前视图刷新不完整，请稍后重试。', 'warning');
+                    }
+                } else {
+                    const entriesRefreshed = await loadEntries(currentPage.value);
+                    if (tagsRefreshed === false || entriesRefreshed === false) {
+                        showToast('标签已合并，但相关列表刷新不完整，请稍后重试。', 'warning');
+                    }
+                }
             } catch (error) {
                 showToast(error.message || '标签合并失败', 'error');
             } finally {

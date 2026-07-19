@@ -64,6 +64,13 @@ function readAppVersion() {
     return match[1];
 }
 
+function readFrontendAssetVersion() {
+    const source = readProjectFile('backend/version.py');
+    const match = source.match(/WEB_ASSET_VERSION\s*=\s*"([^"]+)"/);
+    if (!match) throw new Error('无法读取 backend/version.py 中的 WEB_ASSET_VERSION');
+    return match[1];
+}
+
 module.exports = {
     root,
     templatePaths,
@@ -71,5 +78,6 @@ module.exports = {
     readProjectFile,
     readFrontendMarkup,
     readFrontendCss,
-    readAppVersion
+    readAppVersion,
+    readFrontendAssetVersion
 };

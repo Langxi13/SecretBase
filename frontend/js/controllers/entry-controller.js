@@ -4,10 +4,10 @@
 (function () {
     function createEntryController(options) {
         const {
-            api,
             store,
             showToast,
             copyToClipboard,
+            openExternalUrl,
             normalizeFieldForEdit,
             entries,
             filter,
@@ -16,7 +16,14 @@
             currentPage,
             totalPages,
             selectedEntry,
+            showEntryDetail,
+            entryDetailTargetId,
+            entryDetailLoading,
+            entryDetailError,
             editingEntry,
+            entryEditLoading,
+            entryEditTargetId,
+            entryEditError,
             entryForm,
             entryTemplates,
             selectedTemplate,
@@ -27,10 +34,10 @@
             showCreateModal,
             showEditModal,
             entrySaving,
-            showOnboarding,
-            importingSamples,
+            entryActionIds = { value: [] },
             selectedEntryIds,
             batchTagName,
+            batchBusy = { value: false },
             allCurrentPageSelected,
             copyMenuEntryId,
             showTagDropdown,
@@ -39,22 +46,95 @@
             loadEntries,
             loadTags,
             loadGroups,
-            loadAllData,
             showConfirmDialog
         } = options;
+        let detailRequestSequence = 0;
+        let editorRequestSequence = 0;
+
+        async function refreshEntryLists(page = currentPage.value, includeTaxonomy = true) {
+            const tasks = [loadEntries(page)];
+            if (includeTaxonomy) tasks.push(loadTags(), loadGroups());
+            const results = await Promise.allSettled(tasks);
+            return results.every(result => result.status === 'fulfilled' && result.value !== false);
+        }
 
         async function toggleStar(entry) {
-            await store.toggleStar(entry);
-            await loadEntries(currentPage.value);
+            if (entryActionIds.value.includes(entry.id)) return false;
+            entryActionIds.value = [...entryActionIds.value, entry.id];
+            try {
+                const result = await store.toggleStar(entry);
+                if (!result) return false;
+                const refreshed = await refreshEntryLists(currentPage.value, false);
+                if (!refreshed) showToast('收藏状态已更新，但列表刷新不完整，请稍后重试。', 'warning');
+                return true;
+            } catch (error) {
+                showToast(error.message || '更新收藏状态失败', 'error');
+                return false;
+            } finally {
+                entryActionIds.value = entryActionIds.value.filter(id => id !== entry.id);
+            }
+        }
+
+        async function loadEntryDetail(entryId) {
+            const normalizedId = String(entryId || '').trim();
+            if (!normalizedId) return false;
+            const request = ++detailRequestSequence;
+            entryDetailTargetId.value = normalizedId;
+            showEntryDetail.value = true;
+            selectedEntry.value = null;
+            revealedFields.value = [];
+            entryDetailLoading.value = true;
+            entryDetailError.value = '';
+            try {
+                const detail = await store.getEntry(normalizedId);
+                if (request !== detailRequestSequence) return false;
+                if (!detail) {
+                    entryDetailError.value = '条目详情暂时无法读取，请重试。';
+                    return false;
+                }
+                selectedEntry.value = detail;
+                return true;
+            } catch (error) {
+                if (request !== detailRequestSequence) return false;
+                entryDetailError.value = error.message || '条目详情暂时无法读取，请重试。';
+                return false;
+            } finally {
+                if (request === detailRequestSequence) entryDetailLoading.value = false;
+            }
         }
 
         async function viewEntry(entry) {
-            selectedEntry.value = await store.getEntry(entry.id);
-            revealedFields.value = [];
+            return loadEntryDetail(entry?.id);
         }
 
         function closeEntryDetail() {
+            detailRequestSequence += 1;
+            showEntryDetail.value = false;
             selectedEntry.value = null;
+            entryDetailTargetId.value = '';
+            entryDetailLoading.value = false;
+            entryDetailError.value = '';
+            revealedFields.value = [];
+        }
+
+        function openEntryDetail(entry) {
+            const normalizedId = String(entry?.id || '').trim();
+            if (!normalizedId || !entry) return false;
+            detailRequestSequence += 1;
+            entryDetailTargetId.value = normalizedId;
+            entryDetailLoading.value = false;
+            entryDetailError.value = '';
+            revealedFields.value = [];
+            selectedEntry.value = entry;
+            showEntryDetail.value = true;
+            return true;
+        }
+
+        function disposeEntryRequests() {
+            detailRequestSequence += 1;
+            editorRequestSequence += 1;
+            entryDetailLoading.value = false;
+            entryEditLoading.value = false;
         }
 
         function openCreateModal() {
@@ -77,77 +157,43 @@
             }
         }
 
-        function skipOnboarding() {
-            showOnboarding.value = false;
-        }
-
-        async function importSampleData() {
-            importingSamples.value = true;
+        async function editEntry(entry) {
+            const request = ++editorRequestSequence;
+            const normalizedId = String(entry?.id || '').trim();
+            if (!normalizedId) return false;
+            entryEditTargetId.value = normalizedId;
+            entryEditLoading.value = true;
+            entryEditError.value = '';
+            editingEntry.value = null;
+            showEditModal.value = true;
             try {
-                const samples = [
-                    {
-                        title: '示例：云服务器控制台',
-                        url: 'https://example.invalid/cloud',
-                        starred: true,
-                        tags: ['示例', '云服务'],
-                        fields: [
-                            { name: '账号', value: 'demo-cloud-user', copyable: true, hidden: false },
-                            { name: '密码', value: 'Demo-Password-123!', copyable: true, hidden: true }
-                        ],
-                        remarks: '这是示例数据，可删除。用于体验字段复制、星标和标签筛选。'
-                    },
-                    {
-                        title: '示例：测试邮箱',
-                        url: 'https://example.invalid/mail',
-                        starred: false,
-                        tags: ['示例', '邮箱'],
-                        fields: [
-                            { name: '邮箱', value: 'demo@example.invalid', copyable: true, hidden: false },
-                            { name: '恢复码', value: 'DEMO-CODE-0000', copyable: true, hidden: true }
-                        ],
-                        remarks: '这是示例数据，可删除。这里不包含任何真实账号。'
-                    },
-                    {
-                        title: '示例：本地开发密钥',
-                        url: '',
-                        starred: false,
-                        tags: ['示例', '开发'],
-                        fields: [
-                            { name: 'API Key', value: 'demo_api_key_not_real', copyable: true, hidden: true },
-                            { name: '环境', value: 'local-demo', copyable: false, hidden: false }
-                        ],
-                        remarks: '这是示例数据，可删除。用于体验备注和自定义字段。'
-                    }
-                ];
-
-                for (const sample of samples) {
-                    await api.post('/entries', sample);
+                const fullEntry = await store.getEntry(normalizedId);
+                if (request !== editorRequestSequence) return false;
+                if (!fullEntry) {
+                    entryEditError.value = '条目暂时无法读取，请重试。';
+                    return false;
                 }
-
-                showOnboarding.value = false;
-                await loadAllData();
-                showToast('示例数据已导入', 'success');
+                editingEntry.value = fullEntry;
+                entryForm.id = fullEntry.id;
+                entryForm.title = fullEntry.title;
+                entryForm.url = fullEntry.url || '';
+                entryForm.starred = fullEntry.starred;
+                entryForm.tags = [...(fullEntry.tags || [])];
+                entryForm.groups = [...(fullEntry.groups || [])];
+                entryForm.fields = (fullEntry.fields || []).map(normalizeFieldForEdit);
+                entryForm.remarks = fullEntry.remarks || '';
+                return true;
             } catch (error) {
-                showToast(error.message || '示例数据导入失败', 'error');
+                if (request !== editorRequestSequence) return false;
+                entryEditError.value = error.message || '条目暂时无法读取，请重试。';
+                return false;
             } finally {
-                importingSamples.value = false;
+                if (request === editorRequestSequence) entryEditLoading.value = false;
             }
         }
 
-        async function editEntry(entry) {
-            const fullEntry = await store.getEntry(entry.id);
-            if (!fullEntry) return;
-
-            editingEntry.value = fullEntry;
-            entryForm.id = fullEntry.id;
-            entryForm.title = fullEntry.title;
-            entryForm.url = fullEntry.url || '';
-            entryForm.starred = fullEntry.starred;
-            entryForm.tags = [...fullEntry.tags];
-            entryForm.groups = [...(fullEntry.groups || [])];
-            entryForm.fields = fullEntry.fields.map(normalizeFieldForEdit);
-            entryForm.remarks = fullEntry.remarks || '';
-            showEditModal.value = true;
+        function retryEditEntry() {
+            return editEntry({ id: entryEditTargetId.value });
         }
 
         function createEntryFromCurrentEdit() {
@@ -160,8 +206,12 @@
         }
 
         function closeEntryModal() {
+            editorRequestSequence += 1;
             showCreateModal.value = false;
             showEditModal.value = false;
+            entryEditLoading.value = false;
+            entryEditTargetId.value = '';
+            entryEditError.value = '';
             resetEntryForm();
         }
 
@@ -187,19 +237,33 @@
         async function addGroup() {
             const groupName = newGroup.value.trim();
             if (!groupName) return;
-            if (!entryForm.groups.includes(groupName)) {
-                entryForm.groups.push(groupName);
+            const alreadySelected = entryForm.groups.includes(groupName);
+            if (!alreadySelected) entryForm.groups.push(groupName);
+            try {
+                const existingGroup = groups.value.find(group => group.name === groupName);
+                if (!existingGroup) {
+                    const created = await store.createGroup({
+                        name: groupName,
+                        description: newGroupDescription.value.trim()
+                    });
+                    if (!created) {
+                        if (!alreadySelected) {
+                            entryForm.groups = entryForm.groups.filter(group => group !== groupName);
+                        }
+                        return false;
+                    }
+                    await loadGroups();
+                }
+                newGroup.value = '';
+                newGroupDescription.value = '';
+                return true;
+            } catch (error) {
+                if (!alreadySelected) {
+                    entryForm.groups = entryForm.groups.filter(group => group !== groupName);
+                }
+                showToast(error.message || '创建密码组失败，请重试', 'error');
+                return false;
             }
-            const existingGroup = groups.value.find(group => group.name === groupName);
-            if (!existingGroup) {
-                await store.createGroup({
-                    name: groupName,
-                    description: newGroupDescription.value.trim()
-                });
-                await loadGroups();
-            }
-            newGroup.value = '';
-            newGroupDescription.value = '';
         }
 
         function addExistingGroup(group) {
@@ -234,7 +298,8 @@
                     addTag();
                 }
                 if (newGroup.value.trim()) {
-                    await addGroup();
+                    const groupAdded = await addGroup();
+                    if (groupAdded === false) return;
                 }
 
                 const data = {
@@ -253,9 +318,11 @@
 
                 if (result) {
                     closeEntryModal();
-                    await loadEntries(currentPage.value);
-                    await Promise.all([loadTags(), loadGroups()]);
+                    const refreshed = await refreshEntryLists();
+                    if (!refreshed) showToast('条目已保存，但相关列表刷新不完整，请稍后重试。', 'warning');
                 }
+            } catch (error) {
+                showToast(error.message || '保存条目失败', 'error');
             } finally {
                 entrySaving.value = false;
             }
@@ -264,11 +331,11 @@
         function confirmDeleteEntry(entry) {
             showConfirmDialog('删除条目', `确认将「${entry.title}」移至回收站？`, async () => {
                 const success = await store.deleteEntry(entry.id);
-                if (!success) return;
-                selectedEntry.value = null;
+                if (!success) return false;
+                closeEntryDetail();
                 selectedEntryIds.value = selectedEntryIds.value.filter(id => id !== entry.id);
-                await loadEntries(currentPage.value);
-                await Promise.all([loadTags(), loadGroups()]);
+                const refreshed = await refreshEntryLists();
+                if (!refreshed) showToast('条目已移至回收站，但列表刷新不完整，请稍后重试。', 'warning');
             });
         }
 
@@ -302,28 +369,45 @@
         function batchDeleteSelected() {
             if (selectedEntryIds.value.length === 0) return;
             showConfirmDialog('批量删除', `确认将已选 ${selectedEntryIds.value.length} 个条目移至回收站？此操作不会彻底删除，可从回收站恢复。`, async () => {
-                await store.batchDelete(selectedEntryIds.value);
+                const result = await store.batchDelete(selectedEntryIds.value);
+                if (!result) return false;
                 clearSelection();
-                await loadEntries(1);
-                await Promise.all([loadTags(), loadGroups()]);
+                const refreshed = await refreshEntryLists(1);
+                if (!refreshed) showToast('批量删除已完成，但列表刷新不完整，请稍后重试。', 'warning');
             });
         }
 
         async function batchStarSelected(starred) {
-            if (selectedEntryIds.value.length === 0) return;
-            await store.batchStar(selectedEntryIds.value, starred);
-            clearSelection();
-            await loadEntries(currentPage.value);
+            if (batchBusy.value || selectedEntryIds.value.length === 0) return;
+            batchBusy.value = true;
+            try {
+                const result = await store.batchStar(selectedEntryIds.value, starred);
+                if (!result) return;
+                clearSelection();
+                const refreshed = await refreshEntryLists(currentPage.value, false);
+                if (!refreshed) showToast('收藏状态已更新，但列表刷新不完整，请稍后重试。', 'warning');
+            } catch (error) {
+                showToast(error.message || '批量更新收藏状态失败，请重试', 'error');
+            } finally {
+                batchBusy.value = false;
+            }
         }
 
         async function batchAddTagSelected() {
             const tag = batchTagName.value.trim();
             if (selectedEntryIds.value.length === 0 || !tag) return;
             showConfirmDialog('批量加标签', `确认给已选 ${selectedEntryIds.value.length} 个条目添加标签「${tag}」？`, async () => {
-                await store.batchUpdateTags(selectedEntryIds.value, [tag], []);
-                batchTagName.value = '';
-                await loadEntries(currentPage.value);
-                await loadTags();
+                if (batchBusy.value) return false;
+                batchBusy.value = true;
+                try {
+                    const result = await store.batchUpdateTags(selectedEntryIds.value, [tag], []);
+                    if (!result) return false;
+                    batchTagName.value = '';
+                    const refreshed = await refreshEntryLists(currentPage.value, true);
+                    if (!refreshed) showToast('标签已更新，但列表刷新不完整，请稍后重试。', 'warning');
+                } finally {
+                    batchBusy.value = false;
+                }
             });
         }
 
@@ -331,10 +415,17 @@
             const tag = batchTagName.value.trim();
             if (selectedEntryIds.value.length === 0 || !tag) return;
             showConfirmDialog('批量移除标签', `确认从已选 ${selectedEntryIds.value.length} 个条目移除标签「${tag}」？`, async () => {
-                await store.batchUpdateTags(selectedEntryIds.value, [], [tag]);
-                batchTagName.value = '';
-                await loadEntries(currentPage.value);
-                await loadTags();
+                if (batchBusy.value) return false;
+                batchBusy.value = true;
+                try {
+                    const result = await store.batchUpdateTags(selectedEntryIds.value, [], [tag]);
+                    if (!result) return false;
+                    batchTagName.value = '';
+                    const refreshed = await refreshEntryLists(currentPage.value, true);
+                    if (!refreshed) showToast('标签已更新，但列表刷新不完整，请稍后重试。', 'warning');
+                } finally {
+                    batchBusy.value = false;
+                }
             });
         }
 
@@ -346,15 +437,21 @@
             copyMenuEntryId.value = copyMenuEntryId.value === entryId ? null : entryId;
         }
 
-        async function copyField(entryId, field) {
+        async function copyField(entryId, field, fieldIndex = -1) {
             try {
                 const entryDetail = await store.getEntry(entryId);
                 if (entryDetail) {
-                    const targetField = entryDetail.fields.find(item => item.name === field.name);
+                    const targetField = Number.isInteger(fieldIndex) && fieldIndex >= 0
+                        ? entryDetail.fields[fieldIndex]
+                        : entryDetail.fields.find(item => item.name === field.name);
                     if (targetField) {
                         const copied = await copyToClipboard(targetField.value);
                         showToast(copied ? `已复制 ${field.name}` : '复制失败，请手动复制', copied ? 'success' : 'error');
+                    } else {
+                        showToast('字段已不存在，请刷新后重试', 'warning');
                     }
+                } else {
+                    showToast('条目详情读取失败，无法复制', 'error');
                 }
             } catch (error) {
                 showToast('复制失败', 'error');
@@ -372,6 +469,8 @@
                         .join('\n');
                     const copied = await copyToClipboard(text);
                     showToast(copied ? '已复制全部字段' : '复制失败，请手动复制', copied ? 'success' : 'error');
+                } else {
+                    showToast('条目详情读取失败，无法复制', 'error');
                 }
             } catch (error) {
                 showToast('复制失败', 'error');
@@ -398,11 +497,13 @@
         return {
             toggleStar,
             viewEntry,
+            loadEntryDetail,
+            openEntryDetail,
+            retryEditEntry,
             closeEntryDetail,
+            disposeEntryRequests,
             openCreateModal,
             applyEntryTemplate,
-            skipOnboarding,
-            importSampleData,
             editEntry,
             createEntryFromCurrentEdit,
             closeEntryModal,

@@ -7,11 +7,19 @@
                             <p>管理密码组，点击进入查看条目。</p>
                         </div>
                         <div class="group-mode-actions">
-                            <button class="btn-secondary" @click="resetGroupOrder">恢复默认排序</button>
-                            <button class="btn-primary" @click="openCreateGroupModal">+ 新建密码组</button>
+                            <button class="btn-secondary" @click="resetGroupOrder" :disabled="groupOrdering">{{ groupOrdering ? '排序中...' : '恢复默认排序' }}</button>
+                            <button class="btn-primary" @click="openCreateGroupModal" :disabled="groupOrdering || groupSaving">+ 新建密码组</button>
                         </div>
                     </div>
-                    <div v-if="groups.length === 0" class="empty-state group-empty-state">
+                    <div v-if="hasLoadError('groups')" class="empty-state error-state group-empty-state">
+                        <div class="empty-icon">!</div>
+                        <h3>密码组暂时无法加载</h3>
+                        <p>已有密码组数据未被删除，请重试读取。</p>
+                        <button class="btn-secondary" @click="retryDataLoad" :disabled="dataLoading">
+                            {{ dataLoading ? '重试中...' : '重新加载' }}
+                        </button>
+                    </div>
+                    <div v-else-if="groups.length === 0" class="empty-state group-empty-state">
                         <div class="empty-icon">🗂️</div>
                         <h3>还没有密码组</h3>
                         <p>在新建或编辑条目时添加密码组即可生成。</p>
@@ -39,8 +47,8 @@
                             </span>
                             <span class="group-card-date">{{ group.updated_at ? formatDate(group.updated_at) : '暂无更新' }}</span>
                             <span class="group-card-order-actions" @click.stop>
-                                <button type="button" class="btn-small group-card-action-btn group-card-move-up" @click.stop="moveGroupOrder(group.name, -1)">上移</button>
-                                <button type="button" class="btn-small group-card-action-btn group-card-move-down" @click.stop="moveGroupOrder(group.name, 1)">下移</button>
+                                <button type="button" class="btn-small group-card-action-btn group-card-move-up" @click.stop="moveGroupOrder(group.name, -1)" :disabled="groupOrdering">上移</button>
+                                <button type="button" class="btn-small group-card-action-btn group-card-move-down" @click.stop="moveGroupOrder(group.name, 1)" :disabled="groupOrdering">下移</button>
                             </span>
                             <button type="button" class="btn-small group-card-edit group-card-action-btn group-card-edit-action" @click.stop="openEditGroupModal(group)">编辑</button>
                             <button type="button" class="btn-small group-card-delete group-card-action-btn group-card-delete-action" @click.stop="confirmDeleteGroup(group)">删除</button>
@@ -119,14 +127,14 @@
                         <p>{{ (activeGroup && activeGroup.description) || '当前密码组' }} · {{ totalEntries }} 个条目</p>
                     </div>
                     <div class="active-group-actions">
-                        <button class="btn-secondary" @click="showGroupMode">返回密码组</button>
-                        <button class="btn-secondary" @click="openGroupEntryPicker">选择已有条目</button>
-                        <button class="btn-danger" @click="confirmDeleteGroup(activeGroup)">删除密码组</button>
+                        <button class="btn-secondary" @click="showGroupMode" :disabled="groupPickerSaving">返回密码组</button>
+                        <button class="btn-secondary" @click="openGroupEntryPicker" :disabled="groupPickerSaving">选择已有条目</button>
+                        <button class="btn-danger" @click="confirmDeleteGroup(activeGroup)" :disabled="groupPickerSaving">删除密码组</button>
                     </div>
                 </section>
 
                 <!-- 空状态 -->
-                <div v-if="filter !== 'groups' && entries.length === 0 && !loading" class="empty-state">
+                <div v-if="filter !== 'groups' && entries.length === 0 && !loading && !hasLoadError('entries')" class="empty-state">
                     <div class="empty-icon">📭</div>
                     <h3>还没有条目</h3>
                     <p>点击下方按钮新建条目</p>
@@ -162,6 +170,7 @@
                                 class="star-btn"
                                 :class="{ starred: entry.starred }"
                                 @click.stop="toggleStar(entry)"
+                                :disabled="entryActionIds.includes(entry.id)"
                             >
                                 {{ entry.starred ? '★' : '☆' }}
                             </button>
@@ -211,8 +220,8 @@
 
                         <div class="card-fields">
                             <div
-                                v-for="field in entry.fields.slice(0, 2)"
-                                :key="field.name"
+                                v-for="(field, fieldIndex) in entry.fields.slice(0, 2)"
+                                :key="field.name + '-' + fieldIndex"
                                 class="field-row"
                             >
                                 <span class="field-name" :title="field.name">{{ field.name }}</span>
@@ -234,9 +243,9 @@
                                 <div v-if="copyMenuEntryId === entry.id" class="copy-menu">
                                     <button
                                         v-for="field in entry.fields.filter(f => f.copyable)"
-                                        :key="field.name"
+                                        :key="field.name + '-' + entry.fields.indexOf(field)"
                                         class="copy-item"
-                                        @click.stop="copyField(entry.id, field)"
+                                        @click.stop="copyField(entry.id, field, entry.fields.indexOf(field))"
                                     >
                                         复制{{ field.name }}
                                     </button>
@@ -345,13 +354,13 @@
                 </button>
                 <div v-if="selectedEntryIds.length > 0" class="batch-actions">
                     <span class="batch-count">已选 {{ selectedEntryIds.length }} 条</span>
-                    <button class="btn-small" @click="batchStarSelected(true)">设为星标</button>
-                    <button class="btn-small" @click="batchStarSelected(false)">取消星标</button>
-                    <input type="text" v-model="batchTagName" placeholder="批量添加标签" @keydown.enter="batchAddTagSelected">
-                    <button class="btn-small" @click="batchAddTagSelected">加标签</button>
-                    <button class="btn-small" @click="batchRemoveTagSelected">移除标签</button>
-                    <button class="btn-small btn-small-danger" @click="batchDeleteSelected">删除</button>
-                    <button class="btn-small" @click="clearSelection">取消选择</button>
+                    <button class="btn-small" @click="batchStarSelected(true)" :disabled="batchBusy">设为星标</button>
+                    <button class="btn-small" @click="batchStarSelected(false)" :disabled="batchBusy">取消星标</button>
+                    <input type="text" v-model="batchTagName" placeholder="批量添加标签" @keydown.enter="batchAddTagSelected" :disabled="batchBusy">
+                    <button class="btn-small" @click="batchAddTagSelected" :disabled="batchBusy">加标签</button>
+                    <button class="btn-small" @click="batchRemoveTagSelected" :disabled="batchBusy">移除标签</button>
+                    <button class="btn-small btn-small-danger" @click="batchDeleteSelected" :disabled="batchBusy">删除</button>
+                    <button class="btn-small" @click="clearSelection" :disabled="batchBusy">取消选择</button>
                 </div>
                 <div class="footer-links">
                     <a href="#" @click.prevent="showTagManager = true">🏷️ 标签管理</a>

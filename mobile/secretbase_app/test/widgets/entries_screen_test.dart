@@ -130,7 +130,7 @@ void main() {
 
     final centers = [
       tester.getCenter(find.text(tagName)),
-      tester.getCenter(find.text(groupName)),
+      tester.getCenter(find.text(groupName).last),
       tester.getCenter(find.byTooltip('显示全部条目')),
       tester.getCenter(find.byTooltip('清除筛选')),
     ];
@@ -202,6 +202,92 @@ void main() {
     await tester.pump();
 
     expect(returned, isTrue);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('从密码组进入后切换到另一个密码组会更新标题和返回行为', (tester) async {
+    tester.view.physicalSize = const Size(360, 760);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    SharedPreferences.setMockInitialValues({});
+    final preferences = await SharedPreferences.getInstance();
+    const firstGroup = '工作账号';
+    const secondGroup = '个人账号';
+    const firstQuery = EntryQuery(
+      page: 1,
+      pageSize: 5,
+      search: '',
+      group: firstGroup,
+      deleted: false,
+    );
+    const secondQuery = EntryQuery(
+      page: 1,
+      pageSize: 5,
+      search: '',
+      group: secondGroup,
+      deleted: false,
+    );
+    final page = EntryPage(
+      items: const [],
+      page: 1,
+      pageSize: 5,
+      total: 0,
+      totalPages: 1,
+      revision: BigInt.zero,
+    );
+    const groups = [
+      TaxonomyRecord(
+        name: firstGroup,
+        description: '',
+        color: '#315DA8',
+        count: 0,
+      ),
+      TaxonomyRecord(
+        name: secondGroup,
+        description: '',
+        color: '#7C3AED',
+        count: 0,
+      ),
+    ];
+
+    var returned = false;
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          sharedPreferencesProvider.overrideWithValue(preferences),
+          entryPageProvider(firstQuery).overrideWith((ref) async => page),
+          entryPageProvider(secondQuery).overrideWith((ref) async => page),
+          taxonomyProvider('tags').overrideWith((ref) async => const []),
+          taxonomyProvider('groups').overrideWith((ref) async => groups),
+        ],
+        child: MaterialApp(
+          theme: AppTheme.light(),
+          home: EntriesScreen(
+            preset: const EntryFilterPreset(
+              group: firstGroup,
+              origin: EntryFilterOrigin.groups,
+            ),
+            onExitPreset: () => returned = true,
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byTooltip(firstGroup));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text(secondGroup).last);
+    await tester.pumpAndSettle();
+
+    expect(find.text(secondGroup), findsWidgets);
+    expect(find.text('密码组 · 共 0 条'), findsOneWidget);
+    expect(find.byTooltip('返回密码组'), findsNothing);
+    expect(find.byTooltip('清除筛选'), findsOneWidget);
+    await tester.tap(find.byTooltip('清除筛选'));
+    await tester.pump();
+    expect(returned, isFalse);
     expect(tester.takeException(), isNull);
   });
 

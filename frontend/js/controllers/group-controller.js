@@ -27,6 +27,7 @@
             editingGroupName,
             groupForm,
             groupSaving,
+            groupOrdering = { value: false },
             showGroupModal,
             loadGroups,
             loadEntries,
@@ -38,11 +39,22 @@
             groupPickerGroupFilter,
             groupPickerPage,
             groupPickerLoading,
+            groupPickerError = { value: '' },
             groupPickerSaving,
             groupPickerTotalPages,
             paginatedGroupPickerEntries,
-            allGroupPickerEntriesSelected
+            allGroupPickerEntriesSelected,
+            locked
         } = options;
+        let pickerRequestSequence = 0;
+
+        async function refreshGroupMutationView(page = currentPage.value, reloadEntries = true) {
+            const results = await Promise.allSettled([
+                loadGroups(),
+                ...(reloadEntries ? [loadEntries(page)] : [])
+            ]);
+            return results.every(result => result.status === 'fulfilled' && result.value !== false);
+        }
 
         function goToGroupPage(page) {
             if (page < 1 || page > groupTotalPages.value) return;
@@ -51,6 +63,7 @@
         }
 
         async function showGroupMode() {
+            if (showGroupEntryPicker.value) closeGroupEntryPicker();
             filter.value = 'groups';
             groupCurrentPage.value = 1;
             activeTagName.value = '';
@@ -61,7 +74,7 @@
             store.clearFilters();
             resetAdvancedFilterForm();
             selectedEntryIds.value = [];
-            await loadGroups();
+            return loadGroups();
         }
 
         function openCreateGroupModal() {
@@ -100,20 +113,32 @@
         }
 
         async function moveGroupOrder(groupName, direction) {
+            if (groupOrdering.value) return;
             const nextNames = groupOrderNamesAfterMove(groupName, direction);
             if (nextNames.join('\n') === groups.value.map(group => group.name).join('\n')) {
                 return;
             }
-            const updatedGroups = await store.updateGroupOrder(nextNames);
-            if (updatedGroups) {
-                groups.value = updatedGroups;
+            groupOrdering.value = true;
+            try {
+                const updatedGroups = await store.updateGroupOrder(nextNames);
+                if (updatedGroups) groups.value = updatedGroups;
+            } catch (error) {
+                showToast(error.message || '密码组排序失败，请重试', 'error');
+            } finally {
+                groupOrdering.value = false;
             }
         }
 
         async function resetGroupOrder() {
-            const updatedGroups = await store.updateGroupOrder([]);
-            if (updatedGroups) {
-                groups.value = updatedGroups;
+            if (groupOrdering.value) return;
+            groupOrdering.value = true;
+            try {
+                const updatedGroups = await store.updateGroupOrder([]);
+                if (updatedGroups) groups.value = updatedGroups;
+            } catch (error) {
+                showToast(error.message || '恢复默认排序失败，请重试', 'error');
+            } finally {
+                groupOrdering.value = false;
             }
         }
 
@@ -136,13 +161,23 @@
                     : await store.createGroup(payload);
                 if (result) {
                     closeGroupModal();
-                    await loadGroups();
+                    const groupsRefreshed = await loadGroups();
                     if (oldName && activeGroupName.value === oldName) {
-                        await filterByGroup(result.new_name || name);
+                        const entriesRefreshed = await filterByGroup(result.new_name || name);
+                        if (groupsRefreshed === false || entriesRefreshed === false) {
+                            showToast('密码组已更新，但当前视图刷新不完整，请稍后重试。', 'warning');
+                        }
                     } else if (oldName) {
-                        await loadEntries(currentPage.value);
+                        const entriesRefreshed = await loadEntries(currentPage.value);
+                        if (groupsRefreshed === false || entriesRefreshed === false) {
+                            showToast('密码组已更新，但相关列表刷新不完整，请稍后重试。', 'warning');
+                        }
+                    } else if (groupsRefreshed === false) {
+                        showToast('密码组已创建，但列表刷新不完整，请稍后重试。', 'warning');
                     }
                 }
+            } catch (error) {
+                showToast(error.message || '保存密码组失败', 'error');
             } finally {
                 groupSaving.value = false;
             }
@@ -160,18 +195,22 @@
                 : '该操作只会删除密码组，不会删除任何条目。';
             showConfirmDialog('删除密码组', `确认删除密码组「${name}」？\n\n${relationNotice}`, async () => {
                 const result = await store.deleteGroup(name);
-                if (!result) return;
+                if (!result) return false;
                 if (filter.value === 'group' && activeGroupName.value === name) {
-                    await showGroupMode();
+                    const refreshed = await showGroupMode();
+                    if (refreshed === false) showToast('密码组已删除，但列表刷新不完整，请稍后重试。', 'warning');
                     return;
                 }
-                await Promise.all([loadGroups(), loadEntries(currentPage.value)]);
+                if (!(await refreshGroupMutationView())) {
+                    showToast('密码组已删除，但相关列表刷新不完整，请稍后重试。', 'warning');
+                }
             });
         }
 
         async function filterByGroup(groupName) {
             const normalized = String(groupName || '').trim();
             if (!normalized) return;
+            if (showGroupEntryPicker.value) closeGroupEntryPicker();
             searchQuery.value = '';
             resetSearchScopes();
             resetAdvancedFilterForm();
@@ -185,17 +224,15 @@
             activeTagName.value = '';
             activeGroupName.value = normalized;
             selectedEntryIds.value = [];
-            await loadEntries(1);
+            return loadEntries(1);
         }
 
-        async function openGroupEntryPicker() {
-            if (!activeGroupName.value || groupPickerLoading.value || groupPickerSaving.value) return;
-            showGroupEntryPicker.value = true;
-            groupPickerTagFilter.value = '';
-            groupPickerGroupFilter.value = '';
-            groupPickerPage.value = 1;
-            groupPickerSelectedIds.value = [];
+        async function loadGroupEntryPicker() {
+            if (locked?.value || !activeGroupName.value || groupPickerLoading.value || groupPickerSaving.value) return;
+            const requestSequence = ++pickerRequestSequence;
+            const targetGroupName = activeGroupName.value;
             groupPickerLoading.value = true;
+            groupPickerError.value = '';
             try {
                 const params = new URLSearchParams({
                     page: '1',
@@ -204,17 +241,74 @@
                     sort_order: 'asc'
                 });
                 const result = await api.get(`/entries?${params}`);
-                groupPickerEntries.value = result.data?.items || [];
+                if (
+                    requestSequence !== pickerRequestSequence
+                    || locked?.value
+                    || activeGroupName.value !== targetGroupName
+                ) return;
+                const items = [...(result.data?.items || [])];
+                const totalPages = Math.max(
+                    1,
+                    Number(result.data?.pagination?.total_pages || result.data?.pagination?.totalPages || 1)
+                );
+                // 选择器支持跨页选择；一次打开时把后续元数据页补齐，避免超过 1000 条后静默缺失。
+                for (let page = 2; page <= totalPages; page += 1) {
+                    if (
+                        requestSequence !== pickerRequestSequence
+                        || locked?.value
+                        || activeGroupName.value !== targetGroupName
+                    ) return;
+                    const nextParams = new URLSearchParams(params);
+                    nextParams.set('page', String(page));
+                    const nextResult = await api.get(`/entries?${nextParams}`);
+                    items.push(...(nextResult.data?.items || []));
+                }
+                if (
+                    requestSequence !== pickerRequestSequence
+                    || locked?.value
+                    || activeGroupName.value !== targetGroupName
+                ) return;
+                groupPickerEntries.value = items;
+                return true;
             } catch (error) {
+                if (
+                    requestSequence !== pickerRequestSequence
+                    || error?.code === 'SESSION_INVALIDATED'
+                    || locked?.value
+                    || activeGroupName.value !== targetGroupName
+                ) return;
                 groupPickerEntries.value = [];
-                showToast(error.message || '加载可选条目失败', 'error');
+                groupPickerError.value = error.message || '加载可选条目失败，请重试。';
+                showToast(groupPickerError.value, 'error');
+                return false;
             } finally {
-                groupPickerLoading.value = false;
+                if (requestSequence === pickerRequestSequence) groupPickerLoading.value = false;
             }
         }
 
+        async function openGroupEntryPicker() {
+            if (locked?.value || !activeGroupName.value || groupPickerLoading.value || groupPickerSaving.value) return;
+            showGroupEntryPicker.value = true;
+            groupPickerTagFilter.value = '';
+            groupPickerGroupFilter.value = '';
+            groupPickerPage.value = 1;
+            groupPickerSelectedIds.value = [];
+            await loadGroupEntryPicker();
+        }
+
+        async function retryGroupEntryPicker() {
+            if (!showGroupEntryPicker.value || groupPickerLoading.value || groupPickerSaving.value) return;
+            groupPickerPage.value = 1;
+            groupPickerSelectedIds.value = [];
+            await loadGroupEntryPicker();
+        }
+
         function closeGroupEntryPicker() {
+            pickerRequestSequence += 1;
             showGroupEntryPicker.value = false;
+            // 关闭弹窗即取消当前读取上下文，避免迟到请求让下一次打开永久停在加载态。
+            groupPickerLoading.value = false;
+            groupPickerError.value = '';
             groupPickerEntries.value = [];
             groupPickerSelectedIds.value = [];
             groupPickerTagFilter.value = '';
@@ -252,8 +346,12 @@
                 const result = await store.assignEntriesToGroup(activeGroupName.value, groupPickerSelectedIds.value);
                 if (result) {
                     closeGroupEntryPicker();
-                    await Promise.all([loadEntries(currentPage.value), loadGroups()]);
+                    if (!(await refreshGroupMutationView())) {
+                        showToast('条目已加入密码组，但相关列表刷新不完整，请稍后重试。', 'warning');
+                    }
                 }
+            } catch (error) {
+                showToast(error.message || '加入密码组失败，请重试', 'error');
             } finally {
                 groupPickerSaving.value = false;
             }
@@ -271,6 +369,7 @@
             confirmDeleteGroup,
             filterByGroup,
             openGroupEntryPicker,
+            retryGroupEntryPicker,
             closeGroupEntryPicker,
             goToGroupPickerPage,
             toggleGroupPickerEntry,

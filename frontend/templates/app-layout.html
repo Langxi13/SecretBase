@@ -4,6 +4,19 @@
             <p>加载中...</p>
         </div>
 
+        <!-- 本地服务或认证状态读取失败时提供可恢复入口，不把故障伪装成密码错误 -->
+        <div v-else-if="startupError" class="auth-screen startup-error-screen">
+            <div class="auth-card startup-error-card" role="alert">
+                <div class="startup-error-icon">!</div>
+                <h1>暂时无法连接 SecretBase</h1>
+                <p class="auth-hint">{{ startupError }}</p>
+                <button type="button" class="btn-primary" @click="retryInitialization" :disabled="startupRetrying">
+                    {{ startupRetrying ? '重试中...' : '重新连接' }}
+                </button>
+                <p class="startup-error-help">数据仍保留在本机，连接恢复后即可继续使用。</p>
+            </div>
+        </div>
+
         <!-- 未初始化 - 设置主密码 -->
         <div v-else-if="!initialized" class="auth-screen">
             <div class="auth-card">
@@ -330,5 +343,11 @@
                         <span v-for="item in activeListStateItems" :key="item" class="state-pill">{{ item }}</span>
                     </div>
                     <button class="btn-small" @click="clearListState">{{ filter === 'group' && activeGroupName ? '返回密码组' : '清除定位/筛选' }}</button>
+                </div>
+                <div v-if="dataLoadError" class="data-load-error-banner" role="alert">
+                    <span>{{ dataLoadError }}</span>
+                    <button class="btn-small" @click="retryDataLoad" :disabled="dataLoading">
+                        {{ dataLoading ? '重试中...' : '重试' }}
+                    </button>
                 </div>
             </div>

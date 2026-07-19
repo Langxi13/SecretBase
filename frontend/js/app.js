@@ -66,12 +66,22 @@ const app = createApp({
             loadSavedAdvancedFilters: features.actions.loadSavedAdvancedFilters,
             loadAiSettingsStatus: features.actions.loadAiSettingsStatus,
             loadDesktopDiagnostics: features.actions.loadDesktopDiagnostics,
+            disposeAiSettings: features.actions.disposeAiSettings,
+            disposeAiAssistant: features.actions.disposeAiAssistant,
+            disposeAiTools: features.actions.disposeAiTools,
+            disposeMaintenance: features.actions.disposeMaintenance,
+            disposeEntryRequests: features.actions.disposeEntryRequests,
             initializeDesktopUpdates: features.actions.initializeDesktopUpdates,
             disposeDesktopUpdates: features.actions.disposeDesktopUpdates,
             initializeSync: features.actions.initializeSync,
             pauseSync: features.actions.pauseSync,
             disposeSync: features.actions.disposeSync,
-            handleDocumentClick: features.actions.handleDocumentClick
+            closeSyncOverlays: features.actions.closeSyncOverlays,
+            handleDocumentClick: features.actions.handleDocumentClick,
+            handleDocumentKeydown: features.actions.handleDocumentKeydown,
+            clearPendingDialogs: ui.clearPendingDialogs,
+            clearDataLoadErrors: data.clearLoadErrors,
+            invalidateDataRequests: data.invalidateRequests
         });
         Object.assign(settingsActions, session);
 
@@ -80,7 +90,8 @@ const app = createApp({
             state,
             views: features.views,
             actions: features.actions,
-            savePageSizePreference: pagination.savePageSizePreference
+            savePageSizePreference: pagination.savePageSizePreference,
+            normalizeUniversalPageSize: pagination.normalizeUniversalPageSize
         });
         session.registerLifecycle({ onMounted, onUnmounted });
 

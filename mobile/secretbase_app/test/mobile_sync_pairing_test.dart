@@ -49,6 +49,8 @@ void main() {
       'secretbase://sync/join?v=2&recovery_code=SBSYNC2-AIIRC-EIRCE-IUCEM-BCEIR-CEIRC-EISEI-RCEIR-CEQRC-QIRCE-IRCEI-RCEAI-CAMCA-KBQHB-AEQUC-YMBUH-A6EAR-CIJRI-FIWC4-MBSGQ-3DQOR-4HZAJ-QFRST-R&url=https%3A%2F%2Fdav.example.test&username=tester',
       'secretbase://sync/join?v=2&recovery_code=SBSYNC2-AIIRC-EIRCE-IUCEM-BCEIR-CEIRC-EISEI-RCEIR-CEQRC-QIRCE-IRCEI-RCEAI-CAMCA-KBQHB-AEQUC-YMBUH-A6EAR-CIJRI-FIWC4-MBSGQ-3DQOR-4HZAJ-QFRST-Q&url=http%3A%2F%2Fdav.example.test&username=tester',
       'secretbase://sync/join?v=2&recovery_code=SBSYNC2-AIIRC-EIRCE-IUCEM-BCEIR-CEIRC-EISEI-RCEIR-CEQRC-QIRCE-IRCEI-RCEAI-CAMCA-KBQHB-AEQUC-YMBUH-A6EAR-CIJRI-FIWC4-MBSGQ-3DQOR-4HZAJ-QFRST-Q&url=https%3A%2F%2Fname%3Apass%40dav.example.test&username=tester',
+      'secretbase://sync/join?v=2&v=2&recovery_code=SBSYNC2-TEST&url=https%3A%2F%2Fdav.example.test&username=tester',
+      'secretbase://sync/join?v=2&recovery_code=SBSYNC2-TEST&password=secret&url=https%3A%2F%2Fdav.example.test&username=tester',
     ]) {
       expect(
         () => MobileSyncPairing.parse(value),

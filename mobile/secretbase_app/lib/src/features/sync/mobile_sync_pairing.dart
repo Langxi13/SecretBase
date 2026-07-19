@@ -45,8 +45,33 @@ class MobileSyncPairing {
     if (parsed == null ||
         parsed.scheme != 'secretbase' ||
         parsed.host != 'sync' ||
-        parsed.path != '/join') {
+        parsed.path != '/join' ||
+        parsed.userInfo.isNotEmpty ||
+        parsed.fragment.isNotEmpty) {
       throw const MobileSyncPairingException('不是 SecretBase 同步配对链接');
+    }
+    for (final key in const [
+      'v',
+      'url',
+      'username',
+      'recovery_code',
+      'key',
+      'vault_id',
+      'space_id',
+    ]) {
+      if ((parsed.queryParametersAll[key] ?? const []).length > 1) {
+        throw MobileSyncPairingException('配对链接包含重复的 $key 参数');
+      }
+    }
+    for (final key in const [
+      'password',
+      'webdav_password',
+      'app_password',
+      'token',
+    ]) {
+      if (parsed.queryParametersAll.containsKey(key)) {
+        throw const MobileSyncPairingException('配对链接不得包含 WebDAV 应用密码或访问令牌');
+      }
     }
     if (parsed.queryParameters['v'] != '2') {
       throw const MobileSyncPairingException(
@@ -70,6 +95,9 @@ class MobileSyncPairing {
     }
 
     var recoveryCode = parsed.queryParameters['recovery_code']?.trim() ?? '';
+    if (recoveryCode.isNotEmpty && parsed.queryParameters['key'] != null) {
+      throw const MobileSyncPairingException('配对链接包含重复的同步密钥材料，请重新生成');
+    }
     if (recoveryCode.isEmpty) {
       recoveryCode = _recoveryCodeFromLegacyKey(parsed.queryParameters);
     }

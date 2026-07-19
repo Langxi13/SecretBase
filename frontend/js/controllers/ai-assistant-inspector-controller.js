@@ -15,6 +15,7 @@
     const domainOrder = ['groups', 'tags', 'entry_structure', 'entry_creation', 'navigation', 'other'];
 
     function normalizeAssistantPlan(data, requestContext, defaultScope, normalizeTargets) {
+        data = data && typeof data === 'object' ? data : {};
         const context = requestContext || {};
         const conflicts = Array.isArray(data.conflicts) ? data.conflicts : [];
         const actions = (data.actions || []).map(action => ({
@@ -126,6 +127,10 @@
             try {
                 const entry = await store.getEntry(normalizedId);
                 if (currentRequestId !== requestId) return;
+                if (!entry) {
+                    aiAssistantInspector.error = '目标条目暂时无法读取，请重试。';
+                    return;
+                }
                 aiAssistantInspector.entry = {
                     ...entry,
                     fields: (entry?.fields || []).map(field => ({

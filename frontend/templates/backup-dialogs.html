@@ -3,7 +3,7 @@
             <div class="modal-content backup-center-modal">
                 <div class="modal-header">
                     <h2>💾 备份中心</h2>
-                    <button class="modal-close" @click="showBackupCenter = false">✕</button>
+                    <button class="modal-close" @click="closeBackupCenter" :disabled="backupBusy">✕</button>
                 </div>
                 <div class="modal-body">
                     <section class="backup-summary-grid">
@@ -28,7 +28,7 @@
                     <section class="backup-toolbar">
                         <div class="setting-item backup-retention-control">
                             <label>自动备份保留数量</label>
-                            <input type="number" v-model.number="settingsForm.autoBackupRetention" min="5" max="200" @change="saveSettings">
+                            <input type="number" v-model.number="settingsForm.autoBackupRetention" min="5" max="200" @change="saveSettings" :disabled="backupBusy">
                         </div>
                         <div class="backup-toolbar-actions">
                             <button class="btn-primary inline" @click="createManualBackup" :disabled="backupBusy">
@@ -44,8 +44,14 @@
                         <span class="loading-spinner"></span>
                         <span>正在加载备份列表...</span>
                     </div>
+                    <div v-else-if="backupError" class="empty-state error-state">
+                        <p>{{ backupError }}</p>
+                        <button class="btn-secondary" @click="loadBackups" :disabled="backupBusy">
+                            {{ backupListLoading ? '重试中...' : '重新加载' }}
+                        </button>
+                    </div>
 
-                    <div class="backup-list">
+                    <div v-else class="backup-list">
                         <section v-for="group in backupGroups" :key="group.type" class="backup-group" :class="'backup-group-' + group.type">
                             <div class="backup-group-header">
                                 <div>
@@ -90,16 +96,16 @@
                             <div class="backup-pagination">
                                 <label class="tag-page-size-control" title="输入自定义条数或选择">
                                     <span>每页</span>
-                                    <input type="number" class="page-size-input" v-model.number="backupPageSize" min="1" max="500">
-                                    <select class="page-size-quick-select" :value="backupPageSize" @change="backupPageSize = Number($event.target.value)">
+                                    <input type="number" class="page-size-input" v-model.number="backupPageSize" min="1" max="500" :disabled="backupBusy">
+                                    <select class="page-size-quick-select" :value="backupPageSize" :disabled="backupBusy" @change="backupPageSize = Number($event.target.value)">
                                         <option :value="backupPageSize" v-if="!(backupPageSizeOptions || [3, 6, 10, 20, 50, 100]).includes(backupPageSize)">{{ backupPageSize }} (自定)</option>
                                         <option v-for="size in (backupPageSizeOptions || [3, 6, 10, 20, 50, 100])" :key="'backup-size-' + size" :value="size">{{ size }}</option>
                                     </select>
                                     <span>个</span>
                                 </label>
-                                <button class="btn-small" :disabled="group.page <= 1" @click="setBackupPage(group.type, group.page - 1)">上一页</button>
+                                <button class="btn-small" :disabled="backupBusy || group.page <= 1" @click="setBackupPage(group.type, group.page - 1)">上一页</button>
                                 <span>{{ group.page }} / {{ group.totalPages }}</span>
-                                <button class="btn-small" :disabled="group.page >= group.totalPages" @click="setBackupPage(group.type, group.page + 1)">下一页</button>
+                                <button class="btn-small" :disabled="backupBusy || group.page >= group.totalPages" @click="setBackupPage(group.type, group.page + 1)">下一页</button>
                             </div>
                         </section>
                     </div>
@@ -112,7 +118,7 @@
             <div class="modal-content restore-wizard-modal">
                 <div class="modal-header">
                     <h2>恢复备份</h2>
-                    <button class="modal-close" @click="closeRestoreWizard">✕</button>
+                    <button class="modal-close" @click="closeRestoreWizard" :disabled="restoreWizard.restoring">✕</button>
                 </div>
                 <div class="modal-body">
                     <div class="wizard-steps">

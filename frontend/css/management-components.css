@@ -244,6 +244,11 @@
     overflow: hidden;
 }
 
+.file-action.disabled {
+    opacity: 0.55;
+    pointer-events: none;
+}
+
 .file-action input {
     position: absolute;
     inset: 0;

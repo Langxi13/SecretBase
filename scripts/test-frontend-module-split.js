@@ -9,8 +9,8 @@ const indexHtml = read('frontend/index.html');
 const appJs = read('frontend/js/app.js');
 const utilsJs = read('frontend/js/utils.js');
 const aiWorkspaceCss = read('frontend/css/ai-workspace.css');
-const { cssPaths, readAppVersion } = require('./frontend-source');
-const appVersion = readAppVersion();
+const { cssPaths, readFrontendAssetVersion } = require('./frontend-source');
+const assetVersion = readFrontendAssetVersion();
 
 function assertIncludes(content, needle, message) {
     if (!content.includes(needle)) {
@@ -46,14 +46,14 @@ function assertLessThan(actual, expected, message) {
     'css/component-responsive.css',
     'css/visual-polish.css',
     'css/component-polish.css'
-].forEach(asset => assertIncludes(indexHtml, `${asset}?v=${appVersion}`, `入口页必须加载 ${asset}`));
+].forEach(asset => assertIncludes(indexHtml, `${asset}?v=${assetVersion}`, `入口页必须加载 ${asset}`));
 assertNotIncludes(indexHtml, 'css/style.css', '入口页不应继续加载巨型 style.css');
 assertNotIncludes(indexHtml, 'css/components.css', '入口页不应继续加载巨型 components.css');
-assertIncludes(indexHtml, `js/storage.js?v=${appVersion}`, '安全存储适配必须先于应用模块加载');
-assertIncludes(indexHtml, `js/pagination.js?v=${appVersion}`, '分页偏好工具必须拆到独立 JS 模块');
-assertIncludes(indexHtml, `js/toast.js?v=${appVersion}`, 'Toast 工具必须拆到独立 JS 模块');
-assertIncludes(aiWorkspaceCss, `@import url('./ai-entry-inspector.css?v=${appVersion}')`, 'AI 工作区必须加载独立建议详情样式');
-assertIncludes(aiWorkspaceCss, `@import url('./ai-plan-review.css?v=${appVersion}')`, 'AI 工作区必须加载独立复合计划审核样式');
+assertIncludes(indexHtml, `js/storage.js?v=${assetVersion}`, '安全存储适配必须先于应用模块加载');
+assertIncludes(indexHtml, `js/pagination.js?v=${assetVersion}`, '分页偏好工具必须拆到独立 JS 模块');
+assertIncludes(indexHtml, `js/toast.js?v=${assetVersion}`, 'Toast 工具必须拆到独立 JS 模块');
+assertIncludes(aiWorkspaceCss, `@import url('./ai-entry-inspector.css?v=${assetVersion}')`, 'AI 工作区必须加载独立建议详情样式');
+assertIncludes(aiWorkspaceCss, `@import url('./ai-plan-review.css?v=${assetVersion}')`, 'AI 工作区必须加载独立复合计划审核样式');
 
 assertIncludes(appJs, 'window.SecretBasePagination', 'app.js 必须复用分页偏好工具模块');
 assertNotIncludes(appJs, 'function normalizeUniversalPageSize', 'app.js 不应继续内联通用分页归一化函数');

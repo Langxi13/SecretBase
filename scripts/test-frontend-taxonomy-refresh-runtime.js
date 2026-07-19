@@ -48,6 +48,8 @@ vm.runInContext(read('frontend/js/controllers/tag-controller.js'), context, {
     let confirmation = null;
     let loadTagsCount = 0;
     let loadEntriesCount = 0;
+    const showTagManager = ref(true);
+    const showTagEditorModal = ref(true);
     const actions = context.SecretBaseTagController.createTagController({
         api: {},
         store,
@@ -66,8 +68,8 @@ vm.runInContext(read('frontend/js/controllers/tag-controller.js'), context, {
         tagBrowserTotalPages: ref(1),
         loadEntries: async () => { loadEntriesCount += 1; },
         resetAdvancedFilterForm: () => {},
-        showTagManager: ref(true),
-        showTagEditorModal: ref(true),
+        showTagManager,
+        showTagEditorModal,
         tagEditorForm,
         selectedManagedTagNames,
         tagManagerPage: ref(1),
@@ -94,6 +96,7 @@ vm.runInContext(read('frontend/js/controllers/tag-controller.js'), context, {
     await actions.createTagFromManager();
     assert(storeCalls.some(call => call[0] === 'create'), '标签管理必须提交新建操作');
     assert(loadTagsCount === 2 && loadEntriesCount === 1, '新建标签后只需刷新标签列表');
+    assert(!showTagEditorModal.value, '标签创建成功后必须关闭编辑弹窗');
 
     tagEditorForm.mode = 'edit';
     tagEditorForm.originalName = '新标签';
@@ -101,6 +104,7 @@ vm.runInContext(read('frontend/js/controllers/tag-controller.js'), context, {
     await actions.saveManagedTag();
     assert(storeCalls.some(call => call[0] === 'update'), '标签管理必须提交编辑操作');
     assert(loadTagsCount === 3 && loadEntriesCount === 2, '编辑标签后必须刷新标签和条目');
+    assert(!showTagEditorModal.value, '标签编辑成功后必须关闭编辑弹窗');
 
     selectedManagedTagNames.value = ['标签 A', '标签 B'];
     await actions.batchDeleteManagedTags();

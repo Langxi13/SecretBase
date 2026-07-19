@@ -3,8 +3,8 @@ const path = require('path');
 
 const root = path.resolve(__dirname, '..');
 const read = file => fs.readFileSync(path.join(root, file), 'utf8');
-const { readFrontendMarkup, readFrontendCss, readAppVersion } = require('./frontend-source');
-const appVersion = readAppVersion();
+const { readFrontendMarkup, readFrontendCss, readFrontendAssetVersion } = require('./frontend-source');
+const assetVersion = readFrontendAssetVersion();
 
 const indexHtml = readFrontendMarkup();
 const appJs = read('frontend/js/app.js');
@@ -30,7 +30,7 @@ assertIncludes(indexHtml, 'field-overflow-hint', '字段剩余提示必须使用
 assertIncludes(indexHtml, '还有 {{ entry.fields.length - 2 }} 个字段，点击查看详情', '字段剩余提示必须明确展示剩余数量和详情入口');
 assertIncludes(indexHtml, 'class="field-name" :title="field.name"', '长字段名必须支持悬停查看完整内容');
 assertIncludes(indexHtml, ":title=\"field.masked ? '隐藏字段' : field.value\"", '长字段值必须支持安全悬停且不能泄露隐藏值');
-assertIncludes(indexHtml, `?v=${appVersion}`, '前端资源版本必须与应用版本一致，避免浏览器继续使用旧 JS');
+assertIncludes(indexHtml, `?v=${assetVersion}`, '前端资源必须使用独立修订号，避免浏览器继续使用旧 JS');
 assertIncludes(indexHtml, ':style="entryCardStyle(entry)"', '条目卡片必须通过标签或密码组颜色注入视觉区分变量');
 assertIncludes(indexHtml, 'visibleEntryGroups(entry)', '条目卡片必须控制密码组 chip 展示数量');
 assertIncludes(indexHtml, 'remainingEntryGroupsCount(entry)', '密码组较多时必须显示剩余数量提示');

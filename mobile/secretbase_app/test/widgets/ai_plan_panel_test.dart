@@ -62,6 +62,7 @@ void main() {
     final selected = <String>{'item-1'};
     final revealed = <String>{};
     final expanded = <String>{};
+    var discarded = false;
 
     await tester.pumpWidget(
       MaterialApp(
@@ -86,6 +87,7 @@ void main() {
                 onReveal: (key) => setState(() => revealed.add(key)),
                 onExpanded: (id) => setState(() => expanded.add(id)),
                 onApply: () {},
+                onDiscard: () => discarded = true,
               ),
             ),
           ),
@@ -101,6 +103,8 @@ void main() {
     await tester.tap(find.byTooltip('显示内容'));
     await tester.pump();
     expect(find.text('must-not-show-before-confirmation'), findsOneWidget);
+    await tester.tap(find.text('放弃建议'));
+    expect(discarded, isTrue);
     expect(tester.takeException(), isNull);
   });
 }

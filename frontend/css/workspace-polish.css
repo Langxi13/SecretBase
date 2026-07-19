@@ -86,6 +86,25 @@ body {
     background: var(--color-primary-light);
 }
 
+.data-load-error-banner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-top: 10px;
+    padding: 10px 12px;
+    border: 1px solid color-mix(in srgb, var(--color-error) 35%, var(--border-color));
+    border-radius: var(--border-radius);
+    background: var(--status-error-bg);
+    color: var(--color-error);
+    font-size: var(--font-size-sm);
+}
+
+.data-load-error-banner > span {
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
 .list-state-banner > div {
     display: flex;
     align-items: center;

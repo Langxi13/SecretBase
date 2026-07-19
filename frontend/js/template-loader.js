@@ -5,8 +5,9 @@
  * 但入口页不再承担全部页面和弹窗的标记。
  */
 (function () {
+    const runtimeConfig = window.SECRETBASE_RUNTIME_CONFIG || {};
     const templateVersion = String(
-        window.SECRETBASE_RUNTIME_CONFIG?.version || 'development'
+        runtimeConfig.assetVersion || runtimeConfig.version || 'development'
     );
     const templatePaths = [
         'templates/app-layout.html',

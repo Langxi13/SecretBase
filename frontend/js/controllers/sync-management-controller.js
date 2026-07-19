@@ -13,7 +13,10 @@
         epochIsCurrent,
         responseBelongsToCurrentSession
     }) {
+        let recoveryDialogEpoch = 0;
+
         function openSyncRecovery(mode = 'reveal') {
+            recoveryDialogEpoch += 1;
             state.syncRecoveryMode.value = ['rotate', 'migrate', 'compact'].includes(mode) ? mode : 'reveal';
             state.syncMasterPassword.value = '';
             state.syncCompactConfirmation.value = '';
@@ -24,6 +27,7 @@
 
         function closeSyncRecovery() {
             if (state.syncRecoveryBusy.value) return;
+            recoveryDialogEpoch += 1;
             state.showSyncRecovery.value = false;
             state.syncMasterPassword.value = '';
             state.syncCompactConfirmation.value = '';
@@ -35,6 +39,7 @@
             state.syncRecoveryBusy.value = true;
             state.syncError.value = '';
             const epoch = lifecycle.currentEpoch();
+            const dialogEpoch = recoveryDialogEpoch;
             try {
                 const mode = state.syncRecoveryMode.value;
                 const path = mode === 'rotate'
@@ -45,17 +50,18 @@
                 const payload = { password: state.syncMasterPassword.value };
                 if (mode === 'compact') payload.confirmation = state.syncCompactConfirmation.value.trim();
                 const result = await api.post(path, payload);
-                if (!responseBelongsToCurrentSession(epoch)) return;
+                if (!responseBelongsToCurrentSession(epoch) || dialogEpoch !== recoveryDialogEpoch || !state.showSyncRecovery.value) return;
                 state.syncRecoveryMaterial.value = result.data;
                 applySyncStatus(result.data?.status);
                 if (['rotate', 'migrate', 'compact'].includes(mode)) {
                     showToast(result.message || (mode === 'compact' ? '同步历史已压缩' : '同步设置已更新'), 'success');
                 }
             } catch (error) {
-                if (!responseBelongsToCurrentSession(epoch)) return;
+                if (!responseBelongsToCurrentSession(epoch) || dialogEpoch !== recoveryDialogEpoch) return;
                 state.syncError.value = error.message || '同步恢复信息读取失败';
+                showToast(state.syncError.value, 'error');
             } finally {
-                if (epochIsCurrent(epoch)) {
+                if (epochIsCurrent(epoch) && dialogEpoch === recoveryDialogEpoch) {
                     state.syncMasterPassword.value = '';
                     state.syncRecoveryBusy.value = false;
                 }
@@ -85,7 +91,10 @@
                     showToast(result.message || '已断开本机同步', 'success');
                 } catch (error) {
                     if (!responseBelongsToCurrentSession(epoch)) return;
-                    showToast(error.message || '断开同步失败', 'error');
+                    const message = error.message || '断开同步失败';
+                    state.syncError.value = message;
+                    showToast(message, 'error');
+                    throw new Error(message);
                 } finally {
                     if (epochIsCurrent(epoch)) state.syncBusy.value = false;
                 }
@@ -97,6 +106,14 @@
             state.syncDeleteForm.confirmation = '';
             state.syncError.value = '';
             state.showSyncDeleteRemote.value = true;
+        }
+
+        function closeDeleteRemoteSync(force = false) {
+            if (state.syncBusy.value && !force) return;
+            state.showSyncDeleteRemote.value = false;
+            state.syncDeleteForm.password = '';
+            state.syncDeleteForm.confirmation = '';
+            state.syncError.value = '';
         }
 
         async function deleteRemoteSync() {
@@ -111,11 +128,12 @@
                 });
                 if (!responseBelongsToCurrentSession(epoch)) return;
                 applySyncStatus(result.data);
-                state.showSyncDeleteRemote.value = false;
+                closeDeleteRemoteSync(true);
                 showToast(result.message || '远端同步数据已删除', 'success');
             } catch (error) {
                 if (!responseBelongsToCurrentSession(epoch)) return;
                 state.syncError.value = error.message || '远端同步数据删除失败';
+                showToast(state.syncError.value, 'error');
             } finally {
                 if (epochIsCurrent(epoch)) {
                     state.syncDeleteForm.password = '';
@@ -131,6 +149,7 @@
             copySyncSecret,
             disconnectSync,
             openDeleteRemoteSync,
+            closeDeleteRemoteSync,
             deleteRemoteSync
         };
     }

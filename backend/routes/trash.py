@@ -47,7 +47,9 @@ async def get_trash(
     
     # 分页
     total = len(items)
-    start = (page - 1) * page_size
+    total_pages = (total + page_size - 1) // page_size
+    effective_page = min(page, total_pages) if total_pages else 1
+    start = (effective_page - 1) * page_size
     end = start + page_size
     page_items = items[start:end]
     
@@ -56,10 +58,10 @@ async def get_trash(
         "data": {
             "items": page_items,
             "pagination": {
-                "page": page,
+                "page": effective_page,
                 "page_size": page_size,
                 "total": total,
-                "total_pages": (total + page_size - 1) // page_size
+                "total_pages": total_pages
             }
         }
     }

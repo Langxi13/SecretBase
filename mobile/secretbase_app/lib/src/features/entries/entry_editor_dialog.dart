@@ -134,10 +134,19 @@ class _EntryEditorDialogState extends State<EntryEditorDialog> {
         ),
         expectedRevision: widget.ref.read(vaultControllerProvider).revision,
       );
-      await widget.ref.read(vaultControllerProvider.notifier).refreshStatus();
+      var refreshed = true;
+      try {
+        await widget.ref.read(vaultControllerProvider.notifier).refreshStatus();
+      } catch (_) {
+        refreshed = false;
+      }
       widget.ref.invalidate(entryPageProvider);
       widget.ref.invalidate(taxonomyProvider);
-      if (mounted) Navigator.of(context).pop(result.message);
+      if (mounted) {
+        Navigator.of(
+          context,
+        ).pop(refreshed ? result.message : '${result.message}，但界面刷新不完整，请稍后重试。');
+      }
     } catch (error) {
       if (!mounted) return;
       setState(() {

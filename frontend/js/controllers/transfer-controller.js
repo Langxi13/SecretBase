@@ -7,11 +7,14 @@
             api,
             showToast,
             showConfirmDialog,
+            showPromptDialog = async () => null,
             friendlyApiMessage,
             downloadProtectedFile,
             loadAllData,
             importConflictStrategy,
             importConflictMessage,
+            transferBusy = { value: false },
+            transferError = { value: '' },
             showImportConflicts,
             importConflicts,
             showImportReport,
@@ -25,37 +28,66 @@
             lastImportConflictResolutions
         } = options;
 
-        function showImportResultReport(resultData = {}, fallbackConflictCount = 0) {
-            importReport.value = {
+        function beginTransfer() {
+            if (transferBusy.value) return false;
+            transferBusy.value = true;
+            transferError.value = '';
+            return true;
+        }
+
+        function endTransfer() {
+            transferBusy.value = false;
+        }
+
+        function showImportResultReport(resultData = {}, fallbackConflictCount = 0, refreshIncomplete = false) {
+                importReport.value = {
                 importedCount: resultData.imported_count ?? 0,
                 createdCount: resultData.created_count ?? 0,
                 overwrittenCount: resultData.overwritten_count ?? 0,
                 skippedCount: resultData.skipped_count ?? 0,
                 conflictCount: resultData.conflicts?.length ?? fallbackConflictCount,
-                selectedCount: lastImportSelectedIds.value.length
+                selectedCount: lastImportSelectedIds.value.length,
+                refreshIncomplete
             };
             showImportReport.value = true;
         }
 
         async function exportEncrypted() {
-            await downloadProtectedFile({
-                api,
-                showToast,
-                path: '/export/encrypted',
-                body: {},
-                filename: `secretbase-backup-${new Date().toISOString().slice(0, 10)}.enc`
-            });
+            if (!beginTransfer()) return;
+            try {
+                await downloadProtectedFile({
+                    api,
+                    showToast,
+                    path: '/export/encrypted',
+                    body: {},
+                    filename: `secretbase-backup-${new Date().toISOString().slice(0, 10)}.enc`
+                });
+                transferError.value = '';
+            } finally {
+                endTransfer();
+            }
         }
 
         function exportPlain() {
             showConfirmDialog('导出明文', '明文包含所有密码，是否继续？', async () => {
-                await downloadProtectedFile({
-                    api,
-                    showToast,
-                    path: '/export/plain',
-                    body: { confirm: true },
-                    filename: `secretbase-backup-${new Date().toISOString().slice(0, 10)}.json`
-                });
+                if (!beginTransfer()) return false;
+                try {
+                    await downloadProtectedFile({
+                        api,
+                        showToast,
+                        path: '/export/plain',
+                        body: { confirm: true },
+                        filename: `secretbase-backup-${new Date().toISOString().slice(0, 10)}.json`,
+                        throwOnError: true
+                    });
+                    transferError.value = '';
+                    return true;
+                } catch (error) {
+                    transferError.value = friendlyApiMessage(error, '明文导出失败');
+                    throw new Error(transferError.value);
+                } finally {
+                    endTransfer();
+                }
             });
         }
 
@@ -65,21 +97,37 @@
             if (!file) return;
 
             showConfirmDialog('导入加密备份', '导入会替换当前数据文件，系统会先自动备份当前数据。确认继续？', async () => {
+                if (!beginTransfer()) return false;
                 try {
                     let result;
                     try {
                         result = await api.upload('/import/encrypted', file);
                     } catch (error) {
                         if (!error.data?.needs_password) throw error;
-                        const password = window.prompt('该加密备份可能是旧备份或主密码不匹配。请输入该备份对应的主密码。') || '';
-                        if (!password) throw error;
+                        const password = await showPromptDialog({
+                            title: '输入备份主密码',
+                            message: '该加密备份可能来自旧版本或其他密码库。请输入这份备份原主人的主密码。',
+                            placeholder: '备份对应的主密码',
+                            type: 'password',
+                            confirmLabel: '继续导入',
+                            maxLength: 128
+                        });
+                        if (password === null) return false;
                         result = await api.upload('/import/encrypted', file, { password });
                     }
                     if (!result.success) throw new Error(result.message || '导入失败');
-                    showToast(result.message || '导入成功', 'success');
-                    await loadAllData();
+                    transferError.value = '';
+                    const refreshed = await loadAllData();
+                    showToast(
+                        refreshed === false
+                            ? `${result.message || '导入成功'}，但列表刷新不完整，请稍后重试。`
+                            : (result.message || '导入成功'),
+                        refreshed === false ? 'warning' : 'success'
+                    );
                 } catch (error) {
-                    showToast(friendlyApiMessage(error, '导入失败'), 'error');
+                    throw new Error(friendlyApiMessage(error, '导入失败'));
+                } finally {
+                    endTransfer();
                 }
             });
         }
@@ -89,6 +137,7 @@
             event.target.value = '';
             if (!file) return;
             lastImportPlainFile.value = file;
+            if (!beginTransfer()) return;
 
             try {
                 const preview = await api.upload('/import/plain/preview', file);
@@ -101,14 +150,19 @@
                 );
                 showImportPreview.value = true;
             } catch (error) {
-                showToast(error.message || '导入失败', 'error');
+                transferError.value = error.message || '导入预览失败';
+                showToast(transferError.value, 'error');
+            } finally {
+                endTransfer();
             }
         }
 
         async function confirmImportPlain() {
             if (!lastImportPlainFile.value) return;
+            if (!beginTransfer()) return;
             if (importPreview.value?.entries?.length && importPreviewSelectedIds.value.length === 0) {
                 showToast('请至少选择一个要导入的条目', 'warning');
+                endTransfer();
                 return;
             }
             const selectedIds = [...importPreviewSelectedIds.value];
@@ -121,7 +175,6 @@
                 .filter(entry => entry.is_conflict && selectedIds.includes(entry.id))
                 .length;
             lastImportConflictResolutions.value = conflictResolutions;
-            closeImportPreview();
             try {
                 const result = await api.upload('/import/plain', lastImportPlainFile.value, {
                     conflict_strategy: importConflictStrategy.value,
@@ -130,17 +183,29 @@
                 });
                 if (!result.success) throw new Error(result.message || '导入失败');
                 importConflictMessage.value = '';
-                showToast(result.message || '导入成功', 'success');
-                showImportResultReport(result.data, selectedConflictCount);
-                await loadAllData();
+                transferError.value = '';
+                const refreshed = await loadAllData();
+                showToast(
+                    refreshed === false
+                        ? `${result.message || '导入成功'}，但列表刷新不完整，请稍后重试。`
+                        : (result.message || '导入成功'),
+                    refreshed === false ? 'warning' : 'success'
+                );
+                closeImportPreview();
+                lastImportPlainFile.value = null;
+                showImportResultReport(result.data, selectedConflictCount, refreshed === false);
             } catch (error) {
                 const conflicts = error.data?.conflicts || [];
                 if (conflicts.length > 0) {
                     importConflictMessage.value = `发现 ${conflicts.length} 个冲突：${conflicts.slice(0, 3).map(conflict => conflict.import_title).join('、')}`;
                     importConflicts.value = conflicts;
+                    closeImportPreview();
                     showImportConflicts.value = true;
                 }
+                transferError.value = error.message || '导入失败';
                 showToast(error.message || '导入失败', 'error');
+            } finally {
+                endTransfer();
             }
         }
 
@@ -150,6 +215,7 @@
                 closeImportConflicts();
                 return;
             }
+            if (!beginTransfer()) return;
 
             try {
                 const unresolvedConflictCount = importConflicts.value.length;
@@ -162,11 +228,20 @@
                 importConflictStrategy.value = strategy;
                 importConflictMessage.value = '';
                 closeImportConflicts();
-                showToast(result.message || '导入成功', 'success');
-                showImportResultReport(result.data, unresolvedConflictCount);
-                await loadAllData();
+                lastImportPlainFile.value = null;
+                const refreshed = await loadAllData();
+                showToast(
+                    refreshed === false
+                        ? `${result.message || '导入成功'}，但列表刷新不完整，请稍后重试。`
+                        : (result.message || '导入成功'),
+                    refreshed === false ? 'warning' : 'success'
+                );
+                showImportResultReport(result.data, unresolvedConflictCount, refreshed === false);
             } catch (error) {
-                showToast(error.message || '导入失败', 'error');
+                transferError.value = error.message || '导入失败';
+                showToast(transferError.value, 'error');
+            } finally {
+                endTransfer();
             }
         }
 

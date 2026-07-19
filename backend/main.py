@@ -39,7 +39,7 @@ from storage import (
 )
 from routes import auth, entries, trash, tags, groups, ai, settings, health, transfer, tools, sync
 from utils import request_log_path
-from version import APP_VERSION
+from version import APP_VERSION, WEB_ASSET_VERSION
 
 
 SENSITIVE_LOG_PATTERN = re.compile(r"(?i)(password|token|api[_-]?key|secret|authorization)=([^\s,]+)")
@@ -305,6 +305,7 @@ async def runtime_config_js():
         "mode": "desktop" if is_desktop_mode() else "server",
         "apiBaseUrl": api_base_url,
         "version": APP_VERSION,
+        "assetVersion": WEB_ASSET_VERSION,
         "desktopShell": os.getenv("SECRETBASE_DESKTOP_SHELL", "false").lower() == "true",
         "desktopPlatform": os.getenv("SECRETBASE_DESKTOP_PLATFORM", ""),
         "desktopArchitecture": os.getenv("SECRETBASE_DESKTOP_ARCHITECTURE", ""),

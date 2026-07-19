@@ -11,6 +11,7 @@
         const aiStatusError = ref('');
         const aiFailureMessage = ref('');
         const aiOrganizing = ref(false);
+        const aiRequestCancelable = ref(false);
         const aiOrganizeError = ref('');
         const aiOrganizeResult = ref(null);
         const aiOrganizeMode = ref('tags');
@@ -153,6 +154,7 @@
             aiStatusError,
             aiFailureMessage,
             aiOrganizing,
+            aiRequestCancelable,
             aiOrganizeError,
             aiOrganizeResult,
             aiOrganizeMode,

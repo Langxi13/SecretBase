@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:secretbase/src/core/widgets/android_back_exit_guard.dart';
 import 'package:secretbase/src/core/widgets/brand_mark.dart';
+import 'package:secretbase/src/data/vault_providers.dart';
 import 'package:secretbase/src/features/ai/ai_manager_screen.dart';
 import 'package:secretbase/src/features/entries/entries_screen.dart';
 import 'package:secretbase/src/features/groups/groups_screen.dart';
@@ -11,6 +12,18 @@ import 'package:secretbase/src/features/sync/mobile_sync_auto.dart';
 import 'package:secretbase/src/features/tags/tags_screen.dart';
 import 'package:secretbase/src/features/update/mobile_update_widgets.dart';
 import 'package:secretbase/src/state/vault_controller.dart';
+
+enum AppShellBackAction { none, showEntries, returnToOrigin }
+
+/// 系统返回键先处理当前导航层级，再处理来源筛选。
+AppShellBackAction resolveAppShellBackAction({
+  required int selectedIndex,
+  required EntryFilterOrigin? origin,
+}) {
+  if (selectedIndex != 0) return AppShellBackAction.showEntries;
+  if (origin != null) return AppShellBackAction.returnToOrigin;
+  return AppShellBackAction.none;
+}
 
 class AppShell extends ConsumerStatefulWidget {
   const AppShell({super.key});
@@ -64,6 +77,24 @@ class _AppShellState extends ConsumerState<AppShell> {
           !_exiting) {
         context.go('/');
       }
+    });
+    ref.listen(taxonomyProvider('groups'), (previous, next) {
+      next.whenData((items) {
+        if (!mounted) return;
+        final target = _entryPreset.group;
+        if (target != null && !items.any((item) => item.name == target)) {
+          _returnFromEntryPreset();
+        }
+      });
+    });
+    ref.listen(taxonomyProvider('tags'), (previous, next) {
+      next.whenData((items) {
+        if (!mounted) return;
+        final target = _entryPreset.tag;
+        if (target != null && !items.any((item) => item.name == target)) {
+          _returnFromEntryPreset();
+        }
+      });
     });
     if (vaultPhase != VaultPhase.unlocked && !_exiting) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -172,19 +203,22 @@ class _AppShellState extends ConsumerState<AppShell> {
   }
 
   bool _handleBackBeforeExit() {
-    if (_entryPreset.origin != null) {
-      _returnFromEntryPreset();
-      return true;
+    switch (resolveAppShellBackAction(
+      selectedIndex: _index,
+      origin: _entryPreset.origin,
+    )) {
+      case AppShellBackAction.showEntries:
+        setState(() {
+          _filterGeneration += 1;
+          _index = 0;
+        });
+        return true;
+      case AppShellBackAction.returnToOrigin:
+        _returnFromEntryPreset();
+        return true;
+      case AppShellBackAction.none:
+        return false;
     }
-    if (_index != 0) {
-      setState(() {
-        _filterGeneration += 1;
-        _entryPreset = EntryFilterPreset(generation: _filterGeneration);
-        _index = 0;
-      });
-      return true;
-    }
-    return false;
   }
 
   Future<bool> _lockBeforeExit() async {
@@ -228,6 +262,7 @@ class _AppShellState extends ConsumerState<AppShell> {
   }
 
   void _returnFromEntryPreset() {
+    if (!mounted) return;
     final origin = _entryPreset.origin;
     setState(() {
       _filterGeneration += 1;

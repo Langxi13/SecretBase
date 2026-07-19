@@ -221,7 +221,7 @@ def test_runtime_config_endpoint_returns_javascript() -> None:
             """
 from fastapi.testclient import TestClient
 import main
-from version import APP_VERSION
+from version import APP_VERSION, WEB_ASSET_VERSION
 client = TestClient(main.app, base_url="http://127.0.0.1")
 response = client.get("/secretbase-runtime-config.js")
 assert response.status_code == 200
@@ -230,6 +230,7 @@ assert "window.SECRETBASE_RUNTIME_CONFIG" in response.text
 assert '"apiBaseUrl": ""' in response.text
 assert '"mode": "desktop"' in response.text
 assert f'"version": "{APP_VERSION}"' in response.text
+assert f'"assetVersion": "{WEB_ASSET_VERSION}"' in response.text
 assert '"desktopShell": true' in response.text
 assert '"desktopPlatform": "macos"' in response.text
 assert '"desktopArchitecture": "arm64"' in response.text

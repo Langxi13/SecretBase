@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:secretbase/src/core/mobile_error_presenter.dart';
@@ -53,6 +55,9 @@ class _AiScreenState extends ConsumerState<AiScreen> {
   final Set<String> _expanded = {};
   bool _working = false;
   String? _error;
+  AiTransportOperation? _transportOperation;
+  int? _activityToken;
+  int _requestGeneration = 0;
 
   @override
   void initState() {
@@ -63,6 +68,15 @@ class _AiScreenState extends ConsumerState<AiScreen> {
 
   @override
   void dispose() {
+    _requestGeneration += 1;
+    _transportOperation?.cancel();
+    _transportOperation = null;
+    if (_working) unawaited(rust_api.cancelAiPending().catchError((_) {}));
+    final activityToken = _activityToken;
+    if (activityToken != null) {
+      ref.read(aiActivityControllerProvider.notifier).finish(activityToken);
+      _activityToken = null;
+    }
     _inputController.dispose();
     _preferenceController.dispose();
     super.dispose();
@@ -91,7 +105,7 @@ class _AiScreenState extends ConsumerState<AiScreen> {
             _AiHeader(
               status: status,
               onBack: widget.onBack,
-              onSettings: _openSettings,
+              onSettings: _working || _preview != null ? null : _openSettings,
             ),
             if (snapshot.connectionState != ConnectionState.done)
               const Expanded(child: LoadingView(label: '正在读取 AI 设置'))
@@ -146,7 +160,14 @@ class _AiScreenState extends ConsumerState<AiScreen> {
                       ),
                       const SizedBox(height: 2),
                     ],
-                    _ToolSelector(selected: _tool, onSelected: _selectTool),
+                    _ToolSelector(
+                      selected: _tool,
+                      enabled:
+                          !_working &&
+                          !anotherRequestActive &&
+                          _preview == null,
+                      onSelected: _selectTool,
+                    ),
                     const SizedBox(height: 10),
                     _RequestPanel(
                       tool: _tool,
@@ -154,8 +175,11 @@ class _AiScreenState extends ConsumerState<AiScreen> {
                       preferenceController: _preferenceController,
                       selectedEntryTitle: _entryTitle,
                       working: _working || anotherRequestActive,
+                      reviewing: _preview != null,
+                      cancelable: _working,
                       onPickEntry: _pickEntry,
                       onGenerate: () => _generate(status),
+                      onCancel: () => unawaited(_cancelRequest()),
                     ),
                     if (_error != null) ...[
                       const SizedBox(height: 9),
@@ -191,6 +215,7 @@ class _AiScreenState extends ConsumerState<AiScreen> {
                           if (!_expanded.add(id)) _expanded.remove(id);
                         }),
                         onApply: _applyPreview,
+                        onDiscard: _discardPreview,
                       ),
                     ],
                   ],
@@ -211,7 +236,7 @@ class _AiScreenState extends ConsumerState<AiScreen> {
   }
 
   void _selectTool(AiTool tool) {
-    if (_working || tool == _tool) return;
+    if (_working || _preview != null || tool == _tool) return;
     setState(() {
       _tool = tool;
       _preview = null;
@@ -229,6 +254,7 @@ class _AiScreenState extends ConsumerState<AiScreen> {
   }
 
   Future<void> _pickEntry() async {
+    if (_working || _preview != null) return;
     final selection = await showAiEntryPickerDialog(context);
     if (selection != null && mounted) {
       setState(() {
@@ -239,6 +265,7 @@ class _AiScreenState extends ConsumerState<AiScreen> {
   }
 
   Future<void> _generate(AiStatus status) async {
+    if (_working || _preview != null) return;
     if (_tool == AiTool.entryTags && _entryId == null) {
       setState(() => _error = '请先选择需要整理标签的条目');
       return;
@@ -250,10 +277,13 @@ class _AiScreenState extends ConsumerState<AiScreen> {
     }
     if (!await _ensurePrivacyConsent()) return;
     final activity = ref.read(aiActivityControllerProvider.notifier);
-    if (!activity.start()) {
+    final activityToken = activity.acquire();
+    if (activityToken == null) {
       setState(() => _error = '另一个 AI 请求正在处理中，请等待完成');
       return;
     }
+    final generation = ++_requestGeneration;
+    _activityToken = activityToken;
     setState(() {
       _working = true;
       _error = null;
@@ -262,6 +292,7 @@ class _AiScreenState extends ConsumerState<AiScreen> {
       _revealed.clear();
       _expanded.clear();
     });
+    AiTransportOperation? operation;
     try {
       final plan = await rust_api.prepareAiRequest(
         kind: _tool.key,
@@ -269,29 +300,62 @@ class _AiScreenState extends ConsumerState<AiScreen> {
         entryId: _entryId,
         userPrompt: _preferenceController.text,
       );
-      if (!mounted || !await _confirmSend(plan.summary, status)) {
-        if (mounted) setState(() => _working = false);
+      if (!_isCurrentRequest(generation)) {
+        unawaited(rust_api.cancelAiPending().catchError((_) {}));
         return;
       }
-      final response = await AiTransport.send(plan.request);
+      if (!await _confirmSend(plan.summary, status)) {
+        unawaited(rust_api.cancelAiPending().catchError((_) {}));
+        if (_isCurrentRequest(generation)) setState(() => _working = false);
+        return;
+      }
+      if (!_isCurrentRequest(generation)) return;
+      operation = AiTransport.start(plan.request);
+      _transportOperation = operation;
+      final response = await operation.future;
+      if (!_isCurrentRequest(generation)) return;
       final preview = await rust_api.consumeAiResponse(
         token: plan.token,
         content: response,
       );
-      if (mounted) {
+      if (_isCurrentRequest(generation)) {
         setState(() => _working = false);
         _setPreview(preview);
       }
     } catch (error) {
-      if (mounted) {
+      unawaited(rust_api.cancelAiPending().catchError((_) {}));
+      if (_isCurrentRequest(generation)) {
         setState(() {
           _working = false;
           _error = _errorMessage(error);
         });
       }
     } finally {
-      activity.finish();
+      if (identical(_transportOperation, operation)) _transportOperation = null;
+      if (_activityToken == activityToken) _activityToken = null;
+      activity.finish(activityToken);
     }
+  }
+
+  bool _isCurrentRequest(int generation) =>
+      mounted && _working && generation == _requestGeneration;
+
+  Future<void> _cancelRequest() async {
+    if (!_working) return;
+    _requestGeneration += 1;
+    _transportOperation?.cancel();
+    _transportOperation = null;
+    unawaited(rust_api.cancelAiPending().catchError((_) {}));
+    final activityToken = _activityToken;
+    if (activityToken != null) {
+      ref.read(aiActivityControllerProvider.notifier).finish(activityToken);
+      _activityToken = null;
+    }
+    if (!mounted) return;
+    setState(() {
+      _working = false;
+      _error = 'AI 请求已取消';
+    });
   }
 
   Future<void> _applyPreview() async {
@@ -313,7 +377,12 @@ class _AiScreenState extends ConsumerState<AiScreen> {
         expectedRevision: ref.read(vaultControllerProvider).revision,
       );
       ref.read(aiUndoControllerProvider.notifier).record(result);
-      await ref.read(vaultControllerProvider.notifier).refreshStatus();
+      var refreshed = true;
+      try {
+        await ref.read(vaultControllerProvider.notifier).refreshStatus();
+      } catch (_) {
+        refreshed = false;
+      }
       ref.invalidate(entryPageProvider);
       ref.invalidate(taxonomyProvider);
       if (mounted) {
@@ -324,9 +393,13 @@ class _AiScreenState extends ConsumerState<AiScreen> {
           _revealed.clear();
           _expanded.clear();
         });
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(result.message)));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              refreshed ? result.message : '${result.message}，但界面刷新不完整，请稍后重试。',
+            ),
+          ),
+        );
       }
     } catch (error) {
       if (mounted) {
@@ -364,6 +437,25 @@ class _AiScreenState extends ConsumerState<AiScreen> {
         _error = _errorMessage(error);
       });
     }
+  }
+
+  Future<void> _discardPreview() async {
+    if (_preview == null || _working) return;
+    final confirmed = await showAiDiscardConfirmationSheet(context: context);
+    if (confirmed != true) return;
+    try {
+      await rust_api.cancelAiPending();
+    } catch (_) {
+      // 锁定流程可能已经清理运行时状态，仍允许用户关闭本地预览。
+    }
+    if (!mounted) return;
+    setState(() {
+      _preview = null;
+      _selected.clear();
+      _revealed.clear();
+      _expanded.clear();
+      _error = null;
+    });
   }
 
   void _setPreview(AiPreview preview) {
@@ -419,6 +511,7 @@ class _AiScreenState extends ConsumerState<AiScreen> {
   }
 
   Future<void> _openSettings() async {
+    if (_working || _preview != null) return;
     final status = await showAiSettingsDialog(context: context, ref: ref);
     if (status != null && mounted) {
       setState(() {
@@ -446,7 +539,7 @@ class _AiHeader extends StatelessWidget {
 
   final AiStatus? status;
   final VoidCallback? onBack;
-  final VoidCallback onSettings;
+  final VoidCallback? onSettings;
 
   @override
   Widget build(BuildContext context) {
@@ -472,9 +565,14 @@ class _AiHeader extends StatelessWidget {
 }
 
 class _ToolSelector extends StatelessWidget {
-  const _ToolSelector({required this.selected, required this.onSelected});
+  const _ToolSelector({
+    required this.selected,
+    required this.enabled,
+    required this.onSelected,
+  });
 
   final AiTool selected;
+  final bool enabled;
   final ValueChanged<AiTool> onSelected;
 
   @override
@@ -502,9 +600,11 @@ class _ToolSelector extends StatelessWidget {
                   ),
                 )
                 .toList(),
-            onChanged: (value) {
-              if (value != null) onSelected(value);
-            },
+            onChanged: enabled
+                ? (value) {
+                    if (value != null) onSelected(value);
+                  }
+                : null,
           );
         }
         return Wrap(
@@ -516,7 +616,7 @@ class _ToolSelector extends StatelessWidget {
                   selected: tool == selected,
                   avatar: Icon(tool.icon, size: 17),
                   label: Text(tool.label),
-                  onSelected: (_) => onSelected(tool),
+                  onSelected: enabled ? (_) => onSelected(tool) : null,
                 ),
               )
               .toList(),
@@ -533,8 +633,11 @@ class _RequestPanel extends StatelessWidget {
     required this.preferenceController,
     required this.selectedEntryTitle,
     required this.working,
+    required this.reviewing,
+    required this.cancelable,
     required this.onPickEntry,
     required this.onGenerate,
+    required this.onCancel,
   });
 
   final AiTool tool;
@@ -542,8 +645,11 @@ class _RequestPanel extends StatelessWidget {
   final TextEditingController preferenceController;
   final String? selectedEntryTitle;
   final bool working;
+  final bool reviewing;
+  final bool cancelable;
   final VoidCallback onPickEntry;
   final VoidCallback onGenerate;
+  final VoidCallback? onCancel;
 
   @override
   Widget build(BuildContext context) {
@@ -573,7 +679,7 @@ class _RequestPanel extends StatelessWidget {
           const SizedBox(height: 10),
           if (tool == AiTool.entryTags) ...[
             OutlinedButton.icon(
-              onPressed: working ? null : onPickEntry,
+              onPressed: working || reviewing ? null : onPickEntry,
               icon: const Icon(Icons.key_outlined),
               label: Text(selectedEntryTitle ?? '选择条目'),
             ),
@@ -582,7 +688,7 @@ class _RequestPanel extends StatelessWidget {
           if (tool == AiTool.parse)
             TextField(
               controller: inputController,
-              enabled: !working,
+              enabled: !working && !reviewing,
               minLines: 6,
               maxLines: 12,
               maxLength: 6000,
@@ -594,7 +700,7 @@ class _RequestPanel extends StatelessWidget {
           else if (tool == AiTool.actions)
             TextField(
               controller: inputController,
-              enabled: !working,
+              enabled: !working && !reviewing,
               minLines: 4,
               maxLines: 8,
               maxLength: 2000,
@@ -607,7 +713,7 @@ class _RequestPanel extends StatelessWidget {
             if (tool == AiTool.actions) const SizedBox(height: 10),
             TextField(
               controller: preferenceController,
-              enabled: !working,
+              enabled: !working && !reviewing,
               minLines: 2,
               maxLines: 5,
               maxLength: 1000,
@@ -620,11 +726,23 @@ class _RequestPanel extends StatelessWidget {
           const SizedBox(height: 4),
           Align(
             alignment: Alignment.centerRight,
-            child: FilledButton.icon(
-              onPressed: working ? null : onGenerate,
-              icon: const Icon(Icons.auto_awesome, size: 18),
-              label: Text(working ? '正在处理' : '生成建议'),
-            ),
+            child: cancelable
+                ? OutlinedButton.icon(
+                    onPressed: onCancel,
+                    icon: const Icon(Icons.stop_rounded, size: 18),
+                    label: const Text('取消请求'),
+                  )
+                : FilledButton.icon(
+                    onPressed: working || reviewing ? null : onGenerate,
+                    icon: const Icon(Icons.auto_awesome, size: 18),
+                    label: Text(
+                      reviewing
+                          ? '请先处理建议'
+                          : working
+                          ? '已有请求处理中'
+                          : '生成建议',
+                    ),
+                  ),
           ),
         ],
       ),

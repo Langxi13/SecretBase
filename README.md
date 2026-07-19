@@ -218,23 +218,23 @@ http://127.0.0.1:8001
 
 `v3.0.0` 已完成由浏览器承载界面的桌面基础模式。`v3.1.0` 在此基础上增加 Windows 独立桌面窗口：使用 PyInstaller one-folder、pywebview 和 Edge WebView2，用户双击 `SecretBase.exe` 即可使用，不需要单独打开浏览器或安装 Python 依赖。
 
-V5.3.1 是当前稳定版本。Web、自托管、Windows、macOS 和 Android 均支持用户自有 WebDAV 的端到端加密快照同步；默认推荐 V2 兼容模式，可在不提供强 ETag 的坚果云等服务上工作。V5.3.1 补齐 Android 扫描配对二维码、配对链接导入、连接测试和恢复码安全复制。GitHub Release 包含：
+V5.3.2 是当前稳定版本。Web、自托管、Windows、macOS 和 Android 均支持用户自有 WebDAV 的端到端加密快照同步；默认推荐 V2 兼容模式，可在不提供强 ETag 的坚果云等服务上工作。V5.3.2 补齐 Android 扫描配对二维码、配对链接导入、连接测试和恢复码安全复制，并补充跨端交互失败保护、迟到数据提交守卫、桌面更新轮询防并发和 Android AI 请求取消。GitHub Release 包含：
 
 ```text
-SecretBase-v5.3.1-windows-x64-setup.exe
-SecretBase-v5.3.1-windows-x64.zip
-SecretBase-v5.3.1-macos-arm64.dmg
-SecretBase-v5.3.1-macos-arm64.zip
-SecretBase-v5.3.1-android-universal.apk
-SecretBase-v5.3.1-android-arm64-v8a.apk
-SecretBase-v5.3.1-android-armeabi-v7a.apk
-SecretBase-v5.3.1-android-x86_64.apk
+SecretBase-v5.3.2-windows-x64-setup.exe
+SecretBase-v5.3.2-windows-x64.zip
+SecretBase-v5.3.2-macos-arm64.dmg
+SecretBase-v5.3.2-macos-arm64.zip
+SecretBase-v5.3.2-android-universal.apk
+SecretBase-v5.3.2-android-arm64-v8a.apk
+SecretBase-v5.3.2-android-armeabi-v7a.apk
+SecretBase-v5.3.2-android-x86_64.apk
 secretbase-update-v1.json
 secretbase-update-v1.json.sig
 SHA256SUMS.txt
 ```
 
-V5.3.1 的协议、安全边界和验收范围见 [Sync Protocol V2](docs/sync-protocol-v2.md)、[发布评估](docs/release-assessment-v5.3.1.md) 和 [逐步人工验收清单](docs/manual-qa-checklist-v5.3.1.md)。同步默认关闭，不改变已有 Vault V1、数据目录或本机备份；V1 严格 ETag 模式继续保留，二维码、配对链接和恢复码只在再次验证主密码后显示。
+V5.3.2 的协议、安全边界和验收范围见 [Sync Protocol V2](docs/sync-protocol-v2.md)、[发布评估](docs/release-assessment-v5.3.2.md) 和 [逐步人工验收清单](docs/manual-qa-checklist-v5.3.2.md)。同步默认关闭，不改变已有 Vault V1、数据目录或本机备份；V1 严格 ETag 模式继续保留，二维码、配对链接和恢复码只在再次验证主密码后显示。
 
 Windows 独立版默认将 vault、备份、日志、设置和 WebView 数据保存在 `%LOCALAPPDATA%\SecretBase\`。发布包只包含程序资源，构建时会扫描并拒绝 `.env`、vault、备份、日志和本地设置文件。桌面导出使用 Windows 原生“另存为”，外部网址交给系统默认浏览器打开；重复启动会恢复并聚焦已有窗口。
 
@@ -687,7 +687,7 @@ http://127.0.0.1:8001
 
 `v3.0.0` completes the browser-hosted desktop foundation. `v3.1.0` adds an independent Windows window built with PyInstaller one-folder, pywebview, and Edge WebView2. Users launch `SecretBase.exe` directly without opening a separate browser or installing Python dependencies.
 
-V5.3.1 is the current stable release. Self-hosted Web, Windows, macOS, and Android support optional end-to-end encrypted WebDAV snapshot synchronization. The maintenance release adds Android QR pairing, pairing-link import, connection testing, and secure recovery-code copy actions. The recommended V2 mode uses immutable encrypted snapshot DAGs and does not require strong ETags, while the V1 strict mode remains available for existing spaces. GitHub Release provides the Windows installer and portable ZIP, the macOS DMG and ZIP, universal and ABI-specific Android APKs, the signed update manifest, and `SHA256SUMS.txt`.
+V5.3.2 is the current stable release. Self-hosted Web, Windows, macOS, and Android support optional end-to-end encrypted WebDAV snapshot synchronization. The maintenance release adds Android QR pairing, pairing-link import, connection testing, secure recovery-code copy actions, cross-platform interaction guards, stale-store commit protection, single-flight desktop update polling, and cancellable Android AI requests. The recommended V2 mode uses immutable encrypted snapshot DAGs and does not require strong ETags, while the V1 strict mode remains available for existing spaces. GitHub Release provides the Windows installer and portable ZIP, the macOS DMG and ZIP, universal and ABI-specific Android APKs, the signed update manifest, and `SHA256SUMS.txt`.
 
 Desktop data is stored under `%LOCALAPPDATA%\SecretBase\`. Build validation rejects `.env`, vault, backup, log, and local settings files. Native exports use the Windows Save As dialog, external URLs open in the system browser, and a second launch activates the existing window.
 

@@ -31,6 +31,7 @@
             listContextNotice.value = '';
             store.setFilter('search', searchQuery.value);
             store.setFilter('searchScopes', selectedSearchScopes.value);
+            clearSelection();
             await loadEntries(1);
         }, 300);
 
@@ -42,6 +43,7 @@
             if (searchQuery.value.trim()) {
                 store.setFilter('entryIds', []);
                 listContextNotice.value = '';
+                clearSelection();
                 await loadEntries(1);
             }
         }
@@ -57,6 +59,7 @@
             resetAdvancedFilterForm();
             sortBy.value = store.state.filters.sortBy;
             sortOrder.value = store.state.filters.sortOrder;
+            clearSelection();
             await loadEntries(1);
         }
 
@@ -65,10 +68,14 @@
             activeTagName.value = '';
             activeGroupName.value = '';
             listContextNotice.value = '';
-            store.setFilter('entryIds', []);
-            store.setFilter('tag', null);
-            store.setFilter('group', null);
+            searchQuery.value = '';
+            resetSearchScopes();
+            resetAdvancedFilterForm();
+            store.clearFilters();
             store.setFilter('starred', true);
+            sortBy.value = store.state.filters.sortBy;
+            sortOrder.value = store.state.filters.sortOrder;
+            clearSelection();
             await loadEntries(1);
         }
 
@@ -88,6 +95,7 @@
             listContextNotice.value = '';
             store.setFilter('sortBy', sortBy.value);
             store.setFilter('sortOrder', sortOrder.value);
+            clearSelection();
             await loadEntries(1);
         }
 
@@ -107,6 +115,7 @@
             store.setFilter('updatedTo', '');
             store.setFilter('hasUrl', advancedFilters.hasUrl);
             store.setFilter('hasRemarks', advancedFilters.hasRemarks);
+            clearSelection();
             await loadEntries(1);
         }
 
@@ -122,6 +131,7 @@
             store.setFilter('updatedTo', '');
             store.setFilter('hasUrl', '');
             store.setFilter('hasRemarks', '');
+            clearSelection();
             await loadEntries(1);
         }
 
@@ -148,15 +158,19 @@
             await loadEntries(1);
         }
 
-        function isFieldRevealed(fieldName) {
-            return revealedFields.value.includes(fieldName);
+        function fieldRevealKey(entryId, fieldIndex) {
+            return `${String(entryId || 'entry')}:${Number(fieldIndex)}`;
         }
 
-        function toggleFieldReveal(fieldName) {
-            if (isFieldRevealed(fieldName)) {
-                revealedFields.value = revealedFields.value.filter(name => name !== fieldName);
+        function isFieldRevealed(fieldKey) {
+            return revealedFields.value.includes(fieldKey);
+        }
+
+        function toggleFieldReveal(fieldKey) {
+            if (isFieldRevealed(fieldKey)) {
+                revealedFields.value = revealedFields.value.filter(key => key !== fieldKey);
             } else {
-                revealedFields.value = [...revealedFields.value, fieldName];
+                revealedFields.value = [...revealedFields.value, fieldKey];
             }
         }
 
@@ -170,6 +184,7 @@
             applyAdvancedFilters,
             clearAdvancedFilters,
             clearListState,
+            fieldRevealKey,
             isFieldRevealed,
             toggleFieldReveal
         };

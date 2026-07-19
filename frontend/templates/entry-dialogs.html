@@ -25,13 +25,22 @@
         </div>
 
         <!-- 条目详情弹窗 -->
-        <div v-if="selectedEntry" class="modal-overlay">
+        <div v-if="showEntryDetail" class="modal-overlay">
             <div class="modal-content entry-detail-modal">
                 <div class="modal-header">
-                    <h2>{{ selectedEntry.title }}</h2>
+                    <h2>{{ selectedEntry ? selectedEntry.title : '条目详情' }}</h2>
                     <button class="modal-close" @click="closeEntryDetail">✕</button>
                 </div>
                 <div class="modal-body">
+                    <div v-if="entryDetailLoading" class="loading-state">
+                        <span class="loading-spinner"></span>
+                        <span>正在读取条目详情...</span>
+                    </div>
+                    <div v-else-if="entryDetailError" class="empty-state error-state">
+                        <p>{{ entryDetailError }}</p>
+                        <button class="btn-secondary" @click="loadEntryDetail(entryDetailTargetId)">重新加载</button>
+                    </div>
+                    <template v-else-if="selectedEntry">
                     <div v-if="selectedEntry.url" class="detail-row">
                         <span>网址</span>
                         <a :href="selectedEntry.url" rel="noopener noreferrer" @click.prevent="openUrl(selectedEntry.url)">{{ selectedEntry.url }}</a>
@@ -57,21 +66,22 @@
                         </span>
                     </div>
                     <div class="detail-fields">
-                        <div v-for="field in selectedEntry.fields" :key="field.name" class="detail-field">
+                        <div v-for="(field, fieldIndex) in selectedEntry.fields" :key="field.name + '-' + fieldIndex" class="detail-field">
                             <span class="field-name">{{ field.name }}</span>
-                            <span class="field-value">{{ field.hidden && !isFieldRevealed(field.name) ? '••••••' : field.value }}</span>
-                            <button v-if="field.hidden" class="btn-small" @click="toggleFieldReveal(field.name)">
-                                {{ isFieldRevealed(field.name) ? '隐藏' : '显示' }}
+                            <span class="field-value">{{ field.hidden && !isFieldRevealed(fieldRevealKey(selectedEntry.id, fieldIndex)) ? '••••••' : field.value }}</span>
+                            <button v-if="field.hidden" class="btn-small" @click="toggleFieldReveal(fieldRevealKey(selectedEntry.id, fieldIndex))">
+                                {{ isFieldRevealed(fieldRevealKey(selectedEntry.id, fieldIndex)) ? '隐藏' : '显示' }}
                             </button>
-                            <button v-if="field.copyable" class="btn-small" @click="copyField(selectedEntry.id, field)">复制</button>
+                            <button v-if="field.copyable" class="btn-small" @click="copyField(selectedEntry.id, field, fieldIndex)">复制</button>
                         </div>
                     </div>
                     <div v-if="selectedEntry.remarks" class="detail-remarks">
                         <h4>备注</h4>
                         <p>{{ selectedEntry.remarks }}</p>
                     </div>
+                    </template>
                 </div>
-                <div class="modal-footer">
+                <div v-if="selectedEntry && !entryDetailLoading" class="modal-footer">
                     <button class="btn-secondary" @click="editEntry(selectedEntry); closeEntryDetail()">编辑</button>
                     <button class="btn-danger" @click="confirmDeleteEntry(selectedEntry)">删除</button>
                 </div>
@@ -85,7 +95,16 @@
                     <h2>{{ showEditModal ? '编辑条目' : '新建条目' }}</h2>
                     <button class="modal-close" @click="closeEntryModal" :disabled="entrySaving">✕</button>
                 </div>
-                <div class="modal-body" :inert="entrySaving ? '' : null">
+                <div class="modal-body" :inert="entrySaving || entryEditLoading ? '' : null">
+                    <div v-if="entryEditLoading" class="loading-state">
+                        <span class="loading-spinner"></span>
+                        <span>正在读取条目...</span>
+                    </div>
+                    <div v-else-if="entryEditError" class="empty-state error-state">
+                        <p>{{ entryEditError }}</p>
+                        <button class="btn-secondary" @click="retryEditEntry" :disabled="entryEditLoading">重新加载</button>
+                    </div>
+                    <template v-else>
                     <div v-if="!showEditModal" class="form-group">
                         <label>条目模板</label>
                         <select v-model="selectedTemplate" @change="applyEntryTemplate">
@@ -195,13 +214,14 @@
                         <label>备注</label>
                         <textarea v-model="entryForm.remarks" placeholder="添加备注..." rows="3" maxlength="2000"></textarea>
                     </div>
+                    </template>
                 </div>
                 <div class="modal-footer">
-                    <button class="btn-secondary" @click="closeEntryModal" :disabled="entrySaving">取消</button>
-                    <button v-if="showEditModal" class="btn-secondary" @click="createEntryFromCurrentEdit" :disabled="entrySaving">
+                    <button class="btn-secondary" @click="closeEntryModal" :disabled="entrySaving || entryEditLoading">取消</button>
+                    <button v-if="showEditModal && !entryEditLoading && !entryEditError" class="btn-secondary" @click="createEntryFromCurrentEdit" :disabled="entrySaving">
                         在此基础上新建
                     </button>
-                    <button class="btn-primary" @click="saveEntry" :disabled="entrySaving || !entryForm.title.trim()">
+                    <button class="btn-primary" @click="saveEntry" :disabled="entrySaving || entryEditLoading || !!entryEditError || !entryForm.title.trim()">
                         {{ entrySaving ? '保存中...' : (showEditModal ? '保存' : '创建') }}
                     </button>
                 </div>
@@ -267,6 +287,13 @@
                         </button>
                     </div>
                     <div v-if="groupPickerLoading" class="loading-state">正在加载条目...</div>
+                    <div v-else-if="groupPickerError" class="empty-state compact-empty error-state" role="alert">
+                        <h3>条目暂时无法加载</h3>
+                        <p>{{ groupPickerError }}</p>
+                        <button class="btn-secondary" @click="retryGroupEntryPicker" :disabled="groupPickerLoading || groupPickerSaving">
+                            {{ groupPickerLoading ? '重试中...' : '重新加载' }}
+                        </button>
+                    </div>
                     <div v-else-if="availableGroupPickerEntries.length === 0" class="empty-state compact-empty">
                         <h3>没有可加入的条目</h3>
                         <p>当前筛选下没有可加入当前密码组的条目。</p>

@@ -28,6 +28,7 @@ class _SecurityLifecycleGuardState extends ConsumerState<SecurityLifecycleGuard>
   DateTime? _backgroundedAt;
   bool _obscured = false;
   bool _locking = false;
+  String? _lockError;
 
   @override
   void initState() {
@@ -63,7 +64,7 @@ class _SecurityLifecycleGuardState extends ConsumerState<SecurityLifecycleGuard>
                 DateTime.now().difference(backgroundedAt) >=
                     widget.backgroundLockDelay)) {
           unawaited(_lockNow());
-        } else {
+        } else if (_lockError == null) {
           _setObscured(false);
         }
     }
@@ -89,23 +90,37 @@ class _SecurityLifecycleGuardState extends ConsumerState<SecurityLifecycleGuard>
   Future<void> _lockNow() async {
     if (_locking) return;
     if (ref.read(vaultControllerProvider).phase != VaultPhase.unlocked) {
+      _lockError = null;
       _showUnlockRoute();
       return;
     }
     _locking = true;
+    _lockError = null;
+    _setObscured(true);
+    var locked = false;
     try {
       await ref.read(vaultControllerProvider.notifier).lock();
+      locked = true;
       _showUnlockRoute();
+    } catch (_) {
+      // 保持保护遮罩，避免锁定失败时把密码库重新暴露给用户。
+      if (mounted) {
+        setState(() {
+          _lockError = '无法安全锁定密码库，请点击重试。';
+          _obscured = true;
+        });
+      }
     } finally {
       _locking = false;
-      if (mounted) {
-        _setObscured(false);
-      }
+      if (mounted && !locked) _setObscured(true);
     }
   }
 
+  Future<void> _retryLock() => _lockNow();
+
   void _showUnlockRoute() {
     if (!mounted) return;
+    _lockError = null;
     GoRouter.maybeOf(context)?.go('/');
     _setObscured(false);
   }
@@ -121,7 +136,10 @@ class _SecurityLifecycleGuardState extends ConsumerState<SecurityLifecycleGuard>
     return Stack(
       fit: StackFit.expand,
       children: [
-        widget.child,
+        IgnorePointer(
+          ignoring: _obscured,
+          child: ExcludeSemantics(excluding: _obscured, child: widget.child),
+        ),
         if (_obscured)
           ColoredBox(
             color: Theme.of(context).colorScheme.surface,
@@ -138,11 +156,19 @@ class _SecurityLifecycleGuardState extends ConsumerState<SecurityLifecycleGuard>
                     ),
                     const SizedBox(height: 12),
                     Text(
-                      '内容已保护',
+                      _lockError == null ? '内容已保护' : _lockError!,
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
                         fontWeight: FontWeight.w700,
                       ),
                     ),
+                    if (_lockError != null) ...[
+                      const SizedBox(height: 14),
+                      FilledButton.icon(
+                        onPressed: _locking ? null : _retryLock,
+                        icon: const Icon(Icons.lock_outline),
+                        label: const Text('重试锁定'),
+                      ),
+                    ],
                   ],
                 ),
               ),

@@ -67,6 +67,16 @@ class _MobileSyncPairingScannerState extends State<_MobileSyncPairingScanner> {
     }
   }
 
+  Future<void> _toggleTorch() async {
+    try {
+      await _scanner.toggleTorch();
+    } catch (_) {
+      if (mounted) {
+        setState(() => _error = '当前设备暂不支持闪光灯切换，请直接调整环境光线。');
+      }
+    }
+  }
+
   Future<void> _clearClipboardIfMatches(String value) async {
     try {
       final current = await Clipboard.getData(Clipboard.kTextPlain);
@@ -127,7 +137,7 @@ class _MobileSyncPairingScannerState extends State<_MobileSyncPairingScanner> {
                       shape: const CircleBorder(),
                       child: IconButton(
                         tooltip: '切换闪光灯',
-                        onPressed: () => _scanner.toggleTorch(),
+                        onPressed: _toggleTorch,
                         color: Colors.white,
                         icon: const Icon(Icons.flash_on_outlined),
                       ),

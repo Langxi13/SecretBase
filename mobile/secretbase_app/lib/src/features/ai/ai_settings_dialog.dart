@@ -40,6 +40,8 @@ class _AiSettingsDialogState extends ConsumerState<AiSettingsDialog> {
   bool _working = false;
   bool _obscureKey = true;
   String? _error;
+  AiTransportOperation? _transportOperation;
+  int? _activityToken;
 
   @override
   void initState() {
@@ -49,6 +51,13 @@ class _AiSettingsDialogState extends ConsumerState<AiSettingsDialog> {
 
   @override
   void dispose() {
+    _transportOperation?.cancel();
+    _transportOperation = null;
+    final activityToken = _activityToken;
+    if (activityToken != null) {
+      ref.read(aiActivityControllerProvider.notifier).finish(activityToken);
+      _activityToken = null;
+    }
     _baseUrlController.dispose();
     _apiKeyController.dispose();
     _modelController.dispose();
@@ -84,20 +93,25 @@ class _AiSettingsDialogState extends ConsumerState<AiSettingsDialog> {
 
   Future<void> _fetchModels() async {
     final activity = ref.read(aiActivityControllerProvider.notifier);
-    if (!activity.start()) {
+    final activityToken = activity.acquire();
+    if (activityToken == null) {
       setState(() => _error = '当前 AI 请求完成后才能获取模型列表');
       return;
     }
+    _activityToken = activityToken;
     setState(() {
       _working = true;
       _error = null;
     });
+    AiTransportOperation? operation;
     try {
       final request = await rust_api.prepareAiModelsRequest(
         baseUrl: _baseUrlController.text,
         apiKey: _apiKeyController.text,
       );
-      final response = await AiTransport.send(request);
+      operation = AiTransport.start(request);
+      _transportOperation = operation;
+      final response = await operation.future;
       final models = await rust_api.parseAiModelsResponse(content: response);
       if (!mounted) return;
       setState(() {
@@ -117,7 +131,9 @@ class _AiSettingsDialogState extends ConsumerState<AiSettingsDialog> {
         });
       }
     } finally {
-      activity.finish();
+      if (identical(_transportOperation, operation)) _transportOperation = null;
+      if (_activityToken == activityToken) _activityToken = null;
+      activity.finish(activityToken);
     }
   }
 
@@ -128,21 +144,26 @@ class _AiSettingsDialogState extends ConsumerState<AiSettingsDialog> {
       return;
     }
     final activity = ref.read(aiActivityControllerProvider.notifier);
-    if (!activity.start()) {
+    final activityToken = activity.acquire();
+    if (activityToken == null) {
       setState(() => _error = '当前 AI 请求完成后才能修改服务设置');
       return;
     }
+    _activityToken = activityToken;
     setState(() {
       _working = true;
       _error = null;
     });
+    AiTransportOperation? operation;
     try {
       final request = await rust_api.prepareAiVerifyRequest(
         baseUrl: _baseUrlController.text,
         apiKey: _apiKeyController.text,
         model: model,
       );
-      final response = await AiTransport.send(request);
+      operation = AiTransport.start(request);
+      _transportOperation = operation;
+      final response = await operation.future;
       await rust_api.verifyAiResponse(content: response);
       final status = await rust_api.saveAiSettings(
         baseUrl: _baseUrlController.text,
@@ -158,7 +179,9 @@ class _AiSettingsDialogState extends ConsumerState<AiSettingsDialog> {
         });
       }
     } finally {
-      activity.finish();
+      if (identical(_transportOperation, operation)) _transportOperation = null;
+      if (_activityToken == activityToken) _activityToken = null;
+      activity.finish(activityToken);
     }
   }
 
@@ -208,7 +231,14 @@ class _AiSettingsDialogState extends ConsumerState<AiSettingsDialog> {
         ],
       ),
     );
-    if (confirmed != true) return;
+    if (confirmed != true || !mounted) return;
+    final activity = ref.read(aiActivityControllerProvider.notifier);
+    final activityToken = activity.acquire();
+    if (activityToken == null) {
+      if (mounted) setState(() => _error = '当前 AI 请求完成后才能清除服务设置');
+      return;
+    }
+    _activityToken = activityToken;
     setState(() {
       _working = true;
       _error = null;
@@ -222,6 +252,12 @@ class _AiSettingsDialogState extends ConsumerState<AiSettingsDialog> {
           _working = false;
           _error = mobileErrorMessage(error);
         });
+      }
+    } finally {
+      if (_activityToken == activityToken) _activityToken = null;
+      activity.finish(activityToken);
+      if (mounted && _working) {
+        setState(() => _working = false);
       }
     }
   }

@@ -8,6 +8,7 @@
             store,
             showToast,
             showConfirmDialog,
+            showPromptDialog = async () => null,
             friendlyApiMessage,
             showTools,
             healthReport,
@@ -27,6 +28,11 @@
             loadTags,
             loadAllData
         } = options;
+        let reportRequestEpoch = 0;
+
+        function isCurrentReportRequest(epoch) {
+            return epoch === reportRequestEpoch;
+        }
 
         function reportItemIds(items = []) {
             return Array.from(new Set(items.map(item => item.id).filter(Boolean)));
@@ -46,9 +52,14 @@
             activeGroupName.value = '';
             listContextNotice.value = `工具定位：${label || '条目'}（${ids.length} 条）`;
             store.setFilter('entryIds', ids);
+            const loaded = await loadEntries(1);
+            if (!loaded) {
+                showToast(`定位${label || '条目'}失败，请重试加载`, 'error');
+                return false;
+            }
             showTools.value = false;
-            await loadEntries(1);
             showToast(`已定位 ${ids.length} 条${label || '条目'}`, 'success');
+            return true;
         }
 
         async function focusReportGroups(groups, label) {
@@ -68,43 +79,76 @@
             const items = maintenanceReport.value?.untagged_items || [];
             const ids = reportItemIds(items);
             if (ids.length === 0) return;
-            const tagName = window.prompt('给无标签条目添加标签', '待整理');
+            const tagName = await showPromptDialog({
+                title: '批量添加标签',
+                message: `将给 ${ids.length} 个无标签条目添加同一个标签。`,
+                value: '待整理',
+                placeholder: '标签名称',
+                confirmLabel: '添加标签',
+                maxLength: 50
+            });
             if (!tagName || !tagName.trim()) return;
-            const result = await store.batchUpdateTags(ids, [tagName.trim()], []);
-            if (result) {
-                await Promise.all([loadEntries(1), loadTags(), loadMaintenanceReport()]);
+            try {
+                const result = await store.batchUpdateTags(ids, [tagName.trim()], []);
+                if (result) {
+                    const refreshed = await Promise.allSettled([loadEntries(1), loadTags(), loadMaintenanceReport()]);
+                    if (refreshed.some(item => item.status === 'rejected' || item.value === false)) {
+                        showToast('标签已添加，但工具报告刷新不完整，请稍后重试。', 'warning');
+                    }
+                }
+            } catch (error) {
+                showToast(error.message || '批量添加标签失败，请重试', 'error');
             }
         }
 
         async function openToolsModal() {
+            const epoch = ++reportRequestEpoch;
             showTools.value = true;
-            await Promise.all([loadHealthReport(), loadMaintenanceReport(), loadSecurityReport()]);
+            await Promise.all([loadHealthReport(epoch), loadMaintenanceReport(epoch), loadSecurityReport(epoch)]);
         }
 
-        async function loadHealthReport() {
+        function closeToolsModal() {
+            reportRequestEpoch += 1;
+            showTools.value = false;
+        }
+
+        function disposeMaintenance() {
+            closeToolsModal();
+        }
+
+        async function loadHealthReport(epoch = reportRequestEpoch) {
             try {
                 const result = await api.get('/tools/health-report');
+                if (!isCurrentReportRequest(epoch) || !showTools.value) return false;
                 healthReport.value = result.data;
+                return true;
             } catch (error) {
-                showToast(error.message || '健康报告加载失败', 'error');
+                if (isCurrentReportRequest(epoch) && showTools.value) showToast(error.message || '健康报告加载失败', 'error');
+                return false;
             }
         }
 
-        async function loadMaintenanceReport() {
+        async function loadMaintenanceReport(epoch = reportRequestEpoch) {
             try {
                 const result = await api.get('/tools/maintenance-report');
+                if (!isCurrentReportRequest(epoch) || !showTools.value) return false;
                 maintenanceReport.value = result.data;
+                return true;
             } catch (error) {
-                showToast(error.message || '维护报告加载失败', 'error');
+                if (isCurrentReportRequest(epoch) && showTools.value) showToast(error.message || '维护报告加载失败', 'error');
+                return false;
             }
         }
 
-        async function loadSecurityReport() {
+        async function loadSecurityReport(epoch = reportRequestEpoch) {
             try {
                 const result = await api.get('/tools/security-report');
+                if (!isCurrentReportRequest(epoch) || !showTools.value) return false;
                 securityReport.value = result.data;
+                return true;
             } catch (error) {
-                showToast(friendlyApiMessage(error, '安全自检加载失败'), 'error');
+                if (isCurrentReportRequest(epoch) && showTools.value) showToast(friendlyApiMessage(error, '安全自检加载失败'), 'error');
+                return false;
             }
         }
 
@@ -112,15 +156,21 @@
             const ids = (maintenanceReport.value?.sample_items || []).map(item => item.id);
             if (ids.length === 0) return;
             showConfirmDialog('删除示例数据', `确认删除 ${ids.length} 条示例数据？`, async () => {
-                await store.batchDelete(ids);
+                const result = await store.batchDelete(ids);
+                if (!result) return false;
                 await loadAllData();
-                await loadMaintenanceReport();
-                showToast('示例数据已移至回收站', 'success');
+                const refreshed = await loadMaintenanceReport();
+                showToast(
+                    refreshed ? '示例数据已移至回收站' : '示例数据已移至回收站，但报告刷新不完整，请稍后重试。',
+                    refreshed ? 'success' : 'warning'
+                );
             });
         }
 
         return {
             openToolsModal,
+            closeToolsModal,
+            disposeMaintenance,
             loadHealthReport,
             loadMaintenanceReport,
             loadSecurityReport,

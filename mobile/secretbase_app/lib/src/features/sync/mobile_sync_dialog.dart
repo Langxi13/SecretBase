@@ -14,6 +14,8 @@ import 'package:secretbase/src/features/sync/mobile_sync_pairing.dart';
 import 'package:secretbase/src/features/sync/mobile_sync_pairing_scanner.dart';
 import 'package:secretbase/src/features/sync/mobile_sync_setup_form.dart';
 import 'package:secretbase/src/features/sync/mobile_sync_service.dart';
+import 'package:secretbase/src/features/sync/mobile_sync_feedback.dart';
+import 'package:secretbase/src/features/sync/mobile_sync_setup_validation.dart';
 import 'package:secretbase/src/features/sync/mobile_webdav.dart';
 import 'package:secretbase/src/rust/mobile/models.dart' as rust_models;
 import 'package:secretbase/src/state/vault_controller.dart';
@@ -45,6 +47,8 @@ class _MobileSyncDialogState extends ConsumerState<_MobileSyncDialog> {
   Map<String, String> _resolutions = {};
   String? _recoveryCode;
   String? _error;
+  bool _errorCanReload = false;
+  bool _connectionTestPassed = false;
   bool _loading = true;
   bool _working = false;
   bool _joining = false;
@@ -70,16 +74,18 @@ class _MobileSyncDialogState extends ConsumerState<_MobileSyncDialog> {
     super.dispose();
   }
 
-  Future<void> _load() async {
+  Future<bool> _load({bool showError = true}) async {
     try {
       final status = await _coordinator.status();
       final connection = status.configured
           ? await _coordinator.connection()
           : null;
-      if (!mounted) return;
+      if (!mounted) return false;
       setState(() {
         _status = status;
         _autoSync = status.autoSync;
+        _error = null;
+        _errorCanReload = false;
         if (connection != null) {
           _url.text = connection.baseUrl;
           _username.text = connection.username;
@@ -87,16 +93,33 @@ class _MobileSyncDialogState extends ConsumerState<_MobileSyncDialog> {
         }
         _loading = false;
       });
+      return true;
     } catch (error) {
-      if (!mounted) return;
+      if (!mounted) return false;
       setState(() {
-        _error = mobileErrorMessage(error);
+        _error = showError
+            ? mobileErrorMessage(error)
+            : '操作已完成，但同步状态读取失败，请点击“重新读取”。';
+        _errorCanReload = true;
         _loading = false;
       });
+      showMobileSyncError(context, _error!);
+      return false;
     }
   }
 
+  Future<void> _reloadStatus() async {
+    if (_loading || _working || !mounted) return;
+    setState(() {
+      _loading = true;
+      _error = null;
+      _errorCanReload = false;
+    });
+    await _load();
+  }
+
   Future<void> _create() async {
+    if (!_validateSetup()) return;
     await _run(() async {
       final status = await _coordinator.create(
         baseUrl: _url.text,
@@ -116,6 +139,7 @@ class _MobileSyncDialogState extends ConsumerState<_MobileSyncDialog> {
   }
 
   Future<void> _join() async {
+    if (!_validateSetup(requireRecovery: true)) return;
     await _run(() async {
       final result = await _coordinator.join(
         baseUrl: _url.text,
@@ -134,26 +158,22 @@ class _MobileSyncDialogState extends ConsumerState<_MobileSyncDialog> {
         _resolutions = {};
       });
       if (result.conflictSession == null) {
-        await _refreshVault();
-        await _load();
-        _showMessage(result.message);
+        final refreshed = await _refreshAfterMutation(refreshVault: true);
+        _showMessage(mobileSyncResultMessage(result.message, refreshed));
       }
     });
   }
 
   Future<void> _testConnection() async {
-    if (_url.text.trim().isEmpty ||
-        _username.text.trim().isEmpty ||
-        _password.text.isEmpty) {
-      setState(() => _error = '请先填写 WebDAV 地址、用户名和应用密码');
-      return;
-    }
+    if (!_validateSetup(requireRecovery: false)) return;
+    if (mounted) setState(() => _connectionTestPassed = false);
     await _run(() async {
       await _coordinator.testConnection(
         baseUrl: _url.text,
         username: _username.text,
         password: _password.text,
       );
+      if (mounted) setState(() => _connectionTestPassed = true);
       _showMessage('WebDAV 连接测试通过');
     });
   }
@@ -167,6 +187,8 @@ class _MobileSyncDialogState extends ConsumerState<_MobileSyncDialog> {
       _username.text = pairing.username;
       _recovery.text = pairing.recoveryCode;
       _error = null;
+      _errorCanReload = false;
+      _connectionTestPassed = false;
     });
     _showMessage('已读取配对信息，请输入 WebDAV 应用密码');
   }
@@ -185,12 +207,14 @@ class _MobileSyncDialogState extends ConsumerState<_MobileSyncDialog> {
         _username.text = pairing.username;
         _recovery.text = pairing.recoveryCode;
         _error = null;
+        _errorCanReload = false;
+        _connectionTestPassed = false;
       });
       _showMessage('已读取配对信息，请输入 WebDAV 应用密码');
     } on MobileSyncPairingException catch (error) {
-      if (mounted) setState(() => _error = error.message);
+      _reportError(error.message);
     } catch (_) {
-      if (mounted) setState(() => _error = '读取剪贴板失败，请手动粘贴恢复码');
+      _reportError('读取剪贴板失败，请手动粘贴恢复码');
     }
   }
 
@@ -209,6 +233,8 @@ class _MobileSyncDialogState extends ConsumerState<_MobileSyncDialog> {
     setState(() {
       _joining = value;
       _error = null;
+      _errorCanReload = false;
+      _connectionTestPassed = false;
       if (!value) {
         _recovery.clear();
         _mergeExisting = false;
@@ -237,7 +263,7 @@ class _MobileSyncDialogState extends ConsumerState<_MobileSyncDialog> {
       await copySensitiveValue(ref, pairing.uri.toString());
       _showMessage('配对链接已复制，将按剪贴板设置自动清理');
     } catch (error) {
-      if (mounted) setState(() => _error = mobileErrorMessage(error));
+      _reportError(mobileErrorMessage(error));
     }
   }
 
@@ -256,12 +282,13 @@ class _MobileSyncDialogState extends ConsumerState<_MobileSyncDialog> {
       } else {
         ref.read(mobileSyncAutoStateProvider.notifier).success(result.message);
       }
+      var refreshed = true;
       if (result.conflictSession == null &&
           (result.action == 'downloaded' || result.action == 'merged')) {
-        await _refreshVault();
+        refreshed = await _refreshVaultSafely();
       }
-      await _load();
-      _showMessage(result.message);
+      refreshed = await _load(showError: false) && refreshed;
+      _showMessage(mobileSyncResultMessage(result.message, refreshed));
     });
   }
 
@@ -288,9 +315,13 @@ class _MobileSyncDialogState extends ConsumerState<_MobileSyncDialog> {
         ref.read(mobileSyncAutoStateProvider.notifier).success(result.message);
       }
       if (result.conflictSession == null) {
-        await _refreshVault();
-        await _load();
-        _showMessage(result.message);
+        final refreshed = await _refreshAfterMutation(refreshVault: true);
+        _showMessage(mobileSyncResultMessage(result.message, refreshed));
+      } else {
+        final loaded = await _load(showError: false);
+        if (!loaded) {
+          _showMessage('冲突已保存，但状态刷新不完整，请重新读取。');
+        }
       }
     });
   }
@@ -346,14 +377,25 @@ class _MobileSyncDialogState extends ConsumerState<_MobileSyncDialog> {
       final result = await _coordinator.compactHistory(
         password: input.password,
       );
-      final code = await _coordinator.recoveryCode(input.password);
-      final status = await _coordinator.status();
+      var refreshed = true;
+      String? code;
+      rust_models.SyncStatus? status;
+      try {
+        code = await _coordinator.recoveryCode(input.password);
+      } catch (_) {
+        refreshed = false;
+      }
+      try {
+        status = await _coordinator.status();
+      } catch (_) {
+        refreshed = false;
+      }
       if (!mounted) return;
       setState(() {
-        _status = status;
+        if (status != null) _status = status;
         _recoveryCode = code;
       });
-      _showMessage(result.message);
+      _showMessage(mobileSyncResultMessage(result.message, refreshed));
     });
   }
 
@@ -424,9 +466,8 @@ class _MobileSyncDialogState extends ConsumerState<_MobileSyncDialog> {
     if (confirmed != true) return;
     await _run(() async {
       final result = await _coordinator.restore(snapshotId);
-      await _refreshVault();
-      await _load();
-      _showMessage(result.message);
+      final refreshed = await _refreshAfterMutation(refreshVault: true);
+      _showMessage(mobileSyncResultMessage(result.message, refreshed));
     });
   }
 
@@ -440,14 +481,25 @@ class _MobileSyncDialogState extends ConsumerState<_MobileSyncDialog> {
     if (input == null) return;
     await _run(() async {
       final result = await _coordinator.rotateKey(password: input.password);
-      final code = await _coordinator.recoveryCode(input.password);
-      final status = await _coordinator.status();
+      var refreshed = true;
+      String? code;
+      rust_models.SyncStatus? status;
+      try {
+        code = await _coordinator.recoveryCode(input.password);
+      } catch (_) {
+        refreshed = false;
+      }
+      try {
+        status = await _coordinator.status();
+      } catch (_) {
+        refreshed = false;
+      }
       if (!mounted) return;
       setState(() {
-        _status = status;
+        if (status != null) _status = status;
         _recoveryCode = code;
       });
-      _showMessage(result.message);
+      _showMessage(mobileSyncResultMessage(result.message, refreshed));
     });
   }
 
@@ -479,42 +531,67 @@ class _MobileSyncDialogState extends ConsumerState<_MobileSyncDialog> {
     });
   }
 
-  Future<void> _refreshVault() =>
-      ref.read(vaultControllerProvider.notifier).refreshStatus();
-
-  void _handleMoreAction(String value) {
-    switch (value) {
-      case 'disconnect':
-        _disconnect();
-      case 'compact':
-        _compactHistory();
-      case 'rotate':
-        _rotateKey();
-      case 'delete':
-        _deleteRemote();
+  Future<bool> _refreshVaultSafely() async {
+    try {
+      await ref.read(vaultControllerProvider.notifier).refreshStatus();
+      return true;
+    } catch (_) {
+      return false;
     }
   }
 
-  void _showMessage(String message) {
-    if (!mounted || message.isEmpty) return;
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text(message)));
+  Future<bool> _refreshAfterMutation({bool refreshVault = false}) async {
+    var refreshed = true;
+    if (refreshVault) refreshed = await _refreshVaultSafely();
+    final loaded = await _load(showError: false);
+    return refreshed && loaded;
   }
 
+  bool _validateSetup({bool requireRecovery = false}) {
+    return validateAndReportMobileSyncSetup(
+      baseUrl: _url.text,
+      username: _username.text,
+      password: _password.text,
+      recoveryCode: _recovery.text,
+      requireRecovery: requireRecovery,
+      onError: _reportError,
+    );
+  }
+
+  void _handleMoreAction(String value) {
+    if (value == 'disconnect') _disconnect();
+    if (value == 'compact') _compactHistory();
+    if (value == 'rotate') _rotateKey();
+    if (value == 'delete') _deleteRemote();
+  }
+
+  void _reportError(String message, {bool canReload = false}) {
+    if (!mounted || message.isEmpty) return;
+    setState(() {
+      _error = message;
+      _errorCanReload = canReload;
+      _connectionTestPassed = false;
+    });
+    showMobileSyncError(context, message);
+  }
+
+  void _showMessage(String message) => showMobileSyncMessage(context, message);
+
   Future<void> _run(Future<void> Function() operation) async {
-    if (_working) return;
+    if (!mounted || _working) return;
     setState(() {
       _working = true;
       _error = null;
+      _errorCanReload = false;
     });
     try {
       await operation();
     } on MobileWebDavException catch (error) {
-      if (mounted) setState(() => _error = error.message);
+      _reportError(error.message);
     } catch (error) {
-      if (mounted) setState(() => _error = mobileErrorMessage(error));
+      _reportError(mobileErrorMessage(error));
     } finally {
+      _password.clear();
       if (mounted) setState(() => _working = false);
     }
   }
@@ -548,24 +625,36 @@ class _MobileSyncDialogState extends ConsumerState<_MobileSyncDialog> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           if (_error != null) ...[
-            _errorPanel(_error!),
+            MobileSyncErrorPanel(
+              message: _error!,
+              canReload: _errorCanReload,
+              working: _working,
+              onReload: _reloadStatus,
+            ),
             const SizedBox(height: 12),
           ],
           _conflictView(),
         ],
       );
     }
-    if (_error != null) {
+    if (_status?.configured == true) {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          _errorPanel(_error!),
-          const SizedBox(height: 12),
-          if (_status?.configured != true) _setupForm() else _configuredView(),
+          if (_error != null) ...[
+            MobileSyncErrorPanel(
+              message: _error!,
+              canReload: _errorCanReload,
+              working: _working,
+              onReload: _reloadStatus,
+            ),
+            const SizedBox(height: 12),
+          ],
+          _configuredView(),
         ],
       );
     }
-    return _status?.configured == true ? _configuredView() : _setupForm();
+    return _setupForm();
   }
 
   Widget _setupForm() {
@@ -586,8 +675,17 @@ class _MobileSyncDialogState extends ConsumerState<_MobileSyncDialog> {
       onPastePairing: _pastePairing,
       onTestConnection: _testConnection,
       onSubmit: _joining ? _join : _create,
+      errorMessage: _error,
+      connectionTestPassed: _connectionTestPassed,
+      onReload: _errorCanReload ? _reloadStatus : null,
       onInputChanged: () {
-        if (_error != null) setState(() => _error = null);
+        if (_error != null || _connectionTestPassed) {
+          setState(() {
+            _error = null;
+            _errorCanReload = false;
+            _connectionTestPassed = false;
+          });
+        }
       },
     );
   }
@@ -627,11 +725,6 @@ class _MobileSyncDialogState extends ConsumerState<_MobileSyncDialog> {
     );
   }
 
-  Widget _errorPanel(String message) => Material(
-    color: Theme.of(context).colorScheme.errorContainer,
-    child: Padding(padding: const EdgeInsets.all(10), child: Text(message)),
-  );
-
   void _clearSensitiveState() {
     if (!mounted) return;
     MobileWebDavClient.cancelAll();
@@ -644,6 +737,8 @@ class _MobileSyncDialogState extends ConsumerState<_MobileSyncDialog> {
       _device.clear();
       _recoveryCode = null;
       _error = null;
+      _errorCanReload = false;
+      _connectionTestPassed = false;
       _conflict = null;
       _resolutions = {};
       _working = false;

@@ -4,6 +4,7 @@ const { readProjectFile } = require('./frontend-source');
 const ref = value => ({ value });
 const calls = [];
 let releaseSubmit;
+let cancellationMode = false;
 const submitGate = new Promise(resolve => {
     releaseSubmit = resolve;
 });
@@ -18,8 +19,17 @@ const api = {
         if (path.startsWith('/ai/assistant/conversations/')) return { data: { messages: [] } };
         throw new Error(`未处理 GET ${path}`);
     },
-    async post(path, data) {
+    async post(path, data, options = {}) {
         calls.push({ method: 'POST', path, data });
+        if (cancellationMode && path === '/ai/assistant/turns/preview') {
+            return new Promise((_resolve, reject) => {
+                options.signal?.addEventListener('abort', () => {
+                    const error = new Error('aborted by user');
+                    error.name = 'AbortError';
+                    reject(error);
+                });
+            });
+        }
         if (path === '/ai/assistant/turns/preview') {
             return {
                 data: {
@@ -81,6 +91,7 @@ const sandbox = {
     console,
     Promise,
     Uint32Array,
+    AbortController,
     encodeURIComponent,
     setTimeout,
     clearTimeout
@@ -95,6 +106,15 @@ const context = vm.createContext(sandbox);
 vm.runInContext(readProjectFile('frontend/js/controllers/ai-assistant-inspector-controller.js'), context, {
     filename: 'ai-assistant-inspector-controller.js'
 });
+vm.runInContext(readProjectFile('frontend/js/controllers/ai-assistant-history-controller.js'), context, {
+    filename: 'ai-assistant-history-controller.js'
+});
+vm.runInContext(readProjectFile('frontend/js/controllers/ai-assistant-local-actions.js'), context, {
+    filename: 'ai-assistant-local-actions.js'
+});
+vm.runInContext(readProjectFile('frontend/js/ai-assistant-request.js'), context, {
+    filename: 'ai-assistant-request.js'
+});
 vm.runInContext(readProjectFile('frontend/js/controllers/ai-assistant-controller.js'), context, {
     filename: 'ai-assistant-controller.js'
 });
@@ -103,10 +123,12 @@ const showAiAssistant = ref(true);
 const showAiParse = ref(false);
 const aiAssistantInput = ref('请整理密码组，内部提示词 XYZ');
 const aiAssistantBusy = ref(false);
+const aiAssistantError = ref('');
 const aiAssistantPrepared = ref(null);
 const aiAssistantMessages = ref([]);
 const aiAssistantPlan = ref(null);
 const aiAssistantLastResult = ref(null);
+const selectedEntry = ref(null);
 const aiAssistantInspector = {
     open: false,
     loading: false,
@@ -120,6 +142,7 @@ const aiAssistantInspector = {
     entry: null
 };
 let settingsOpened = 0;
+let entryDetailsOpened = 0;
 const store = {
     state: { filters: {} },
     async getEntry(id) {
@@ -166,7 +189,7 @@ const controller = context.window.SecretBaseAiAssistantController.createAiAssist
     aiAssistantInput,
     aiAssistantBusy,
     aiAssistantStage: ref(''),
-    aiAssistantError: ref(''),
+    aiAssistantError,
     aiAssistantConversations: ref([]),
     aiAssistantConversationId: ref('conversation-1'),
     aiAssistantMessages,
@@ -174,7 +197,7 @@ const controller = context.window.SecretBaseAiAssistantController.createAiAssist
     aiAssistantPlan,
     aiAssistantLastResult,
     aiAssistantHistoryOpen: ref(false),
-    selectedEntry: ref(null),
+    selectedEntry,
     currentPage: ref(1),
     assistantFiltersForScope: () => ({}),
     assistantScopeCount: () => 1,
@@ -186,6 +209,7 @@ const controller = context.window.SecretBaseAiAssistantController.createAiAssist
     async loadGroups() {},
     async openSettings() { settingsOpened += 1; },
     async selectSettingsTab() {},
+    openEntryDetail: entry => { entryDetailsOpened += 1; selectedEntry.value = entry; return true; },
     normalizeAssistantActionTargets: inspectorController.normalizeAssistantActionTargets,
     resetAssistantInspector: inspectorController.resetAssistantInspector,
     assistantPlanHasSelectedConflicts: inspectorController.assistantPlanHasSelectedConflicts
@@ -227,14 +251,14 @@ const controller = context.window.SecretBaseAiAssistantController.createAiAssist
         throw new Error('确认发送后必须进入明确的处理中状态');
     }
 
-    await controller.openProfessionalAiTools();
-    if (!showAiAssistant.value || !showAiParse.value) {
-        throw new Error('发送过程中仍必须能打开专业工具，且 AI 管家保留在下层');
+    const toolsResult = await controller.openProfessionalAiTools();
+    if (toolsResult !== false || showAiParse.value) {
+        throw new Error('发送过程中必须锁定专业工具入口，不能改变当前 AI 会话');
     }
 
-    await controller.openAssistantSettings();
-    if (!showAiAssistant.value || settingsOpened !== 1) {
-        throw new Error('发送过程中仍必须能打开服务设置，且 AI 管家保留在下层');
+    const settingsResult = await controller.openAssistantSettings();
+    if (settingsResult !== false || settingsOpened !== 0) {
+        throw new Error('发送过程中必须锁定服务设置入口，不能改变当前 AI 会话');
     }
     if (calls.filter(call => call.path === '/ai/assistant/turns/submit').length !== 1) {
         throw new Error('打开子面板不得取消或重发正在进行的 AI 请求');
@@ -305,6 +329,23 @@ const controller = context.window.SecretBaseAiAssistantController.createAiAssist
     });
     if (!aiAssistantInspector.open || aiAssistantInspector.entry?.fields?.[0]?.revealed !== false) {
         throw new Error('建议详情必须从本机加载完整条目，隐藏字段默认保持遮罩');
+    }
+
+    showAiAssistant.value = true;
+    await controller.openAssistantNavigation({ entry_id: 'entry-1' });
+    if (entryDetailsOpened !== 1 || showAiAssistant.value || selectedEntry.value?.id !== 'entry-1') {
+        throw new Error('AI 建议的打开条目操作必须真正打开本地条目详情并关闭 AI 面板');
+    }
+
+    showAiAssistant.value = true;
+    aiAssistantInput.value = '测试取消请求';
+    cancellationMode = true;
+    const cancelledSend = controller.sendAssistantMessage();
+    await Promise.resolve();
+    controller.cancelAssistantRequest();
+    await cancelledSend;
+    if (aiAssistantBusy.value || aiAssistantError.value !== '已取消本次 AI 请求。') {
+        throw new Error('取消 AI 请求后必须立即恢复可交互状态并给出明确提示');
     }
 
     console.log('PASS frontend ai assistant runtime');

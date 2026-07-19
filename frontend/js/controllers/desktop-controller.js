@@ -16,6 +16,13 @@
         state
     }) {
         let updatePollTimer = null;
+        let updatePollInFlight = false;
+        let desktopRequestEpoch = 0;
+        let desktopDialogEpoch = 0;
+        const isCurrentDesktopRequest = epoch => epoch === desktopRequestEpoch;
+        const diagnosticsSurfaceOpen = () => (
+            state.showDesktopStatus?.value === true || state.showSettings?.value === true
+        );
         const desktopPackageLabel = computed(() => {
             const packageType = state.desktopDiagnostics.value?.package_type;
             if (packageType === 'installed') return '安装版';
@@ -65,26 +72,50 @@
         }
 
         async function loadDesktopDiagnostics() {
-            if (!state.isDesktopMode) return null;
+            if (!state.isDesktopMode || state.locked?.value) return null;
+            const epoch = desktopRequestEpoch;
+            const dialogEpoch = desktopDialogEpoch;
             state.desktopDiagnosticsLoading.value = true;
             state.desktopDiagnosticsError.value = '';
             try {
                 const api = requireDesktopApi('get_diagnostics');
                 const result = await api.get_diagnostics();
+                if (
+                    !isCurrentDesktopRequest(epoch)
+                    || dialogEpoch !== desktopDialogEpoch
+                    || state.locked?.value
+                    || !diagnosticsSurfaceOpen()
+                ) return null;
                 state.desktopDiagnostics.value = result;
                 return result;
             } catch (error) {
-                state.desktopDiagnosticsError.value = error.message || '无法读取桌面状态';
+                if (
+                    isCurrentDesktopRequest(epoch)
+                    && dialogEpoch === desktopDialogEpoch
+                    && diagnosticsSurfaceOpen()
+                ) {
+                    state.desktopDiagnosticsError.value = error.message || '无法读取桌面状态';
+                }
                 return null;
             } finally {
-                state.desktopDiagnosticsLoading.value = false;
+                if (isCurrentDesktopRequest(epoch) && dialogEpoch === desktopDialogEpoch) {
+                    state.desktopDiagnosticsLoading.value = false;
+                }
             }
         }
 
         async function openDesktopStatus() {
             if (!state.isDesktopMode) return;
+            const dialogEpoch = ++desktopDialogEpoch;
             state.showDesktopStatus.value = true;
             await loadDesktopDiagnostics();
+            if (dialogEpoch !== desktopDialogEpoch) return;
+        }
+
+        function closeDesktopStatus() {
+            desktopDialogEpoch += 1;
+            state.showDesktopStatus.value = false;
+            state.desktopDiagnosticsLoading.value = false;
         }
 
         async function openDesktopDirectory(kind) {
@@ -135,45 +166,69 @@
         }
 
         async function refreshDesktopUpdateState() {
-            if (!state.isDesktopMode) return null;
+            if (!state.isDesktopMode || state.locked?.value) return null;
+            if (updatePollInFlight) return null;
+            updatePollInFlight = true;
+            const epoch = desktopRequestEpoch;
             try {
                 const api = requireDesktopApi('get_update_state');
-                return applyDesktopUpdateState(await api.get_update_state());
+                const result = await api.get_update_state();
+                return isCurrentDesktopRequest(epoch) && !state.locked?.value
+                    ? applyDesktopUpdateState(result)
+                    : null;
             } catch (error) {
-                state.desktopUpdateError.value = error.message || '无法读取更新状态';
-                stopUpdatePolling();
+                if (isCurrentDesktopRequest(epoch)) {
+                    state.desktopUpdateError.value = error.message || '无法读取更新状态';
+                    stopUpdatePolling();
+                }
                 return null;
+            } finally {
+                updatePollInFlight = false;
             }
         }
 
         async function initializeDesktopUpdates() {
-            if (!state.isDesktopMode) return null;
+            if (!state.isDesktopMode || state.locked?.value) return null;
+            const epoch = desktopRequestEpoch;
             try {
                 const api = requireDesktopApi('start_background_update_check');
-                return applyDesktopUpdateState(await api.start_background_update_check());
+                const result = await api.start_background_update_check();
+                return isCurrentDesktopRequest(epoch) && !state.locked?.value
+                    ? applyDesktopUpdateState(result)
+                    : null;
             } catch (error) {
-                state.desktopUpdateError.value = error.message || '无法初始化更新检查';
+                if (isCurrentDesktopRequest(epoch)) {
+                    state.desktopUpdateError.value = error.message || '无法初始化更新检查';
+                }
                 return null;
             }
         }
 
         function disposeDesktopUpdates() {
+            desktopRequestEpoch += 1;
+            desktopDialogEpoch += 1;
             stopUpdatePolling();
         }
 
         async function checkDesktopUpdates() {
+            if (state.locked?.value || desktopUpdateBusy.value || state.desktopUpdateChecking.value) return null;
+            const epoch = desktopRequestEpoch;
             state.desktopUpdateChecking.value = true;
             state.desktopUpdateError.value = '';
             try {
                 const api = requireDesktopApi('check_for_updates');
                 const result = await api.check_for_updates();
-                return applyDesktopUpdateState(result);
+                return isCurrentDesktopRequest(epoch) && !state.locked?.value
+                    ? applyDesktopUpdateState(result)
+                    : null;
             } catch (error) {
-                state.desktopUpdateResult.value = null;
-                state.desktopUpdateError.value = error.message || '无法检查更新';
+                if (isCurrentDesktopRequest(epoch)) {
+                    state.desktopUpdateResult.value = null;
+                    state.desktopUpdateError.value = error.message || '无法检查更新';
+                }
                 return null;
             } finally {
-                state.desktopUpdateChecking.value = false;
+                if (isCurrentDesktopRequest(epoch)) state.desktopUpdateChecking.value = false;
             }
         }
 
@@ -189,12 +244,14 @@
         }
 
         async function saveDesktopUpdatePreferences() {
+            const epoch = desktopRequestEpoch;
             try {
                 const api = requireDesktopApi('set_update_preferences');
                 const result = await api.set_update_preferences(
                     Boolean(state.settingsForm.desktopUpdateAutoCheck),
                     Boolean(state.settingsForm.desktopUpdateAutoDownload)
                 );
+                if (!isCurrentDesktopRequest(epoch)) return;
                 applyDesktopUpdateState(result);
                 showToast('更新偏好已保存', 'success');
             } catch (error) {
@@ -204,9 +261,13 @@
         }
 
         async function startDesktopUpdateDownload() {
+            if (state.locked?.value || desktopUpdateBusy.value) return null;
+            const epoch = desktopRequestEpoch;
             try {
                 const api = requireDesktopApi('start_update_download');
-                applyDesktopUpdateState(await api.start_update_download());
+                const result = await api.start_update_download();
+                if (!isCurrentDesktopRequest(epoch)) return;
+                applyDesktopUpdateState(result);
                 startUpdatePolling();
             } catch (error) {
                 showToast(error.message || '无法下载更新', 'error');
@@ -214,15 +275,20 @@
         }
 
         async function cancelDesktopUpdateDownload() {
+            if (state.locked?.value || state.desktopUpdateResult.value?.status !== 'downloading') return null;
+            const epoch = desktopRequestEpoch;
             try {
                 const api = requireDesktopApi('cancel_update_download');
-                applyDesktopUpdateState(await api.cancel_update_download());
+                const result = await api.cancel_update_download();
+                if (!isCurrentDesktopRequest(epoch)) return;
+                applyDesktopUpdateState(result);
             } catch (error) {
                 showToast(error.message || '无法取消更新下载', 'error');
             }
         }
 
         function installDesktopUpdate() {
+            if (state.desktopUpdateResult.value?.status !== 'ready' || desktopUpdateBusy.value) return;
             showConfirmDialog(
                 '安装更新',
                 '应用将立即锁定密码库、退出并安装更新，完成后自动重新打开。确认继续？',
@@ -231,8 +297,8 @@
                         const api = requireDesktopApi('install_downloaded_update');
                         applyDesktopUpdateState(await api.install_downloaded_update());
                     } catch (error) {
-                        showToast(error.message || '无法启动更新安装程序', 'error');
                         await refreshDesktopUpdateState();
+                        throw new Error(error.message || '无法启动更新安装程序');
                     }
                 }
             );
@@ -327,6 +393,7 @@
             actions: {
                 loadDesktopDiagnostics,
                 openDesktopStatus,
+                closeDesktopStatus,
                 openDesktopDirectory,
                 copyDesktopDiagnostics,
                 checkDesktopUpdates,

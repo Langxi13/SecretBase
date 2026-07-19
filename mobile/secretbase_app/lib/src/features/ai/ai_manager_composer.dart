@@ -13,11 +13,13 @@ class AiManagerComposer extends StatelessWidget {
     required this.mode,
     required this.selectedEntryCount,
     required this.working,
+    this.reviewing = false,
     required this.onModeChanged,
     required this.onScope,
     required this.onPrompt,
     required this.onTools,
     required this.onSend,
+    this.onCancel,
     super.key,
   });
 
@@ -25,11 +27,13 @@ class AiManagerComposer extends StatelessWidget {
   final String mode;
   final int selectedEntryCount;
   final bool working;
+  final bool reviewing;
   final ValueChanged<String> onModeChanged;
   final VoidCallback onScope;
   final ValueChanged<String> onPrompt;
   final VoidCallback onTools;
   final VoidCallback onSend;
+  final VoidCallback? onCancel;
 
   @override
   Widget build(BuildContext context) {
@@ -54,7 +58,9 @@ class AiManagerComposer extends StatelessWidget {
                 children: [
                   IconButton.outlined(
                     tooltip: '更多 AI 操作',
-                    onPressed: () => _openActions(context),
+                    onPressed: working || reviewing
+                        ? null
+                        : () => _openActions(context),
                     icon: const Icon(Icons.add_rounded),
                     style: IconButton.styleFrom(
                       fixedSize: const Size(42, 42),
@@ -66,7 +72,7 @@ class AiManagerComposer extends StatelessWidget {
                   Expanded(
                     child: TextField(
                       controller: controller,
-                      enabled: !working,
+                      enabled: !working && !reviewing,
                       minLines: 1,
                       maxLines: sensitive ? 6 : 4,
                       maxLength: 6000,
@@ -78,16 +84,28 @@ class AiManagerComposer extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(width: 7),
-                  IconButton.filled(
-                    tooltip: '预览发送',
-                    onPressed: working ? null : onSend,
-                    icon: const Icon(Icons.arrow_upward_rounded),
-                    style: IconButton.styleFrom(
-                      fixedSize: const Size(44, 44),
-                      minimumSize: const Size(44, 44),
-                      shape: const CircleBorder(),
+                  if (working)
+                    IconButton.outlined(
+                      tooltip: '取消请求',
+                      onPressed: onCancel,
+                      icon: const Icon(Icons.stop_rounded),
+                      style: IconButton.styleFrom(
+                        fixedSize: const Size(44, 44),
+                        minimumSize: const Size(44, 44),
+                        shape: const CircleBorder(),
+                      ),
+                    )
+                  else
+                    IconButton.filled(
+                      tooltip: '预览发送',
+                      onPressed: reviewing ? null : onSend,
+                      icon: const Icon(Icons.arrow_upward_rounded),
+                      style: IconButton.styleFrom(
+                        fixedSize: const Size(44, 44),
+                        minimumSize: const Size(44, 44),
+                        shape: const CircleBorder(),
+                      ),
                     ),
-                  ),
                 ],
               ),
             ],
@@ -101,7 +119,7 @@ class AiManagerComposer extends StatelessWidget {
     final panel = AiComposerActionPanel(
       mode: mode,
       selectedEntryCount: selectedEntryCount,
-      working: working,
+      working: working || reviewing,
       onModeChanged: onModeChanged,
       onScope: onScope,
       onPrompt: onPrompt,
@@ -270,7 +288,7 @@ class AiComposerActionPanel extends StatelessWidget {
             icon: Icons.tune,
             title: '专业工具',
             subtitle: working ? '可查看；当前请求完成前不能发起新请求' : '打开五项独立整理工具',
-            enabled: true,
+            enabled: !working,
             onTap: () => _closeThen(context, onTools),
           ),
           const SizedBox(height: 8),

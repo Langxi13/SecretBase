@@ -22,6 +22,7 @@ class AiPlanPanel extends StatelessWidget {
     required this.onReveal,
     required this.onExpanded,
     required this.onApply,
+    required this.onDiscard,
     super.key,
   });
 
@@ -35,6 +36,7 @@ class AiPlanPanel extends StatelessWidget {
   final ValueChanged<String> onReveal;
   final ValueChanged<String> onExpanded;
   final VoidCallback onApply;
+  final VoidCallback onDiscard;
 
   @override
   Widget build(BuildContext context) {
@@ -80,10 +82,24 @@ class AiPlanPanel extends StatelessWidget {
             ),
           ),
         if (preview.items.isNotEmpty)
-          FilledButton.icon(
-            onPressed: selectedCount == 0 || working ? null : onApply,
-            icon: const Icon(Icons.done_all, size: 18),
-            label: Text('应用已选计划（$selectedCount）'),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: working ? null : onDiscard,
+                  icon: const Icon(Icons.clear, size: 18),
+                  label: const Text('放弃建议'),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: FilledButton.icon(
+                  onPressed: selectedCount == 0 || working ? null : onApply,
+                  icon: const Icon(Icons.done_all, size: 18),
+                  label: Text('应用已选（$selectedCount）'),
+                ),
+              ),
+            ],
           ),
       ],
     );

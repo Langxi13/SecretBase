@@ -4,6 +4,9 @@ const vm = require('vm');
 
 const root = path.resolve(__dirname, '..');
 const source = fs.readFileSync(path.join(root, 'frontend/js/app-session-controller.js'), 'utf8');
+const lifecycleSource = fs.readFileSync(path.join(root, 'frontend/js/app-session-lifecycle.js'), 'utf8');
+const securitySource = fs.readFileSync(path.join(root, 'frontend/js/app-session-security.js'), 'utf8');
+const settingsSource = fs.readFileSync(path.join(root, 'frontend/js/app-session-settings.js'), 'utf8');
 const coverSource = fs.readFileSync(path.join(root, 'frontend/js/desktop-lock-cover.js'), 'utf8');
 
 function ref(value) {
@@ -16,6 +19,7 @@ let animationFrame = null;
 let fallbackTimeout = null;
 let finishPasswordChange = null;
 let passwordChangeCalls = 0;
+let invalidationCalls = 0;
 const attributes = new Set();
 
 const sandbox = {
@@ -58,6 +62,9 @@ const sandbox = {
 sandbox.window.window = sandbox.window;
 const context = vm.createContext(sandbox);
 vm.runInContext(coverSource, context);
+vm.runInContext(lifecycleSource, context);
+vm.runInContext(securitySource, context);
+vm.runInContext(settingsSource, context);
 vm.runInContext(source, context);
 
 const state = {
@@ -72,6 +79,22 @@ const state = {
     entries: ref([{ id: 'sensitive-entry' }]),
     tags: ref([{ name: 'sensitive-tag' }]),
     groups: ref([{ name: 'sensitive-group' }]),
+    trashItems: ref([{ id: 'sensitive-trash' }]),
+    backups: ref([{ filename: 'sensitive-backup' }]),
+    groupPickerEntries: ref([{ id: 'sensitive-picker-entry' }]),
+    healthReport: ref({ sensitive: true }),
+    maintenanceReport: ref({ sensitive: true }),
+    securityReport: ref({ sensitive: true }),
+    importPreview: ref({ sensitive: true }),
+    importConflicts: ref([{ sensitive: true }]),
+    importReport: ref({ sensitive: true }),
+    lastImportPlainFile: ref({ name: 'sensitive.json' }),
+    importPreviewSelectedIds: ref(['sensitive-entry']),
+    lastImportSelectedIds: ref(['sensitive-entry']),
+    importConflictResolutions: ref({ sensitive: 'skip' }),
+    lastImportConflictResolutions: ref({ sensitive: 'skip' }),
+    trashError: ref('stale-trash-error'),
+    importConflictMessage: ref('stale-import-error'),
     selectedEntry: ref({ id: 'sensitive-entry' }),
     editingEntry: ref({ id: 'sensitive-entry' }),
     selectedEntryIds: ref(['sensitive-entry']),
@@ -112,25 +135,57 @@ const state = {
     showImportReport: ref(true),
     copyMenuEntryId: ref('sensitive-entry'),
     showTagDropdown: ref(true),
-    restoreWizard: { visible: true },
+    restoreWizard: {
+        visible: true,
+        backup: { filename: 'sensitive-backup' },
+        summary: { sensitive: true },
+        password: 'sensitive-backup-password',
+        confirmation: 'RESTORE',
+        error: 'stale-restore-error'
+    },
     revealedFields: ref(['sensitive-entry:password']),
     settingsForm: { autoLockMinutes: 5 },
     aiSettingsStatus: ref(null),
     aiNow: ref(0),
     loading: ref(true),
+    startupError: ref(''),
+    startupRetrying: ref(false),
+    dataLoadError: ref(''),
+    dataLoading: ref(false),
+    settingsSaving: ref(false),
+    settingsError: ref(''),
+    confirmError: ref(''),
     activeSettingsTab: ref('general'),
     passwordForm: {
         oldPassword: 'old-password',
         newPassword: 'new-password',
         confirmPassword: 'new-password',
         error: ''
-    }
+    },
+    tagMergeForm: { sourceTags: 'sensitive', targetTag: 'target' },
+    tagMergeSourceList: ref(['sensitive']),
+    tagEditorForm: { name: 'sensitive-tag', description: 'sensitive-description' },
+    groupForm: { name: 'sensitive-group', description: 'sensitive-description' },
+    searchQuery: ref('sensitive-search'),
+    aiText: ref('sensitive-ai-text'),
+    lastAiParseText: ref('sensitive-ai-parse'),
+    aiActionInstruction: ref('sensitive-ai-action'),
+    aiOrganizeResult: ref({ sensitive: true }),
+    aiActionResult: ref({ sensitive: true }),
+    aiResult: ref({ sensitive: true }),
+    aiSettingsForm: { apiKey: 'sensitive-api-key' },
+    aiModels: ref([{ id: 'sensitive-model' }]),
+    aiDiagnosticsPreview: ref({ sensitive: true }),
+    aiDiagnosticsReport: ref({ sensitive: true })
 };
 
 const api = {
     token: 'sensitive-token',
     setToken(value) {
         this.token = value;
+    },
+    invalidateSession() {
+        invalidationCalls += 1;
     },
     getToken() {
         return this.token;
@@ -235,8 +290,16 @@ controller.registerLifecycle({
     if (api.token !== null || !store.lockedState || !state.locked.value) {
         throw new Error('桌面锁定没有立即清除认证状态');
     }
+    if (invalidationCalls < 1) {
+        throw new Error('桌面锁定没有终止仍在执行的敏感请求');
+    }
     if (state.entries.value.length || state.tags.value.length || state.groups.value.length) {
         throw new Error('桌面锁定没有立即清除敏感列表');
+    }
+    if (state.trashItems.value.length || state.backups.value.length || state.groupPickerEntries.value.length
+        || state.importPreview.value || state.importConflicts.value.length || state.lastImportPlainFile.value
+        || state.aiSettingsForm.apiKey || state.restoreWizard.password || state.passwordForm.oldPassword) {
+        throw new Error('桌面锁定没有清除缓存的敏感数据');
     }
     if (state.showSettings.value || state.showEditModal.value || state.restoreWizard.visible
         || state.showDesktopCloseConfirm.value || state.showAiAssistant.value

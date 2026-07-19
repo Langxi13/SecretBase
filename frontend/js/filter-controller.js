@@ -18,7 +18,9 @@
             sortBy,
             sortOrder,
             applyAdvancedFilters,
-            clearAdvancedFilters
+            clearAdvancedFilters,
+            showPromptDialog = async () => null,
+            showToast = () => {}
         } = options;
 
         const activeAdvancedFilterChips = computed(() => {
@@ -121,13 +123,19 @@
             };
         }
 
-        function saveCurrentAdvancedFilter() {
+        async function saveCurrentAdvancedFilter() {
             if (activeAdvancedFilterChips.value.length === 0) {
                 showToast('请先设置筛选条件', 'warning');
                 return;
             }
             const defaultName = activeAdvancedFilterChips.value.map(chip => chip.label).join(' + ').slice(0, 40);
-            const name = window.prompt('保存筛选名称', defaultName);
+            const name = await showPromptDialog({
+                title: '保存筛选',
+                message: '给这组筛选条件起一个容易识别的名称。',
+                value: defaultName,
+                placeholder: '例如：最近创建的工作账号',
+                maxLength: 40
+            });
             if (!name || !name.trim()) return;
             savedAdvancedFilters.value = [
                 getAdvancedFilterSnapshot(name.trim()),

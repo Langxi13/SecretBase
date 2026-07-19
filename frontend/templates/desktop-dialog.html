@@ -1,8 +1,8 @@
-        <div v-if="showDesktopStatus && isDesktopMode" class="modal-overlay" @click.self="showDesktopStatus = false">
+        <div v-if="showDesktopStatus && isDesktopMode" class="modal-overlay" @click.self="closeDesktopStatus">
             <div class="modal-content desktop-status-modal">
                 <div class="modal-header">
                     <h2>桌面状态</h2>
-                    <button class="modal-close" @click="showDesktopStatus = false">✕</button>
+                    <button class="modal-close" @click="closeDesktopStatus">✕</button>
                 </div>
                 <div class="modal-body desktop-status-body">
                     <div v-if="desktopDiagnosticsLoading" class="desktop-status-loading">
@@ -94,7 +94,7 @@
                 </div>
                 <div class="modal-footer desktop-status-footer">
                     <button class="btn-secondary" @click="copyDesktopDiagnostics" :disabled="!desktopDiagnostics">复制诊断信息</button>
-                    <button class="btn-primary inline" @click="showDesktopStatus = false">完成</button>
+                    <button class="btn-primary inline" @click="closeDesktopStatus">完成</button>
                 </div>
             </div>
         </div>
@@ -108,7 +108,7 @@
             <div class="modal-content desktop-close-modal" role="dialog" aria-modal="true" aria-labelledby="desktop-close-title">
                 <div class="modal-header">
                     <h2 id="desktop-close-title">关闭 SecretBase</h2>
-                    <button class="modal-close" type="button" title="取消关闭" @click="cancelDesktopClose">✕</button>
+                    <button class="modal-close" type="button" title="取消关闭" @click="cancelDesktopClose" :disabled="desktopCloseSubmitting">✕</button>
                 </div>
                 <div class="modal-body desktop-close-body">
                     <p v-if="desktopSupportsTray">你可以将窗口隐藏到系统托盘，也可以完全退出应用。隐藏前会立即锁定密码库。</p>

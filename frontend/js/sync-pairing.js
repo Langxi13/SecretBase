@@ -234,8 +234,14 @@
         } catch (_) {
             fail('配对链接格式无效');
         }
-        if (uri.protocol !== 'secretbase:' || uri.hostname !== 'sync' || uri.pathname !== '/join' || uri.hash) {
+        if (uri.protocol !== 'secretbase:' || uri.hostname !== 'sync' || uri.pathname !== '/join' || uri.hash || uri.username || uri.password) {
             fail('链接不是 SecretBase 同步配对链接');
+        }
+        for (const key of ['v', 'url', 'username', 'recovery_code', 'key', 'vault_id', 'space_id']) {
+            if (uri.searchParams.getAll(key).length > 1) fail(`配对链接包含重复的 ${key} 参数`);
+        }
+        for (const key of ['password', 'webdav_password', 'app_password', 'token']) {
+            if (uri.searchParams.has(key)) fail('配对链接不得包含 WebDAV 应用密码或访问令牌');
         }
         const version = Number(uri.searchParams.get('v'));
         if (version !== 1 && version !== 2) fail('仅支持 V1/V2 SecretBase 同步配对链接');
@@ -251,7 +257,7 @@
             fail('配对链接中的 WebDAV 信息无效');
         }
         const recoveryValue = uri.searchParams.get('recovery_code');
-        if (recoveryValue && uri.searchParams.get('key')) fail('配对链接包含重复的同步密钥材料，请重新生成');
+        if (recoveryValue && uri.searchParams.has('key')) fail('配对链接包含重复的同步密钥材料，请重新生成');
         const recovery = recoveryValue || await legacyRecoveryCode(uri, version);
         const validated = await validateRecoveryCode(recovery, version);
         const declaredVault = uri.searchParams.get('vault_id');

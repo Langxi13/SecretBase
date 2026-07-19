@@ -51,7 +51,9 @@ context.removeEventListener = type => windowListeners.delete(type);
 vm.runInContext(read('frontend/js/sync-state.js'), context, { filename: 'sync-state.js' });
 vm.runInContext(read('frontend/js/sync-pairing.js'), context, { filename: 'sync-pairing.js' });
 vm.runInContext(read('frontend/js/sync-lifecycle.js'), context, { filename: 'sync-lifecycle.js' });
+vm.runInContext(read('frontend/js/sync-setup-validation.js'), context, { filename: 'sync-setup-validation.js' });
 vm.runInContext(read('frontend/js/controllers/sync-management-controller.js'), context, { filename: 'sync-management-controller.js' });
+vm.runInContext(read('frontend/js/controllers/sync-operation-controller.js'), context, { filename: 'sync-operation-controller.js' });
 vm.runInContext(read('frontend/js/controllers/sync-controller.js'), context, { filename: 'sync-controller.js' });
 
 const state = {
@@ -86,6 +88,7 @@ const api = {
     },
     async post(url, payload) {
         calls.push(['POST', url, payload]);
+        if (url === '/sync/config/test') return { message: '连接测试通过' };
         if (url === '/sync/create') return { data: { status: { ...status } }, message: '已创建' };
         if (url === '/sync/recovery-code') {
             return {
@@ -116,13 +119,14 @@ const api = {
 const controller = context.SecretBaseSyncController.createSyncController({
     computed,
     api,
-    showToast: () => {},
+    showToast: (message, type) => toasts.push({ message, type }),
     showConfirmDialog: (_title, _message, callback) => callback(),
     copyToClipboard: async value => Boolean(value),
     state,
     loadAllData: async () => { loadAllDataCount += 1; }
 });
 const actions = controller.actions;
+const toasts = [];
 
 (async () => {
     await actions.initializeSync();
@@ -130,6 +134,46 @@ const actions = controller.actions;
     assert(windowListeners.has('secretbase:vault-mutated'), '必须监听 Vault 写入事件');
     assert(documentListeners.has('visibilitychange'), '必须监听前台恢复事件');
     assert([...timers.values()].some(timer => timer.delay === 0), '解锁后启用自动同步时必须安排立即检查');
+
+    const originalGet = api.get;
+    let conflictCalls = 0;
+    api.get = async url => {
+        if (url === '/sync/conflicts') {
+            conflictCalls += 1;
+            throw new Error('冲突服务暂时不可用');
+        }
+        return originalGet.call(api, url);
+    };
+    state.syncStatus.pending_conflicts = 1;
+    await actions.loadSyncConflicts(true);
+    assert(conflictCalls === 1, '同步冲突读取失败时必须只发起一次请求');
+    assert(state.syncConflictsError.value.includes('冲突服务暂时不可用'), '同步冲突失败必须保留原地错误');
+    assert(!state.syncConflictsLoading.value && state.showSyncConflicts.value, '同步冲突失败后必须恢复交互并保留重试弹窗');
+
+    let releaseConflictLoad;
+    api.get = async url => {
+        if (url === '/sync/conflicts') {
+            conflictCalls += 1;
+            return new Promise(resolve => { releaseConflictLoad = resolve; });
+        }
+        return originalGet.call(api, url);
+    };
+    state.showSyncConflicts.value = false;
+    const firstConflictLoad = actions.loadSyncConflicts(false);
+    const duplicateConflictLoad = actions.loadSyncConflicts(true);
+    assert(state.syncConflictsLoading.value && conflictCalls === 2, '同步冲突读取期间重复点击必须复用同一请求');
+    releaseConflictLoad({ data: {
+        conflict_token: 'conflict-token',
+        conflicts: [{ conflict_id: 'entry:runtime', allow_both: true, changed_sections: ['标题'] }]
+    } });
+    await Promise.all([firstConflictLoad, duplicateConflictLoad]);
+    assert(state.syncConflicts.value.length === 1 && state.syncConflictsError.value === '', '同步冲突重试成功后必须填充结果并清除错误');
+    assert(state.showSyncConflicts.value, '后台冲突读取期间用户主动打开后，结果返回不得再次隐藏弹窗');
+    assert(state.syncStatus.pending_conflicts === 1, '同步冲突结果必须同步待处理数量');
+    api.get = originalGet;
+    state.showSyncConflicts.value = false;
+    state.syncConflicts.value = [];
+    state.syncStatus.pending_conflicts = 0;
 
     timers.clear();
     windowListeners.get('secretbase:vault-mutated')();
@@ -140,6 +184,43 @@ const actions = controller.actions;
     await actions.runSync({ silent: true });
     assert([...timers.values()].some(timer => timer.delay === 5000), '自动同步遇到短暂忙碌时必须重新排队');
     state.syncBusy.value = false;
+
+    actions.openSyncSetup('join');
+    Object.assign(state.syncSetupForm, {
+        baseUrl: 'https://dav.example.invalid/secretbase',
+        username: 'tester',
+        password: 'app-password',
+        recoveryCode: ''
+    });
+    await actions.testSyncConnection();
+    assert(state.syncSetupTestPassed.value === true, '连接测试成功后必须保留通过状态');
+    assert(controller.views.syncSetupCanSubmit.value === true, '连接测试结束后加入按钮必须恢复可交互');
+    const joinCallsBeforeValidation = calls.filter(call => call[0] === 'POST' && call[1] === '/sync/join').length;
+    await actions.submitSyncSetup();
+    assert(state.syncSetupError.value.includes('同步恢复码'), '缺少恢复码时必须在配置弹窗保留明确错误');
+    assert(calls.filter(call => call[0] === 'POST' && call[1] === '/sync/join').length === joinCallsBeforeValidation, '表单不完整时不得发送加入请求');
+    assert(toasts.some(item => item.type === 'error' && item.message.includes('同步恢复码')), '同步配置错误必须触发顶层提示');
+
+    const autoPairingUri = 'secretbase://sync/join?v=2&vault_id=11111111-1111-4111-8111-111111111111&space_id=22222222-2222-4222-8222-222222222222&key=AQIDBAUGBwgJCgsMDQ4PEBESExQVFhcYGRobHB0eHyA&url=https%3A%2F%2Fdav.example.invalid%2Fsecretbase&username=tester';
+    let autoJoinPayload = null;
+    const postBeforeAutoJoin = api.post;
+    api.post = async (url, payload) => {
+        if (url === '/sync/join') {
+            autoJoinPayload = payload;
+            return { data: { status: { ...status } }, message: '已加入' };
+        }
+        return postBeforeAutoJoin.call(api, url, payload);
+    };
+    actions.openSyncSetup('join');
+    Object.assign(state.syncSetupForm, {
+        password: 'app-password',
+        pairingUri: autoPairingUri
+    });
+    await actions.submitSyncSetup();
+    assert(autoJoinPayload?.recovery_code?.startsWith('SBSYNC2-'), '直接提交配对链接时必须自动转换并提交恢复码');
+    assert(state.showSyncSetup.value === false, '自动读取配对链接成功后必须关闭配置弹窗');
+    loadAllDataCount = 0;
+    api.post = postBeforeAutoJoin;
 
     const regularPost = api.post;
     api.post = async (url, payload) => {
@@ -188,6 +269,18 @@ const actions = controller.actions;
         'secretbase://sync/join?v=1&vault_id=11111111-1111-4111-8111-111111111111&recovery_code=SBSYNC1-AEIRC-EIRCE-IUCEM-BCEIR-CEIRC-EIQCA-QDAQC-QMBYI-BEFAW-DANBY-HRAEI-SCMKB-KFQXD-AMRUG-Y4DUP-B6IDR-H3HFC&url=https%3A%2F%2Fdav.example.invalid%2Fsecretbase&username=tester'
     );
     assert(v1Pairing.version === 1, 'V1 配对链接应保留协议版本');
+    for (const invalid of [
+        'secretbase://sync/join?v=2&v=2&recovery_code=SBSYNC2-TEST&url=https%3A%2F%2Fdav.example.invalid&username=tester',
+        'secretbase://sync/join?v=2&recovery_code=SBSYNC2-TEST&password=secret&url=https%3A%2F%2Fdav.example.invalid&username=tester'
+    ]) {
+        let rejected = false;
+        try {
+            await context.SecretBaseSyncPairing.parse(invalid);
+        } catch (_) {
+            rejected = true;
+        }
+        assert(rejected, '配对链接必须拒绝重复参数和嵌入式凭据');
+    }
     Object.assign(state.syncSetupForm, {
         baseUrl: 'https://dav.example.invalid/secretbase',
         username: 'tester',

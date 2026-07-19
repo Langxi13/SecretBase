@@ -113,6 +113,7 @@ class _TagsScreenState extends ConsumerState<TagsScreen> {
   }
 
   Widget _buildPage(List<TaxonomyRecord> items, int pageSize) {
+    _selected.removeWhere((name) => !items.any((item) => item.name == name));
     final filtered = items.where((item) {
       final query = _search.toLowerCase();
       return query.isEmpty ||
@@ -226,7 +227,15 @@ class _TagsScreenState extends ConsumerState<TagsScreen> {
       kind: 'tags',
       existing: tag,
     );
-    if (message != null && mounted) _showMessage(message);
+    if (message != null && mounted) {
+      final currentNames =
+          ref.read(taxonomyProvider('tags')).asData?.value ??
+          const <TaxonomyRecord>[];
+      if (!currentNames.any((item) => item.name == tag.name)) {
+        _selected.remove(tag.name);
+      }
+      _showMessage(message);
+    }
   }
 
   Future<void> _deleteOne(TaxonomyRecord tag) async {
@@ -237,7 +246,10 @@ class _TagsScreenState extends ConsumerState<TagsScreen> {
         kind: 'tags',
         name: tag.name,
       );
-      if (message != null && mounted) _showMessage(message);
+      if (message != null && mounted) {
+        _selected.remove(tag.name);
+        _showMessage(message);
+      }
     } catch (error) {
       if (mounted) _showMessage(mobileErrorMessage(error));
     }
@@ -273,7 +285,12 @@ class _TagsScreenState extends ConsumerState<TagsScreen> {
         names: _selected.toList(),
         expectedRevision: ref.read(vaultControllerProvider).revision,
       );
-      await ref.read(vaultControllerProvider.notifier).refreshStatus();
+      var refreshed = true;
+      try {
+        await ref.read(vaultControllerProvider.notifier).refreshStatus();
+      } catch (_) {
+        refreshed = false;
+      }
       ref.invalidate(taxonomyProvider);
       ref.invalidate(entryPageProvider);
       if (mounted) {
@@ -282,7 +299,9 @@ class _TagsScreenState extends ConsumerState<TagsScreen> {
           _selectionMode = false;
           _selected.clear();
         });
-        _showMessage(result.message);
+        _showMessage(
+          refreshed ? result.message : '${result.message}，但列表刷新不完整，请稍后重试。',
+        );
       }
     } catch (error) {
       if (mounted) {

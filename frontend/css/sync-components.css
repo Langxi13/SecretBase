@@ -337,6 +337,36 @@
     line-height: 1.45;
 }
 
+.sync-setup-requirement,
+.sync-test-success {
+    margin: 9px 0 0;
+    padding: 9px 11px;
+    border: 1px solid var(--border-color);
+    border-radius: 7px;
+    font-size: var(--font-size-xs);
+    line-height: 1.45;
+}
+
+.sync-setup-requirement {
+    background: var(--status-warning-bg);
+    border-color: color-mix(in srgb, var(--color-warning) 36%, var(--border-color));
+    color: var(--color-warning);
+}
+
+.sync-test-success {
+    background: var(--status-success-bg);
+    border-color: color-mix(in srgb, var(--color-success) 36%, var(--border-color));
+    color: var(--color-success);
+}
+
+.sync-setup-error {
+    margin-top: 10px;
+    padding: 9px 11px;
+    border: 1px solid color-mix(in srgb, var(--color-error) 38%, var(--border-color));
+    border-radius: 7px;
+    background: var(--status-error-bg);
+}
+
 .sync-merge-option {
     margin-top: 10px;
 }

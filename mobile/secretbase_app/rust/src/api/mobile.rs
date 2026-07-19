@@ -339,6 +339,10 @@ pub fn clear_ai_settings() -> Result<AiStatus, MobileError> {
     runtime::clear_ai_settings()
 }
 
+pub fn cancel_ai_pending() -> Result<(), MobileError> {
+    runtime::cancel_ai_pending()
+}
+
 pub fn prepare_ai_request(
     kind: String,
     input: String,

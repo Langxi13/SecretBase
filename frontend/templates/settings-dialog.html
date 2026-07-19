@@ -3,7 +3,7 @@
             <div class="modal-content settings-modal">
                 <div class="modal-header">
                     <h2>⚙️ 设置</h2>
-                    <button class="modal-close" @click="showSettings = false">✕</button>
+                    <button class="modal-close" @click="closeSettings" :disabled="settingsWriteBusy">✕</button>
                 </div>
                 <div class="modal-body settings-body">
                     <div class="settings-tabs" role="tablist" aria-label="设置分类">
@@ -15,16 +15,18 @@
                             role="tab"
                             :aria-selected="activeSettingsTab === tab.key"
                             @click="selectSettingsTab(tab.key)"
+                            :disabled="settingsWriteBusy"
                         >
                             {{ tab.label }}
                         </button>
                     </div>
+                    <p v-if="settingsError" class="error-message settings-global-error">{{ settingsError }}</p>
                     <div class="settings-tab-panel">
                         <div v-if="activeSettingsTab === 'general'" class="settings-section">
                             <h3>通用</h3>
                             <div class="setting-item">
                                 <label>主题</label>
-                                <select v-model="settingsForm.theme" @change="saveSettings">
+                                <select v-model="settingsForm.theme" @change="saveSettings" :disabled="settingsSaving">
                                     <option value="system">自动（按时间）</option>
                                     <option value="light">亮色</option>
                                     <option value="dark">暗色</option>
@@ -35,7 +37,7 @@
                             <h3>安全</h3>
                             <div class="setting-item">
                                 <label>自动锁定时间</label>
-                                <select v-model.number="settingsForm.autoLockMinutes" @change="saveSettings">
+                                <select v-model.number="settingsForm.autoLockMinutes" @change="saveSettings" :disabled="settingsSaving">
                                     <option value="5">5 分钟</option>
                                     <option value="10">10 分钟</option>
                                     <option value="30">30 分钟</option>
@@ -217,7 +219,9 @@
                                     </div>
                                 </div>
                                 <div class="setting-actions sync-primary-actions">
-                                    <button class="btn-primary inline" @click="loadSyncConflicts(true)">继续处理冲突</button>
+                                    <button class="btn-primary inline" @click="loadSyncConflicts(true)" :disabled="syncConflictsLoading">
+                                        {{ syncConflictsLoading ? '读取中...' : '继续处理冲突' }}
+                                    </button>
                                     <button class="btn-secondary" @click="disconnectSync" :disabled="syncBusy">取消加入</button>
                                 </div>
                             </template>
@@ -257,10 +261,10 @@
                                     <button class="btn-primary inline" @click="runSync" :disabled="syncBusy">
                                         {{ syncBusy || syncStatus.phase === 'syncing' ? '同步中...' : '立即同步' }}
                                     </button>
-                                    <button v-if="syncStatus.pending_conflicts > 0" class="btn-secondary sync-conflict-action" @click="loadSyncConflicts(true)">
-                                        处理 {{ syncStatus.pending_conflicts }} 项冲突
+                                    <button v-if="syncStatus.pending_conflicts > 0" class="btn-secondary sync-conflict-action" @click="loadSyncConflicts(true)" :disabled="syncConflictsLoading">
+                                        {{ syncConflictsLoading ? '读取冲突中...' : `处理 ${syncStatus.pending_conflicts} 项冲突` }}
                                     </button>
-                                    <button class="btn-secondary" @click="openSyncHistory" :disabled="syncBusy">历史版本</button>
+                                    <button class="btn-secondary" @click="openSyncHistory" :disabled="syncBusy || syncHistoryLoading">历史版本</button>
                                     <button class="btn-secondary" @click="openSyncRecovery('reveal')" :disabled="syncBusy">加入新设备</button>
                                     <button class="btn-secondary" @click="openSyncConfig" :disabled="syncBusy">连接设置</button>
                                 </div>
@@ -288,16 +292,17 @@
                                 </select>
                             </div>
                             <p v-if="importConflictMessage" class="warning-message">{{ importConflictMessage }}</p>
+                            <p v-if="transferError" class="error-message" role="alert">{{ transferError }}</p>
                             <div class="setting-item setting-actions">
-                                <button class="btn-secondary" @click="exportEncrypted">导出加密备份</button>
-                                <button class="btn-secondary" @click="exportPlain">导出明文 JSON</button>
-                                <label class="btn-secondary file-action">
+                                <button class="btn-secondary" @click="exportEncrypted" :disabled="transferBusy">导出加密备份</button>
+                                <button class="btn-secondary" @click="exportPlain" :disabled="transferBusy">导出明文 JSON</button>
+                                <label class="btn-secondary file-action" :class="{ disabled: transferBusy }">
                                     导入加密备份
-                                    <input type="file" accept=".enc,.bak,application/octet-stream" @change="importEncryptedFile">
+                                    <input type="file" accept=".enc,.bak,application/octet-stream" @change="importEncryptedFile" :disabled="transferBusy">
                                 </label>
-                                <label class="btn-secondary file-action">
+                                <label class="btn-secondary file-action" :class="{ disabled: transferBusy }">
                                     导入明文 JSON
-                                    <input type="file" accept=".json,application/json" @change="importPlainFile">
+                                    <input type="file" accept=".json,application/json" @change="importPlainFile" :disabled="transferBusy">
                                 </label>
                             </div>
                             <button class="btn-secondary" @click="openBackupCenter">打开备份中心</button>

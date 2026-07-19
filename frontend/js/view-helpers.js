@@ -146,9 +146,9 @@
     function aiActionEntryLabel(action) {
         if (!action) return '';
         if (action.type === 'create_entry_from_field') {
-            return action.source_entry_title || action.source_entry_id || '';
+            return action.source_entry_title || '来源条目';
         }
-        return action.entry_title || action.entry_id || action.source_entry_title || action.source_entry_id || '';
+        return action.entry_title || action.source_entry_title || '相关条目';
     }
 
     function aiActionTitle(action) {

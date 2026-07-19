@@ -22,6 +22,20 @@ class _UnlockedVaultController extends VaultController {
   }
 }
 
+class _RetryableLockVaultController extends VaultController {
+  int lockCount = 0;
+
+  @override
+  VaultUiState build() => const VaultUiState(phase: VaultPhase.unlocked);
+
+  @override
+  Future<void> lock() async {
+    lockCount += 1;
+    if (lockCount == 1) throw StateError('simulated lock failure');
+    state = const VaultUiState(phase: VaultPhase.locked);
+  }
+}
+
 void main() {
   testWidgets('Vault 已锁定时恢复应用会释放内容保护遮罩', (tester) async {
     await tester.pumpWidget(
@@ -110,5 +124,31 @@ void main() {
     expect(tester.testTextInput.isVisible, isFalse);
     final editable = tester.widget<EditableText>(find.byType(EditableText));
     expect(editable.focusNode.hasFocus, isFalse);
+  });
+
+  testWidgets('锁定失败时继续遮罩内容并提供重试入口', (tester) async {
+    final controller = _RetryableLockVaultController();
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [vaultControllerProvider.overrideWith(() => controller)],
+        child: const MaterialApp(
+          home: SecurityLifecycleGuard(child: Scaffold(body: Text('密码库内容'))),
+        ),
+      ),
+    );
+
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+    await tester.pump();
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    await tester.pumpAndSettle();
+
+    expect(find.text('无法安全锁定密码库，请点击重试。'), findsOneWidget);
+    expect(find.text('密码库内容'), findsOneWidget);
+    final retry = find.text('重试锁定');
+    expect(retry, findsOneWidget);
+    await tester.tap(retry);
+    await tester.pumpAndSettle();
+    expect(controller.lockCount, 2);
+    expect(find.text('无法安全锁定密码库，请点击重试。'), findsNothing);
   });
 }

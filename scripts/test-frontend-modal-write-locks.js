@@ -19,7 +19,8 @@ function deferred() {
 
 const markup = readFrontendMarkup();
 for (const state of ['entrySaving', 'groupSaving', 'groupPickerSaving', 'tagSaving', 'passwordChanging']) {
-    assert(markup.includes(`:inert="${state} ? '' : null"`), `${state} 期间必须冻结弹窗表单`);
+    const escaped = state.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    assert(new RegExp(`:inert="[^\"]*\\b${escaped}\\b[^\"]*\\? '' : null"`).test(markup), `${state} 期间必须冻结弹窗表单`);
 }
 
 const context = vm.createContext({ console, window: null, Element: class {} });

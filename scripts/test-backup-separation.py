@@ -17,6 +17,20 @@ from routes import transfer_common  # noqa: E402
 from routes import settings as settings_route  # noqa: E402
 
 
+def assert_isolated_storage_paths(data_dir: Path) -> None:
+    root = data_dir.resolve()
+    for name in (
+        "VAULT_PATH",
+        "BACKUP_DIR",
+        "SETTINGS_PATH",
+        "SECURE_SETTINGS_FILE",
+        "AI_HISTORY_FILE",
+        "SYNC_SETTINGS_FILE",
+        "SYNC_BASE_FILE",
+    ):
+        Path(getattr(storage, name)).resolve().relative_to(root)
+
+
 def reset_storage(tmpdir: Path, max_backups: int = 5, auto_backup_retention: int | None = None) -> None:
     storage.lock_vault()
     data_dir = tmpdir / "data"
@@ -28,6 +42,12 @@ def reset_storage(tmpdir: Path, max_backups: int = 5, auto_backup_retention: int
     storage.BACKUP_DIR = str(backup_dir)
     storage.SETTINGS_PATH = str(data_dir / "settings.json")
     storage.SECURE_SETTINGS_FILE = str(data_dir / "secure-settings.enc")
+    # 这些文件与 Vault 密钥绑定；测试必须全部落在临时目录，避免改密测试
+    # 误触真实运行时的 AI 历史或 WebDAV 同步状态。
+    storage.AI_HISTORY_FILE = str(data_dir / "ai-history.enc")
+    storage.SYNC_SETTINGS_FILE = str(data_dir / "sync-settings.enc")
+    storage.SYNC_BASE_FILE = str(data_dir / "sync-base.enc")
+    assert_isolated_storage_paths(data_dir)
     settings_route.SETTINGS_PATH = storage.SETTINGS_PATH
     Path(settings_route.SETTINGS_PATH).write_text(
         json.dumps({"auto_backup_retention": auto_backup_retention or max_backups}),

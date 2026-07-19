@@ -8,6 +8,7 @@
             api,
             store,
             showToast,
+            showConfirmDialog = (_title, _message, callback) => callback?.(),
             copyToClipboard,
             showAiAssistant,
             showAiParse,
@@ -37,25 +38,31 @@
             loadGroups,
             openSettings,
             selectSettingsTab,
+            openEntryDetail = () => false,
             normalizeAssistantActionTargets,
             resetAssistantInspector,
             assistantPlanHasSelectedConflicts
         } = options;
         let pendingMessageId = '';
+        let assistantEpoch = 0;
+        const requestLifecycle = window.SecretBaseAiAssistantRequest.createAiAssistantRequestLifecycle();
         const planHelpers = window.SecretBaseAiAssistantPlanHelpers;
+        const isCurrentAssistantSession = epoch => epoch === assistantEpoch;
+        function invalidateAssistantRequests() {
+            requestLifecycle.abort();
+            assistantEpoch += 1;
+            clearPendingUserMessage();
+            return assistantEpoch;
+        }
+        function beginAssistantRequest() {
+            return requestLifecycle.begin();
+        }
+        const finishAssistantRequest = controller => requestLifecycle.finish(controller);
         function normalizePlan(data, requestContext = {}) {
             return planHelpers.normalizeAssistantPlan(
                 data, requestContext, aiAssistantScope.value, normalizeAssistantActionTargets
             );
         }
-
-        async function scrollAssistantToBottom() {
-            await nextTick();
-            if (typeof document === 'undefined') return;
-            const thread = document.querySelector('.ai-chat-thread');
-            if (thread) thread.scrollTop = thread.scrollHeight;
-        }
-
         function showPendingUserMessage(content) {
             clearPendingUserMessage();
             pendingMessageId = `pending-${Date.now()}`;
@@ -67,99 +74,75 @@
             }];
             scrollAssistantToBottom();
         }
-
         function clearPendingUserMessage() {
             if (!pendingMessageId) return;
             aiAssistantMessages.value = aiAssistantMessages.value.filter(message => message.id !== pendingMessageId);
             pendingMessageId = '';
         }
-
-        function collapseHistoryOnNarrowScreen() {
-            if (
-                typeof window !== 'undefined'
-                && typeof window.matchMedia === 'function'
-                && window.matchMedia('(max-width: 820px)').matches
-            ) {
-                aiAssistantHistoryOpen.value = false;
-            }
-        }
-
-        async function loadConversations() {
-            const result = await api.get('/ai/assistant/conversations');
-            aiAssistantConversations.value = result.data?.conversations || [];
-            return aiAssistantConversations.value;
-        }
-
-        async function createConversation() {
-            const result = await api.post('/ai/assistant/conversations', { title: '' });
-            resetAssistantScopeForConversation();
-            aiAssistantConversationId.value = result.data.id;
-            aiAssistantMessages.value = [];
-            pendingMessageId = '';
-            aiAssistantPlan.value = null;
-            aiAssistantLastResult.value = null;
-            resetAssistantInspector();
-            await loadConversations();
-            await refreshAssistantScopeCatalog({ silent: true });
-            collapseHistoryOnNarrowScreen();
-            return result.data;
-        }
-
-        async function loadConversation(conversationId, preserveReview = false) {
-            if (!conversationId) return;
-            const changedConversation = conversationId !== aiAssistantConversationId.value;
-            if (changedConversation) {
-                resetAssistantScopeForConversation();
-            }
-            const result = await api.get(`/ai/assistant/conversations/${encodeURIComponent(conversationId)}`);
-            aiAssistantConversationId.value = conversationId;
-            aiAssistantMessages.value = result.data?.messages || [];
-            pendingMessageId = '';
-            aiAssistantPrepared.value = null;
-            if (!preserveReview) {
-                aiAssistantPlan.value = null;
-                aiAssistantLastResult.value = null;
-                resetAssistantInspector();
-            }
-            if (changedConversation) {
-                await refreshAssistantScopeCatalog({ silent: true });
-            }
-            collapseHistoryOnNarrowScreen();
-            scrollAssistantToBottom();
-        }
-
-        async function ensureConversation() {
-            const conversations = await loadConversations();
-            const target = aiAssistantConversationId.value
-                ? conversations.find(item => item.id === aiAssistantConversationId.value)
-                : conversations[0];
-            if (target) {
-                await loadConversation(target.id);
-            } else {
-                await createConversation();
-            }
-        }
-
+        const resetPendingMessage = () => { clearPendingUserMessage(); pendingMessageId = ''; };
+        const history = window.SecretBaseAiAssistantHistoryController.createAiAssistantHistoryController({
+            nextTick,
+            api,
+            showToast,
+            showConfirmDialog,
+            aiAssistantHistoryOpen,
+            aiAssistantConversations,
+            aiAssistantConversationId,
+            aiAssistantMessages,
+            aiAssistantPrepared,
+            aiAssistantPlan,
+            aiAssistantLastResult,
+            resetAssistantScopeForConversation,
+            refreshAssistantScopeCatalog,
+            closeAssistantScopePicker,
+            resetAssistantInspector,
+            isCurrentAssistantSession,
+            getAssistantEpoch: () => assistantEpoch,
+            resetPendingMessage
+        });
+        const {
+            scrollAssistantToBottom,
+            loadConversations,
+            createConversation,
+            loadConversation,
+            ensureConversation,
+            deleteAssistantConversation,
+            clearAssistantHistory,
+            refreshAssistantContext
+        } = history;
+        const localActions = window.SecretBaseAiAssistantLocalActions.createAiAssistantLocalActions({
+            aiAssistantLastResult,
+            copyToClipboard,
+            showToast,
+            getAssistantEpoch: () => assistantEpoch,
+            isCurrentAssistantSession
+        });
+        const { generateAssistantSecret, copyAssistantSecret } = localActions;
         async function openAiAssistant() {
+            const epoch = ++assistantEpoch;
             showAiAssistant.value = true;
             aiAssistantError.value = '';
             aiAssistantPrepared.value = null;
             try {
                 const status = await api.get('/ai/status');
+                if (!isCurrentAssistantSession(epoch)) return;
                 aiStatus.value = status.data;
-                await ensureConversation();
+                await ensureConversation(epoch);
+                if (!isCurrentAssistantSession(epoch)) return;
                 await refreshAssistantScopeCatalog({ silent: true });
+                if (!isCurrentAssistantSession(epoch)) return;
                 scrollAssistantToBottom();
             } catch (error) {
+                if (!isCurrentAssistantSession(epoch)) return;
                 aiAssistantError.value = error.message || '无法加载 AI 管家';
             }
         }
-
         function closeAiAssistant() {
             if (aiAssistantBusy.value) {
                 showToast('AI 请求正在处理中，请稍候', 'warning');
                 return;
             }
+            invalidateAssistantRequests();
             showAiAssistant.value = false;
             aiAssistantPrepared.value = null;
             closeAssistantScopePicker();
@@ -169,51 +152,28 @@
             resetAssistantInspector();
             aiAssistantStage.value = '';
         }
-
-        async function deleteAssistantConversation(conversationId) {
-            if (!window.confirm('确认删除这段本机加密保存的 AI 对话？')) return;
-            try {
-                await api.delete(`/ai/assistant/conversations/${encodeURIComponent(conversationId)}`);
-                if (aiAssistantConversationId.value === conversationId) {
-                    aiAssistantConversationId.value = '';
-                    aiAssistantMessages.value = [];
-                }
-                await ensureConversation();
-            } catch (error) {
-                showToast(error.message || '删除 AI 对话失败', 'error');
-            }
+        function disposeAiAssistant() {
+            invalidateAssistantRequests();
+            showAiAssistant.value = false;
+            aiAssistantBusy.value = false;
+            aiAssistantStage.value = '';
+            aiAssistantError.value = '';
+            aiAssistantPrepared.value = null;
+            aiAssistantPlan.value = null;
+            aiAssistantLastResult.value = null;
+            aiAssistantConversationId.value = '';
+            aiAssistantMessages.value = [];
+            closeAssistantScopePicker();
+            resetAssistantScopeForConversation();
+            resetAssistantInspector();
         }
-
-        async function clearAssistantHistory() {
-            if (!window.confirm('确认清除本机全部 AI 对话历史？此操作不影响密码库。')) return;
-            try {
-                await api.delete('/ai/assistant/conversations');
-                aiAssistantConversationId.value = '';
-                aiAssistantMessages.value = [];
-                await createConversation();
-                showToast('AI 对话历史已清除', 'success');
-            } catch (error) {
-                showToast(error.message || '清除 AI 对话历史失败', 'error');
-            }
-        }
-
-        function refreshAssistantContext(conversationId) {
-            Promise.allSettled([
-                loadConversation(conversationId, true),
-                loadConversations()
-            ]).then(results => {
-                if (results.some(result => result.status === 'rejected')) {
-                    showToast('AI 回复已完成，但对话历史刷新失败', 'warning');
-                }
-            });
-        }
-
-        async function requestSendPreview(draft) {
+        async function requestSendPreview(draft, epoch = assistantEpoch, signal = null) {
             const result = await api.post('/ai/assistant/turns/preview', {
                 mode: draft.mode,
                 scope: draft.scope,
                 filters: draft.filters
-            }, { timeoutMs: 20000 });
+            }, { timeoutMs: 20000, signal });
+            if (!isCurrentAssistantSession(epoch)) return null;
             const data = result.data || {};
             return {
                 ...draft,
@@ -221,8 +181,8 @@
                 manifest: data.manifest || {}
             };
         }
-
-        function applyAssistantTurnResult(data, requestContext = {}) {
+        function applyAssistantTurnResult(data, requestContext = {}, epoch = assistantEpoch) {
+            if (!isCurrentAssistantSession(epoch)) return;
             clearPendingUserMessage();
             aiAssistantConversationId.value = data.conversation_id || aiAssistantConversationId.value;
             aiAssistantPrepared.value = null;
@@ -244,21 +204,40 @@
                         privacyNote: data.privacy_note || ''
                     }
                     : null);
-            refreshAssistantContext(aiAssistantConversationId.value);
+            refreshAssistantContext(aiAssistantConversationId.value, epoch);
         }
-
-        async function restorePreparedReview(draft) {
+        async function restorePreparedReview(draft, epoch = assistantEpoch) {
+            if (!isCurrentAssistantSession(epoch)) return;
             aiAssistantStage.value = '正在恢复发送确认';
             try {
-                aiAssistantPrepared.value = await requestSendPreview(draft);
+                const prepared = await requestSendPreview(draft, epoch);
+                if (isCurrentAssistantSession(epoch)) aiAssistantPrepared.value = prepared;
             } catch (_error) {
-                aiAssistantPrepared.value = null;
+                if (isCurrentAssistantSession(epoch)) aiAssistantPrepared.value = null;
             }
         }
-
+        async function refreshAssistantAfterMutation(epoch) {
+            const results = await Promise.allSettled([
+                loadEntries(currentPage.value),
+                loadTags(),
+                loadGroups(),
+                loadConversation(aiAssistantConversationId.value, true, epoch),
+                loadConversations(epoch),
+                refreshAssistantScopeCatalog({ silent: true })
+            ]);
+            if (!isCurrentAssistantSession(epoch)) return null;
+            return results.every(result => (
+                result.status === 'fulfilled' && result.value !== false
+            ));
+        }
+        function mutationRefreshMessage(successMessage, refreshed) {
+            return refreshed === false ? `${successMessage}，但界面刷新不完整，请稍后点击重试。` : successMessage;
+        }
         async function submitPreparedTurn() {
             const prepared = aiAssistantPrepared.value;
             if (!prepared?.previewToken || aiAssistantBusy.value) return;
+            const epoch = assistantEpoch;
+            const requestController = beginAssistantRequest();
             const draft = {
                 originalMessage: prepared.originalMessage,
                 mode: prepared.mode,
@@ -275,7 +254,8 @@
                     preview_token: prepared.previewToken,
                     conversation_id: aiAssistantConversationId.value || null,
                     message: prepared.originalMessage
-                }, { timeoutMs: 20000 });
+                }, { timeoutMs: 20000, signal: requestController?.signal || null });
+                if (!isCurrentAssistantSession(epoch)) return;
                 const turn = preparedResult.data || {};
                 aiAssistantConversationId.value = turn.conversation_id || aiAssistantConversationId.value;
                 if (turn.local_result) {
@@ -293,23 +273,31 @@
                     return;
                 }
                 if (!turn.turn_token) throw new Error('AI 请求令牌生成失败');
-
                 aiAssistantStage.value = 'AI 正在分析并校验计划';
                 const result = await api.post('/ai/assistant/turns/submit', {
                     turn_token: turn.turn_token,
                     acknowledge_risk: true
-                }, { timeoutMs: 150000 });
-                applyAssistantTurnResult(result.data || {}, prepared);
+                }, { timeoutMs: 150000, signal: requestController?.signal || null });
+                if (!isCurrentAssistantSession(epoch)) return;
+                applyAssistantTurnResult(result.data || {}, prepared, epoch);
             } catch (error) {
+                if (!isCurrentAssistantSession(epoch)) return;
+                if (error?.code === 'REQUEST_CANCELLED') {
+                    clearPendingUserMessage();
+                    aiAssistantError.value = '已取消本次 AI 请求。';
+                    return;
+                }
                 clearPendingUserMessage();
                 aiAssistantError.value = error.message || 'AI 请求失败';
-                await restorePreparedReview(draft);
+                await restorePreparedReview(draft, epoch);
             } finally {
-                aiAssistantBusy.value = false;
-                aiAssistantStage.value = '';
+                finishAssistantRequest(requestController);
+                if (isCurrentAssistantSession(epoch)) {
+                    aiAssistantBusy.value = false;
+                    aiAssistantStage.value = '';
+                }
             }
         }
-
         async function sendAssistantMessage() {
             const message = aiAssistantInput.value.trim();
             if (!message || aiAssistantBusy.value || aiAssistantPrepared.value) return;
@@ -330,6 +318,8 @@
                 aiAssistantError.value = '自定义选择范围下，请先选择至少一个条目。';
                 return;
             }
+            const epoch = assistantEpoch;
+            const requestController = beginAssistantRequest();
             aiAssistantBusy.value = true;
             aiAssistantStage.value = '正在核对发送范围';
             aiAssistantError.value = '';
@@ -343,20 +333,36 @@
                 filters: assistantFiltersForScope()
             };
             try {
-                aiAssistantPrepared.value = await requestSendPreview(draft);
+                const prepared = await requestSendPreview(draft, epoch, requestController?.signal || null);
+                if (isCurrentAssistantSession(epoch)) aiAssistantPrepared.value = prepared;
             } catch (error) {
-                aiAssistantError.value = error.message || '无法核对 AI 发送范围';
+                if (isCurrentAssistantSession(epoch)) {
+                    aiAssistantError.value = error?.code === 'REQUEST_CANCELLED'
+                        ? '已取消本次 AI 请求。'
+                        : (error.message || '无法核对 AI 发送范围');
+                }
             } finally {
-                aiAssistantBusy.value = false;
-                aiAssistantStage.value = '';
+                finishAssistantRequest(requestController);
+                if (isCurrentAssistantSession(epoch)) {
+                    aiAssistantBusy.value = false;
+                    aiAssistantStage.value = '';
+                }
             }
         }
-
         function cancelPreparedTurn() {
+            invalidateAssistantRequests();
             aiAssistantPrepared.value = null;
             aiAssistantStage.value = '';
         }
-
+        function cancelAssistantRequest() {
+            if (!aiAssistantBusy.value && !requestLifecycle.hasActive()) return false;
+            invalidateAssistantRequests();
+            aiAssistantBusy.value = false;
+            aiAssistantStage.value = '';
+            aiAssistantPrepared.value = null;
+            aiAssistantError.value = '已取消本次 AI 请求。';
+            return true;
+        }
         async function applyAssistantPlan() {
             if (aiAssistantBusy.value) return;
             const plan = aiAssistantPlan.value;
@@ -369,6 +375,7 @@
                 showToast('当前选中操作存在冲突，请取消冲突项后再应用', 'warning');
                 return;
             }
+            const epoch = assistantEpoch;
             aiAssistantBusy.value = true;
             aiAssistantStage.value = '正在本地应用已确认的操作';
             aiAssistantError.value = '';
@@ -378,6 +385,7 @@
                     selected_ids: selectedIds,
                     expected_revision: plan.source_revision
                 });
+                if (!isCurrentAssistantSession(epoch)) return;
                 aiAssistantLastResult.value = {
                     message: result.message,
                     undoToken: result.data?.undo_token || '',
@@ -386,27 +394,28 @@
                 };
                 aiAssistantPlan.value = null;
                 resetAssistantInspector();
-                await Promise.all([
-                    loadEntries(currentPage.value),
-                    loadTags(),
-                    loadGroups(),
-                    loadConversation(aiAssistantConversationId.value, true),
-                    loadConversations(),
-                    refreshAssistantScopeCatalog({ silent: true })
-                ]);
-                showToast(result.message || 'AI 操作已应用', 'success');
+                const refreshed = await refreshAssistantAfterMutation(epoch);
+                if (!isCurrentAssistantSession(epoch)) return;
+                showToast(
+                    mutationRefreshMessage(result.message || 'AI 操作已应用', refreshed),
+                    refreshed === false ? 'warning' : 'success'
+                );
             } catch (error) {
-                aiAssistantError.value = error.message || '应用 AI 计划失败';
+                if (isCurrentAssistantSession(epoch)) {
+                    aiAssistantError.value = error.message || '应用 AI 计划失败';
+                }
             } finally {
-                aiAssistantBusy.value = false;
-                aiAssistantStage.value = '';
+                if (isCurrentAssistantSession(epoch)) {
+                    aiAssistantBusy.value = false;
+                    aiAssistantStage.value = '';
+                }
             }
         }
-
         async function undoAssistantPlan() {
             if (aiAssistantBusy.value) return;
             const resultState = aiAssistantLastResult.value;
             if (!resultState?.undoToken || !resultState.revision) return;
+            const epoch = assistantEpoch;
             aiAssistantBusy.value = true;
             aiAssistantStage.value = '正在恢复 AI 操作前的加密快照';
             try {
@@ -414,111 +423,106 @@
                     undo_token: resultState.undoToken,
                     expected_revision: resultState.revision
                 });
+                if (!isCurrentAssistantSession(epoch)) return;
                 aiAssistantLastResult.value = { message: result.message };
                 aiAssistantPlan.value = null;
                 resetAssistantInspector();
-                await Promise.all([
-                    loadEntries(currentPage.value), loadTags(), loadGroups(),
-                    loadConversation(aiAssistantConversationId.value, true), loadConversations(),
-                    refreshAssistantScopeCatalog({ silent: true })
-                ]);
-                showToast('已撤销本次 AI 操作', 'success');
+                const refreshed = await refreshAssistantAfterMutation(epoch);
+                if (!isCurrentAssistantSession(epoch)) return;
+                showToast(
+                    mutationRefreshMessage('已撤销本次 AI 操作', refreshed),
+                    refreshed === false ? 'warning' : 'success'
+                );
             } catch (error) {
-                aiAssistantError.value = error.message || '撤销 AI 操作失败';
+                if (isCurrentAssistantSession(epoch)) {
+                    aiAssistantError.value = error.message || '撤销 AI 操作失败';
+                }
             } finally {
-                aiAssistantBusy.value = false;
-                aiAssistantStage.value = '';
+                if (isCurrentAssistantSession(epoch)) {
+                    aiAssistantBusy.value = false;
+                    aiAssistantStage.value = '';
+                }
             }
         }
-
-        async function deleteAssistantEmptyGroup(groupName) {
-            if (!window.confirm(`确认删除已经为空的密码组「${groupName}」？`)) return;
-            try {
-                const result = await api.delete(`/groups/${encodeURIComponent(groupName)}/empty`);
-                aiAssistantLastResult.value.emptyGroups = (aiAssistantLastResult.value.emptyGroups || [])
-                    .filter(name => name !== groupName);
-                aiAssistantLastResult.value.undoToken = '';
-                await loadGroups();
-                await refreshAssistantScopeCatalog({ silent: true });
-                showToast(result.message || '空密码组已删除', 'success');
-            } catch (error) {
-                showToast(error.message || '删除空密码组失败', 'error');
-            }
+        function deleteAssistantEmptyGroup(groupName) {
+            showConfirmDialog('删除空密码组', `确认删除已经为空的密码组「${groupName}」？`, async () => {
+                const epoch = assistantEpoch;
+                try {
+                    const result = await api.delete(`/groups/${encodeURIComponent(groupName)}/empty`);
+                    if (!isCurrentAssistantSession(epoch)) return;
+                    aiAssistantLastResult.value.emptyGroups = (aiAssistantLastResult.value.emptyGroups || [])
+                        .filter(name => name !== groupName);
+                    aiAssistantLastResult.value.undoToken = '';
+                    const refreshed = await Promise.allSettled([
+                        loadGroups(),
+                        refreshAssistantScopeCatalog({ silent: true })
+                    ]);
+                    if (!isCurrentAssistantSession(epoch)) return;
+                    const refreshOk = refreshed.every(item => (
+                        item.status === 'fulfilled' && item.value !== false
+                    ));
+                    showToast(
+                        mutationRefreshMessage(result.message || '空密码组已删除', refreshOk),
+                        refreshOk ? 'success' : 'warning'
+                    );
+                } catch (error) {
+                    if (!isCurrentAssistantSession(epoch)) return;
+                    throw new Error(error.message || '删除空密码组失败');
+                }
+            });
         }
-
         async function openAssistantNavigation(navigation = null) {
             const target = navigation || aiAssistantLastResult.value?.navigation;
             if (!target?.entry_id) return;
             try {
-                selectedEntry.value = await store.getEntry(target.entry_id);
+                const entry = await store.getEntry(target.entry_id);
+                if (!entry) {
+                    showToast('目标条目已不存在或无法读取', 'warning');
+                    return;
+                }
+                const opened = await openEntryDetail(entry);
+                if (opened === false) {
+                    showToast('无法打开条目详情，请重试', 'warning');
+                    return;
+                }
                 showAiAssistant.value = false;
             } catch (error) {
                 showToast(error.message || '无法打开目标条目', 'error');
             }
         }
-
-        function secureRandomText(length, alphabet) {
-            const result = [];
-            const values = new Uint32Array(32);
-            const limit = Math.floor(0x100000000 / alphabet.length) * alphabet.length;
-            while (result.length < length) {
-                window.crypto.getRandomValues(values);
-                for (const value of values) {
-                    if (value < limit) result.push(alphabet[value % alphabet.length]);
-                    if (result.length === length) break;
-                }
-            }
-            return result.join('');
-        }
-
-        function generateAssistantSecret() {
-            const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%^&*_-+=';
-            const requestedLength = Number(aiAssistantLastResult.value?.localAction?.length);
-            const length = Number.isInteger(requestedLength) && requestedLength >= 12 && requestedLength <= 64
-                ? requestedLength
-                : 20;
-            const secret = secureRandomText(length, alphabet);
-            aiAssistantLastResult.value = {
-                message: `已在本机生成 ${length} 位随机密码，内容不会发送给 AI。`,
-                generatedSecret: secret
-            };
-            window.setTimeout(() => {
-                if (aiAssistantLastResult.value?.generatedSecret === secret) {
-                    aiAssistantLastResult.value = { message: '本地生成的密码已从 AI 面板清除。' };
-                }
-            }, 60000);
-        }
-
-        async function copyAssistantSecret() {
-            const secret = aiAssistantLastResult.value?.generatedSecret;
-            if (!secret) return;
-            await copyToClipboard(secret);
-            showToast('本地生成的密码已复制', 'success');
-        }
-
         function useAssistantQuickReply(text) {
             aiAssistantInput.value = text;
             sendAssistantMessage();
         }
-
         async function openProfessionalAiTools() {
+            if (aiAssistantBusy.value || aiAssistantPrepared.value) {
+                showToast('当前 AI 请求或发送确认正在处理中，请稍候', 'warning');
+                return false;
+            }
+            const epoch = assistantEpoch;
             showAiParse.value = true;
             try {
                 const result = await api.get('/ai/status');
-                aiStatus.value = result.data;
+                if (isCurrentAssistantSession(epoch)) aiStatus.value = result.data;
             } catch (error) {
-                aiAssistantError.value = error.message || '无法加载 AI 状态';
+                if (isCurrentAssistantSession(epoch)) {
+                    aiAssistantError.value = error.message || '无法加载 AI 状态';
+                }
             }
         }
-
         async function openAssistantSettings() {
+            if (aiAssistantBusy.value || aiAssistantPrepared.value) {
+                showToast('当前 AI 请求或发送确认正在处理中，请稍候', 'warning');
+                return false;
+            }
+            const epoch = assistantEpoch;
             await openSettings();
-            selectSettingsTab('ai');
+            if (isCurrentAssistantSession(epoch)) selectSettingsTab('ai');
         }
-
         return {
             openAiAssistant,
             closeAiAssistant,
+            disposeAiAssistant,
             createAssistantConversation: createConversation,
             loadAssistantConversation: loadConversation,
             deleteAssistantConversation,
@@ -526,6 +530,7 @@
             sendAssistantMessage,
             submitPreparedTurn,
             cancelPreparedTurn,
+            cancelAssistantRequest,
             applyAssistantPlan,
             undoAssistantPlan,
             deleteAssistantEmptyGroup,
@@ -537,7 +542,6 @@
             openAssistantSettings
         };
     }
-
     window.SecretBaseAiAssistantController = {
         createAiAssistantController
     };

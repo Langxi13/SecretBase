@@ -2241,7 +2241,7 @@ GET /health
   "success": true,
   "data": {
     "status": "healthy",
-    "version": "5.3.1",
+    "version": "5.3.2",
     "uptime": 3600
   }
 }

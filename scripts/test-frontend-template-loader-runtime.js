@@ -1,8 +1,10 @@
 const vm = require('vm');
 const {
     templatePaths,
-    readProjectFile
+    readProjectFile,
+    readFrontendAssetVersion
 } = require('./frontend-source');
+const assetVersion = readFrontendAssetVersion();
 
 const templateSources = new Map(
     templatePaths.map(templatePath => [
@@ -11,6 +13,7 @@ const templateSources = new Map(
     ])
 );
 const requestedPaths = [];
+const requestedUrls = [];
 let mountedTarget = null;
 
 const root = {
@@ -24,6 +27,7 @@ const sandbox = {
     console,
     Promise,
     Error,
+    SECRETBASE_RUNTIME_CONFIG: { assetVersion },
     document: {
         getElementById(id) {
             return id === 'app' ? root : null;
@@ -37,6 +41,7 @@ const sandbox = {
         }
     },
     fetch: async requestPath => {
+        requestedUrls.push(String(requestPath));
         const path = String(requestPath).split('?')[0];
         requestedPaths.push(path);
         return {
@@ -65,6 +70,9 @@ vm.runInContext(readProjectFile('frontend/js/template-loader.js'), context, {
     const expectedPaths = templatePaths.map(templatePath => templatePath.replace(/^frontend\//, ''));
     if (requestedPaths.join('|') !== expectedPaths.join('|')) {
         throw new Error(`模板请求顺序错误：${requestedPaths.join(', ')}`);
+    }
+    if (requestedUrls.some(url => !url.endsWith(`?v=${assetVersion}`))) {
+        throw new Error(`模板请求必须使用资源修订号 ${assetVersion}`);
     }
     if (mountedTarget !== root) {
         throw new Error('模板合并后 Vue 没有挂载到 #app');

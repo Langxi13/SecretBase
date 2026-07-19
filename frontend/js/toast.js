@@ -2,8 +2,14 @@
  * Toast 提示
  */
 function showToast(message, type = 'info', duration = 3000) {
-    const container = document.getElementById('toast-container');
-    if (!container) return;
+    let container = document.getElementById('toast-container');
+    if (!container) {
+        container = document.createElement('div');
+        container.id = 'toast-container';
+        container.setAttribute('aria-live', 'polite');
+        container.setAttribute('aria-atomic', 'false');
+        document.body.appendChild(container);
+    }
 
     const icons = {
         success: '✓',
@@ -14,6 +20,7 @@ function showToast(message, type = 'info', duration = 3000) {
 
     const toast = document.createElement('div');
     toast.className = `toast ${type}`;
+    toast.setAttribute('role', type === 'error' ? 'alert' : 'status');
 
     const iconElement = document.createElement('span');
     iconElement.className = 'toast-icon';

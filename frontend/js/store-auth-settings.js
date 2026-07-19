@@ -15,9 +15,9 @@
                 } catch (error) {
                     console.error('检查认证状态失败:', error);
                     const isUninitialized = error.status === 404 || (error.data && error.data.initialized === false);
-                    const initializedValue = isUninitialized ? false : (this.state.initialized || true);
-                    this.setState({ initialized: initializedValue, locked: true });
-                    return { initialized: initializedValue, locked: true };
+                    if (!isUninitialized) throw error;
+                    this.setState({ initialized: false, locked: true });
+                    return { initialized: false, locked: true };
                 }
             },
 

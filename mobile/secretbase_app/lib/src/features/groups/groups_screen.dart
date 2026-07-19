@@ -215,7 +215,12 @@ class _GroupsScreenState extends ConsumerState<GroupsScreen> {
         names: _ordered.map((item) => item.name).toList(),
         expectedRevision: ref.read(vaultControllerProvider).revision,
       );
-      await ref.read(vaultControllerProvider.notifier).refreshStatus();
+      var refreshed = true;
+      try {
+        await ref.read(vaultControllerProvider.notifier).refreshStatus();
+      } catch (_) {
+        refreshed = false;
+      }
       ref.invalidate(taxonomyProvider('groups'));
       if (mounted) {
         setState(() {
@@ -223,7 +228,9 @@ class _GroupsScreenState extends ConsumerState<GroupsScreen> {
           _reordering = false;
           _ordered = [];
         });
-        _showMessage(result.message);
+        _showMessage(
+          refreshed ? result.message : '${result.message}，但列表刷新不完整，请稍后重试。',
+        );
       }
     } catch (error) {
       if (mounted) {
@@ -241,9 +248,18 @@ class _GroupsScreenState extends ConsumerState<GroupsScreen> {
         names: const [],
         expectedRevision: ref.read(vaultControllerProvider).revision,
       );
-      await ref.read(vaultControllerProvider.notifier).refreshStatus();
+      var refreshed = true;
+      try {
+        await ref.read(vaultControllerProvider.notifier).refreshStatus();
+      } catch (_) {
+        refreshed = false;
+      }
       ref.invalidate(taxonomyProvider('groups'));
-      if (mounted) _showMessage(result.message);
+      if (mounted) {
+        _showMessage(
+          refreshed ? result.message : '${result.message}，但列表刷新不完整，请稍后重试。',
+        );
+      }
     } catch (error) {
       if (mounted) _showMessage(mobileErrorMessage(error));
     } finally {

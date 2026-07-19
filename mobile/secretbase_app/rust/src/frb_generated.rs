@@ -38,7 +38,7 @@ flutter_rust_bridge::frb_generated_boilerplate!(
     default_rust_auto_opaque = RustAutoOpaqueMoi,
 );
 pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_VERSION: &str = "2.12.0";
-pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = 1309916109;
+pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = -543669019;
 
 // Section: executor
 
@@ -144,6 +144,38 @@ fn wire__crate__api__mobile__apply_import_impl(
             move |context| {
                 transform_result_sse::<_, crate::mobile::error::MobileError>((move || {
                     let output_ok = crate::api::mobile::apply_import(api_token)?;
+                    Ok(output_ok)
+                })())
+            }
+        },
+    )
+}
+fn wire__crate__api__mobile__cancel_ai_pending_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "cancel_ai_pending",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, crate::mobile::error::MobileError>((move || {
+                    let output_ok = crate::api::mobile::cancel_ai_pending()?;
                     Ok(output_ok)
                 })())
             }
@@ -3324,142 +3356,143 @@ fn pde_ffi_dispatcher_primary_impl(
         1 => wire__crate__api__mobile__ai_status_impl(port, ptr, rust_vec_len, data_len),
         2 => wire__crate__api__mobile__apply_ai_preview_impl(port, ptr, rust_vec_len, data_len),
         3 => wire__crate__api__mobile__apply_import_impl(port, ptr, rust_vec_len, data_len),
-        4 => wire__crate__api__mobile__change_password_impl(port, ptr, rust_vec_len, data_len),
-        5 => {
+        4 => wire__crate__api__mobile__cancel_ai_pending_impl(port, ptr, rust_vec_len, data_len),
+        5 => wire__crate__api__mobile__change_password_impl(port, ptr, rust_vec_len, data_len),
+        6 => {
             wire__crate__api__mobile__clear_ai_conversations_impl(port, ptr, rust_vec_len, data_len)
         }
-        6 => wire__crate__api__mobile__clear_ai_settings_impl(port, ptr, rust_vec_len, data_len),
-        7 => wire__crate__api__mobile__consume_ai_assistant_response_impl(
+        7 => wire__crate__api__mobile__clear_ai_settings_impl(port, ptr, rust_vec_len, data_len),
+        8 => wire__crate__api__mobile__consume_ai_assistant_response_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        8 => wire__crate__api__mobile__consume_ai_response_impl(port, ptr, rust_vec_len, data_len),
-        9 => {
+        9 => wire__crate__api__mobile__consume_ai_response_impl(port, ptr, rust_vec_len, data_len),
+        10 => {
             wire__crate__api__mobile__create_ai_conversation_impl(port, ptr, rust_vec_len, data_len)
         }
-        10 => wire__crate__api__mobile__create_vault_impl(port, ptr, rust_vec_len, data_len),
-        11 => {
+        11 => wire__crate__api__mobile__create_vault_impl(port, ptr, rust_vec_len, data_len),
+        12 => {
             wire__crate__api__mobile__delete_ai_conversation_impl(port, ptr, rust_vec_len, data_len)
         }
-        12 => wire__crate__api__mobile__delete_taxonomies_impl(port, ptr, rust_vec_len, data_len),
-        13 => wire__crate__api__mobile__delete_taxonomy_impl(port, ptr, rust_vec_len, data_len),
-        14 => {
+        13 => wire__crate__api__mobile__delete_taxonomies_impl(port, ptr, rust_vec_len, data_len),
+        14 => wire__crate__api__mobile__delete_taxonomy_impl(port, ptr, rust_vec_len, data_len),
+        15 => {
             wire__crate__api__mobile__export_encrypted_vault_impl(port, ptr, rust_vec_len, data_len)
         }
-        15 => wire__crate__api__mobile__get_ai_conversation_impl(port, ptr, rust_vec_len, data_len),
-        16 => wire__crate__api__mobile__get_entry_impl(port, ptr, rust_vec_len, data_len),
-        17 => wire__crate__api__mobile__init_app_impl(port, ptr, rust_vec_len, data_len),
-        18 => wire__crate__api__mobile__initialize_runtime_impl(port, ptr, rust_vec_len, data_len),
-        19 => {
+        16 => wire__crate__api__mobile__get_ai_conversation_impl(port, ptr, rust_vec_len, data_len),
+        17 => wire__crate__api__mobile__get_entry_impl(port, ptr, rust_vec_len, data_len),
+        18 => wire__crate__api__mobile__init_app_impl(port, ptr, rust_vec_len, data_len),
+        19 => wire__crate__api__mobile__initialize_runtime_impl(port, ptr, rust_vec_len, data_len),
+        20 => {
             wire__crate__api__mobile__list_ai_conversations_impl(port, ptr, rust_vec_len, data_len)
         }
-        20 => wire__crate__api__mobile__list_entries_impl(port, ptr, rust_vec_len, data_len),
-        21 => wire__crate__api__mobile__list_recovery_snapshots_impl(
+        21 => wire__crate__api__mobile__list_entries_impl(port, ptr, rust_vec_len, data_len),
+        22 => wire__crate__api__mobile__list_recovery_snapshots_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        22 => wire__crate__api__mobile__list_taxonomy_impl(port, ptr, rust_vec_len, data_len),
-        23 => wire__crate__api__mobile__lock_vault_impl(port, ptr, rust_vec_len, data_len),
-        24 => wire__crate__api__mobile__parse_ai_models_response_impl(
+        23 => wire__crate__api__mobile__list_taxonomy_impl(port, ptr, rust_vec_len, data_len),
+        24 => wire__crate__api__mobile__lock_vault_impl(port, ptr, rust_vec_len, data_len),
+        25 => wire__crate__api__mobile__parse_ai_models_response_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        25 => wire__crate__api__mobile__pending_ai_preview_impl(port, ptr, rust_vec_len, data_len),
-        26 => wire__crate__api__mobile__pending_ai_undo_impl(port, ptr, rust_vec_len, data_len),
-        27 => {
+        26 => wire__crate__api__mobile__pending_ai_preview_impl(port, ptr, rust_vec_len, data_len),
+        27 => wire__crate__api__mobile__pending_ai_undo_impl(port, ptr, rust_vec_len, data_len),
+        28 => {
             wire__crate__api__mobile__pending_import_preview_impl(port, ptr, rust_vec_len, data_len)
         }
-        28 => wire__crate__api__mobile__prepare_ai_assistant_request_impl(
+        29 => wire__crate__api__mobile__prepare_ai_assistant_request_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        29 => wire__crate__api__mobile__prepare_ai_models_request_impl(
+        30 => wire__crate__api__mobile__prepare_ai_models_request_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        30 => wire__crate__api__mobile__prepare_ai_request_impl(port, ptr, rust_vec_len, data_len),
-        31 => wire__crate__api__mobile__prepare_ai_verify_request_impl(
+        31 => wire__crate__api__mobile__prepare_ai_request_impl(port, ptr, rust_vec_len, data_len),
+        32 => wire__crate__api__mobile__prepare_ai_verify_request_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        32 => wire__crate__api__mobile__prepare_device_unlock_credential_impl(
+        33 => wire__crate__api__mobile__prepare_device_unlock_credential_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        33 => wire__crate__api__mobile__preview_import_impl(port, ptr, rust_vec_len, data_len),
-        34 => wire__crate__api__mobile__preview_recovery_impl(port, ptr, rust_vec_len, data_len),
-        35 => wire__crate__api__mobile__purge_entry_impl(port, ptr, rust_vec_len, data_len),
-        36 => wire__crate__api__mobile__restore_entry_impl(port, ptr, rust_vec_len, data_len),
-        37 => wire__crate__api__mobile__save_ai_settings_impl(port, ptr, rust_vec_len, data_len),
-        38 => wire__crate__api__mobile__save_entry_impl(port, ptr, rust_vec_len, data_len),
-        39 => wire__crate__api__mobile__save_group_order_impl(port, ptr, rust_vec_len, data_len),
-        40 => wire__crate__api__mobile__save_taxonomy_impl(port, ptr, rust_vec_len, data_len),
-        41 => wire__crate__api__mobile__sync_apply_remote_impl(port, ptr, rust_vec_len, data_len),
-        42 => wire__crate__api__mobile__sync_cancel_pending_impl(port, ptr, rust_vec_len, data_len),
-        43 => wire__crate__api__mobile__sync_commit_compact_impl(port, ptr, rust_vec_len, data_len),
-        44 => wire__crate__api__mobile__sync_commit_create_impl(port, ptr, rust_vec_len, data_len),
-        45 => wire__crate__api__mobile__sync_commit_join_impl(port, ptr, rust_vec_len, data_len),
-        46 => wire__crate__api__mobile__sync_commit_remote_delete_impl(
+        34 => wire__crate__api__mobile__preview_import_impl(port, ptr, rust_vec_len, data_len),
+        35 => wire__crate__api__mobile__preview_recovery_impl(port, ptr, rust_vec_len, data_len),
+        36 => wire__crate__api__mobile__purge_entry_impl(port, ptr, rust_vec_len, data_len),
+        37 => wire__crate__api__mobile__restore_entry_impl(port, ptr, rust_vec_len, data_len),
+        38 => wire__crate__api__mobile__save_ai_settings_impl(port, ptr, rust_vec_len, data_len),
+        39 => wire__crate__api__mobile__save_entry_impl(port, ptr, rust_vec_len, data_len),
+        40 => wire__crate__api__mobile__save_group_order_impl(port, ptr, rust_vec_len, data_len),
+        41 => wire__crate__api__mobile__save_taxonomy_impl(port, ptr, rust_vec_len, data_len),
+        42 => wire__crate__api__mobile__sync_apply_remote_impl(port, ptr, rust_vec_len, data_len),
+        43 => wire__crate__api__mobile__sync_cancel_pending_impl(port, ptr, rust_vec_len, data_len),
+        44 => wire__crate__api__mobile__sync_commit_compact_impl(port, ptr, rust_vec_len, data_len),
+        45 => wire__crate__api__mobile__sync_commit_create_impl(port, ptr, rust_vec_len, data_len),
+        46 => wire__crate__api__mobile__sync_commit_join_impl(port, ptr, rust_vec_len, data_len),
+        47 => wire__crate__api__mobile__sync_commit_remote_delete_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        47 => wire__crate__api__mobile__sync_commit_rotate_impl(port, ptr, rust_vec_len, data_len),
-        48 => wire__crate__api__mobile__sync_commit_upload_impl(port, ptr, rust_vec_len, data_len),
-        49 => wire__crate__api__mobile__sync_connection_impl(port, ptr, rust_vec_len, data_len),
-        50 => wire__crate__api__mobile__sync_current_document_json_impl(
+        48 => wire__crate__api__mobile__sync_commit_rotate_impl(port, ptr, rust_vec_len, data_len),
+        49 => wire__crate__api__mobile__sync_commit_upload_impl(port, ptr, rust_vec_len, data_len),
+        50 => wire__crate__api__mobile__sync_connection_impl(port, ptr, rust_vec_len, data_len),
+        51 => wire__crate__api__mobile__sync_current_document_json_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        51 => {
+        52 => {
             wire__crate__api__mobile__sync_decode_snapshot_impl(port, ptr, rust_vec_len, data_len)
         }
-        52 => wire__crate__api__mobile__sync_disconnect_impl(port, ptr, rust_vec_len, data_len),
-        53 => wire__crate__api__mobile__sync_local_state_impl(port, ptr, rust_vec_len, data_len),
-        54 => {
+        53 => wire__crate__api__mobile__sync_disconnect_impl(port, ptr, rust_vec_len, data_len),
+        54 => wire__crate__api__mobile__sync_local_state_impl(port, ptr, rust_vec_len, data_len),
+        55 => {
             wire__crate__api__mobile__sync_prepare_compact_impl(port, ptr, rust_vec_len, data_len)
         }
-        55 => wire__crate__api__mobile__sync_prepare_create_impl(port, ptr, rust_vec_len, data_len),
-        56 => wire__crate__api__mobile__sync_prepare_join_impl(port, ptr, rust_vec_len, data_len),
-        57 => wire__crate__api__mobile__sync_prepare_remote_delete_impl(
+        56 => wire__crate__api__mobile__sync_prepare_create_impl(port, ptr, rust_vec_len, data_len),
+        57 => wire__crate__api__mobile__sync_prepare_join_impl(port, ptr, rust_vec_len, data_len),
+        58 => wire__crate__api__mobile__sync_prepare_remote_delete_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        58 => wire__crate__api__mobile__sync_prepare_rotate_impl(port, ptr, rust_vec_len, data_len),
-        59 => wire__crate__api__mobile__sync_prepare_upload_impl(port, ptr, rust_vec_len, data_len),
-        60 => wire__crate__api__mobile__sync_recovery_code_impl(port, ptr, rust_vec_len, data_len),
-        61 => wire__crate__api__mobile__sync_status_impl(port, ptr, rust_vec_len, data_len),
-        62 => wire__crate__api__mobile__sync_update_config_impl(port, ptr, rust_vec_len, data_len),
-        63 => wire__crate__api__mobile__trash_entry_impl(port, ptr, rust_vec_len, data_len),
-        64 => wire__crate__api__mobile__undo_ai_preview_impl(port, ptr, rust_vec_len, data_len),
-        65 => wire__crate__api__mobile__unlock_vault_impl(port, ptr, rust_vec_len, data_len),
-        66 => wire__crate__api__mobile__unlock_vault_with_device_credential_impl(
+        59 => wire__crate__api__mobile__sync_prepare_rotate_impl(port, ptr, rust_vec_len, data_len),
+        60 => wire__crate__api__mobile__sync_prepare_upload_impl(port, ptr, rust_vec_len, data_len),
+        61 => wire__crate__api__mobile__sync_recovery_code_impl(port, ptr, rust_vec_len, data_len),
+        62 => wire__crate__api__mobile__sync_status_impl(port, ptr, rust_vec_len, data_len),
+        63 => wire__crate__api__mobile__sync_update_config_impl(port, ptr, rust_vec_len, data_len),
+        64 => wire__crate__api__mobile__trash_entry_impl(port, ptr, rust_vec_len, data_len),
+        65 => wire__crate__api__mobile__undo_ai_preview_impl(port, ptr, rust_vec_len, data_len),
+        66 => wire__crate__api__mobile__unlock_vault_impl(port, ptr, rust_vec_len, data_len),
+        67 => wire__crate__api__mobile__unlock_vault_with_device_credential_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        67 => wire__crate__api__mobile__vault_status_impl(port, ptr, rust_vec_len, data_len),
-        68 => wire__crate__api__mobile__verify_ai_response_impl(port, ptr, rust_vec_len, data_len),
+        68 => wire__crate__api__mobile__vault_status_impl(port, ptr, rust_vec_len, data_len),
+        69 => wire__crate__api__mobile__verify_ai_response_impl(port, ptr, rust_vec_len, data_len),
         _ => unreachable!(),
     }
 }

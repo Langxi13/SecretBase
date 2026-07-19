@@ -5,6 +5,7 @@
     function createAiSettingsController({
         api,
         showToast,
+        showConfirmDialog = (_title, _message, callback) => callback?.(),
         aiSettingsForm,
         aiProviders,
         aiManualModel,
@@ -21,6 +22,10 @@
         aiDiagnosticsError
     }) {
         let diagnosticsPollTimer = null;
+        let settingsRequestEpoch = 0;
+        let diagnosticsPreviewEpoch = 0;
+        let modelsRequestSequence = 0;
+        const isCurrentSettingsRequest = epoch => epoch === settingsRequestEpoch;
 
         function stopDiagnosticsPolling() {
             if (diagnosticsPollTimer) {
@@ -29,33 +34,40 @@
             }
         }
 
-        function resetAiDiagnosticsState() {
+        function resetAiDiagnosticsState({ invalidateRequests = true } = {}) {
+            if (invalidateRequests) settingsRequestEpoch += 1;
+            diagnosticsPreviewEpoch += 1;
+            modelsRequestSequence += 1;
             stopDiagnosticsPolling();
             aiDiagnosticsPreview.value = null;
             aiDiagnosticsReport.value = null;
             aiDiagnosticsBusy.value = false;
             aiDiagnosticsError.value = '';
+            // 获取模型属于只读请求，关闭设置页时也必须释放它的界面锁。
+            aiModelsLoading.value = false;
         }
 
-        function scheduleDiagnosticsPolling() {
+        function scheduleDiagnosticsPolling(epoch = settingsRequestEpoch) {
             stopDiagnosticsPolling();
             diagnosticsPollTimer = setTimeout(() => {
-                refreshAiDiagnosticsStatus(true);
+                if (isCurrentSettingsRequest(epoch)) refreshAiDiagnosticsStatus(true, epoch);
             }, 1500);
         }
 
-        async function refreshAiDiagnosticsStatus(keepPolling = false) {
+        async function refreshAiDiagnosticsStatus(keepPolling = false, epoch = settingsRequestEpoch) {
             try {
                 const result = await api.get('/ai/assistant/diagnostics/status');
+                if (!isCurrentSettingsRequest(epoch)) return;
                 const report = result.data || null;
                 aiDiagnosticsReport.value = report;
                 aiDiagnosticsBusy.value = report?.status === 'running';
                 if (keepPolling && aiDiagnosticsBusy.value) {
-                    scheduleDiagnosticsPolling();
+                    scheduleDiagnosticsPolling(epoch);
                 } else {
                     stopDiagnosticsPolling();
                 }
             } catch (error) {
+                if (!isCurrentSettingsRequest(epoch)) return;
                 stopDiagnosticsPolling();
                 aiDiagnosticsBusy.value = false;
                 aiDiagnosticsError.value = error.message || '无法读取 AI 诊断状态';
@@ -63,17 +75,22 @@
         }
 
         async function previewAiDiagnostics() {
+            const epoch = settingsRequestEpoch;
+            const previewEpoch = ++diagnosticsPreviewEpoch;
             aiDiagnosticsError.value = '';
             try {
                 const result = await api.get('/ai/assistant/diagnostics/preview');
+                if (!isCurrentSettingsRequest(epoch) || previewEpoch !== diagnosticsPreviewEpoch) return;
                 aiDiagnosticsPreview.value = result.data || null;
             } catch (error) {
+                if (!isCurrentSettingsRequest(epoch) || previewEpoch !== diagnosticsPreviewEpoch) return;
                 aiDiagnosticsPreview.value = null;
                 aiDiagnosticsError.value = error.message || '无法准备 AI 兼容性诊断';
             }
         }
 
         function cancelAiDiagnosticsPreview() {
+            diagnosticsPreviewEpoch += 1;
             aiDiagnosticsPreview.value = null;
         }
 
@@ -81,25 +98,31 @@
             if (!aiDiagnosticsPreview.value || aiDiagnosticsBusy.value) return;
             aiDiagnosticsError.value = '';
             aiDiagnosticsBusy.value = true;
+            const epoch = settingsRequestEpoch;
             try {
                 const result = await api.post('/ai/assistant/diagnostics/run', {
                     acknowledge_cost: true
                 }, { timeoutMs: 20000 });
+                if (!isCurrentSettingsRequest(epoch)) return;
                 aiDiagnosticsPreview.value = null;
                 aiDiagnosticsReport.value = result.data || null;
-                scheduleDiagnosticsPolling();
+                scheduleDiagnosticsPolling(epoch);
                 showToast('AI 兼容性诊断已开始', 'success');
             } catch (error) {
+                if (!isCurrentSettingsRequest(epoch)) return;
                 aiDiagnosticsBusy.value = false;
                 aiDiagnosticsError.value = error.message || 'AI 兼容性诊断启动失败';
             }
         }
 
         async function loadAiProviders() {
+            const epoch = settingsRequestEpoch;
             try {
                 const result = await api.get('/ai/providers');
+                if (!isCurrentSettingsRequest(epoch)) return;
                 aiProviders.value = result.data?.providers || [];
             } catch (error) {
+                if (!isCurrentSettingsRequest(epoch)) return;
                 aiProviders.value = [{
                     id: 'custom',
                     name: '自定义 OpenAI 兼容接口',
@@ -109,12 +132,15 @@
         }
 
         async function loadAiSettingsStatus() {
+            const epoch = settingsRequestEpoch;
             aiSettingsError.value = '';
             try {
                 if (aiProviders.value.length === 0) {
                     await loadAiProviders();
+                    if (!isCurrentSettingsRequest(epoch)) return;
                 }
                 const result = await api.get('/ai/status');
+                if (!isCurrentSettingsRequest(epoch)) return;
                 const status = result.data || {};
                 status.base_url = status.base_url || status.baseUrl || '';
                 aiSettingsStatus.value = status;
@@ -126,9 +152,10 @@
                 aiManualModel.value = false;
                 aiSettingsEditing.value = !status.configured;
                 if (status.configured) {
-                    refreshAiDiagnosticsStatus(true);
+                    refreshAiDiagnosticsStatus(true, epoch);
                 }
             } catch (error) {
+                if (!isCurrentSettingsRequest(epoch)) return;
                 aiSettingsStatus.value = null;
                 aiSettingsEditing.value = true;
                 aiSettingsError.value = error.message || '无法加载 AI 配置状态';
@@ -181,12 +208,15 @@
             }
 
             aiModelsLoading.value = true;
+            const epoch = settingsRequestEpoch;
+            const request = ++modelsRequestSequence;
             try {
                 const result = await api.post('/ai/models', {
                     providerId: aiSettingsForm.providerId,
                     baseUrl,
                     apiKey
                 });
+                if (!isCurrentSettingsRequest(epoch) || request !== modelsRequestSequence) return;
                 aiModels.value = result.data?.models || [];
                 if (!aiModels.value.includes(aiSettingsForm.model)) {
                     aiSettingsForm.model = aiModels.value[0] || '';
@@ -196,11 +226,14 @@
                     : '服务商未返回可用模型';
                 aiManualModel.value = aiModels.value.length === 0;
             } catch (error) {
+                if (!isCurrentSettingsRequest(epoch) || request !== modelsRequestSequence) return;
                 aiModels.value = [];
                 aiManualModel.value = true;
                 aiSettingsError.value = `${error.message || '获取模型列表失败'}，可以手动填写模型 ID。`;
             } finally {
-                aiModelsLoading.value = false;
+                if (isCurrentSettingsRequest(epoch) && request === modelsRequestSequence) {
+                    aiModelsLoading.value = false;
+                }
             }
         }
 
@@ -220,6 +253,7 @@
             }
 
             aiSettingsSaving.value = true;
+            const epoch = settingsRequestEpoch;
             try {
                 const result = await api.put('/ai/settings', {
                     providerId: aiSettingsForm.providerId,
@@ -227,40 +261,54 @@
                     apiKey,
                     model
                 });
+                if (!isCurrentSettingsRequest(epoch)) return;
                 aiSettingsStatus.value = result.data;
                 aiSettingsForm.providerId = result.data?.provider_id || aiSettingsForm.providerId;
                 aiSettingsForm.apiKey = '';
                 aiModels.value = result.data?.model ? [result.data.model] : [];
                 aiSettingsEditing.value = false;
-                resetAiDiagnosticsState();
+                resetAiDiagnosticsState({ invalidateRequests: false });
                 aiSettingsMessage.value = 'AI 连通测试通过，设置已保存';
                 showToast('AI 设置已保存', 'success');
             } catch (error) {
-                aiSettingsError.value = error.message || 'AI 连通测试失败，设置未保存';
+                if (isCurrentSettingsRequest(epoch)) {
+                    aiSettingsError.value = error.message || 'AI 连通测试失败，设置未保存';
+                }
             } finally {
-                aiSettingsSaving.value = false;
+                if (isCurrentSettingsRequest(epoch)) aiSettingsSaving.value = false;
             }
         }
 
-        async function clearAiConfiguration() {
-            aiSettingsError.value = '';
-            aiSettingsMessage.value = '';
-            try {
-                const result = await api.delete('/ai/settings');
-                aiSettingsStatus.value = result.data;
-                aiSettingsForm.baseUrl = '';
-                aiSettingsForm.providerId = 'deepseek';
-                aiSettingsForm.apiKey = '';
-                aiSettingsForm.model = '';
-                aiModels.value = [];
-                aiManualModel.value = false;
-                aiSettingsEditing.value = true;
-                resetAiDiagnosticsState();
-                aiSettingsMessage.value = 'AI 设置已清除';
-                showToast('AI 设置已清除', 'success');
-            } catch (error) {
-                aiSettingsError.value = error.message || '清除 AI 设置失败';
-            }
+        function clearAiConfiguration() {
+            showConfirmDialog('清除 AI 配置', '将删除本机加密保存的 API Key、模型和服务地址。确认继续？', async () => {
+                aiSettingsError.value = '';
+                aiSettingsMessage.value = '';
+                aiSettingsSaving.value = true;
+                const epoch = settingsRequestEpoch;
+                try {
+                    const result = await api.delete('/ai/settings');
+                    if (!isCurrentSettingsRequest(epoch)) return;
+                    aiSettingsStatus.value = result.data;
+                    aiSettingsForm.baseUrl = '';
+                    aiSettingsForm.providerId = 'deepseek';
+                    aiSettingsForm.apiKey = '';
+                    aiSettingsForm.model = '';
+                    aiModels.value = [];
+                    aiManualModel.value = false;
+                    aiSettingsEditing.value = true;
+                    resetAiDiagnosticsState({ invalidateRequests: false });
+                    aiSettingsMessage.value = 'AI 设置已清除';
+                    showToast('AI 设置已清除', 'success');
+                } catch (error) {
+                    if (isCurrentSettingsRequest(epoch)) {
+                        aiSettingsError.value = error.message || '清除 AI 设置失败';
+                    }
+                    return false;
+                } finally {
+                    if (isCurrentSettingsRequest(epoch)) aiSettingsSaving.value = false;
+                }
+                return true;
+            });
         }
 
         function resetConfigurationForm(editing) {
@@ -289,7 +337,8 @@
             previewAiDiagnostics,
             cancelAiDiagnosticsPreview,
             runAiDiagnostics,
-            refreshAiDiagnosticsStatus
+            refreshAiDiagnosticsStatus,
+            disposeAiSettings: resetAiDiagnosticsState
         };
     }
 

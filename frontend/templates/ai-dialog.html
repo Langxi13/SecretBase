@@ -3,13 +3,13 @@
             <div class="modal-content ai-assistant-modal" role="dialog" aria-modal="true" aria-label="AI 专业工具">
                 <div class="modal-header">
                     <h2>AI 专业工具</h2>
-                    <button class="modal-close" @click="showAiParse = false" :title="showAiAssistant ? '返回 AI 管家' : '关闭'">✕</button>
+                    <button class="modal-close" @click="closeAiParse" :disabled="aiParsing || aiOrganizing" :title="showAiAssistant ? '返回 AI 管家' : '关闭'">✕</button>
                 </div>
                 <div class="modal-body">
                     <div class="ai-mode-tabs" role="tablist" aria-label="AI 功能">
-                        <button class="ai-mode-tab" :class="{ active: aiMode === 'parse' }" @click="setAiMode('parse')">智能录入</button>
-                        <button class="ai-mode-tab" :class="{ active: aiMode === 'organize' }" @click="setAiMode('organize')">整理条目</button>
-                        <button class="ai-mode-tab" :class="{ active: aiMode === 'actions' }" @click="setAiMode('actions')">AI 交互</button>
+                        <button class="ai-mode-tab" :class="{ active: aiMode === 'parse' }" @click="setAiMode('parse')" :disabled="aiParsing || aiOrganizing">智能录入</button>
+                        <button class="ai-mode-tab" :class="{ active: aiMode === 'organize' }" @click="setAiMode('organize')" :disabled="aiParsing || aiOrganizing">整理条目</button>
+                        <button class="ai-mode-tab" :class="{ active: aiMode === 'actions' }" @click="setAiMode('actions')" :disabled="aiParsing || aiOrganizing">AI 交互</button>
                     </div>
                     <div v-if="aiStatusError" class="warning-panel">
                         {{ aiStatusError }}
@@ -75,7 +75,7 @@
                         <div v-if="aiFailureMessage" class="warning-panel ai-failure-panel">
                             <strong>AI 解析未完成</strong>
                             <p>{{ aiFailureMessage }}</p>
-                            <button class="btn-small" @click="manualEntryFromAi()">保留原文并转为手动录入</button>
+                            <button class="btn-small" @click="manualEntryFromAi()" :disabled="aiParsing || aiOrganizing">保留原文并转为手动录入</button>
                         </div>
                     </div>
                     <div v-if="aiMode === 'organize'" class="ai-organize-panel">
@@ -87,6 +87,7 @@
                                 class="ai-mode-tab"
                                 :class="{ active: aiOrganizeMode === 'tags' }"
                                 @click="setAiOrganizeMode('tags')"
+                                :disabled="aiParsing || aiOrganizing"
                             >
                                 条目标签整理
                             </button>
@@ -94,6 +95,7 @@
                                 class="ai-mode-tab"
                                 :class="{ active: aiOrganizeMode === 'groups' }"
                                 @click="setAiOrganizeMode('groups')"
+                                :disabled="aiParsing || aiOrganizing"
                             >
                                 密码组整理
                             </button>
@@ -101,6 +103,7 @@
                                 class="ai-mode-tab"
                                 :class="{ active: aiOrganizeMode === 'tag-governance' }"
                                 @click="setAiOrganizeMode('tag-governance')"
+                                :disabled="aiParsing || aiOrganizing"
                             >
                                 标签系统管理
                             </button>
@@ -150,7 +153,7 @@
                                 <summary>
                                     <label class="checkbox-label ai-entry-select ai-organize-select" @click.stop>
                                         <input type="checkbox" v-model="suggestion.selected">
-                                        <span class="ai-organize-title">{{ isAiTagGovernanceMode ? aiTagActionTitle(suggestion) : (suggestion.entry_title || suggestion.entry_id) }}</span>
+                                        <span class="ai-organize-title">{{ isAiTagGovernanceMode ? aiTagActionTitle(suggestion) : (suggestion.entry_title || '相关条目') }}</span>
                                     </label>
                                 </summary>
                                 <p v-if="suggestion.reason" class="muted-text">{{ suggestion.reason }}</p>
@@ -266,11 +269,12 @@
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <button class="btn-secondary" @click="showAiParse = false">取消</button>
-                    <button v-if="aiMode === 'parse'" class="btn-secondary" @click="clearAiParse" :disabled="!aiText && !aiResult && !aiFailureMessage">
+                    <button v-if="aiRequestCancelable" class="btn-secondary danger-quiet" @click="cancelAiRequest">取消请求</button>
+                    <button class="btn-secondary" @click="closeAiParse" :disabled="aiParsing || aiOrganizing">取消</button>
+                    <button v-if="aiMode === 'parse'" class="btn-secondary" @click="clearAiParse" :disabled="aiParsing || aiOrganizing || (!aiText && !aiResult && !aiFailureMessage)">
                         清空解析
                     </button>
-                    <button v-if="aiMode === 'parse'" class="btn-secondary" @click="manualEntryFromAi()">
+                    <button v-if="aiMode === 'parse'" class="btn-secondary" @click="manualEntryFromAi()" :disabled="aiParsing || aiOrganizing">
                         转为手动录入
                     </button>
                     <button v-if="aiMode === 'parse'" class="btn-primary" @click="parseAiText" :disabled="!canParseAi">

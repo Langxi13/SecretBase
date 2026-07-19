@@ -12,6 +12,10 @@
         defaultSearchScopes
     }) {
         const loading = ref(true);
+        const startupError = ref('');
+        const startupRetrying = ref(false);
+        const dataLoadError = ref('');
+        const dataLoading = ref(false);
         const initialized = ref(false);
         const locked = ref(true);
         const password = ref('');
@@ -85,12 +89,29 @@
         const showTagBrowser = ref(false);
         const showGroupEntryPicker = ref(false);
         const entrySaving = ref(false);
+        const entryActionIds = ref([]);
         const groupSaving = ref(false);
+        const groupOrdering = ref(false);
         const tagSaving = ref(false);
         const tagMerging = ref(false);
         const groupPickerSaving = ref(false);
+        const settingsSaving = ref(false);
+        const settingsError = ref('');
         const showConfirm = ref(false);
         const confirmSubmitting = ref(false);
+        const confirmError = ref('');
+        const showPrompt = ref(false);
+        const promptSubmitting = ref(false);
+        const promptTitle = ref('');
+        const promptMessage = ref('');
+        const promptValue = ref('');
+        const promptPlaceholder = ref('');
+        const promptType = ref('text');
+        const promptConfirmLabel = ref('确定');
+        const promptMaxLength = ref(200);
+        const promptRequired = ref(true);
+        const promptError = ref('');
+        const promptObscured = ref(true);
         const showTools = ref(false);
         const showBackupCenter = ref(false);
         const showAdvancedFilters = ref(false);
@@ -101,10 +122,18 @@
         const desktopCloseError = ref('');
         const desktopCloseSettingsSaving = ref(false);
         const selectedEntry = ref(null);
+        const showEntryDetail = ref(false);
+        const entryDetailTargetId = ref('');
+        const entryDetailLoading = ref(false);
+        const entryDetailError = ref('');
         const editingEntry = ref(null);
+        const entryEditLoading = ref(false);
+        const entryEditTargetId = ref('');
+        const entryEditError = ref('');
         const copyMenuEntryId = ref(null);
         const selectedEntryIds = ref([]);
         const batchTagName = ref('');
+        const batchBusy = ref(false);
         const groupPickerEntries = ref([]);
         const groupPickerSelectedIds = ref([]);
         const groupPickerTagFilter = ref('');
@@ -113,7 +142,10 @@
         const groupPickerPageSize = ref(loadPageSizePreference('secretbase.groupPickerPageSize', 10));
         const groupPickerPageSizeOptions = [5, 10, 20, 50, 100];
         const groupPickerLoading = ref(false);
+        const groupPickerError = ref('');
         const importConflictMessage = ref('');
+        const transferBusy = ref(false);
+        const transferError = ref('');
         const showOnboarding = ref(false);
         const importingSamples = ref(false);
         const showImportConflicts = ref(false);
@@ -129,6 +161,7 @@
         const lastImportConflictResolutions = ref({});
         const revealedFields = ref([]);
         const backups = ref([]);
+        const backupError = ref('');
         const highlightedBackupFilename = ref('');
         const backupListLoading = ref(false);
         const creatingBackup = ref(false);
@@ -253,17 +286,25 @@
         });
 
         const trashItems = ref([]);
+        const trashLoading = ref(false);
+        const trashError = ref('');
         const trashPage = ref(1);
         const trashTotalPages = ref(0);
         const trashTotal = ref(0);
         const trashPageSize = ref(loadPageSizePreference('secretbase.trashPageSize', 10));
         const trashPageSizeOptions = [5, 10, 20, 50, 100];
+        const trashActionIds = ref([]);
+        const trashEmptying = ref(false);
 
         const confirmTitle = ref('');
         const confirmMessage = ref('');
 
         return {
             loading,
+            startupError,
+            startupRetrying,
+            dataLoadError,
+            dataLoading,
             initialized,
             locked,
             password,
@@ -319,12 +360,29 @@
             showTagBrowser,
             showGroupEntryPicker,
             entrySaving,
+            entryActionIds,
             groupSaving,
+            groupOrdering,
             tagSaving,
             tagMerging,
             groupPickerSaving,
+            settingsSaving,
+            settingsError,
             showConfirm,
             confirmSubmitting,
+            confirmError,
+            showPrompt,
+            promptSubmitting,
+            promptTitle,
+            promptMessage,
+            promptValue,
+            promptPlaceholder,
+            promptType,
+            promptConfirmLabel,
+            promptMaxLength,
+            promptRequired,
+            promptError,
+            promptObscured,
             showTools,
             showBackupCenter,
             showAdvancedFilters,
@@ -335,10 +393,18 @@
             desktopCloseError,
             desktopCloseSettingsSaving,
             selectedEntry,
+            showEntryDetail,
+            entryDetailTargetId,
+            entryDetailLoading,
+            entryDetailError,
             editingEntry,
+            entryEditLoading,
+            entryEditTargetId,
+            entryEditError,
             copyMenuEntryId,
             selectedEntryIds,
             batchTagName,
+            batchBusy,
             groupPickerEntries,
             groupPickerSelectedIds,
             groupPickerTagFilter,
@@ -347,7 +413,10 @@
             groupPickerPageSize,
             groupPickerPageSizeOptions,
             groupPickerLoading,
+            groupPickerError,
             importConflictMessage,
+            transferBusy,
+            transferError,
             showOnboarding,
             importingSamples,
             showImportConflicts,
@@ -363,6 +432,7 @@
             lastImportConflictResolutions,
             revealedFields,
             backups,
+            backupError,
             highlightedBackupFilename,
             backupListLoading,
             creatingBackup,
@@ -408,11 +478,15 @@
             groupForm,
             passwordForm,
             trashItems,
+            trashLoading,
+            trashError,
             trashPage,
             trashTotalPages,
             trashTotal,
             trashPageSize,
             trashPageSizeOptions,
+            trashActionIds,
+            trashEmptying,
             confirmTitle,
             confirmMessage
         };

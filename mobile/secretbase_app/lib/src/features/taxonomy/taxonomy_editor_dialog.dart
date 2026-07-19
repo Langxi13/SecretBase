@@ -92,10 +92,19 @@ class _TaxonomyEditorDialogState extends State<TaxonomyEditorDialog> {
         color: _isTag ? _color : null,
         expectedRevision: widget.ref.read(vaultControllerProvider).revision,
       );
-      await widget.ref.read(vaultControllerProvider.notifier).refreshStatus();
+      var refreshed = true;
+      try {
+        await widget.ref.read(vaultControllerProvider.notifier).refreshStatus();
+      } catch (_) {
+        refreshed = false;
+      }
       widget.ref.invalidate(taxonomyProvider);
       widget.ref.invalidate(entryPageProvider);
-      if (mounted) Navigator.of(context).pop(result.message);
+      if (mounted) {
+        Navigator.of(
+          context,
+        ).pop(refreshed ? result.message : '${result.message}，但界面刷新不完整，请稍后重试。');
+      }
     } catch (error) {
       if (mounted) {
         setState(() {
@@ -142,7 +151,7 @@ class _TaxonomyEditorDialogState extends State<TaxonomyEditorDialog> {
                       controller: _descriptionController,
                       minLines: 3,
                       maxLines: 5,
-                      maxLength: 500,
+                      maxLength: 300,
                       decoration: const InputDecoration(
                         labelText: '简介',
                         alignLabelWithHint: true,
@@ -284,8 +293,13 @@ Future<String?> deleteTaxonomy({
     name: name,
     expectedRevision: ref.read(vaultControllerProvider).revision,
   );
-  await ref.read(vaultControllerProvider.notifier).refreshStatus();
+  var refreshed = true;
+  try {
+    await ref.read(vaultControllerProvider.notifier).refreshStatus();
+  } catch (_) {
+    refreshed = false;
+  }
   ref.invalidate(taxonomyProvider);
   ref.invalidate(entryPageProvider);
-  return result.message;
+  return refreshed ? result.message : '${result.message}，但界面刷新不完整，请稍后重试。';
 }

@@ -6,6 +6,9 @@ const appJs = fs.readFileSync(path.join(root, 'frontend/js/app.js'), 'utf8');
 const stateJs = fs.readFileSync(path.join(root, 'frontend/js/app-state.js'), 'utf8');
 const dataControllerJs = fs.readFileSync(path.join(root, 'frontend/js/app-data-controller.js'), 'utf8');
 const sessionControllerJs = fs.readFileSync(path.join(root, 'frontend/js/app-session-controller.js'), 'utf8');
+const sessionLifecycleJs = fs.readFileSync(path.join(root, 'frontend/js/app-session-lifecycle.js'), 'utf8');
+const sessionSettingsJs = fs.readFileSync(path.join(root, 'frontend/js/app-session-settings.js'), 'utf8');
+const sessionSource = `${sessionControllerJs}\n${sessionLifecycleJs}\n${sessionSettingsJs}`;
 const contextJs = fs.readFileSync(path.join(root, 'frontend/js/app-template-context.js'), 'utf8');
 const { readFrontendMarkup } = require('./frontend-source');
 const indexHtml = readFrontendMarkup();
@@ -41,13 +44,13 @@ assertMatches(
     '启动或解锁恢复条目分页偏好时必须等待设置同步完成，避免首次加载仍用旧分页'
 );
 assertMatches(
-    sessionControllerJs,
+    sessionSource,
     /await data\.applySettings\(settings, theme\)/,
     '初始化流程必须等待分页偏好应用后再加载条目'
 );
 assertMatches(
-    sessionControllerJs,
-    /await data\.applySettings\(await store\.loadSettings\(\), theme\)/,
+    sessionSource,
+    /const settings = await store\.loadSettings\(\)[\s\S]*?await data\.applySettings\(settings, theme\)/,
     '初始化和解锁流程必须等待分页偏好应用后再加载条目'
 );
 assertIncludes(indexHtml, 'updateEntryPageSize(settingsForm.pageSize)', '全部条目分页控件必须继续支持自定义每页数量');
@@ -63,7 +66,7 @@ assertMatches(
     '修改主密码表单必须限制为 8 至 128 个字符'
 );
 assertIncludes(sessionControllerJs, 'state.password.value.length > 128', '初始化逻辑必须提前拦截超长主密码');
-assertIncludes(sessionControllerJs, 'state.passwordForm.newPassword.length > 128', '改密逻辑必须提前拦截超长主密码');
+assertIncludes(sessionSettingsJs, 'state.passwordForm.newPassword.length > 128', '改密逻辑必须提前拦截超长主密码');
 if (/<div class="setting-item">\s*<label>每页条目数<\/label>/.test(indexHtml)) {
     throw new Error('系统设置通用页不应再保留“每页条目数”，分页数量应在各分页区自定义');
 }

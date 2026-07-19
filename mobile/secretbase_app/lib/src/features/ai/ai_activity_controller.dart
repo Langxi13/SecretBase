@@ -4,16 +4,27 @@ final aiActivityControllerProvider =
     NotifierProvider<AiActivityController, bool>(AiActivityController.new);
 
 class AiActivityController extends Notifier<bool> {
+  int _nextToken = 0;
+  int? _activeToken;
+
   @override
   bool build() => false;
 
-  bool start() {
-    if (state) return false;
+  int? acquire() {
+    if (state) return null;
+    final token = ++_nextToken;
+    _activeToken = token;
     state = true;
-    return true;
+    return token;
   }
 
-  void finish() {
+  bool start() {
+    return acquire() != null;
+  }
+
+  void finish([int? token]) {
+    if (token != null && token != _activeToken) return;
+    _activeToken = null;
     state = false;
   }
 }

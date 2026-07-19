@@ -120,6 +120,25 @@ Future<bool> showAiApplyConfirmationSheet({
       false;
 }
 
+Future<bool> showAiDiscardConfirmationSheet({
+  required BuildContext context,
+}) async {
+  return await showModalBottomSheet<bool>(
+        context: context,
+        useSafeArea: true,
+        showDragHandle: true,
+        constraints: const BoxConstraints(maxWidth: 520),
+        builder: (sheetContext) => _ConfirmationSheet(
+          icon: Icons.delete_outline,
+          title: '放弃当前 AI 建议',
+          accent: Theme.of(sheetContext).colorScheme.error,
+          content: const Text('将清除当前建议和本机待处理请求，不会修改密码库。之后可以重新发起分析。'),
+          confirmLabel: '放弃建议',
+        ),
+      ) ??
+      false;
+}
+
 class _ConfirmationSheet extends StatelessWidget {
   const _ConfirmationSheet({
     required this.icon,

@@ -53,11 +53,7 @@ Future<String?> importVaultBackup({
   if (!confirmed) return null;
   final result = await rust_api.applyImport(token: preview.token);
   await _clearBiometricCredential(ref);
-  await ref.read(vaultControllerProvider.notifier).refreshStatus();
-  ref.invalidate(entryPageProvider);
-  ref.invalidate(taxonomyProvider);
-  ref.invalidate(recoverySnapshotsProvider);
-  return result.message;
+  return _finishVaultMutation(ref, result.message);
 }
 
 Future<String?> restoreRecoverySnapshot({
@@ -81,11 +77,20 @@ Future<String?> restoreRecoverySnapshot({
   if (!confirmed) return null;
   final result = await rust_api.applyImport(token: preview.token);
   await _clearBiometricCredential(ref);
-  await ref.read(vaultControllerProvider.notifier).refreshStatus();
+  return _finishVaultMutation(ref, result.message);
+}
+
+Future<String> _finishVaultMutation(WidgetRef ref, String message) async {
+  var refreshed = true;
+  try {
+    await ref.read(vaultControllerProvider.notifier).refreshStatus();
+  } catch (_) {
+    refreshed = false;
+  }
   ref.invalidate(entryPageProvider);
   ref.invalidate(taxonomyProvider);
   ref.invalidate(recoverySnapshotsProvider);
-  return result.message;
+  return refreshed ? message : '$message，但界面刷新不完整，请稍后重试。';
 }
 
 Future<void> _clearBiometricCredential(WidgetRef ref) async {

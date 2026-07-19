@@ -362,6 +362,9 @@ Future<AiStatus> saveAiSettings({
 Future<AiStatus> clearAiSettings() =>
     RustLib.instance.api.crateApiMobileClearAiSettings();
 
+Future<void> cancelAiPending() =>
+    RustLib.instance.api.crateApiMobileCancelAiPending();
+
 Future<AiRequestPlan> prepareAiRequest({
   required String kind,
   required String input,

@@ -809,6 +809,16 @@ pub fn clear_ai_settings() -> Result<AiStatus, MobileError> {
     })
 }
 
+pub fn cancel_ai_pending() -> Result<(), MobileError> {
+    with_runtime(|runtime| {
+        let _ = runtime.session()?;
+        runtime.pending_ai_request = None;
+        runtime.pending_ai_assistant = None;
+        runtime.pending_ai_preview = None;
+        Ok(())
+    })
+}
+
 pub fn prepare_ai_request(
     kind: String,
     input: String,

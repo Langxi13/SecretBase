@@ -47,6 +47,9 @@ class _AiManagerScreenState extends ConsumerState<AiManagerScreen> {
   bool _loading = true;
   bool _working = false;
   String? _error;
+  AiTransportOperation? _transportOperation;
+  int? _activityToken;
+  int _requestGeneration = 0;
 
   @override
   void initState() {
@@ -56,6 +59,15 @@ class _AiManagerScreenState extends ConsumerState<AiManagerScreen> {
 
   @override
   void dispose() {
+    _requestGeneration += 1;
+    _transportOperation?.cancel();
+    _transportOperation = null;
+    if (_working) unawaited(rust_api.cancelAiPending().catchError((_) {}));
+    final activityToken = _activityToken;
+    if (activityToken != null) {
+      ref.read(aiActivityControllerProvider.notifier).finish(activityToken);
+      _activityToken = null;
+    }
     _messageController.dispose();
     _scrollController.dispose();
     super.dispose();
@@ -90,6 +102,15 @@ class _AiManagerScreenState extends ConsumerState<AiManagerScreen> {
     }
   }
 
+  Future<void> _retryInitial() async {
+    if (_loading || _working) return;
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    await _loadInitial();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Column(
@@ -97,13 +118,19 @@ class _AiManagerScreenState extends ConsumerState<AiManagerScreen> {
       children: [
         AiManagerHeader(
           status: _status,
-          onNewConversation: _working ? null : _newConversation,
-          onHistory: _working ? null : _openHistory,
-          onTools: _preview != null ? null : _openProfessionalTools,
-          onSettings: _openSettings,
+          onNewConversation: _working || _preview != null
+              ? null
+              : _newConversation,
+          onHistory: _working || _preview != null ? null : _openHistory,
+          onTools: _working || _preview != null ? null : _openProfessionalTools,
+          onSettings: _working || _preview != null ? null : _openSettings,
         ),
         if (_loading)
           const Expanded(child: LoadingView(label: '正在读取 AI 管家'))
+        else if (_error != null && _status == null)
+          Expanded(
+            child: ErrorView(message: _error!, onRetry: _retryInitial),
+          )
         else if (_status?.configured != true)
           Expanded(
             child: EmptyView(
@@ -131,11 +158,13 @@ class _AiManagerScreenState extends ConsumerState<AiManagerScreen> {
                       mode: _mode,
                       selectedEntryCount: _scopeEntries.length,
                       working: _working,
+                      reviewing: _preview != null,
                       onModeChanged: (value) => setState(() => _mode = value),
                       onScope: _openScope,
                       onPrompt: _usePrompt,
-                      onTools: _openProfessionalTools,
+                      onTools: _working ? () {} : _openProfessionalTools,
                       onSend: _send,
+                      onCancel: () => unawaited(_cancelRequest()),
                     ),
                   ],
                 ),
@@ -224,6 +253,7 @@ class _AiManagerScreenState extends ConsumerState<AiManagerScreen> {
               }
             }),
             onApply: _applyPreview,
+            onDiscard: _discardPreview,
           ),
         ),
     ];
@@ -243,13 +273,16 @@ class _AiManagerScreenState extends ConsumerState<AiManagerScreen> {
 
   Future<void> _send() async {
     final message = _messageController.text.trim();
-    if (message.isEmpty || _working) return;
+    if (message.isEmpty || _working || _preview != null) return;
     if (!await _ensurePrivacyConsent()) return;
     final activity = ref.read(aiActivityControllerProvider.notifier);
-    if (!activity.start()) {
+    final activityToken = activity.acquire();
+    if (activityToken == null) {
       setState(() => _error = '已有 AI 请求正在处理中，请稍后再试');
       return;
     }
+    final generation = ++_requestGeneration;
+    _activityToken = activityToken;
     setState(() {
       _working = true;
       _pendingUserMessage = message;
@@ -263,6 +296,7 @@ class _AiManagerScreenState extends ConsumerState<AiManagerScreen> {
       _expandedPlanItems.clear();
     });
     _scrollToBottom();
+    AiTransportOperation? operation;
     try {
       final plan = await rust_api.prepareAiAssistantRequest(
         conversationId: _conversationId,
@@ -270,8 +304,13 @@ class _AiManagerScreenState extends ConsumerState<AiManagerScreen> {
         mode: _mode,
         selectedEntryIds: _scopeEntries.keys.toList(),
       );
-      if (!mounted || !await _confirmSend(plan.summary)) {
-        if (mounted) {
+      if (!_isCurrentRequest(generation)) {
+        unawaited(rust_api.cancelAiPending().catchError((_) {}));
+        return;
+      }
+      if (!await _confirmSend(plan.summary)) {
+        unawaited(rust_api.cancelAiPending().catchError((_) {}));
+        if (_isCurrentRequest(generation)) {
           setState(() {
             _working = false;
             _pendingUserMessage = null;
@@ -279,29 +318,43 @@ class _AiManagerScreenState extends ConsumerState<AiManagerScreen> {
         }
         return;
       }
-      final response = await AiTransport.send(plan.request);
+      if (!_isCurrentRequest(generation)) return;
+      operation = AiTransport.start(plan.request);
+      _transportOperation = operation;
+      final response = await operation.future;
+      if (!_isCurrentRequest(generation)) return;
       final result = await rust_api.consumeAiAssistantResponse(
         token: plan.token,
         content: response,
       );
-      final conversation = await rust_api.getAiConversation(
-        id: result.conversationId,
-      );
-      if (!mounted) return;
+      AiConversation? conversation;
+      String? historyRefreshError;
+      try {
+        conversation = await rust_api.getAiConversation(
+          id: result.conversationId,
+        );
+      } catch (error) {
+        historyRefreshError = mobileErrorMessage(error);
+      }
+      if (!_isCurrentRequest(generation)) return;
       setState(() {
         _conversationId = result.conversationId;
-        _messages = conversation.messages;
+        if (conversation != null) _messages = conversation.messages;
         _working = false;
         _pendingUserMessage = null;
         _messageController.clear();
         _turnWarnings = result.warnings;
+        _error = historyRefreshError == null
+            ? null
+            : 'AI 已完成，但对话历史刷新失败，请稍后重新打开本页。';
         _navigationEntryId = result.navigationEntryId;
         _navigationEntryTitle = result.navigationEntryTitle;
         if (result.preview != null) _setPreview(result.preview!);
       });
       _scrollToBottom();
     } catch (error) {
-      if (!mounted) return;
+      unawaited(rust_api.cancelAiPending().catchError((_) {}));
+      if (!_isCurrentRequest(generation)) return;
       setState(() {
         _working = false;
         _pendingUserMessage = null;
@@ -309,8 +362,32 @@ class _AiManagerScreenState extends ConsumerState<AiManagerScreen> {
       });
       _scrollToBottom();
     } finally {
-      activity.finish();
+      if (identical(_transportOperation, operation)) _transportOperation = null;
+      if (_activityToken == activityToken) _activityToken = null;
+      activity.finish(activityToken);
     }
+  }
+
+  bool _isCurrentRequest(int generation) =>
+      mounted && _working && generation == _requestGeneration;
+
+  Future<void> _cancelRequest() async {
+    if (!_working) return;
+    _requestGeneration += 1;
+    _transportOperation?.cancel();
+    _transportOperation = null;
+    unawaited(rust_api.cancelAiPending().catchError((_) {}));
+    final activityToken = _activityToken;
+    if (activityToken != null) {
+      ref.read(aiActivityControllerProvider.notifier).finish(activityToken);
+      _activityToken = null;
+    }
+    if (!mounted) return;
+    setState(() {
+      _working = false;
+      _pendingUserMessage = null;
+      _error = 'AI 请求已取消';
+    });
   }
 
   Future<void> _applyPreview() async {
@@ -332,12 +409,21 @@ class _AiManagerScreenState extends ConsumerState<AiManagerScreen> {
         expectedRevision: ref.read(vaultControllerProvider).revision,
       );
       ref.read(aiUndoControllerProvider.notifier).record(result);
-      await ref.read(vaultControllerProvider.notifier).refreshStatus();
+      var refreshed = true;
+      try {
+        await ref.read(vaultControllerProvider.notifier).refreshStatus();
+      } catch (_) {
+        refreshed = false;
+      }
       ref.invalidate(entryPageProvider);
       ref.invalidate(taxonomyProvider);
       AiConversation? conversation;
       if (_conversationId != null) {
-        conversation = await rust_api.getAiConversation(id: _conversationId!);
+        try {
+          conversation = await rust_api.getAiConversation(id: _conversationId!);
+        } catch (_) {
+          refreshed = false;
+        }
       }
       if (!mounted) return;
       setState(() {
@@ -348,9 +434,13 @@ class _AiManagerScreenState extends ConsumerState<AiManagerScreen> {
         _revealedDetails.clear();
         _expandedPlanItems.clear();
       });
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(result.message)));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            refreshed ? result.message : '${result.message}，但界面刷新不完整，请稍后重试。',
+          ),
+        ),
+      );
     } catch (error) {
       if (!mounted) return;
       setState(() {
@@ -369,8 +459,13 @@ class _AiManagerScreenState extends ConsumerState<AiManagerScreen> {
     try {
       final message = await ref.read(aiUndoControllerProvider.notifier).undo();
       AiConversation? conversation;
+      var refreshed = true;
       if (_conversationId != null) {
-        conversation = await rust_api.getAiConversation(id: _conversationId!);
+        try {
+          conversation = await rust_api.getAiConversation(id: _conversationId!);
+        } catch (_) {
+          refreshed = false;
+        }
       }
       if (!mounted) return;
       setState(() {
@@ -381,9 +476,11 @@ class _AiManagerScreenState extends ConsumerState<AiManagerScreen> {
         _expandedPlanItems.clear();
         if (conversation != null) _messages = conversation.messages;
       });
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(message)));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(refreshed ? message : '$message，但对话历史刷新不完整，请稍后重试。'),
+        ),
+      );
       _scrollToBottom();
     } catch (error) {
       if (!mounted) return;
@@ -392,6 +489,25 @@ class _AiManagerScreenState extends ConsumerState<AiManagerScreen> {
         _error = _errorMessage(error);
       });
     }
+  }
+
+  Future<void> _discardPreview() async {
+    if (_preview == null || _working) return;
+    final confirmed = await showAiDiscardConfirmationSheet(context: context);
+    if (confirmed != true) return;
+    try {
+      await rust_api.cancelAiPending();
+    } catch (_) {
+      // 锁定流程可能已经清理运行时状态，仍允许用户关闭本地预览。
+    }
+    if (!mounted) return;
+    setState(() {
+      _preview = null;
+      _selectedPlanItems.clear();
+      _revealedDetails.clear();
+      _expandedPlanItems.clear();
+      _error = null;
+    });
   }
 
   void _setPreview(AiPreview preview) {
@@ -408,6 +524,7 @@ class _AiManagerScreenState extends ConsumerState<AiManagerScreen> {
   }
 
   Future<void> _newConversation() async {
+    if (_working || _preview != null) return;
     try {
       final conversation = await rust_api.createAiConversation(title: '新对话');
       if (!mounted) return;
@@ -430,7 +547,11 @@ class _AiManagerScreenState extends ConsumerState<AiManagerScreen> {
   }
 
   Future<void> _openHistory() async {
-    final id = await showAiHistoryDialog(context: context);
+    if (_working || _preview != null) return;
+    final id = await showAiHistoryDialog(
+      context: context,
+      currentConversationId: _conversationId,
+    );
     if (id == null) return;
     if (id.isEmpty) {
       if (!mounted) return;
@@ -472,6 +593,7 @@ class _AiManagerScreenState extends ConsumerState<AiManagerScreen> {
   }
 
   Future<void> _openScope() async {
+    if (_working || _preview != null) return;
     final selection = await showAiScopeDialog(
       context: context,
       selected: _scopeEntries,
@@ -491,6 +613,7 @@ class _AiManagerScreenState extends ConsumerState<AiManagerScreen> {
   }
 
   Future<void> _openSettings() async {
+    if (_working || _preview != null) return;
     final status = await showAiSettingsDialog(context: context, ref: ref);
     if (status != null && mounted) {
       setState(() {
@@ -501,6 +624,7 @@ class _AiManagerScreenState extends ConsumerState<AiManagerScreen> {
   }
 
   Future<void> _openProfessionalTools() async {
+    if (_working || _preview != null) return;
     await Navigator.of(context).push<void>(
       MaterialPageRoute(
         builder: (routeContext) => Scaffold(

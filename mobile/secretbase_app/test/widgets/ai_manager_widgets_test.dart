@@ -113,4 +113,36 @@ void main() {
     expect(undone, isTrue);
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets('AI 请求处理中提供明确的取消入口', (tester) async {
+    final controller = TextEditingController();
+    addTearDown(controller.dispose);
+    var cancelled = false;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppTheme.light(),
+        home: Scaffold(
+          body: AiManagerComposer(
+            controller: controller,
+            mode: 'assistant',
+            selectedEntryCount: 0,
+            working: true,
+            onModeChanged: (_) {},
+            onScope: () {},
+            onPrompt: (_) {},
+            onTools: () {},
+            onSend: () {},
+            onCancel: () => cancelled = true,
+          ),
+        ),
+      ),
+    );
+
+    expect(find.byTooltip('取消请求'), findsOneWidget);
+    expect(find.byTooltip('预览发送'), findsNothing);
+    await tester.tap(find.byTooltip('取消请求'));
+    expect(cancelled, isTrue);
+    expect(tester.takeException(), isNull);
+  });
 }

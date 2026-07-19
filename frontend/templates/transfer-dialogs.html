@@ -3,10 +3,11 @@
             <div class="modal-content">
                 <div class="modal-header">
                     <h2>导入发现冲突</h2>
-                    <button class="modal-close" @click="closeImportConflicts">✕</button>
+                    <button class="modal-close" @click="closeImportConflicts" :disabled="transferBusy">✕</button>
                 </div>
                 <div class="modal-body">
                     <p>发现 {{ importConflicts.length }} 个可能重复的条目。请选择处理方式后重新导入。</p>
+                    <p v-if="transferError" class="error-message" role="alert">{{ transferError }}</p>
                     <div class="conflict-list">
                         <div v-for="conflict in importConflicts.slice(0, 8)" :key="conflict.id || conflict.import_title" class="conflict-item">
                             <span>现有：{{ conflict.existing_title || '未知条目' }}</span>
@@ -16,9 +17,9 @@
                     <p v-if="importConflicts.length > 8" class="warning-message">还有 {{ importConflicts.length - 8 }} 个冲突未显示。</p>
                 </div>
                 <div class="modal-footer">
-                    <button class="btn-secondary" @click="retryImportPlain('skip')">跳过已有条目</button>
-                    <button class="btn-secondary" @click="retryImportPlain('overwrite')">覆盖已有条目</button>
-                    <button class="btn-danger" @click="closeImportConflicts">取消</button>
+                    <button class="btn-secondary" @click="retryImportPlain('skip')" :disabled="transferBusy">{{ transferBusy ? '处理中...' : '跳过已有条目' }}</button>
+                    <button class="btn-secondary" @click="retryImportPlain('overwrite')" :disabled="transferBusy">{{ transferBusy ? '处理中...' : '覆盖已有条目' }}</button>
+                    <button class="btn-danger" @click="closeImportConflicts" :disabled="transferBusy">取消</button>
                 </div>
             </div>
         </div>
@@ -28,24 +29,25 @@
             <div class="modal-content">
                 <div class="modal-header">
                     <h2>导入预览</h2>
-                    <button class="modal-close" @click="closeImportPreview">✕</button>
+                    <button class="modal-close" @click="closeImportPreview" :disabled="transferBusy">✕</button>
                 </div>
                 <div class="modal-body" v-if="importPreview">
                     <p>总条目：{{ importPreview.total_count }}，新增：{{ importPreview.new_count }}，冲突：{{ importPreview.conflict_count }}，已选择：{{ selectedImportPreviewCount }}，已选冲突：{{ selectedImportConflictCount }}</p>
+                    <p v-if="transferError" class="error-message" role="alert">{{ transferError }}</p>
                     <div class="setting-actions">
-                        <button class="btn-small" @click="selectAllImportPreviewEntries">全选</button>
-                        <button class="btn-small" @click="clearImportPreviewSelection">清空选择</button>
+                        <button class="btn-small" @click="selectAllImportPreviewEntries" :disabled="transferBusy">全选</button>
+                        <button class="btn-small" @click="clearImportPreviewSelection" :disabled="transferBusy">清空选择</button>
                     </div>
                     <div v-if="importPreview.entries && importPreview.entries.length > 0" class="import-preview-list">
                         <div v-for="entry in importPreview.entries" :key="entry.id" class="import-preview-item" :class="{ conflict: entry.is_conflict }">
-                            <input type="checkbox" :checked="isImportPreviewSelected(entry.id)" @change="toggleImportPreviewSelection(entry.id)">
+                            <input type="checkbox" :checked="isImportPreviewSelected(entry.id)" @change="toggleImportPreviewSelection(entry.id)" :disabled="transferBusy">
                             <span>
                                 <strong>{{ entry.title }}</strong>
                                 <small>{{ entry.is_conflict ? '冲突' : '新增' }} · 字段 {{ entry.field_count }} · 标签 {{ entry.tag_count }}</small>
                             </span>
                             <label v-if="entry.is_conflict" class="conflict-resolution-select">
                                 冲突处理
-                                <select :value="importConflictResolutions[entry.id] || 'skip'" @change="setImportConflictResolution(entry.id, $event.target.value)">
+                                    <select :value="importConflictResolutions[entry.id] || 'skip'" @change="setImportConflictResolution(entry.id, $event.target.value)" :disabled="transferBusy">
                                     <option value="skip">跳过</option>
                                     <option value="overwrite">覆盖</option>
                                     <option value="ask">停止</option>
@@ -61,8 +63,8 @@
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <button class="btn-secondary" @click="confirmImportPlain" :disabled="selectedImportPreviewCount === 0">导入已选择 {{ selectedImportPreviewCount }} 条</button>
-                    <button class="btn-danger" @click="closeImportPreview">取消</button>
+                    <button class="btn-secondary" @click="confirmImportPlain" :disabled="transferBusy || selectedImportPreviewCount === 0">{{ transferBusy ? '导入中...' : '导入已选择 ' + selectedImportPreviewCount + ' 条' }}</button>
+                    <button class="btn-danger" @click="closeImportPreview" :disabled="transferBusy">取消</button>
                 </div>
             </div>
         </div>
@@ -83,7 +85,8 @@
                         <div><strong>{{ importReport.skippedCount }}</strong><span>跳过条目</span></div>
                         <div><strong>{{ importReport.conflictCount }}</strong><span>冲突条目</span></div>
                     </div>
-                    <p class="info-message">列表已刷新。若本次覆盖了条目，可通过自动备份恢复导入前状态。</p>
+                    <p v-if="importReport.refreshIncomplete" class="warning-panel">导入已完成，但当前列表刷新不完整，请关闭后重新加载。若本次覆盖了条目，可通过自动备份恢复导入前状态。</p>
+                    <p v-else class="info-message">列表已刷新。若本次覆盖了条目，可通过自动备份恢复导入前状态。</p>
                 </div>
                 <div class="modal-footer">
                     <button class="btn-primary inline" @click="showImportReport = false">完成</button>
@@ -96,7 +99,7 @@
             <div class="modal-content tools-modal">
                 <div class="modal-header">
                     <h2>🧰 管理工具</h2>
-                    <button class="modal-close" @click="showTools = false">✕</button>
+                    <button class="modal-close" @click="closeToolsModal">✕</button>
                 </div>
                 <div class="modal-body">
                     <div class="settings-section">
@@ -155,6 +158,7 @@
                     <div class="confirm-icon">⚠️</div>
                     <h3>{{ confirmTitle }}</h3>
                     <p>{{ confirmMessage }}</p>
+                    <p v-if="confirmError" class="error-message confirm-error">{{ confirmError }}</p>
                     <div class="confirm-actions">
                         <button class="btn-secondary" @click="cancelConfirmAction" :disabled="confirmSubmitting">取消</button>
                         <button class="btn-danger" @click="confirmAction" :disabled="confirmSubmitting">
@@ -165,5 +169,42 @@
             </div>
         </div>
 
-        <!-- Toast 提示 -->
-        <div id="toast-container"></div>
+        <!-- 应用内输入弹窗，避免桌面壳和浏览器出现两套交互 -->
+        <div v-if="showPrompt" class="modal-overlay" @click.self="cancelPrompt">
+            <div class="modal-content prompt-modal" role="dialog" aria-modal="true" aria-labelledby="prompt-dialog-title">
+                <div class="modal-header">
+                    <h2 id="prompt-dialog-title">{{ promptTitle }}</h2>
+                    <button class="modal-close" type="button" title="取消" @click="cancelPrompt" :disabled="promptSubmitting">✕</button>
+                </div>
+                <form @submit.prevent="submitPrompt">
+                    <div class="modal-body">
+                        <p v-if="promptMessage" class="prompt-message">{{ promptMessage }}</p>
+                        <div class="prompt-input-wrap">
+                            <input
+                                v-model="promptValue"
+                                :type="promptType === 'password' && promptObscured ? 'password' : 'text'"
+                                :placeholder="promptPlaceholder"
+                                :maxlength="promptMaxLength"
+                                autocomplete="off"
+                                autofocus
+                            >
+                            <button
+                                v-if="promptType === 'password'"
+                                type="button"
+                                class="btn-icon prompt-visibility"
+                                :title="promptObscured ? '显示内容' : '隐藏内容'"
+                                @click="togglePromptVisibility"
+                                :disabled="promptSubmitting"
+                            >{{ promptObscured ? '◉' : '○' }}</button>
+                        </div>
+                        <p v-if="promptError" class="error-message">{{ promptError }}</p>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn-secondary" @click="cancelPrompt" :disabled="promptSubmitting">取消</button>
+                        <button type="submit" class="btn-primary inline" :disabled="promptSubmitting">
+                            {{ promptSubmitting ? '处理中...' : promptConfirmLabel }}
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>

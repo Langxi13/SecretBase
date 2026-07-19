@@ -83,6 +83,20 @@ context.scrollTo = () => {};
     let deletedName = '';
     let loadGroupsCount = 0;
     let groupLoadEntriesCount = 0;
+    let pickerAttempts = 0;
+    const pickerApi = {
+        async get(url) {
+            if (!url.startsWith('/entries?')) throw new Error(`unexpected picker URL ${url}`);
+            pickerAttempts += 1;
+            if (pickerAttempts === 1) throw new Error('条目列表暂时不可用');
+            return {
+                data: {
+                    items: [{ id: 'entry-picker-1', title: '可加入条目', tags: [], groups: [] }],
+                    pagination: { total_pages: 1 }
+                }
+            };
+        }
+    };
     const store = {
         state: { filters: { sortBy: 'updated_at', sortOrder: 'desc' } },
         clearFilters: () => {},
@@ -92,8 +106,19 @@ context.scrollTo = () => {};
             return { affected_count: 3 };
         }
     };
+    const pickerState = {
+        showGroupEntryPicker: ref(false),
+        groupPickerEntries: ref([]),
+        groupPickerSelectedIds: ref([]),
+        groupPickerTagFilter: ref(''),
+        groupPickerGroupFilter: ref(''),
+        groupPickerPage: ref(1),
+        groupPickerLoading: ref(false),
+        groupPickerError: ref(''),
+        groupPickerSaving: ref(false)
+    };
     const groupActions = context.SecretBaseGroupController.createGroupController({
-        api: {},
+        api: pickerApi,
         store,
         showToast: () => {},
         showConfirmDialog: (title, message, callback) => {
@@ -122,14 +147,7 @@ context.scrollTo = () => {};
         entryForm: { groups: [] },
         resetEntryForm: () => {},
         showCreateModal: ref(false),
-        showGroupEntryPicker: ref(false),
-        groupPickerEntries: ref([]),
-        groupPickerSelectedIds: ref([]),
-        groupPickerTagFilter: ref(''),
-        groupPickerGroupFilter: ref(''),
-        groupPickerPage: ref(1),
-        groupPickerLoading: ref(false),
-        groupPickerSaving: ref(false),
+        ...pickerState,
         groupPickerTotalPages: ref(1),
         paginatedGroupPickerEntries: ref([]),
         allGroupPickerEntriesSelected: ref(false)
@@ -154,6 +172,19 @@ context.scrollTo = () => {};
     assert(deletedName === '个人', '密码组卡片删除必须提交目标名称');
     assert(loadGroupsCount === 2, '密码组卡片删除后必须立即刷新密码组列表');
     assert(groupLoadEntriesCount === 1, '密码组卡片删除后必须同步刷新条目归属关系');
+
+    selectedGroup.value = '工作';
+    groupFilter.value = 'group';
+    await groupActions.openGroupEntryPicker();
+    assert(pickerAttempts === 1, '选择已有条目首次打开必须发起加载请求');
+    assert(pickerState.showGroupEntryPicker.value, '加载失败时选择条目弹窗必须保持打开');
+    assert(!pickerState.groupPickerLoading.value, '加载失败后必须恢复可交互状态');
+    assert(pickerState.groupPickerError.value.includes('条目列表暂时不可用'), '加载失败必须保留原地错误信息');
+    assert(groupFilter.value === 'group', '选择条目失败不得改变当前密码组筛选');
+    await groupActions.retryGroupEntryPicker();
+    assert(pickerAttempts === 2, '选择条目失败后点击重试必须重新请求');
+    assert(pickerState.groupPickerError.value === '', '重试开始成功后必须清理旧错误');
+    assert(pickerState.groupPickerEntries.value.length === 1, '重试成功后必须填充可选条目');
 
     console.log('PASS frontend group navigation runtime');
 })().catch(error => {

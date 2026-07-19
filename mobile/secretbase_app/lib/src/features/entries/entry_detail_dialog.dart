@@ -339,10 +339,19 @@ class _EntryDetailDialogState extends State<EntryDetailDialog> {
     setState(() => _mutating = true);
     try {
       final result = await operation();
-      await widget.ref.read(vaultControllerProvider.notifier).refreshStatus();
+      var refreshed = true;
+      try {
+        await widget.ref.read(vaultControllerProvider.notifier).refreshStatus();
+      } catch (_) {
+        refreshed = false;
+      }
       widget.ref.invalidate(entryPageProvider);
       widget.ref.invalidate(taxonomyProvider);
-      if (mounted) Navigator.of(context).pop(result.message);
+      if (mounted) {
+        Navigator.of(
+          context,
+        ).pop(refreshed ? result.message : '${result.message}，但界面刷新不完整，请稍后重试。');
+      }
     } catch (error) {
       if (!mounted) return;
       setState(() => _mutating = false);
