@@ -101,7 +101,9 @@
     flex: 1;
     flex-direction: column;
     gap: 5px;
+    overflow-y: auto;
     padding: 8px;
+    scrollbar-gutter: stable;
 }
 
 .ai-entry-target-list button {
@@ -330,6 +332,7 @@
     }
 
     .ai-entry-target-panel {
+        max-height: min(38dvh, 320px);
         border-right: 0;
         border-bottom: 1px solid var(--border-color);
     }
@@ -341,7 +344,7 @@
     .ai-entry-target-list {
         display: grid;
         grid-template-columns: repeat(2, minmax(0, 1fr));
-        flex: none;
+        flex: 1 1 auto;
         padding: 7px 9px;
     }
 

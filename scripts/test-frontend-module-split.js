@@ -45,7 +45,8 @@ function assertLessThan(actual, expected, message) {
     'css/ai-diagnostics.css',
     'css/component-responsive.css',
     'css/visual-polish.css',
-    'css/component-polish.css'
+    'css/component-polish.css',
+    'css/modal-layout.css'
 ].forEach(asset => assertIncludes(indexHtml, `${asset}?v=${assetVersion}`, `入口页必须加载 ${asset}`));
 assertNotIncludes(indexHtml, 'css/style.css', '入口页不应继续加载巨型 style.css');
 assertNotIncludes(indexHtml, 'css/components.css', '入口页不应继续加载巨型 components.css');

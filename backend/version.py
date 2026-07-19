@@ -4,4 +4,4 @@ APP_VERSION = "5.3.2"
 
 # Web 静态资源独立修订号。网页资源由 Nginx 缓存数天，UI/交互修复不能
 # 依赖用户手动清空缓存；它不代表桌面或移动端发布版本变化。
-WEB_ASSET_VERSION = "5.3.2-web-20260719-1"
+WEB_ASSET_VERSION = "5.3.2-web-20260719-3"

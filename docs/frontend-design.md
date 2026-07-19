@@ -68,6 +68,7 @@ frontend/
 │   ├── component-responsive.css # 弹窗与管理组件的移动端规则
 │   ├── visual-polish.css   # 后段整体视觉覆盖层，必须在主题样式之后加载
 │   ├── component-polish.css # 后段组件覆盖层，必须在领域组件样式之后加载
+│   ├── modal-layout.css    # 最终弹窗高度、正文滚动和安全区约束，必须最后加载
 │   └── themes/
 │       ├── variables.css   # CSS 变量定义
 │       ├── dark.css        # 暗色主题
@@ -298,7 +299,8 @@ V2.4 以“高级暗色 + 克制工具层级”为主方向，优化 SecretBase 
 - 主工作台保持“桌面侧边栏 + 右侧卡片工作区”的结构，优化搜索筛选区、条目卡片、列表状态提示、分页和底部批量操作栏。
 - 模态框、设置、工具、AI 解析、备份中心、恢复向导、标签管理、回收站和导入流程统一 8px 圆角、边框、长文本换行、加载态和移动端按钮触达。
 - CSS 使用按职责拆分的基础、工作台、弹窗、表单、AI、管理和响应式文件，以及 `themes/*.css`，不引入 npm 构建链或外部图标库。
-- 后段增强样式拆分到 `visual-polish.css` 与 `component-polish.css`，入口顺序必须保持为基础样式、主题样式、视觉覆盖、组件覆盖，避免覆盖关系失效。
+- 后段增强样式拆分到 `visual-polish.css`、`component-polish.css` 与 `modal-layout.css`，入口顺序必须保持为基础样式、主题样式、视觉覆盖、组件覆盖、弹窗布局约束，避免覆盖关系失效。
+- 所有标准弹窗统一采用“头部固定、正文独立滚动、底部固定”的纵向 flex 契约；直接承载表单的弹窗必须让 `<form>` 参与剩余高度分配。标签、AI 范围和建议条目等内部长列表需要独立滚动，移动端底部操作区必须保留系统安全区。
 - `pagination.js` 必须在 `app.js` 之前加载，提供 `window.SecretBasePagination`。所有前端分页条数偏好统一通过 `normalizeUniversalPageSize`、`loadPageSizePreference` 和 `savePageSizePreference` 处理。
 - `auto-lock.js`、`theme-controller.js`、`filter-controller.js`、`tag-view.js`、`group-view.js`、`backup-view.js`、`ai-view.js` 和 `view-helpers.js` 只承载展示层、computed 工厂或本地控制逻辑，不直接改后端接口语义；`controllers/` 按领域封装用户操作，通过显式注入调用既有 API/store 边界。
 - `toast.js` 必须在 `store.js` 和 `app.js` 之前加载，Toast 消息必须使用 `textContent` 写入，不得用 `innerHTML` 拼接用户或错误内容。

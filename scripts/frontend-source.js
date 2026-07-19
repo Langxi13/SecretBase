@@ -39,7 +39,8 @@ const cssPaths = [
     'frontend/css/themes/dark.css',
     'frontend/css/themes/light.css',
     'frontend/css/visual-polish.css',
-    'frontend/css/component-polish.css'
+    'frontend/css/component-polish.css',
+    'frontend/css/modal-layout.css'
 ];
 
 function readProjectFile(file) {
